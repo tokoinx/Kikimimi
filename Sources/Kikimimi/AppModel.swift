@@ -394,6 +394,7 @@ final class AppModel {
         } catch let error as WhisperError where error == .cancelled {
             job.status = .cancelled
             job.message = "中止しました"
+            cleanPartialTranscript(of: job)
         } catch {
             if job.cancelFlag.isSet {
                 job.status = .cancelled
@@ -403,7 +404,16 @@ final class AppModel {
                 job.error = error.localizedDescription
                 job.message = "エラー"
             }
+            cleanPartialTranscript(of: job)
         }
+    }
+
+    /// 中止・失敗したジョブの途中結果にも、完了時と同じ繰り返しの後始末をかける (画面に残り、コピーもできるため)。
+    /// 状態を .running 以外にしてから呼ぶので、このあと遅れて届く区間は追加されない。
+    private func cleanPartialTranscript(of job: Job) {
+        guard filterHallucinations, var transcript = job.transcript, !transcript.segments.isEmpty else { return }
+        transcript.segments = RepetitionFilter.clean(transcript.segments)
+        job.transcript = transcript
     }
 
     // MARK: 録音

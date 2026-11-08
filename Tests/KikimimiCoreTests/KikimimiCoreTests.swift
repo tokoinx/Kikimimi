@@ -173,28 +173,58 @@ final class RepetitionFilterTests: XCTestCase {
     }
 
     func testCollapsesRepeatsInsideOneSegment() {
-        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("音楽の音楽の音楽の音楽の音楽の音楽の"), "音楽の")
-        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("そういめは、チャイニーズレて、チャイニーズレて、チャイニーズレて、チャイニーズレて、終わり"),
+        let r = { (unit: String, n: Int) in String(repeating: unit, count: n) }
+        // 6 回以上続くまとまりは 1 回に
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats(r("音楽の", 57)), "音楽の")
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("そういめは、" + r("チャイニーズレて、", 25) + "終わり"),
                        "そういめは、チャイニーズレて、終わり")
-        // 2 文字の繰り返し (どんどんどんどん) や 3 回までの繰り返しはそのまま
-        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("どんどんどんどん強める"), "どんどんどんどん強める")
-        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("20世紀の20世紀の20世紀の世界"), "20世紀の20世紀の20世紀の世界")
-        // 数字や記号だけの繰り返しは縮めない (金額・数値が変わってしまうため)
-        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("予算は1,000,000,000,000円です"), "予算は1,000,000,000,000円です")
-        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("番号は100000000000000です"), "番号は100000000000000です")
-        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("......... と ーーーーーーーーーーーー"), "......... と ーーー")
-        // 数字の繰り返しの後ろにある、文字の繰り返しはまとめる
-        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("0,000,000,000,000 dollars dollars dollars dollars "), "0,000,000,000,000 dollars ")
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats(r("ブー", 40)), "ブーブー")
+        // 5 回までの強調や、2 文字の繰り返し (どんどん) はそのまま
+        for text in ["No, no, no, no, no.", "Go! Go! Go! Go! Go!", "どんどんどんどん強める", "20世紀の20世紀の20世紀の世界",
+                     "please help help help", r("ありがとうございます、", 5)] {
+            XCTAssertEqual(RepetitionFilter.collapseInlineRepeats(text), text)
+        }
         // 中身が全部繰り返しだった区間は 1 回分になり、空にはならない
-        XCTAssertEqual(RepetitionFilter.clean(segs(["塗装を塗装を塗装を塗装を塗装を"])).map(\.text), ["塗装を"])
+        XCTAssertEqual(RepetitionFilter.clean(segs([r("塗装を", 23)])).map(\.text), ["塗装を"])
+    }
+
+    func testNumbersAreNotShortened() {
+        let r = { (unit: String, n: Int) in String(repeating: unit, count: n) }
+        // 金額・番号・数を表す言葉は、10 回以上続かない限り縮めない
+        for text in ["予算は1,000,000,000,000円です", "番号は100000000000000です", "one" + r(" zero", 9),
+                     "ゼロゼロゼロゼロゼロゼロゼロゼロ", r("一二三", 9), "......... と ーーーーーーーーーーーー"] {
+            XCTAssertEqual(RepetitionFilter.collapseInlineRepeats(text), text, text)
+        }
+        // 「1、2、1、2…」を何十回も続けるような数字のでたらめはまとめる
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats(r("1、2、", 50)), "1、2、")
+        // 数字の後ろの、文字の繰り返しはまとめる
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("1,000,000,000,000 " + r("dollars ", 6)), "1,000,000,000,000 dollars ")
+        XCTAssertTrue(RepetitionFilter.isNumberLike("one zero "))
+        XCTAssertFalse(RepetitionFilter.isNumberLike("1000円"))
+    }
+
+    func testSameWordsMinutesApartAreKept() {
+        // 数分おきに同じことを言う場面は消さない
+        let spaced = [600.0, 780, 905, 1100].map { TranscriptSegment(start: $0, end: $0 + 2, text: "次の方、どうぞ。") }
+        XCTAssertEqual(RepetitionFilter.clean(spaced).count, 4)
+        // 間を空けずに続くものは暴走としてまとめる
+        let packed = (0..<6).map { TranscriptSegment(start: Double($0) * 2, end: Double($0) * 2 + 2, text: "次の方、どうぞ。") }
+        XCTAssertEqual(RepetitionFilter.clean(packed).count, 1)
+        // 途中で長い間が空いたら、そこから先は別の発言として扱う
+        let mixed = packed + spaced
+        XCTAssertEqual(RepetitionFilter.clean(mixed).count, 5)
     }
 
     func testStreamingShowsAtMostThreeInARow() {
         var stream = RepetitionFilter.Streaming()
-        let shown = (0..<10).map { _ in stream.accept("自分の意味になるか?") }
-        XCTAssertEqual(shown, [true, true, true, false, false, false, false, false, false, false])
-        XCTAssertTrue(stream.accept("若いですか?"))
-        XCTAssertTrue(stream.accept("自分の意味になるか?"))
+        let loop = (0..<10).map { TranscriptSegment(start: Double($0) * 2, end: Double($0) * 2 + 2, text: "自分の意味になるか?") }
+        XCTAssertEqual(loop.map { stream.accept($0) }, [true, true, true, false, false, false, false, false, false, false])
+        XCTAssertTrue(stream.accept(TranscriptSegment(start: 20, end: 22, text: "若いですか?")))
+        XCTAssertTrue(stream.accept(TranscriptSegment(start: 22, end: 24, text: "自分の意味になるか?")))
+        // 数分おきの同じ言葉は、途中表示でも出す
+        var spaced = RepetitionFilter.Streaming()
+        let shown = [600.0, 780, 905, 1100].map { spaced.accept(TranscriptSegment(start: $0, end: $0 + 2, text: "次の方、どうぞ。")) }
+        XCTAssertEqual(shown, [true, true, true, true])
     }
 
     func testTimestampsOfKeptSegmentsAreUnchanged() {

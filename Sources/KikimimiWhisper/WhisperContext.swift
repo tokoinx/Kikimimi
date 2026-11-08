@@ -129,9 +129,14 @@ public final class WhisperContext: @unchecked Sendable {
         // 引き継ぐと、1 度の誤認識が後ろの区間すべてに連鎖する (講演の録音で 1,000 行を超える繰り返しが出た)。
         params.no_context = true
         params.n_max_text_ctx = 0
-        // 直近 32 トークンの「ばらつき」がこれより小さいと、繰り返しとみなして温度を上げて言い直す。
-        // 時刻トークンも数に入るため、短い文の繰り返しは既定の 2.4 を少し上回ってすり抜ける。
-        params.entropy_thold = 2.8
+        // 言い直し (温度を上げた再デコード) は、ビームサーチでも 5 候補から選ぶ (whisper-cli と同じ)。
+        // whisper_full_default_params(BEAM_SEARCH) は greedy.best_of を -1 のままにするため、
+        // そのままだと言い直しが 1 候補だけの抽選になり、音楽や雑音の部分ででたらめな文が出やすい。
+        // 繰り返しとみなす基準 (entropy_thold) は既定の 2.4 のまま。上げると普通の発話でも言い直しが増え、
+        // 遅くなるうえに、まとめやすい「同じ文の繰り返し」が、まとめにくい「毎回違うでたらめな文」に変わる。
+        if options.useBeamSearch {
+            params.greedy.best_of = 5
+        }
         params.single_segment = options.singleSegment
         params.no_timestamps = options.noTimestamps
         params.print_special = false
@@ -186,7 +191,7 @@ public final class WhisperContext: @unchecked Sendable {
             guard first < total else { return }
             for i in first..<total {
                 if let seg = WhisperContext.segmentFromState(state, i, filter: box.filter) {
-                    if box.filter, !box.stream.accept(seg.text) { continue }
+                    if box.filter, !box.stream.accept(seg) { continue }
                     box.onSegment(seg)
                 }
             }
