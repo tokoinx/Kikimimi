@@ -134,3 +134,71 @@ final class WAVTests: XCTestCase {
         XCTAssertTrue(f.isSet)
     }
 }
+
+final class RepetitionFilterTests: XCTestCase {
+    private func segs(_ texts: [String]) -> [TranscriptSegment] {
+        texts.enumerated().map { TranscriptSegment(start: Double($0.offset) * 2, end: Double($0.offset) * 2 + 2, text: $0.element) }
+    }
+
+    func testCollapsesRunawayRunsLikeTheLectureRecording() {
+        // 講演の録音で実際に起きた形: 同じ文が数百回つづき、句読点だけ違う文に移ってまた続く
+        var texts: [String] = ["はい、どういう意味になるのか?"]
+        texts += Array(repeating: "どういう意味になるのか?", count: 45)
+        texts += Array(repeating: "自分の意味になるのか?", count: 70)
+        texts += Array(repeating: "自分の意味になるか?", count: 121)
+        texts += ["全ての意味になるか?"]
+        texts += Array(repeating: "自分の意味になるか?", count: 486)
+        texts += ["若いですか?", "年取ってますか?"]
+        let out = RepetitionFilter.clean(segs(texts)).map(\.text)
+        XCTAssertEqual(out, ["はい、どういう意味になるのか?", "どういう意味になるのか?", "自分の意味になるのか?",
+                             "自分の意味になるか?", "全ての意味になるか?", "自分の意味になるか?",
+                             "若いですか?", "年取ってますか?"])
+    }
+
+    func testKeepsGenuineRepetition() {
+        // 実際に 3 回言った言葉や、句読点違いの短い相づちは残す
+        let texts = ["please help help help", "help each other", "help each other", "help each other", "はい", "はい。", "次へ"]
+        XCTAssertEqual(RepetitionFilter.clean(segs(texts)).map(\.text), texts)
+    }
+
+    func testCollapsesAlternatingLoops() {
+        var texts: [String] = ["how does this fit"]
+        for _ in 0..<6 { texts += ["what is the view", "of you"] }
+        texts += ["それの過去の教育で"]
+        XCTAssertEqual(RepetitionFilter.clean(segs(texts)).map(\.text),
+                       ["how does this fit", "what is the view", "of you", "それの過去の教育で"])
+        // 2 周までは残す
+        let two = ["A です", "B です", "A です", "B です", "C です"]
+        XCTAssertEqual(RepetitionFilter.clean(segs(two)).map(\.text), two)
+    }
+
+    func testCollapsesRepeatsInsideOneSegment() {
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("音楽の音楽の音楽の音楽の音楽の音楽の"), "音楽の")
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("そういめは、チャイニーズレて、チャイニーズレて、チャイニーズレて、チャイニーズレて、終わり"),
+                       "そういめは、チャイニーズレて、終わり")
+        // 2 文字の繰り返し (どんどんどんどん) や 3 回までの繰り返しはそのまま
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("どんどんどんどん強める"), "どんどんどんどん強める")
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("20世紀の20世紀の20世紀の世界"), "20世紀の20世紀の20世紀の世界")
+        // 中身が全部繰り返しだった区間は 1 回分になり、空にはならない
+        XCTAssertEqual(RepetitionFilter.clean(segs(["塗装を塗装を塗装を塗装を塗装を"])).map(\.text), ["塗装を"])
+    }
+
+    func testStreamingShowsAtMostThreeInARow() {
+        var stream = RepetitionFilter.Streaming()
+        let shown = (0..<10).map { _ in stream.accept("自分の意味になるか?") }
+        XCTAssertEqual(shown, [true, true, true, false, false, false, false, false, false, false])
+        XCTAssertTrue(stream.accept("若いですか?"))
+        XCTAssertTrue(stream.accept("自分の意味になるか?"))
+    }
+
+    func testTimestampsOfKeptSegmentsAreUnchanged() {
+        var texts: [String] = ["A"]
+        texts += Array(repeating: "B", count: 5)
+        texts += ["C"]
+        let input = segs(texts)
+        let out = RepetitionFilter.clean(input)
+        XCTAssertEqual(out.map(\.text), ["A", "B", "C"])
+        XCTAssertEqual(out[1].start, input[1].start)
+        XCTAssertEqual(out[2].start, input[6].start)
+    }
+}

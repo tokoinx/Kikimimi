@@ -122,7 +122,16 @@ public final class WhisperContext: @unchecked Sendable {
         var params = whisper_full_default_params(options.useBeamSearch ? WHISPER_SAMPLING_BEAM_SEARCH : WHISPER_SAMPLING_GREEDY)
         params.n_threads = Int32(max(1, options.threads))
         params.translate = false
+        // 前の 30 秒区間で認識した文章を、次の区間の手がかりとして渡さない
+        // (OpenAI 版の condition_on_previous_text=False に相当)。
+        // whisper.cpp の no_context は「前回の whisper_full 呼び出し」の文脈を捨てるだけで、
+        // 1 回の呼び出しの中での区間どうしの引き継ぎは n_max_text_ctx で決まる (既定 16384 = 引き継ぐ)。
+        // 引き継ぐと、1 度の誤認識が後ろの区間すべてに連鎖する (講演の録音で 1,000 行を超える繰り返しが出た)。
         params.no_context = true
+        params.n_max_text_ctx = 0
+        // 直近 32 トークンの「ばらつき」がこれより小さいと、繰り返しとみなして温度を上げて言い直す。
+        // 時刻トークンも数に入るため、短い文の繰り返しは既定の 2.4 を少し上回ってすり抜ける。
+        params.entropy_thold = 2.8
         params.single_segment = options.singleSegment
         params.no_timestamps = options.noTimestamps
         params.print_special = false
@@ -138,10 +147,18 @@ public final class WhisperContext: @unchecked Sendable {
         params.language = UnsafePointer(language)
         params.detect_language = false
 
+        // 語彙のヒントは、前の区間の文章を混ぜずに毎区間へ付ける:
+        // carry_initial_prompt でヒントを固定の前置きにし、n_max_text_ctx を「ヒント + 1」に絞って
+        // 前の区間の文章が入る余地をなくす (whisper.cpp v1.9.2 の whisper_full_with_state の組み立て方による)。
         var prompt: UnsafeMutablePointer<CChar>? = nil
         if let p = options.initialPrompt?.trimmingCharacters(in: .whitespacesAndNewlines), !p.isEmpty {
-            prompt = strdup(p)
-            params.initial_prompt = UnsafePointer(prompt)
+            let hintTokens = tokenCount(p)
+            if hintTokens > 0 {
+                prompt = strdup(p)
+                params.initial_prompt = UnsafePointer(prompt)
+                params.carry_initial_prompt = true
+                params.n_max_text_ctx = Int32(hintTokens + 1)
+            }
         }
         defer { free(prompt) }
 
@@ -169,6 +186,7 @@ public final class WhisperContext: @unchecked Sendable {
             guard first < total else { return }
             for i in first..<total {
                 if let seg = WhisperContext.segmentFromState(state, i, filter: box.filter) {
+                    if box.filter, !box.stream.accept(seg.text) { continue }
                     box.onSegment(seg)
                 }
             }
@@ -204,6 +222,9 @@ public final class WhisperContext: @unchecked Sendable {
                 }
             }
         }
+        if options.filterHallucinations {
+            segments = RepetitionFilter.clean(segments)
+        }
 
         // whisper_full は「VAD で発話が見つからない」「100 ms 未満」のとき lang_id を更新せずに 0 を返す。
         // 前回の値を拾わないよう、指定された言語を優先し、自動判定は実際に認識できたときだけ読む。
@@ -224,9 +245,23 @@ public final class WhisperContext: @unchecked Sendable {
     /// whisper.cpp の時刻は 10 ミリ秒単位
     private static func seconds(_ t: Int64) -> TimeInterval { TimeInterval(t) / 100.0 }
 
+    /// テキストのトークン数 (語彙のヒント用)。whisper_tokenize は入れ物が足りないと必要数を負の値で返す。
+    private func tokenCount(_ text: String) -> Int {
+        var tokens = [whisper_token](repeating: 0, count: 512)
+        var n = whisper_tokenize(ctx, text, &tokens, Int32(tokens.count))
+        if n < 0 {
+            tokens = [whisper_token](repeating: 0, count: Int(-n))
+            n = whisper_tokenize(ctx, text, &tokens, Int32(tokens.count))
+        }
+        return max(0, Int(n))
+    }
+
     private func segmentFromContext(_ i: Int32, filter: Bool) -> TranscriptSegment? {
         guard let cText = whisper_full_get_segment_text(ctx, i) else { return nil }
-        let text = String(cString: cText).trimmingCharacters(in: .whitespacesAndNewlines)
+        var text = String(cString: cText).trimmingCharacters(in: .whitespacesAndNewlines)
+        if filter {
+            text = RepetitionFilter.collapseInlineRepeats(text)
+        }
         let noSpeech = whisper_full_get_segment_no_speech_prob(ctx, i)
         if text.isEmpty || (filter && HallucinationFilter.shouldDrop(text: text, noSpeechProbability: noSpeech)) {
             return nil
@@ -238,7 +273,10 @@ public final class WhisperContext: @unchecked Sendable {
 
     fileprivate static func segmentFromState(_ state: OpaquePointer, _ i: Int32, filter: Bool) -> TranscriptSegment? {
         guard let cText = whisper_full_get_segment_text_from_state(state, i) else { return nil }
-        let text = String(cString: cText).trimmingCharacters(in: .whitespacesAndNewlines)
+        var text = String(cString: cText).trimmingCharacters(in: .whitespacesAndNewlines)
+        if filter {
+            text = RepetitionFilter.collapseInlineRepeats(text)
+        }
         let noSpeech = whisper_full_get_segment_no_speech_prob_from_state(state, i)
         if text.isEmpty || (filter && HallucinationFilter.shouldDrop(text: text, noSpeechProbability: noSpeech)) {
             return nil
@@ -261,6 +299,8 @@ private final class CallbackBox {
     let onSegment: (TranscriptSegment) -> Void
     let shouldCancel: () -> Bool
     let filter: Bool
+    /// whisper の推論スレッドからだけ触る
+    var stream = RepetitionFilter.Streaming()
 
     init(onProgress: @escaping (Double) -> Void,
          onSegment: @escaping (TranscriptSegment) -> Void,

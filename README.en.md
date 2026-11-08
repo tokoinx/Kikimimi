@@ -67,7 +67,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 
 - **Prefer accuracy**: uses beam search. Turn it off for faster results.
 - **Skip silence (VAD)**: skips silent parts, which is faster and avoids hallucinations on silence (downloads a 0.9 MB VAD model automatically).
-- **Remove common hallucinations**: drops stock phrases Whisper tends to produce on silence or music, such as "ご視聴ありがとうございました" (Thanks for watching), but only when the segment is likely not speech.
+- **Remove common hallucinations and runaway repetition**: drops stock phrases Whisper tends to produce on silence or music, such as "ご視聴ありがとうございました" (Thanks for watching), but only when the segment is likely not speech. When the same line repeats 4 or more times in a row (or a group of 2–3 lines cycles 3 or more times), only the first occurrence is kept, and a phrase repeated 4 or more times within one line is collapsed to one.
 - **Vocabulary hint**: list proper nouns or jargon (for example: Roblox Studio) so they come out spelled that way.
 
 ## Troubleshooting
@@ -88,6 +88,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
   ```
 
 - **You connected AirPods or switched the input while recording**: recording continues on the new input. If it cannot, the audio captured so far is transcribed.
+- **The same sentence repeats over and over (a bug in 1.0.0)**: 1.0.0 passed the text recognized in each 30-second window to the next window as context, so a single misrecognition on music or noise propagated through every later window. Fixed in 1.0.1. Re-transcribe files processed with 1.0.0 to recover the lost parts.
 - **webm / mkv / ogg will not open**: AVFoundation does not support them. Convert to m4a / mp4 with QuickTime Player or ffmpeg first.
 - **"Cannot verify the developer" on launch**: apps you build yourself normally do not show this. If it appears, right-click the app in Finder and choose Open.
 
@@ -100,6 +101,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | Switching the input device while recording (connecting AirPods, etc.) | Not verified (implemented only) |
 | Finder "Open With" / dropping on the Dock icon | Not verified (implemented only) |
 | Intel Macs | Not verified |
+| Fix for the same sentence repeating through long recordings (1.0.1) | Verified in a reproduction (tiny model, 5 minutes of audio with music in between). Awaiting a re-check on the real lecture recording |
 
 ## Tests
 
@@ -139,7 +141,7 @@ Scripts/build-app.sh     Assembles the .app
 
 - **Why whisper.cpp**: it runs on macOS 14, is fast on Metal, and ships an official prebuilt XCFramework, so there is no C/C++ build step. Accuracy matches OpenAI Whisper because it uses the same models.
 - **SpeechAnalyzer on macOS 26** is a future option; the engine is isolated so it can be swapped in.
-- **Long audio**: Whisper works in 30-second windows. VAD skips silence, and the previous window is not used as context (no_context), which prevents runaway repetition.
+- **Long audio and runaway repetition**: Whisper works in 30-second windows. By default whisper.cpp feeds the text recognized in the previous window to the next one as context; `no_context` does not stop that (it only discards context from a previous call). Kikimimi sets `n_max_text_ctx = 0`, which matches OpenAI's `condition_on_previous_text=False`. A vocabulary hint is attached to every window with `carry_initial_prompt`, with `n_max_text_ctx` limited to the hint's token count + 1 so no previous text gets in. Repetition inside a window is caught by raising the repetition threshold (`entropy_thold`) from 2.4 to 2.8, and anything left over is cleaned up afterwards.
 - **Signing**: ad-hoc. To distribute the app, sign it with a Developer ID and notarize it.
 
 ## Known limitations

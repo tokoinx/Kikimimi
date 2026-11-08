@@ -20,7 +20,7 @@ struct SettingsView: View {
                 }
                 Toggle("精度を優先する (ビームサーチ)", isOn: $model.preferAccuracy)
                 Toggle("無音を飛ばす (VAD)", isOn: $model.useVAD)
-                Toggle("定番の誤認識を取り除く (「ご視聴ありがとうございました」など)", isOn: $model.filterHallucinations)
+                Toggle("定番の誤認識と、同じ文の繰り返しを取り除く", isOn: $model.filterHallucinations)
                 Toggle("録音中にプレビューを出す", isOn: $model.livePreview)
                 VStack(alignment: .leading, spacing: 4) {
                     TextField("語彙のヒント", text: $model.initialPrompt, prompt: Text("例: ロブロックス, Roblox Studio, ききみみ"))
