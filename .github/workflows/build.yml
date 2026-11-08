@@ -1,0 +1,60 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS 15 / Xcode ${{ matrix.xcode }}
+    runs-on: macos-15
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # 16.2: Swift 6.0。macOS 14 Sonoma で動く最後の Xcode (利用者の環境に合わせる)
+        # 26.3: 最新の Xcode / Swift
+        xcode: ["16.2", "26.3"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode ${{ matrix.xcode }}
+        run: |
+          XCODE="/Applications/Xcode_${{ matrix.xcode }}.app"
+          if [ -d "$XCODE" ]; then
+            sudo xcode-select -s "$XCODE"
+          else
+            echo "::warning::$XCODE is not on this runner image; using the default Xcode"
+          fi
+          xcodebuild -version
+          swift --version
+
+      - name: Unit tests (KikimimiCore)
+        run: swift test
+
+      - name: Build Kikimimi.app
+        run: Scripts/build-app.sh
+
+      - name: Check the app bundle
+        run: |
+          APP=build/Kikimimi.app
+          test -x "$APP/Contents/MacOS/Kikimimi"
+          test -d "$APP/Contents/Frameworks/whisper.framework"
+          plutil -lint "$APP/Contents/Info.plist"
+          otool -l "$APP/Contents/MacOS/Kikimimi" | grep -A2 LC_RPATH
+          otool -L "$APP/Contents/MacOS/Kikimimi" | grep whisper.framework
+          codesign --verify --strict --verbose=2 "$APP"
+
+      - name: Zip the app
+        run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-xcode${{ matrix.xcode }}.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Kikimimi-xcode${{ matrix.xcode }}
+          path: build/Kikimimi-xcode${{ matrix.xcode }}.zip
+          retention-days: 14
