@@ -179,6 +179,12 @@ final class RepetitionFilterTests: XCTestCase {
         // 2 文字の繰り返し (どんどんどんどん) や 3 回までの繰り返しはそのまま
         XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("どんどんどんどん強める"), "どんどんどんどん強める")
         XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("20世紀の20世紀の20世紀の世界"), "20世紀の20世紀の20世紀の世界")
+        // 数字や記号だけの繰り返しは縮めない (金額・数値が変わってしまうため)
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("予算は1,000,000,000,000円です"), "予算は1,000,000,000,000円です")
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("番号は100000000000000です"), "番号は100000000000000です")
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("......... と ーーーーーーーーーーーー"), "......... と ーーー")
+        // 数字の繰り返しの後ろにある、文字の繰り返しはまとめる
+        XCTAssertEqual(RepetitionFilter.collapseInlineRepeats("0,000,000,000,000 dollars dollars dollars dollars "), "0,000,000,000,000 dollars ")
         // 中身が全部繰り返しだった区間は 1 回分になり、空にはならない
         XCTAssertEqual(RepetitionFilter.clean(segs(["塗装を塗装を塗装を塗装を塗装を"])).map(\.text), ["塗装を"])
     }

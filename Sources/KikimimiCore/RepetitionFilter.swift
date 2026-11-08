@@ -24,12 +24,23 @@ public enum RepetitionFilter {
 
     /// 1 区間の中で、3 文字以上のまとまりが 4 回以上つづいたら 1 回にまとめる。
     /// 例: 「音楽の音楽の音楽の音楽の…」→「音楽の」。「どんどんどんどん」のような 2 文字の繰り返しは残す。
+    /// 文字 (かな・漢字・英字など) を含まないまとまりは対象外: 「1,000,000,000,000」や「000000000000」を縮めない。
     public static func collapseInlineRepeats(_ text: String) -> String {
         guard let regex = try? NSRegularExpression(pattern: "(.{3,40}?)\\1{3,}", options: [.dotMatchesLineSeparators]) else {
             return text
         }
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: "$1")
+        let ns = NSString(string: text)
+        var result = ""
+        var cursor = 0
+        for match in regex.matches(in: text, options: [], range: NSRange(location: 0, length: ns.length)) {
+            let unit = ns.substring(with: match.range(at: 1))
+            guard unit.unicodeScalars.contains(where: { CharacterSet.letters.contains($0) }) else { continue }
+            result += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            result += unit
+            cursor = match.range.location + match.range.length
+        }
+        result += ns.substring(from: cursor)
+        return result
     }
 
     /// 区間の並びから、同じ区間 (または 2〜3 区間の組) が延々と続く部分を、最初の 1 回だけにする。
