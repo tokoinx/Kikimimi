@@ -34,10 +34,18 @@ jobs:
           xcodebuild -version
           swift --version
 
-      # SwiftPM の共有キャッシュに前の実行の残りがあると、XCFramework の取得が
-      # 「already exists in file system」で止まる (2026-11-09 に両方の Xcode で起きた)。毎回空にしてから取得する
-      - name: Clear the SwiftPM artifact cache
-        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
+      # GitHub のリリースの取得は、ときどき 504 (92 バイトの応答) で失敗する (2026-11-09 に llama.cpp・whisper.cpp で起きた)。
+      # SwiftPM はやり直さず、失敗した応答をキャッシュに残すので、次も「already exists in file system」で止まる。
+      # そこで、取得だけを先に行い、失敗したら残りを消して間を空けてやり直す
+      - name: Fetch the XCFrameworks
+        run: |
+          for attempt in 1 2 3 4; do
+            if swift package resolve; then exit 0; fi
+            echo "::warning::fetching the XCFrameworks failed (attempt $attempt); retrying"
+            rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts .build/artifacts
+            sleep $((attempt * 30))
+          done
+          exit 1
 
       - name: Unit tests (KikimimiCore)
         run: swift test
