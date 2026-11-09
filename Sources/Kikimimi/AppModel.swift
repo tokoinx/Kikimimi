@@ -65,6 +65,12 @@ enum ModelAvailability: Equatable {
     case downloading(Double)
 }
 
+/// 設定のウインドウのタブ
+enum SettingsTab: Hashable {
+    case transcription
+    case llm
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -76,6 +82,8 @@ final class AppModel {
     var errorMessage: String?
     var showTimestamps = true
     var searchText = ""
+    /// 設定で開いているタブ (保存しない。LLM の案内の「設定で選ぶ…」で「監査・翻訳」に切り替える)
+    var settingsTab: SettingsTab = .transcription
     let player = PlayerController()
 
     // 録音
@@ -438,6 +446,11 @@ final class AppModel {
     func revealLLMFolder() {
         try? llmStore.ensureDirectory()
         NSWorkspace.shared.open(llmStore.directory)
+    }
+
+    /// LLM の置き場所 (画面に出す用。ホームは ~ で表す)
+    var llmFolderPath: String {
+        (llmStore.directory.path as NSString).abbreviatingWithTildeInPath
     }
 
     // MARK: ファイル

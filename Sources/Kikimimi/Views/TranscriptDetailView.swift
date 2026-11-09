@@ -637,30 +637,54 @@ struct LLMNeededBanner: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-            if let spec = selection.spec {
-                switch model.llmAvailability(of: spec) {
-                case .downloading(let fraction):
-                    ProgressView(value: fraction).frame(width: 90)
-                    Text("\(Int(fraction * 100))%").monospacedDigit().foregroundStyle(.secondary)
-                    Button("中止") { model.cancelLLMDownload(spec) }
-                case .notInstalled:
-                    Button("ダウンロード") { model.downloadLLM(spec) }
-                        .buttonStyle(.borderedProminent)
-                case .installed:
-                    EmptyView()
-                }
-            }
+            // ボタンを並べた残りの幅を文に使う (Spacer と分け合うと、狭いウインドウでボタンの文字が欠ける)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            LLMDownloadControls()
             Button {
                 model.llmBannerDismissed = true
             } label: {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.borderless)
-            .help("閉じる (設定の「監査・翻訳」からいつでも取得できます)")
+            .help("閉じる (設定の「監査・翻訳」タブから、いつでも取得できます)")
         }
         .padding(12)
         .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// LLM のダウンロード (進み具合・中止) と「設定で選ぶ…」。結果の画面の案内と、始めの画面で使う
+struct LLMDownloadControls: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openSettings) private var openSettings
+    /// 「ダウンロード」を目立たせる (始めの画面では、音声認識モデルの取得を主にするので控えめにする)
+    var prominent = true
+
+    var body: some View {
+        if let spec = model.currentLLM.spec {
+            switch model.llmAvailability(of: spec) {
+            case .downloading(let fraction):
+                ProgressView(value: fraction).frame(width: 90)
+                Text("\(Int(fraction * 100))%").monospacedDigit().foregroundStyle(.secondary)
+                Button("中止") { model.cancelLLMDownload(spec) }
+            case .notInstalled:
+                if prominent {
+                    Button("ダウンロード") { model.downloadLLM(spec) }
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    Button("ダウンロード") { model.downloadLLM(spec) }
+                        .buttonStyle(.bordered)
+                }
+            case .installed:
+                EmptyView()
+            }
+        }
+        // 設定の「監査・翻訳」タブを開く (メモリ 8 GB の Mac で軽い 2B を選ぶときなど)
+        Button("設定で選ぶ…") {
+            model.settingsTab = .llm
+            openSettings()
+        }
+        .help("設定の「監査・翻訳」タブを開きます。軽い 2B や高精度の 9B も選べます")
     }
 }
 

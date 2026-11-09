@@ -6,6 +6,25 @@ struct SettingsView: View {
 
     var body: some View {
         @Bindable var model = model
+        TabView(selection: $model.settingsTab) {
+            TranscriptionSettingsForm()
+                .tabItem { Label("文字起こし", systemImage: "waveform") }
+                .tag(SettingsTab.transcription)
+            LLMSettingsForm()
+                .tabItem { Label("監査・翻訳", systemImage: "character.bubble") }
+                .tag(SettingsTab.llm)
+        }
+        // 「監査・翻訳」のタブが、スクロールせずに収まる大きさ
+        .frame(width: 600, height: 680)
+    }
+}
+
+/// 設定の「文字起こし」タブ
+struct TranscriptionSettingsForm: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
         Form {
             Section("文字起こし") {
                 Picker("言語", selection: $model.languageCode) {
@@ -40,6 +59,23 @@ struct SettingsView: View {
                 }
             }
 
+            Section {
+                Text("音声認識には、無料・オープンソースの whisper.cpp (OpenAI Whisper の C/C++ 実装) を使い、Mac の GPU (Metal) で動きます。音声も文字起こしの内容も Mac の外に送られません。インターネットを使うのは、モデルを初めて取得するときだけです。")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// 設定の「監査・翻訳」タブ
+struct LLMSettingsForm: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Form {
             Section("監査・翻訳 (ローカル LLM)") {
                 Toggle("文字起こしのあとに監査する (繰り返し・聞き取りミスの見直し)", isOn: $model.autoAudit)
                 Toggle("日本語以外の区間を、日本語に翻訳する", isOn: $model.autoTranslate)
@@ -64,14 +100,20 @@ struct SettingsView: View {
                         Button("削除") { model.deleteLLMFile(name) }
                     }
                 }
-                HStack {
-                    Button("手元の GGUF を追加…") { model.importLLMFile() }
-                        .disabled(model.importingLLM)
-                    Button("LLM のフォルダを開く") { model.revealLLMFolder() }
-                    if model.importingLLM {
-                        ProgressView().controlSize(.small)
-                        Text("取り込み中…").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Button("手元の GGUF を追加…") { model.importLLMFile() }
+                            .disabled(model.importingLLM)
+                        Button("LLM のフォルダを開く") { model.revealLLMFolder() }
+                        if model.importingLLM {
+                            ProgressView().controlSize(.small)
+                            Text("取り込み中…").foregroundStyle(.secondary)
+                        }
                     }
+                    Text("保存先: \(model.llmFolderPath)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                 }
                 Text("監査役は、同じ文の繰り返しと、文脈から見て明らかな聞き間違いを見つけます。自信のある直しだけを反映し、それ以外は「提案」として残すので、確かめてから反映できます。どの直しも元に戻せます。この Mac のメモリは \(MemoryBudget.physicalGB) GB です\(MemoryBudget.isTight ? " (少なめなので、文字起こしと LLM を交互に読み込みます)" : "")。")
                     .font(.caption)
@@ -79,13 +121,12 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("音声認識は whisper.cpp (OpenAI Whisper の C/C++ 実装)、監査と翻訳は llama.cpp と Qwen3.5 (どちらも無料・オープンソース) を使い、Mac の GPU (Metal) で動きます。音声も文字起こしの内容も Mac の外に送られません。インターネットを使うのは、モデルを初めて取得するときだけです。")
+                Text("監査と翻訳には、無料・オープンソースの llama.cpp と Qwen3.5 を使い、Mac の GPU (Metal) で動きます。文字起こしの内容は Mac の外に送られません。インターネットを使うのは、LLM を初めて取得するときだけです。")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 600, height: 720)
     }
 }
 

@@ -265,6 +265,15 @@ struct EmptyStateView: View {
                 }
             }
 
+            // 監査・翻訳の LLM (任意)。結果の画面を待たずに、ここでも取得できるようにする
+            if !model.isLLMInstalled && (model.autoAudit || model.autoTranslate) && !model.llmBannerDismissed {
+                LLMSetupCard()
+            } else if model.isLLMInstalled {
+                Label("監査・翻訳: \(model.currentLLM.name)", systemImage: "checkmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             HStack(spacing: 12) {
                 Button {
                     model.presentOpenPanel()
@@ -282,5 +291,43 @@ struct EmptyStateView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// 始めの画面の、監査・翻訳の LLM の案内 (取得は任意なので、音声認識モデルの取得より控えめに出す)
+struct LLMSetupCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let selection = model.currentLLM
+        let size = selection.spec.map { "(約 \(TimeFormat.bytes(Int64($0.approxMB) * 1_000_000))) " } ?? ""
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "character.bubble")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("聞き取りミスの監査と、英語から日本語への翻訳もできます")
+                    .font(.callout.weight(.semibold))
+                Text("どちらも Mac の中で動く LLM「\(selection.name)」\(size)を使い、訳は原文と左右に並べて表示します。なくても文字起こしはできるので、ダウンロードはあとからでも構いません。文字起こしの内容は Mac の外に出ません。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    LLMDownloadControls(prominent: false)
+                }
+                .padding(.top, 2)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                model.llmBannerDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help("閉じる (設定の「監査・翻訳」タブから、いつでも取得できます)")
+        }
+        .padding(12)
+        .frame(maxWidth: 560)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 }

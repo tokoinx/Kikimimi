@@ -55,7 +55,7 @@ make install
 
 Recording (⌘R) asks for microphone permission the first time.
 
-To use the auditor and the translator, download the LLM once with the "ダウンロード" (Download) button on the result screen, or from Settings › 監査・翻訳 (Audit & translation). After that, every finished transcript is audited automatically, and English (or other non-Japanese) segments are translated into Japanese.
+To use the auditor and the translator, download the LLM once: click "ダウンロード" (Download) on the start screen or the result screen, or use the "監査・翻訳" (Audit & translation) tab in Settings (⌘,). After that, every finished transcript is audited automatically, and English (or other non-Japanese) segments are translated into Japanese.
 
 ## Audit and translation (local LLM)
 
@@ -82,7 +82,8 @@ A small LLM running on your Mac reads the transcript once more.
 | Qwen3.5 2B (light) | Speed first; less accurate | about 1.3 GB | 8 GB or more |
 | Qwen3.5 9B (accurate) | The smartest, and the slowest | about 5.7 GB | 16 GB or more |
 
-- All are free Apache-2.0 models. The Q4_K_M GGUF is fetched from Hugging Face, and its size and SHA-256 are checked before it is saved to `~/Library/Application Support/Kikimimi/Models/LLM`.
+- All are free Apache-2.0 models. The Q4_K_M GGUF is fetched from Hugging Face and saved to `~/Library/Application Support/Kikimimi/Models/LLM` as `qwen3.5-4b.gguf` (`qwen3.5-2b.gguf` for 2B, `qwen3.5-9b.gguf` for 9B). It is downloaded to a temporary file first and moved into that folder only after the download finishes and its size and SHA-256 check out, so the file does not appear there until then. "LLM のフォルダを開く" (Open the LLM folder) in Settings shows the folder in Finder.
+- Quitting the app during a download cancels it, and the next download starts over from the beginning (closing the Settings window does not stop it).
 - Any GGUF that llama.cpp can run can be added with "手元の GGUF を追加…" (Add a local GGUF) in Settings.
 - Rough timing: for a one-hour English talk on an M1, the audit takes a few minutes and the translation 10–20 minutes with the 4B model (translations appear on the right as they are produced). Pick the 2B model when you are in a hurry.
 - On Macs with less than 12 GB of memory, the speech model and the LLM are loaded in turn so they never use memory at the same time.
@@ -105,7 +106,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 - **Skip silence (VAD)**: skips silent parts, which is faster and avoids hallucinations on silence (downloads a 0.9 MB VAD model automatically).
 - **Remove common hallucinations and runaway repetition**: drops stock phrases Whisper tends to produce on silence or music, such as "ご視聴ありがとうございました" (Thanks for watching), but only when the segment is likely not speech. When the same line repeats back to back 4 or more times (or a group of 2–3 lines cycles 3 or more times), only the first occurrence is kept, and a phrase repeated 6 or more times within one line is collapsed to one. The same words spoken minutes apart, emphasis such as "No, no, no, no, no.", and amounts or numbers are kept.
 - **Vocabulary hint**: list proper nouns or jargon (for example: Roblox Studio) so they come out spelled that way. The auditor and the translator use it too.
-- **Audit & translation (local LLM)**: whether to audit automatically after each transcription, whether to translate non-Japanese segments automatically, and which LLM to use. Download, delete and import LLMs here as well.
+- **Audit & translation (local LLM)**: on the "監査・翻訳" tab, choose whether to audit automatically after each transcription, whether to translate non-Japanese segments automatically, and which LLM to use. Download, delete and import LLMs here as well.
 
 ## Troubleshooting
 
