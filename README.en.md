@@ -145,7 +145,8 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | Audit and translation logic (rules, guardrails, line alignment, apply/undo, exports) | Unit tests (with a fake LLM) |
 | llama.cpp b12211 usage (grammar-constrained generation, cut-offs, cancellation, neutralized control tokens, Japanese UTF-8) | Checked against the real llama.cpp (Linux build) with a tiny random-weight GGUF |
 | whisper.framework and llama.framework in one app | GitHub Actions runs the built app's `--selftest-llm` on every push |
-| Audit and translation quality and speed with the real Qwen3.5 | Not verified yet (awaiting a run on real hardware) |
+| Audit and translation with the real Qwen3.5 2B / 4B (English and Japanese samples, sentences cut across segments, mishearings, repeats) | Verified on a Linux CPU (4B: 7 lines translated in 26 s, audit in 18 s). Found and fixed drift into Chinese and wrong auto-fixes along the way |
+| Qwen3.5 speed on a Mac (Metal), and auditing/translating a long (1-hour) recording | Not verified yet (awaiting a run on real hardware) |
 
 ## Tests
 
