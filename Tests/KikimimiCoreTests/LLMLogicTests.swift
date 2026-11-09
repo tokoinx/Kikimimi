@@ -149,6 +149,15 @@ final class AuditorTests: XCTestCase {
         let changes = Auditor.findRepeats(segments)
         XCTAssertEqual(changes.count, 1)
         XCTAssertFalse(changes[0].isConfident, "あいだに別の発話がある")
+        // あいだにあるのが「提案どまり」で本文に残る区間でも、すぐ前とはみなさない
+        let withSuggestion = [seg(0, "また明日お話ししましょう、みなさん。", length: 2), seg(2.0, "おやすみなさい", length: 1),
+                              seg(3.1, "また明日お話ししましょう、みなさん。", length: 2)]
+        let c2 = Auditor.findRepeats(withSuggestion)
+        XCTAssertTrue(c2.allSatisfy { !$0.isConfident }, "\(c2.map(\.reason))")
+        // あいだにあるのが自動で消す区間なら、すぐ前とみなす (3 度目もすき間なく続く写し)
+        let line = "We will start by opening a new place and adding a part."
+        let triple = [seg(0, line, length: 3), seg(3, line, length: 3), seg(6, line, length: 3)]
+        XCTAssertEqual(Auditor.findRepeats(triple).map(\.isConfident), [true, true])
     }
 
     func testRepeatsSkipJapaneseShortReplies() {

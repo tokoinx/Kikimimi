@@ -46,6 +46,8 @@ public enum Auditor {
         let keys = segments.map { TextSimilarity.key($0.text) }
         let stockPhrases = Set(HallucinationFilter.phrases.map(TextSimilarity.key))
         var flagged = Set<Int>()
+        /// 自動で消す区間 (提案どまりのものは本文に残るので含めない)
+        var removed = Set<Int>()
         var changes: [AuditChange] = []
         for i in segments.indices {
             // 無音や音楽のところで Whisper が出しがちな定番の文 (実際にそう話すこともあるので提案どまり)
@@ -76,9 +78,12 @@ public enum Auditor {
                     if punctuatedKey(segments[i].text) != punctuatedKey(segments[j].text) {
                         finding = nil
                     } else {
-                        // すぐ前の区間との比べっこのときだけ (あいだに「OK」などが入ったくり返しは本当の発話かもしれない)
-                        let adjacent = (j + 1..<i).allSatisfy { flagged.contains($0) }
-                        let confident = adjacent && ki.count >= confidentRepeatLength && gap <= confidentRepeatGap
+                        // すぐ前の区間との比べっこのときだけ (あいだに「OK」などが入ったくり返しは本当の発話かもしれない)。
+                        // あいだにあるのが自動で消す区間だけなら、すぐ前とみなす
+                        let adjacent = (j + 1..<i).allSatisfy { removed.contains($0) }
+                        // すき間は、すぐ前の区間 (あいだの写しを消したあとに隣り合う区間) から測る
+                        let gapToPrevious = segments[i].start - segments[i - 1].end
+                        let confident = adjacent && ki.count >= confidentRepeatLength && gapToPrevious <= confidentRepeatGap
                         finding = ("直前と同じ文の繰り返し (\(when))" + (confident ? "" : "。本当にくり返して話した可能性もあるため要確認"),
                                    confident)
                     }
@@ -94,6 +99,7 @@ public enum Auditor {
                     changes.append(AuditChange(kind: .delete, origin: .rule, original: segments[i],
                                                reason: finding.reason, isConfident: finding.confident))
                     flagged.insert(i)
+                    if finding.confident { removed.insert(i) }
                     break
                 }
             }
