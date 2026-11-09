@@ -350,6 +350,8 @@ final class AppModel {
             defer {
                 llmDownloads[spec.id] = nil
                 llmDownloadTasks[spec.id] = nil
+                // どう終わっても置き場所を見直す (中止がちょうど置き終えた直後に届いても、取得済みと表示できるように)
+                refreshLLMInstalled()
             }
             do {
                 try llmStore.ensureDirectory()
@@ -368,8 +370,9 @@ final class AppModel {
                         }
                     }
                 )
-                try Task.checkCancellation()
                 refreshLLMInstalled()
+                // 中止されていたら、見直し・翻訳は始めない
+                try Task.checkCancellation()
                 // 取得のきっかけになった結果 (いま開いているもの) を、そのまま LLM で見直し・翻訳する
                 if currentLLM.spec?.id == spec.id, let job = selectedJob, job.status == .done, let t = job.transcript {
                     var tasks: [PostTask] = []

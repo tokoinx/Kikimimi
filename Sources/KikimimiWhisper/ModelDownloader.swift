@@ -99,11 +99,11 @@ public final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unche
             finishError = DownloadError.invalidFile
             return
         }
-        // 確かめているあいだ (数 GB の SHA-256 は数秒かかる) に中止された
+        // 確かめているあいだ (数 GB の SHA-256 は数秒かかる) に中止されたら置かない。
+        // 中止の確認と置く作業はロックの中でまとめて行い、「確かめた直後の中止」で置いたかどうかが曖昧にならないようにする
         lock.lock()
-        let wasCancelled = cancelled
-        lock.unlock()
-        if wasCancelled {
+        defer { lock.unlock() }
+        if cancelled {
             finishError = CancellationError()
             return
         }
