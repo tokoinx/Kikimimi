@@ -167,7 +167,11 @@ public enum Translator {
         // 文脈用に、訳しながら訳を覚えておく (最初から訳がある区間も使う)
         var known: [(position: Int, source: String, translation: String)] = segments.indices.compactMap { i in
             guard let t = segments[i].translation else { return nil }
-            return (i, segments[i].text, t)
+            // いくつかの区間をまとめた訳は、原文もまとめた文と組にする (断片と文全体の訳を組にしない)
+            let covers = Set(segments[i].translationCovers ?? [])
+            let source = covers.isEmpty ? segments[i].text
+                : Transcript.join([segments[i].text] + segments.filter { covers.contains($0.id) }.map(\.text))
+            return (i, source, t)
         }
         var failed = 0
         var done = 0
@@ -237,8 +241,12 @@ extension Transcript {
         let ids = [result.head] + result.covers
         guard ids.allSatisfy({ id in segments.first { $0.id == id }?.text == sources[id] }),
               let index = segments.firstIndex(where: { $0.id == result.head }) else { return false }
+        // まとめた区間が、いまも訳の区間のすぐ後ろに順に並んでいるときだけ (訳しているあいだに削除を元に戻した、など)
+        let following = segments.dropFirst(index + 1).prefix(result.covers.count)
+        guard following.count == result.covers.count, zip(following, result.covers).allSatisfy({ $0.id == $1 }) else { return false }
         segments[index].translation = result.text
         segments[index].translationCovers = result.covers.isEmpty ? nil : result.covers
+        for i in following.indices { segments[i].translation = nil }
         return true
     }
 }

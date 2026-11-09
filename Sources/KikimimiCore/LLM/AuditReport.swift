@@ -116,6 +116,7 @@ extension Transcript {
                 segments[i].translationCovers = old.translationCovers
             }
         }
+        normalizeTranslationUnits()
         audit = report
     }
 
@@ -171,6 +172,7 @@ extension Transcript {
             invalidateTranslation(of: change.original.id)
             segments[index].text = text
         }
+        normalizeTranslationUnits()
         return true
     }
 
@@ -185,8 +187,13 @@ extension Transcript {
             guard let index = segments.firstIndex(where: { $0.id == change.original.id }) else { return }
             invalidateTranslation(of: change.original.id)
             segments[index].text = change.original.text
-            segments[index].translation = change.original.translation
-            segments[index].translationCovers = change.original.translationCovers
+            // 1 区間だけの訳は、文が元に戻ればそのまま正しい。いくつかの区間にまたがる訳は、ほかの区間が
+            // 変わっているかもしれないので戻さない (訳し直しにする)
+            if (change.original.translationCovers ?? []).isEmpty {
+                segments[index].translation = change.original.translation
+            }
         }
+        // 戻した区間が、あとから訳した文のまとまりの途中に入ったら、そのまとまりは訳し直し
+        normalizeTranslationUnits()
     }
 }

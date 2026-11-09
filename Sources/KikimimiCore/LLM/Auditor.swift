@@ -76,7 +76,9 @@ public enum Auditor {
                     if punctuatedKey(segments[i].text) != punctuatedKey(segments[j].text) {
                         finding = nil
                     } else {
-                        let confident = ki.count >= confidentRepeatLength && gap <= confidentRepeatGap
+                        // すぐ前の区間との比べっこのときだけ (あいだに「OK」などが入ったくり返しは本当の発話かもしれない)
+                        let adjacent = (j + 1..<i).allSatisfy { flagged.contains($0) }
+                        let confident = adjacent && ki.count >= confidentRepeatLength && gap <= confidentRepeatGap
                         finding = ("直前と同じ文の繰り返し (\(when))" + (confident ? "" : "。本当にくり返して話した可能性もあるため要確認"),
                                    confident)
                     }
@@ -134,14 +136,31 @@ public enum Auditor {
         return english + japanese
     }
 
+    /// 数を表す言葉 (英語)。「fifteen → fifty」のような聞き間違いは、音声を聞かない LLM には決められない
+    static let numberWords: Set<String> = [
+        "zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+        "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+        "hundred", "thousand", "million", "billion", "trillion", "dozen", "half", "quarter", "double", "triple",
+        "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth",
+        "once", "twice", "percent",
+    ]
+
+    static func numberWordsIn(_ text: String) -> [String] {
+        text.lowercased().components(separatedBy: wordSeparators).filter { numberWords.contains($0) }
+    }
+
     /// 自動では反映せず、確かめてもらうべき直しか (意味が変わりうる)。理由を返す
     static func meaningRisk(original: String, fixed: String, wrong: String, right: String) -> String? {
-        if original.filter(\.isNumber) != fixed.filter(\.isNumber) { return "数字が変わる直し" }
+        if original.filter(\.isNumber) != fixed.filter(\.isNumber) || numberWordsIn(original) != numberWordsIn(fixed) {
+            return "数字が変わる直し"
+        }
         if negationCount(original) != negationCount(fixed) { return "否定の有無が変わる直し" }
         let kw = TextSimilarity.key(wrong), kr = TextSimilarity.key(right)
         if kr.contains(kw) || kw.contains(kr) { return "語を足す・削るだけの直し" }
         if kr.count * 2 < kw.count { return "語を大きく削る直し" }
-        if !Script.hasHan(original) && Script.hasHan(fixed) { return "漢字が新しく入る直し" }
+        // かなを漢字にする直し (こうせい → 構成 / 校正 / 厚生…) は、同じ音の候補から当て推量で選ぶことになる
+        if !Script.hasHan(wrong) && Script.hasHan(right) { return "漢字が新しく入る直し" }
         return nil
     }
 
@@ -197,21 +216,51 @@ public enum Auditor {
         return actions
     }
 
+    /// 語の一部になる文字 (漢字・かなを除く): 英字・キリル文字・ハングルなど、空白で語を区切る文字と数字。
+    /// 漢字・かなは除くので、「Roblocksを」の「を」の前は語の切れ目になる
+    static let wordCharacter = "[[\\p{L}\\p{N}'’]--[\\p{Han}\\p{Hiragana}\\p{Katakana}]]"
+
+    /// 直す語の前後に付ける「切れ目」の条件
+    static func boundaries(for wrong: String) -> (leading: String, trailing: String) {
+        func isSpacedLetter(_ c: Character) -> Bool {
+            (c.isLetter || c == "'" || c == "’") && !c.unicodeScalars.contains { Script.isUnspacedCJK($0) }
+        }
+        var leading = "", trailing = ""
+        if let first = wrong.first {
+            if first.isNumber {
+                // 「115」の中の「15」や「1,500」の中の「500」は直さない
+                leading = "(?<!\\p{N})(?<!\\p{N}[.,])"
+            } else if isSpacedLetter(first) {
+                leading = "(?<!\(wordCharacter))"
+            }
+        }
+        if let last = wrong.last {
+            if last.isNumber {
+                trailing = "(?!\\p{N})(?![.,]\\p{N})"
+            } else if isSpacedLetter(last) {
+                trailing = "(?!\(wordCharacter))"
+            }
+        }
+        return (leading, trailing)
+    }
+
     /// 行の中の「聞き間違えた語」を「正しい語」に置き換える (最初の 1 か所だけ)。行に見つからなければ nil。
-    /// 英字の語は語の切れ目で合わせる (「can」を直すつもりで「scan」の中まで変えない)
+    /// 語や数は切れ目で合わせる (「can」を直すつもりで「scan」の中を、「15」を直すつもりで「115」の中を変えない)
     static func applyFix(to text: String, wrong: String, right: String) -> String? {
         guard TextSimilarity.key(wrong) != TextSimilarity.key(right) else { return nil }
-        let isWordChar: (Character) -> Bool = { $0.isLetter || $0.isNumber || $0 == "'" || $0 == "’" }
-        let latin = wrong.unicodeScalars.contains { $0.isASCII && CharacterSet.letters.contains($0) }
-        let leading = latin && wrong.first.map(isWordChar) == true ? "(?<![\\p{L}\\p{N}'’])" : ""
-        let trailing = latin && wrong.last.map(isWordChar) == true ? "(?![\\p{L}\\p{N}'’])" : ""
+        let (leading, trailing) = boundaries(for: wrong)
         let pattern = leading + NSRegularExpression.escapedPattern(for: wrong) + trailing
         for options: NSRegularExpression.Options in [[], [.caseInsensitive]] {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { continue }
             let ns = NSString(string: text)
-            if let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)) {
-                return ns.replacingCharacters(in: match.range, with: right)
+            guard let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)) else { continue }
+            var replacement = right
+            // 大文字小文字を無視して見つけた語が大文字で始まっていれば (文の頭など)、直した語もそろえる
+            if !options.isEmpty, let first = ns.substring(with: match.range).first, first.isUppercase,
+               let r = replacement.first, r.isLowercase {
+                replacement = r.uppercased() + replacement.dropFirst()
             }
+            return ns.replacingCharacters(in: match.range, with: replacement)
         }
         return nil
     }
@@ -289,8 +338,10 @@ public enum Auditor {
                     // 理由に別の行の文を書いている: 番号の取り違え (4B で実際にあった)。使わない
                     if noteQuotesAnotherLine(note, target: index, chunk: chunk, lines: lines) { continue }
                     let backed = deletionIsBacked(index, in: segments, keep: { !deleting.contains($0) })
+                    // LLM の削除は提案どまり: 自動で消してよい「すき間なく同じ文が 2 度」は規則が先に消している。
+                    // 規則が残したもの (聞き返し・間をあけたくり返し) を、LLM の判断で消さない
                     found.append(AuditChange(kind: .delete, origin: .llm, original: segment,
-                                             reason: deletionReason(note, backed: backed), isConfident: backed))
+                                             reason: deletionReason(note, backed: backed), isConfident: false))
                 case .fix(let wrong, let right):
                     // 指摘された語が行に無い・何も変わらない直しは使わない
                     guard let fixed = applyFix(to: segment.text, wrong: wrong, right: right) else { continue }
@@ -376,7 +427,7 @@ public enum Auditor {
         let lower = note.lowercased()
         let kind = lower.contains("dup") || lower.contains("repeat") || note.contains("繰り返") || note.contains("重複")
             ? "繰り返し" : "実際には話していない文の可能性"
-        return backed ? kind : "\(kind) (裏付けが弱いため要確認)"
+        return backed ? "\(kind) (近くに同じ文があります。要確認)" : "\(kind) (裏付けが弱いため要確認)"
     }
 
     /// 規則 → LLM の順に見直し、1 区間 1 件にまとめた結果を返す。generator が nil なら規則だけ。

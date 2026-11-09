@@ -143,6 +143,14 @@ final class AuditorTests: XCTestCase {
         XCTAssertTrue(Auditor.findRepeats(correction).allSatisfy { !$0.isConfident })
     }
 
+    func testRepeatAfterInterjectionIsOnlySuggested() {
+        let segments = [seg(0, "Can everyone see my screen right now?", length: 3), seg(3.0, "No.", length: 0.4),
+                        seg(3.5, "Can everyone see my screen right now?", length: 3)]
+        let changes = Auditor.findRepeats(segments)
+        XCTAssertEqual(changes.count, 1)
+        XCTAssertFalse(changes[0].isConfident, "あいだに別の発話がある")
+    }
+
     func testRepeatsSkipJapaneseShortReplies() {
         let segments = [seg(0, "はい"), seg(1, "はい"), seg(2, "そうですね"), seg(3, "そうですね")]
         XCTAssertTrue(Auditor.findRepeats(segments).isEmpty)
@@ -164,9 +172,17 @@ final class AuditorTests: XCTestCase {
                        "Open Roblox Studio. Roblocks is fun.", "最初の 1 か所だけ")
         XCTAssertEqual(Auditor.applyFix(to: "You can scan the code with your phone.", wrong: "can", right: "can't"),
                        "You can't scan the code with your phone.", "語の途中 (scan) は変えない")
-        XCTAssertEqual(Auditor.applyFix(to: "fall through the Whirled", wrong: "whirled", right: "world"), "fall through the world")
+        XCTAssertEqual(Auditor.applyFix(to: "fall through the Whirled", wrong: "whirled", right: "world"), "fall through the World",
+                       "見つけた語の大文字に合わせる")
         XCTAssertEqual(Auditor.applyFix(to: "議事録を構成します", wrong: "構成", right: "校正"), "議事録を校正します")
         XCTAssertNil(Auditor.applyFix(to: "Hello world", wrong: "planet", right: "earth"), "行に無い語は直さない")
+        XCTAssertEqual(Auditor.applyFix(to: "We have 115 users and 15 admins.", wrong: "15", right: "50"),
+                       "We have 115 users and 50 admins.", "数の途中は変えない")
+        XCTAssertEqual(Auditor.applyFix(to: "13時から3時まで", wrong: "3時", right: "5時"), "13時から5時まで")
+        XCTAssertEqual(Auditor.applyFix(to: "Roblocksを使って作ります", wrong: "Roblocks", right: "Roblox"), "Robloxを使って作ります")
+        XCTAssertEqual(Auditor.applyFix(to: "Слон сказал, что он придёт.", wrong: "он", right: "она"), "Слон сказал, что она придёт.")
+        XCTAssertEqual(Auditor.applyFix(to: "Whirled peace is our goal.", wrong: "whirled", right: "world"), "World peace is our goal.",
+                       "文の頭の大文字をそろえる")
         XCTAssertNil(Auditor.applyFix(to: "Hello world", wrong: "world", right: "World."), "何も変わらない直しは使わない")
     }
 
@@ -312,6 +328,8 @@ final class AuditorTests: XCTestCase {
         XCTAssertNotNil(risk("Open Roblox Studio now.", "Studio", "工作室"))
         XCTAssertNil(risk("Open Roblocks Studio now.", "Roblocks", "Roblox"))
         XCTAssertNil(risk("議事録を構成します", "構成", "校正"))
+        XCTAssertNotNil(risk("We sold fifteen thousand units.", "fifteen", "fifty"), "数を表す言葉")
+        XCTAssertNotNil(risk("明日のかいぎは中止です。", "かいぎ", "会議"), "かなを漢字にする")
     }
 
     func testDeletesDoNotBackEachOther() throws {
@@ -485,6 +503,47 @@ final class TranslatorTests: XCTestCase {
         XCTAssertNil(t.segments[0].translation)
         XCTAssertEqual(t.untranslatedCount, 3)
         XCTAssertEqual(Translator.pendingIndices(t.segments, language: "en"), [0, 1, 2])
+    }
+
+    func testTranslationUnitsStayConsistent() throws {
+        // A・C を 1 つの文として訳したあとで、あいだの B (消していた区間) を元に戻すと、その文は訳し直しになる
+        let a = seg(0, "So the first thing you want to do", length: 2)
+        let b = seg(2.0, "the first thing you want", length: 0.6)
+        let c = seg(2.7, "is open the settings window.", length: 1.8)
+        var t = Transcript(sourceName: "x", segments: [a, b, c], language: "en")
+        let report = AuditReport(changes: [AuditChange(kind: .delete, origin: .rule, original: b, reason: "r", isConfident: true)],
+                                 model: nil, reviewedCount: 3)
+        t.adopt(report)
+        XCTAssertEqual(t.segments.map(\.id), [a.id, c.id])
+        let sources = Dictionary(uniqueKeysWithValues: [a, b, c].map { ($0.id, $0.text) })
+        XCTAssertTrue(t.apply(TranslationResult(head: a.id, covers: [c.id], text: "まず設定画面を開きます。"), sources: sources))
+        XCTAssertEqual(t.untranslatedCount, 0)
+        t.setChange(report.changes[0].id, applied: false)
+        XCTAssertEqual(t.segments.map(\.id), [a.id, b.id, c.id])
+        XCTAssertNil(t.segments[0].translation, "あいだに区間が戻ったので訳し直し")
+        XCTAssertEqual(t.untranslatedCount, 3)
+        XCTAssertEqual(Translator.pendingIndices(t.segments, language: "en"), [0, 1, 2])
+        // まとめた区間がすぐ後ろに並んでいない訳は置かない
+        XCTAssertFalse(t.apply(TranslationResult(head: a.id, covers: [c.id], text: "x"), sources: sources))
+    }
+
+    func testRevertingFixKeepsOnlySingleSegmentTranslation() {
+        let s1 = TranscriptSegment(start: 0, end: 2, text: "We use Roblocks Studio to build", translation: "訳", translationCovers: nil)
+        var t = Transcript(sourceName: "x", segments: [s1], language: "en")
+        let fix = AuditChange(kind: .fix, origin: .llm, original: s1, replacement: "We use Roblox Studio to build",
+                              reason: "r", isConfident: true)
+        t.adopt(AuditReport(changes: [fix], model: "m", reviewedCount: 1))
+        XCTAssertNil(t.segments[0].translation)
+        t.setChange(fix.id, applied: false)
+        XCTAssertEqual(t.segments[0].translation, "訳", "1 区間だけの訳は、文が元に戻れば戻す")
+    }
+
+    func testJoinKeepsSpacesBetweenWords() {
+        XCTAssertEqual(Transcript.join([" Сегодня мы поговорим", " о новом релизе"]), "Сегодня мы поговорим о новом релизе")
+        XCTAssertEqual(Transcript.join(["새로운", "기능을"]), "새로운 기능을")
+        XCTAssertEqual(Transcript.join(["C'était l'été", "à Paris"]), "C'était l'été à Paris")
+        XCTAssertEqual(Transcript.join(["今日は", "いい天気です。"]), "今日はいい天気です。")
+        XCTAssertEqual(Transcript.join(["Roblox Studio を", "開きます"]), "Roblox Studio を開きます")
     }
 
     func testSentenceUnitsLimits() {

@@ -161,14 +161,15 @@ public struct Transcript: Codable, Hashable, Sendable {
         return units
     }
 
-    /// 区間の文をつなぐ。英字どうしのあいだには空白を入れる
+    /// 区間の文をつなぐ。語を空白で区切らない文字 (漢字・かな・全角の記号) の境目以外には空白を入れる
+    /// (英語だけでなく、ロシア語・韓国語・フランス語なども語がくっつかないように)
     public static func join(_ texts: [String]) -> String {
         var out = ""
         for raw in texts {
             let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !t.isEmpty else { continue }
             if let last = out.unicodeScalars.last, let first = t.unicodeScalars.first,
-               last.isASCII || first.isASCII {
+               !Script.isUnspacedCJK(last) && !Script.isUnspacedCJK(first) {
                 out += " "
             }
             out += t
@@ -181,6 +182,24 @@ public struct Transcript: Codable, Hashable, Sendable {
         for i in segments.indices where segments[i].id == id || (segments[i].translationCovers?.contains(id) ?? false) {
             segments[i].translation = nil
             segments[i].translationCovers = nil
+        }
+    }
+
+    /// 文ごとの訳のまとまりを点検する: まとめた区間が訳の区間のすぐ後ろに順に並んでいない (削除・元に戻す で
+    /// あいだに区間が入った、まとめた区間が無くなった、ほかの訳を持っている) ものは、訳を消して訳し直しにする
+    public mutating func normalizeTranslationUnits() {
+        for i in segments.indices {
+            guard let covers = segments[i].translationCovers, !covers.isEmpty else {
+                segments[i].translationCovers = nil
+                continue
+            }
+            let following = segments.dropFirst(i + 1).prefix(covers.count)
+            let intact = segments[i].translation != nil && following.count == covers.count
+                && zip(following, covers).allSatisfy { $0.id == $1 && $0.translation == nil }
+            if !intact {
+                segments[i].translation = nil
+                segments[i].translationCovers = nil
+            }
         }
     }
 }

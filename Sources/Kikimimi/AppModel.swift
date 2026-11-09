@@ -693,14 +693,19 @@ final class AppModel {
                 job.postState = .running(.audit, message: "監査中…", progress: nil)
                 let segments = transcript.segmentsBeforeAudit
                 let options = AuditOptions(glossary: glossary)
-                // 規則だけの見直しは数秒で終わるので、先に反映しておく (LLM が失敗・中止しても、ここまでは残る)。
-                // 長い録音では時間がかかるので、画面を止めないよう裏で回す
-                let rules = try await Task.detached(priority: .userInitiated) {
-                    try Auditor.audit(segments, language: language, options: options, generator: nil,
-                                      modelName: nil, shouldCancel: { flag.isSet })
-                }.value
-                if flag.isSet { throw LLMError.cancelled }
-                adopt(rules, in: job)
+                // 前に LLM で監査してあれば、やり直しの結果は最後にまとめて反映する
+                // (途中で規則だけの結果を反映すると、前の LLM の直しといっしょに訳まで外れてしまう。中止したら前の結果のまま)
+                let hadLLMAudit = transcript.audit?.model != nil
+                if !hadLLMAudit || !useLLM {
+                    // 規則だけの見直しは数秒で終わるので、先に反映しておく (LLM が失敗・中止しても、ここまでは残る)。
+                    // 長い録音では時間がかかるので、画面を止めないよう裏で回す
+                    let rules = try await Task.detached(priority: .userInitiated) {
+                        try Auditor.audit(segments, language: language, options: options, generator: nil,
+                                          modelName: nil, shouldCancel: { flag.isSet })
+                    }.value
+                    if flag.isSet { throw LLMError.cancelled }
+                    adopt(rules, in: job)
+                }
                 guard useLLM else {
                     job.postNote = "LLM が未取得のため、繰り返しの見直しだけを行いました。聞き取りミスも見直すには、設定の「監査・翻訳」から LLM を取得してください。"
                     return
@@ -722,13 +727,19 @@ final class AppModel {
                     }
                     adopt(report, in: job)
                 } catch {
-                    // 中止・失敗: LLM が見終えたまとまりまでの結果を反映する (規則の結果は反映済み)
-                    if let done = partial.value, done.model != nil { adopt(done, in: job) }
-                    if flag.isSet || (error as? LLMError) == .cancelled {
-                        job.postNote = "監査を中止しました。見終えた所までの結果を反映しています。"
-                    } else {
-                        job.postNote = "LLM で見直せなかったため、繰り返しの見直しだけを反映しました: " + error.localizedDescription
+                    let cancelled = flag.isSet || (error as? LLMError) == .cancelled
+                    if hadLLMAudit {
+                        // やり直しの途中: 前の監査の結果をそのまま残す
+                        job.postNote = cancelled
+                            ? "監査のやり直しを中止しました。前の監査の結果のままです。"
+                            : "LLM で見直せなかったため、前の監査の結果のままです: " + error.localizedDescription
+                        return
                     }
+                    // はじめての監査: LLM が見終えたまとまりまでの結果を反映する (規則の結果は反映済み)
+                    if let done = partial.value, done.model != nil { adopt(done, in: job) }
+                    job.postNote = cancelled
+                        ? "監査を中止しました。見終えた所までの結果を反映しています。"
+                        : "LLM で見直せなかったため、繰り返しの見直しだけを反映しました: " + error.localizedDescription
                     return
                 }
 
@@ -764,11 +775,9 @@ final class AppModel {
                     job.postNote = "\(failed) 区間は訳せませんでした。もう一度「翻訳」を押すと、残りだけを訳し直します。"
                 }
             }
-        } catch let error as LLMError where error == .cancelled {
-            job.postNote = "中止しました。ここまでの結果は残しています。"
         } catch {
-            if flag.isSet {
-                job.postNote = "中止しました。ここまでの結果は残しています。"
+            if flag.isSet || (error as? LLMError) == .cancelled {
+                job.postNote = task == .audit ? "監査を中止しました。" : "翻訳を中止しました。訳せた所までは残しています。"
             } else {
                 job.postNote = (task == .audit ? "監査" : "翻訳") + "できませんでした: " + error.localizedDescription
             }

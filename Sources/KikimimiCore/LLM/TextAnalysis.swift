@@ -105,6 +105,12 @@ public enum Script {
         text.unicodeScalars.contains { isHan($0.value) }
     }
 
+    /// 語を空白で区切らない文字か (漢字・かな・日本語や中国語の句読点・全角の文字)
+    public static func isUnspacedCJK(_ scalar: Unicode.Scalar) -> Bool {
+        let v = scalar.value
+        return isHan(v) || isKana(v) || (0x3000...0x303F).contains(v) || (0xFF00...0xFFEF).contains(v)
+    }
+
     /// 日本語に訳す必要があるか (日本語ではなく、文字を含む)
     public static func needsTranslation(_ text: String, transcriptLanguage: String? = nil) -> Bool {
         hasLetters(text) && !isJapanese(text, transcriptLanguage: transcriptLanguage)
