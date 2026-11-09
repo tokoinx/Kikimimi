@@ -96,6 +96,11 @@ public enum MixedLanguageRules {
     /// どの区切りにも相づちが挟まる録音でも探し続けられる。英語だけの区切りは、半分にした 2 回で止まる
     public static let islandBudgetPerChunk = 16.0
     public static let islandBudgetBase = 10.0
+    /// 雑音と島を見分ける比: 島なら、別の言語は一部に集まっている。
+    /// - 二分探索の後: 両端の窓のどちらかの別の言語の確率が、部分全体のこの倍未満のときだけ島を探す
+    ///   (雑音で全体に広がっているなら、両端も全体と同じくらい。英語だけの雑音の多い 25 秒の区切りで、判定 45 回が 13 回になった)
+    /// - 分けて判定し直す回数の上限を超えた区切り: 最初に半分にした 2 つが、この比より近い確率なら、それ以上探さない
+    public static let islandContrast = 0.5
 
     // MARK: 文字にする単位
 
@@ -137,7 +142,10 @@ public enum MixedLanguageRules {
     /// 直す範囲は、引っかかった区間の前後にこれだけ広げる
     public static let repairPadSeconds = 0.2
     /// 別の言語だと、この確からしさ以上で判定されたときだけ、その言語で文字にし直す
+    /// (切り替わりも島も見つからない部分。二分探索の両端がそろっていれば、両端の判定も使う)
     public static let repairConfidence = 0.9
+    /// 文字にし直した部分から何も出ず、元の文がその部分にこれ以上の発話の長さで重なっていたら、入れ替えない (文を消さない)
+    public static let repairKeepOverlapSeconds = 0.5
     /// 文字にし直すのは、ファイルの発話の 1 割まで (時間がかかりすぎないように)。短いファイルでも 30 秒までは直せる。
     /// 判定し直しただけ (同じ言語だった) のところは数えない
     public static let repairSpeechShare = 0.10

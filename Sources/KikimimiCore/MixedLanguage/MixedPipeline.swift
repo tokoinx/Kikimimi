@@ -205,6 +205,8 @@ public enum MixedPipeline {
             }
             var parts = [SwitchSearch.Part(chunk: chunk, guess: guess)]
             var refined = false
+            // 分けて判定し直すべきなのに、回数の上限を超えたので分けなかった (確からしさ 0.90〜0.97)
+            var overBudget = false
             if SwitchSearch.needsRefinement(guess, speechSeconds: chunk.speechSeconds) {
                 let budget = R.refineBudgetPerChunk * Double(index + 1) + R.refineBudgetBase
                 if Double(extraDetections) < budget || (guess?.confidence ?? 0) < R.overBudgetRefineBelow {
@@ -216,15 +218,21 @@ public enum MixedPipeline {
                     report.switches += outcome.switches
                     parts = outcome.parts
                     refined = true
+                } else {
+                    overBudget = true
                 }
-            } else if let g = guess {
-                // 確かそうでも、別の言語の確率がこのファイルのふつうより高ければ、中ほどに短い別の言語が挟まっていないか探す
+            }
+            if !refined, let g = guess {
+                // 確かそうでも、別の言語の確率がこのファイルのふつうより高ければ、中ほどに短い別の言語が挟まっていないか探す。
+                // 上限を超えて分けなかった区切りも探す (2〜4 秒の日本語の一言は、区切りを 0.93〜0.97 に下げる。
+                // 探さなければ、英語で文字にしたときに訳されずに消え、点検にも何も残らない)
                 let threshold = islandThreshold(g.language)
                 let budget = R.islandBudgetPerChunk * Double(index + 1) + R.islandBudgetBase
                 var foundIsland = false
                 if SwitchSearch.needsIslandSearch(g, speechSeconds: chunk.speechSeconds, threshold: threshold),
                    Double(islandDetections) < budget {
-                    let outcome = try SwitchSearch.islands(chunk, host: g, map: map, floor: threshold, detect: detect)
+                    let outcome = try SwitchSearch.islands(chunk, host: g, map: map, floor: threshold, contrast: overBudget,
+                                                           detect: detect)
                     islandDetections += outcome.detections
                     report.islandDetections += outcome.detections
                     report.switches += outcome.switches
@@ -255,15 +263,16 @@ public enum MixedPipeline {
         var doneRegions = 0
         for ((run, segments), runRegions) in zip(decoded, regions) {
             var result = segments
-            for region in runRegions {
+            for pieces in runRegions {
                 try checkCancel()
                 doneRegions += 1
                 guard report.repairDetections < repairDetectionLimit, repairedSpeech < repairLimit else {
                     report.repairsSkipped += 1
                     continue
                 }
-                if let repaired = try repair(region, run: run, current: result, map: map, check: check,
-                                             detect: detect, engine: engine, samples: samples, options: options,
+                if let repaired = try repair(pieces, run: run, current: result, map: map, check: check,
+                                             detect: detect, detectionLimit: repairDetectionLimit,
+                                             engine: engine, samples: samples, options: options,
                                              useVAD: useVAD, repairedSpeech: &repairedSpeech, repairLimit: repairLimit,
                                              report: &report) {
                     result = repaired
@@ -299,9 +308,11 @@ public enum MixedPipeline {
     }
 
     /// 直す範囲: 点検で引っかかった区間 (間が 1 秒未満ならまとめる) と、抜けているところ。前後を少し広げ、範囲の中に収める。
-    /// 28 秒より長い範囲は、区切りと同じように分ける (whisper の言語判定は先頭の 30 秒しか聞かない)
+    /// 28 秒より長い範囲は、区切りと同じように、すき間なく分ける (whisper の言語判定は先頭の 30 秒しか聞かない)。
+    /// 1 つの範囲を分けたものは 1 つの配列にまとめて返す: 判定は分けたまま、入れ替えはまとめて行う
+    /// (whisper の区間は分けた境目をまたぐので、別々に入れ替えると、またいだ文が欠けたり二重になったりする)
     private static func repairRegions(run: DecodeRun, segments: [DecodedSegment], map: SpeechMap, check: DecodeCheck,
-                                      report: inout MixedReport) -> [Range<Int>] {
+                                      report: inout MixedReport) -> [[Range<Int>]] {
         let pad = R.samples(R.repairPadSeconds)
         var regions: [Range<Int>] = []
         var current: Range<Int>? = nil
@@ -338,92 +349,220 @@ public enum MixedPipeline {
             }
         }
         let maxLength = R.samples(R.maxChunkSeconds)
-        var out: [Range<Int>] = []
+        var out: [[Range<Int>]] = []
         for r in merged {
             guard r.count > maxLength else {
-                out.append(r)
+                out.append([r])
                 continue
             }
             let inside = SpeechMap(spans: map.spans(in: r), levels: map.levels, hop: map.hop,
                                    totalSamples: map.totalSamples, fromVAD: map.fromVAD)
             let pieces = SpeechChunker.chunks(inside)
             guard pieces.count > 1 else {
-                out.append(r)
+                out.append([r])
                 continue
             }
             // すき間なく分ける (境目は間の真ん中)
+            var group: [Range<Int>] = []
             var start = r.lowerBound
             for k in pieces.indices {
                 let end = k + 1 < pieces.count
                     ? max(start, (pieces[k].range.upperBound + pieces[k + 1].range.lowerBound) / 2) : r.upperBound
-                if end > start { out.append(start..<end) }
+                if end > start { group.append(start..<end) }
                 start = end
             }
+            out.append(group.isEmpty ? [r] : group)
         }
         return out
     }
 
-    /// 1 か所を直す: 判定し直して別の言語なら、その言語で文字にし直し、良くなったときだけ入れ替える。
-    /// 両端が同じ言語で中ほどに別の言語が挟まっている (英語 → 日本語 → 英語) ときも、その部分だけを文字にし直す
-    private static func repair<Engine: MixedEngine>(_ region: Range<Int>, run: DecodeRun, current: [DecodedSegment],
+    /// 1 か所を直す: 判定し直して別の言語のところがあれば、そこを、重なる元の区間の全体まで広げて、部分ごとの言語で
+    /// 文字にし直し、良くなったときだけ入れ替える (英語 → 日本語 → 英語 のように中ほどに別の言語が挟まっていれば、
+    /// そのまわりだけ)。pieces は直す範囲をすき間なく分けたもの (28 秒以下なら 1 つ)。判定は分けたまま行う
+    private static func repair<Engine: MixedEngine>(_ pieces: [Range<Int>], run: DecodeRun, current: [DecodedSegment],
                                                     map: SpeechMap, check: DecodeCheck,
-                                                    detect: (Range<Int>) throws -> LanguageGuess?,
+                                                    detect: (Range<Int>) throws -> LanguageGuess?, detectionLimit: Int,
                                                     engine: Engine, samples: [Float], options: Options, useVAD: Bool,
                                                     repairedSpeech: inout Int, repairLimit: Int,
                                                     report: inout MixedReport) throws -> [DecodedSegment]? {
-        let inRegion: (DecodedSegment) -> Bool = { s in
-            let mid = R.samples((s.start + s.end) / 2)
-            return region.contains(mid)
-        }
-        let old = current.filter(inRegion)
+        guard let first = pieces.first, let last = pieces.last else { return nil }
+        let region = first.lowerBound..<last.upperBound
+        let inRegion = current.filter { region.contains(R.samples(($0.start + $0.end) / 2)) }
         var entry = MixedReport.Repair(start: R.seconds(region.lowerBound), end: R.seconds(region.upperBound),
                                        runLanguage: run.language, detected: nil, confidence: nil, decodedAs: [],
-                                       accepted: false, before: Transcript.join(old.map(\.text)), after: "")
+                                       accepted: false, before: Transcript.join(inRegion.map(\.text)), after: "")
         defer { report.repairs.append(entry) }
 
-        let guess = try detect(region)
-        report.repairDetections += 1
-        entry.detected = guess?.language
-        entry.confidence = guess?.confidence
-        guard let guess else { return nil }
-
-        // 言語ごとに文字にし直す部分
+        // 1. 言語ごとの計画 (範囲全体をすき間なく)
         var plan: [(range: Range<Int>, language: String)] = []
-        if guess.language != run.language, guess.confidence >= R.repairConfidence {
-            plan = [(region, guess.language)]
-        } else if region.count >= R.samples(R.bisectMinSeconds), guess.confidence < R.bisectBelow {
-            let found = try SwitchSearch.locate(SpeechChunk(range: region, spans: map.spans(in: region)), guess: guess,
-                                                map: map, detect: detect)
-            report.repairDetections += found.detections
-            plan = contiguousPlan(found.parts, in: region, fallback: run.language)
+        var limited = false
+        for piece in pieces {
+            var part: [(range: Range<Int>, language: String)] = [(piece, run.language)]
+            if report.repairDetections < detectionLimit {
+                let guess = try detect(piece)
+                report.repairDetections += 1
+                if let guess {
+                    // 記録には、別の言語と出た部分の判定を残す
+                    if entry.detected == nil || (entry.detected == run.language && guess.language != run.language) {
+                        entry.detected = guess.language
+                        entry.confidence = guess.confidence
+                    }
+                    part = try piecePlan(piece, guess: guess, runLanguage: run.language, map: map, detect: detect,
+                                         report: &report)
+                }
+            } else {
+                limited = true
+            }
+            for p in part {
+                if let l = plan.last, l.language == p.language, l.range.upperBound == p.range.lowerBound {
+                    plan[plan.count - 1] = (l.range.lowerBound..<p.range.upperBound, p.language)
+                } else {
+                    plan.append(p)
+                }
+            }
         }
+        if limited { report.repairsSkipped += 1 }
         // 判定も同じ言語なら、言語の取り違えではない (音楽・雑音・本当の繰り返し): 元のまま
         guard plan.contains(where: { $0.language != run.language }) else { return nil }
+
+        // 2. 文字にし直す範囲と、その中の言語ごとの部分
+        let spans = redecodeSpans(plan, runLanguage: run.language, segments: current, within: region)
+        guard let firstSpan = spans.first, let lastSpan = spans.last else { return nil }
+        let parts = spans.flatMap { span in
+            absorbShortParts(plan.compactMap { p -> (range: Range<Int>, language: String)? in
+                let a = max(p.range.lowerBound, span.lowerBound), b = min(p.range.upperBound, span.upperBound)
+                return a < b ? (a..<b, p.language) : nil
+            }, map: map)
+        }
+        let inSpans: (DecodedSegment) -> Bool = { s in
+            let mid = R.samples((s.start + s.end) / 2)
+            return spans.contains { $0.contains(mid) }
+        }
+        let old = current.filter(inSpans)
+        entry.start = R.seconds(firstSpan.lowerBound)
+        entry.end = R.seconds(lastSpan.upperBound)
+        entry.before = Transcript.join(old.map(\.text))
         // 文字にし直す分だけを、上限から引く
-        let redecode = plan.reduce(0) { $0 + map.speechSamples(in: $1.range) }
+        let redecode = spans.reduce(0) { $0 + map.speechSamples(in: $1) }
         guard repairedSpeech + redecode <= repairLimit else {
             report.repairsSkipped += 1
             return nil
         }
         repairedSpeech += redecode
 
-        var fresh: [DecodedSegment] = []
-        for part in plan where !part.range.isEmpty {
-            fresh += try engine.decode(samples, range: part.range, language: part.language,
-                                       hint: GlossaryHint.hint(options.glossary, for: part.language), useVAD: useVAD,
-                                       onProgress: { _ in }, onSegment: { _ in })
-            report.repairDecodes += 1
-            entry.decodedAs.append(part.language)
-        }
-        entry.after = Transcript.join(fresh.map(\.text))
-        // 仕上げのフィルタで消える文しか無いなら、元の文を消さない (点検は文を消さない)
+        // 3. 文字にし直して比べる。仕上げのフィルタで消える文しか無いなら、元の文を消さない (点検は文を消さない)
         let kept = { (list: [DecodedSegment]) in
             list.filter { transcriptSegment($0, candidates: options.candidates, filter: options.filterHallucinations) != nil }
         }
-        guard !kept(fresh).isEmpty || kept(old).isEmpty else { return nil }
-        guard check.isBetter(fresh, than: old, in: region) else { return nil }
+        let keptOld = kept(old)
+        let keepOverlap = R.samples(R.repairKeepOverlapSeconds)
+        var fresh: [DecodedSegment] = []
+        for part in parts {
+            let got = try engine.decode(samples, range: part.range, language: part.language,
+                                        hint: GlossaryHint.hint(options.glossary, for: part.language), useVAD: useVAD,
+                                        onProgress: { _ in }, onSegment: { _ in })
+            fresh += got
+            report.repairDecodes += 1
+            entry.decodedAs.append(part.language)
+            // 部分ごとにも: 何も残らない部分が、そこに重なっていた元の文を消さない
+            let erased = kept(got).isEmpty && keptOld.contains { s in
+                let a = max(part.range.lowerBound, R.samples(s.start)), b = min(part.range.upperBound, R.samples(s.end))
+                return a < b && map.speechSamples(in: a..<b) >= keepOverlap
+            }
+            if erased {
+                entry.after = Transcript.join(fresh.map(\.text))
+                return nil
+            }
+        }
+        entry.after = Transcript.join(fresh.map(\.text))
+        guard !kept(fresh).isEmpty || keptOld.isEmpty else { return nil }
+        guard check.isBetter(fresh, than: old, in: spans) else { return nil }
         entry.accepted = true
-        return current.filter { !inRegion($0) } + fresh
+        return current.filter { !inSpans($0) } + fresh
+    }
+
+    /// 直す範囲の 1 つの部分 (28 秒以下) の、言語ごとの計画。
+    /// 確からしさが低ければ、別の言語と出ていても、先に切り替わりと島を探す (英語と日本語が半分ずつでも 0.954 と出る。
+    /// 全体を別の言語で文字にし直すと、もとの言語の文が消える)。何も見つからなければ、部分の判定 (両端がそろっていれば、
+    /// 両端の言語の判定のうちいちばん確かなもの) が別の言語で `repairConfidence` 以上のときだけ、全体をその言語にする
+    private static func piecePlan(_ piece: Range<Int>, guess: LanguageGuess, runLanguage: String, map: SpeechMap,
+                                  detect: (Range<Int>) throws -> LanguageGuess?,
+                                  report: inout MixedReport) throws -> [(range: Range<Int>, language: String)] {
+        var decided = guess
+        if piece.count >= R.samples(R.bisectMinSeconds), guess.confidence < R.bisectBelow {
+            let found = try SwitchSearch.locate(SpeechChunk(range: piece, spans: map.spans(in: piece)), guess: guess,
+                                                map: map, detect: detect)
+            report.repairDetections += found.detections
+            if found.parts.count > 1 { return contiguousPlan(found.parts, in: piece, fallback: runLanguage) }
+            if let g = found.parts.first?.guess { decided = g }
+        }
+        if decided.language != runLanguage, decided.confidence >= R.repairConfidence { return [(piece, decided.language)] }
+        return [(piece, runLanguage)]
+    }
+
+    /// 文字にし直す範囲: 別の言語の部分を、そこに重なる元の区間の全体まで広げたもの (直す範囲の中に収める)。
+    /// 元の区間の途中で切ると、切った外側の文が消える (または、元の文が残って二重になる)。広げた分は計画どおりの言語で文字にする
+    static func redecodeSpans(_ plan: [(range: Range<Int>, language: String)], runLanguage: String,
+                              segments: [DecodedSegment], within region: Range<Int>) -> [Range<Int>] {
+        let lines = segments.compactMap { s -> Range<Int>? in
+            let a = max(region.lowerBound, R.samples(s.start)), b = min(region.upperBound, R.samples(s.end))
+            return a < b ? a..<b : nil
+        }
+        var spans = plan.filter { $0.language != runLanguage && !$0.range.isEmpty }.map(\.range)
+        var changed = true
+        while changed {
+            changed = false
+            spans.sort { $0.lowerBound < $1.lowerBound }
+            var joined: [Range<Int>] = []
+            for span in spans {
+                var r = span
+                for line in lines where line.overlaps(r) && (line.lowerBound < r.lowerBound || line.upperBound > r.upperBound) {
+                    r = min(r.lowerBound, line.lowerBound)..<max(r.upperBound, line.upperBound)
+                    changed = true
+                }
+                if let l = joined.last, r.lowerBound <= l.upperBound {
+                    joined[joined.count - 1] = l.lowerBound..<max(l.upperBound, r.upperBound)
+                } else {
+                    joined.append(r)
+                }
+            }
+            spans = joined
+        }
+        return spans
+    }
+
+    /// 発話が `minDetectSpeechSeconds` に満たない部分は、となりの部分に含める
+    /// (広げた分のわずかな切れ端を別に文字にすると、何も出ないか、定番の誤認識になる)
+    static func absorbShortParts(_ parts: [(range: Range<Int>, language: String)],
+                                 map: SpeechMap) -> [(range: Range<Int>, language: String)] {
+        var out = parts
+        let minSpeech = R.samples(R.minDetectSpeechSeconds)
+        var k = 0
+        while out.count > 1, k < out.count {
+            guard map.speechSamples(in: out[k].range) < minSpeech else {
+                k += 1
+                continue
+            }
+            // 前の部分があれば前に、無ければ次に含める
+            if k > 0 {
+                out[k - 1].range = out[k - 1].range.lowerBound..<out[k].range.upperBound
+                out.remove(at: k)
+                k -= 1
+            } else {
+                out[1].range = out[0].range.lowerBound..<out[1].range.upperBound
+                out.remove(at: 0)
+            }
+        }
+        // 同じ言語がとなり合えばまとめる
+        var merged: [(range: Range<Int>, language: String)] = []
+        for p in out {
+            if let l = merged.last, l.language == p.language {
+                merged[merged.count - 1].range = l.range.lowerBound..<p.range.upperBound
+            } else {
+                merged.append(p)
+            }
+        }
+        return merged
     }
 
     /// 判定し直した部分を、すき間なく並んだ (言語, 範囲) にする。部分と部分の境目は間の真ん中。

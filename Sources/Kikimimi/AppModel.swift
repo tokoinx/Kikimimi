@@ -521,9 +521,13 @@ final class AppModel {
 
     /// 監査・翻訳を止める (反映済みの結果は残す)
     func cancelPost(_ job: Job) {
+        let hadQueue = !job.postQueue.isEmpty
         job.postQueue.removeAll()
         if job.postState != .idle {
             job.postCancel.set()
+        } else if hadQueue {
+            // 録音のあいだ一時停止していた作業を取りやめた: 「録音を止めると続けます」を残さない
+            job.postNote = "監査・翻訳を中止しました。反映済みの結果は残しています。"
         }
     }
 

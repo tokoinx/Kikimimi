@@ -671,7 +671,7 @@ struct MixedLanguageSuggestion: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("英語の多い録音でした。日本語と英語が入れ替わるなら、「日本語＋英語」で文字起こしし直せます")
                     .font(.callout.weight(.semibold))
-                Text("区切りごとに日本語か英語かを判定し、その言語で文字にします。言語を 1 つに決めたときに崩れた行が直ることがあります。時間はおよそ 2 倍かかります。")
+                Text("区切りごとに日本語か英語かを判定し、その言語で文字にします。言語を 1 つに決めたときに崩れた行が直ることがあります。時間は 2〜4 倍ほどかかります。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

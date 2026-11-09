@@ -34,7 +34,7 @@ struct TranscriptionSettingsForm: View {
                         }
                     }
                     if model.languageCode == Languages.japaneseEnglish.code {
-                        Text("日本語と英語が入れ替わる録音向けです。区切りごとに、話している言語を日本語か英語かで判定して、その言語で文字にします。判定のぶん、「日本語」の設定のおよそ 2 倍の時間がかかります。どちらか一方だけの録音には、その言語を選んでください。")
+                        Text("日本語と英語が入れ替わる録音向けです。区切りごとに、話している言語を日本語か英語かで判定して、その言語で文字にします。判定のぶん、「日本語」の設定の 2〜4 倍ほどの時間がかかります (言語の入れ替わりや短い差し込みが多いほど長くなります)。どちらか一方だけの録音には、その言語を選んでください。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

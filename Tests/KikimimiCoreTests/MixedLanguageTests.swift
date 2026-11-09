@@ -275,7 +275,8 @@ final class MixedLanguageTests: XCTestCase {
         XCTAssertEqual(b.detections, count.value)
         // 末尾に寄った切り替わりも
         let tailCount = Counter()
-        let t = SwitchSearch.bisect(s(100)..<s(110), map: map, detect: fakeDetector(switchAt: 108.8, calls: tailCount))
+        let tailMap = SpeechMap(spans: [s(100)..<s(110)], totalSamples: s(112))
+        let t = SwitchSearch.bisect(s(100)..<s(110), map: tailMap, detect: fakeDetector(switchAt: 108.8, calls: tailCount))
         XCTAssertEqual(t.head?.language, "en")
         XCTAssertEqual(t.tail?.language, "ja")
         XCTAssertEqual(Double(try XCTUnwrap(t.cut)) / 16_000, 108.8, accuracy: 1.0)

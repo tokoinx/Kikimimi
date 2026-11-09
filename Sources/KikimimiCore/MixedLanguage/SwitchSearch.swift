@@ -4,9 +4,11 @@ import Foundation
 ///
 /// 1. 区切りの中のいちばん長い間 (最大 2 か所) で分け、それぞれを判定する (間のある切り替わり)
 /// 2. 確からしさの低い部分は、先頭と末尾の窓 (4 秒、短い部分は 2 秒) を判定し、違えば二分探索する (間の無い切り替わり)。
-///    切り替わりの位置は、探した幅の中で VAD の発話らしさがいちばん低いところ。
+///    切り替わりの位置は、探した幅の中で VAD の発話らしさがいちばん低いところ。窓に話し声が 1 秒も無ければ、広げてから判定する。
 ///    試作では、間の無い 3 か所の切り替わりを −1.43・−0.01・+1.54 秒の誤差で見つけ、両側とも崩れずに文字にできた。
-/// 3. 両端が同じ言語なら、中ほどに別の言語が挟まっているかもしれない (英語 → 日本語 → 英語)。島として探す (`islands`)
+/// 3. 両端が同じ言語なら、中ほどに別の言語が挟まっているかもしれない (英語 → 日本語 → 英語)。島として探す (`islands`)。
+///    探すのは、どちらかの端が部分全体よりはっきり別の言語が少ないときだけ (雑音で全体に広がった揺れは探さない)。
+///    何も見つからなければ、部分全体の判定より、そろった両端の言語を信じる
 public enum SwitchSearch {
     private typealias R = MixedLanguageRules
 
@@ -98,7 +100,7 @@ public enum SwitchSearch {
     }
 
     /// 言語の混ざっていそうな部分の中で、切り替わり (二分探索) を探し、無ければ、中ほどに挟まった別の言語 (島) を探す。
-    /// 見つからなければ、部分そのもの 1 つ
+    /// 見つからなければ、部分そのもの 1 つ。両端の言語がそろっていれば、その言語にする
     public static func locate(_ piece: SpeechChunk, guess: LanguageGuess?, map: SpeechMap,
                               detect: (Range<Int>) throws -> LanguageGuess?) rethrows -> Outcome {
         let b = try bisect(piece.range, map: map, detect: detect)
@@ -114,16 +116,33 @@ public enum SwitchSearch {
             return Outcome(parts: [Part(chunk: halves.0, guess: b.head), Part(chunk: halves.1, guess: b.tail)],
                            detections: detections, switches: switches)
         }
-        // 両端が同じ言語なのに部分全体の判定が揺れる: 中ほどに別の言語が挟まっているかもしれない
-        if let h = b.head, let t = b.tail, h.language == t.language, piece.range.count > R.samples(R.islandMaxSeconds) {
-            let host = guess.flatMap { $0.language == h.language ? $0 : nil } ?? h
+        guard let h = b.head, let t = b.tail, h.language == t.language else {
+            return Outcome(parts: [Part(chunk: piece, guess: guess)], detections: detections, switches: [])
+        }
+        // 両端が同じ言語なのに部分全体の判定が揺れる: 中ほどに別の言語が挟まっているかもしれない。
+        // 両端の言語の判定 (全体・先頭・末尾のうち、その言語のもの) で、いちばん確かなものを部分の判定にする
+        let host = [guess, h, t].compactMap { $0 }.filter { $0.language == h.language }
+            .max { $0.confidence < $1.confidence } ?? h
+        if piece.range.count > R.samples(R.islandMaxSeconds), shouldSearchIslands(guess, head: h, tail: t) {
             let found = try islands(piece, host: host, map: map, detect: detect)
             detections += found.detections
             if found.parts.contains(where: { $0.guess?.language != h.language }) {
                 return Outcome(parts: found.parts, detections: detections, switches: found.switches)
             }
         }
-        return Outcome(parts: [Part(chunk: piece, guess: guess)], detections: detections, switches: [])
+        // 切り替わりも島も無い: 部分全体の (確からしさの低い) 判定より、そろった両端の言語を信じる
+        return Outcome(parts: [Part(chunk: piece, guess: host)], detections: detections, switches: [])
+    }
+
+    /// 二分探索で両端が同じ言語だったとき、中ほどの島を探すか。
+    /// 探すのは、両端の言語が島を探す言語 (`islandHosts`) か、部分全体が別の言語と判定されたときで、しかも、
+    /// どちらかの端の別の言語の確率が、部分全体の `islandContrast` 倍未満のとき (別の言語が一部に集まっている)。
+    /// 雑音で全体に広がった揺れなら、両端も全体と同じくらい揺れているので探さない
+    static func shouldSearchIslands(_ guess: LanguageGuess?, head h: LanguageGuess, tail t: LanguageGuess) -> Bool {
+        guard let guess else { return false }
+        guard R.islandHosts.contains(h.language) || guess.language != h.language else { return false }
+        let pieceOther = guess.language == h.language ? 1 - guess.confidence : guess.confidence
+        return min(1 - h.confidence, 1 - t.confidence) < R.islandContrast * pieceOther
     }
 
     /// range の中の、間の無い切り替わりを二分探索で探す (refine.py の手順に、端の確かめと短い部分の扱いを足したもの)。
@@ -139,8 +158,8 @@ public enum SwitchSearch {
         let long = range.count >= R.samples(R.bisectLongSeconds)
         let edge = R.samples(R.edgeWindowSeconds)
         let window = long ? R.samples(R.bisectWindowSeconds) : edge
-        let head = try detect(range.lowerBound..<(range.lowerBound + window))
-        let tail = try detect((range.upperBound - window)..<range.upperBound)
+        let head = try detect(probeWindow(range.lowerBound..<(range.lowerBound + window), in: range, map: map, anchor: .start))
+        let tail = try detect(probeWindow((range.upperBound - window)..<range.upperBound, in: range, map: map, anchor: .end))
         var detections = 2
         guard let h = head, let t = tail else {
             return Bisection(cut: nil, head: head, tail: tail, bracket: nil, detections: detections)
@@ -153,7 +172,7 @@ public enum SwitchSearch {
             return Bisection(cut: nil, head: h, tail: t, bracket: nil, detections: detections)
         }
         // 両端が同じ言語: 端の 2 秒を確かめる
-        if let first = try detect(range.lowerBound..<(range.lowerBound + edge)) {
+        if let first = try detect(probeWindow(range.lowerBound..<(range.lowerBound + edge), in: range, map: map, anchor: .start)) {
             detections += 1
             if first.language != h.language {
                 return try search(range, from: range.lowerBound + edge / 2, first, to: range.upperBound - window / 2, t,
@@ -162,7 +181,7 @@ public enum SwitchSearch {
         } else {
             detections += 1
         }
-        if let last = try detect((range.upperBound - edge)..<range.upperBound) {
+        if let last = try detect(probeWindow((range.upperBound - edge)..<range.upperBound, in: range, map: map, anchor: .end)) {
             detections += 1
             if last.language != t.language {
                 return try search(range, from: range.lowerBound + window / 2, h, to: range.upperBound - edge / 2, last,
@@ -172,6 +191,32 @@ public enum SwitchSearch {
             detections += 1
         }
         return Bisection(cut: nil, head: h, tail: t, bracket: nil, detections: detections)
+    }
+
+    /// 判定する窓の、広げずに残す側
+    enum Anchor { case start, end, center }
+
+    /// 判定する窓。発話が `minDetectSpeechSeconds` に満たなければ、満ちるまで range の中で広げる
+    /// (無音に近い窓の判定は当てにならない: 日本語の講演で、0.4 秒しか話していない 2 秒の窓が英語 0.98 と出て、
+    /// 無い切り替わりを作った)。start は後ろへ、end は前へ、center は両側へ広げる (片側が尽きたら反対側へ)
+    static func probeWindow(_ window: Range<Int>, in range: Range<Int>, map: SpeechMap, anchor: Anchor) -> Range<Int> {
+        let need = R.samples(R.minDetectSpeechSeconds)
+        var w = window.clamped(to: range)
+        let step = R.samples(0.25)
+        while map.speechSamples(in: w) < need, w != range {
+            var lower = w.lowerBound, upper = w.upperBound
+            switch anchor {
+            case .start: upper += step
+            case .end: lower -= step
+            case .center:
+                lower -= step / 2
+                upper += step / 2
+            }
+            if upper > range.upperBound { lower -= upper - range.upperBound }
+            if lower < range.lowerBound { upper += range.lowerBound - lower }
+            w = max(range.lowerBound, lower)..<min(range.upperBound, upper)
+        }
+        return w
     }
 
     /// lo (言語 head) と hi (言語 tail) のあいだで、窓の言語が切り替わるところを探し、いちばん静かなところで切る。
@@ -189,7 +234,8 @@ public enum SwitchSearch {
         while hi - lo > stop, steps < R.bisectMaxSteps {
             let half = window / 2
             let mid = (lo + hi) / 2
-            let probe = max(range.lowerBound, mid - half)..<min(range.upperBound, mid + half)
+            let probe = probeWindow(max(range.lowerBound, mid - half)..<min(range.upperBound, mid + half), in: range, map: map,
+                                    anchor: .center)
             guard let g = try detect(probe) else { break }
             detections += 1
             steps += 1
@@ -218,8 +264,11 @@ public enum SwitchSearch {
     /// 半分にし、両方を判定して、別の言語の確率が少しでもある側をさらに半分にしていく。4 秒以下になったら判定のとおりにし、
     /// 別の言語だと信じられる部分だけを分け出す。英日の朗読の試作では、1〜3 秒の日本語の差し込みを取り戻し、
     /// 英語だけの部分を日本語と取り違えることはなかった (英語の 4 秒以下の部分は、どれも英語 0.993 以上)
-    /// floor: 半分を詳しく見る、別の言語の確率の下限
+    /// floor: 半分を詳しく見る、別の言語の確率の下限。
+    /// contrast: 最初に半分にした 2 つが、どちらも同じくらい別の言語らしければ (`islandContrast`)、雑音とみなしてやめる
+    /// (分けて判定し直す回数の上限を超えた、確からしさ 0.90〜0.97 の区切りで使う。雑音の多い英語を延々と調べない)
     public static func islands(_ chunk: SpeechChunk, host: LanguageGuess, map: SpeechMap, floor: Double = MixedLanguageRules.islandFloor,
+                               contrast: Bool = false,
                                detect: (Range<Int>) throws -> LanguageGuess?) rethrows -> Outcome {
         let maxIsland = R.samples(R.islandMaxSeconds)
         let minSpeech = R.samples(R.minDetectSpeechSeconds)
@@ -230,7 +279,10 @@ public enum SwitchSearch {
 
         // (範囲, その範囲の判定, 4 秒以下になってから、もう一度だけ分けたものか)。深さは高々 4〜5 段
         var stack: [(range: Range<Int>, guess: LanguageGuess?, trimmed: Bool)] = [(chunk.range, host, false)]
+        var atRoot = true
         while let node = stack.popLast() {
+            let root = atRoot
+            atRoot = false
             let range = node.range
             let speech = map.speechSamples(in: range)
             if range.count <= maxIsland || speech < 2 * minSpeech {
@@ -260,6 +312,7 @@ public enum SwitchSearch {
             let third = range.count / 3
             let mid = (range.lowerBound + range.upperBound) / 2
             let cut = map.quietestSample(in: (range.lowerBound + third)..<(range.upperBound - third), near: mid) ?? mid
+            var explore: [(range: Range<Int>, guess: LanguageGuess)] = []
             for half in [range.lowerBound..<cut, cut..<range.upperBound] {
                 guard map.speechSamples(in: half) >= minSpeech else {
                     leaves.append((half, nil))
@@ -268,11 +321,19 @@ public enum SwitchSearch {
                 let g = try detect(half)
                 detections += 1
                 if let g, other(g) >= max(R.islandFloor, floor) {
-                    stack.append((half, g, false))
+                    explore.append((half, g))
                 } else {
                     leaves.append((half, nil))
                 }
             }
+            if contrast, root, explore.count == 2 {
+                let a = other(explore[0].guess), b = other(explore[1].guess)
+                if min(a, b) > R.islandContrast * max(a, b) {
+                    leaves += explore.map { ($0.range, nil) }
+                    continue
+                }
+            }
+            for e in explore { stack.append((e.range, e.guess, false)) }
         }
 
         // 並べ直し、つながった同じ言語の部分をまとめる

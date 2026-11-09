@@ -151,14 +151,23 @@ public struct DecodeCheck: Sendable {
 
     /// 直した結果のほうが良いか: 引っかかった数が少ない。同じなら、自信 (対数確率の平均) が高い
     public func isBetter(_ new: [DecodedSegment], than old: [DecodedSegment], in range: Range<Int>) -> Bool {
-        let a = score(new, in: range), b = score(old, in: range)
+        isBetter(new, than: old, in: [range])
+    }
+
+    /// いくつかの範囲をまとめて直したときの比べ方 (抜けは範囲ごとに数える)
+    public func isBetter(_ new: [DecodedSegment], than old: [DecodedSegment], in ranges: [Range<Int>]) -> Bool {
+        let a = score(new, in: ranges), b = score(old, in: ranges)
         if a.flags != b.flags { return a.flags < b.flags }
         return a.logProb > b.logProb
     }
 
     /// 引っかかった数 (区間ごとの点検の数 + 抜けの数) と、トークンで重みをつけた対数確率の平均
     public func score(_ segments: [DecodedSegment], in range: Range<Int>) -> (flags: Int, logProb: Double) {
-        var flags = uncovered(in: range, segments: segments).count
+        score(segments, in: [range])
+    }
+
+    public func score(_ segments: [DecodedSegment], in ranges: [Range<Int>]) -> (flags: Int, logProb: Double) {
+        var flags = ranges.reduce(0) { $0 + uncovered(in: $1, segments: segments).count }
         var sum = 0.0, tokens = 0
         for s in segments {
             flags += self.flags(s).count
