@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import KikimimiCore
+import KikimimiLLM
 import KikimimiWhisper
 import Observation
 import UniformTypeIdentifiers
@@ -24,6 +25,15 @@ final class Job: Identifiable {
     /// 録音した音声 (ファイルから読み直さずに使う)
     @ObservationIgnored var samples: [Float]?
 
+    // 文字起こしのあとの監査・翻訳
+    /// これから行う監査・翻訳
+    var postQueue: [PostTask] = []
+    /// いま行っている監査・翻訳
+    var postState: PostState = .idle
+    /// 監査・翻訳のお知らせ (失敗・一部だけ訳せなかった など)
+    var postNote: String?
+    @ObservationIgnored var postCancel = CancelFlag()
+
     init(name: String, url: URL?, isRecording: Bool = false, samples: [Float]? = nil) {
         self.name = name
         self.url = url
@@ -32,6 +42,19 @@ final class Job: Identifiable {
     }
 
     var isActive: Bool { status == .queued || status == .running }
+    /// 監査・翻訳が待っている / 動いている
+    var isPostActive: Bool { !postQueue.isEmpty || postState != .idle }
+}
+
+/// 文字起こしのあとに行う仕事
+enum PostTask: Equatable {
+    case audit
+    case translate
+}
+
+enum PostState: Equatable {
+    case idle
+    case running(PostTask, message: String, progress: Double?)
 }
 
 enum ModelAvailability: Equatable {
@@ -67,9 +90,22 @@ final class AppModel {
     var filterHallucinations: Bool { didSet { save(filterHallucinations, "filterHallucinations") } }
     var livePreview: Bool { didSet { save(livePreview, "livePreview") } }
     var initialPrompt: String { didSet { save(initialPrompt, "initialPrompt") } }
+    // 監査・翻訳 (ローカル LLM)
+    /// 一覧のモデルの ID か、`file:` + 取り込んだ GGUF のファイル名
+    var llmModelID: String { didSet { save(llmModelID, "llmModelID") } }
+    var autoAudit: Bool { didSet { save(autoAudit, "autoAudit") } }
+    var autoTranslate: Bool { didSet { save(autoTranslate, "autoTranslate") } }
+    /// 原文と日本語訳を左右に並べて表示する
+    var showBilingual: Bool { didSet { save(showBilingual, "showBilingual") } }
+    var installedLLMIDs: Set<String> = []
+    var customLLMFiles: [String] = []
+    var llmDownloads: [String: Double] = [:]
 
     let store = ModelStore()
+    let llmStore: LLMModelStore
     @ObservationIgnored private let service = TranscriptionService()
+    @ObservationIgnored private let llm = LLMService()
+    @ObservationIgnored private var llmDownloadTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var downloadTasks: [String: Task<Void, Error>] = [:]
     @ObservationIgnored private var recorder: LiveRecorder?
@@ -87,8 +123,14 @@ final class AppModel {
         filterHallucinations = d.object(forKey: "filterHallucinations") as? Bool ?? true
         livePreview = d.object(forKey: "livePreview") as? Bool ?? true
         initialPrompt = d.string(forKey: "initialPrompt") ?? ""
+        llmModelID = d.string(forKey: "llmModelID") ?? LLMCatalog.defaultModelID
+        autoAudit = d.object(forKey: "autoAudit") as? Bool ?? true
+        autoTranslate = d.object(forKey: "autoTranslate") as? Bool ?? true
+        showBilingual = d.object(forKey: "showBilingual") as? Bool ?? true
+        llmStore = LLMModelStore(models: store)
         if !Languages.isKnown(languageCode) { languageCode = "ja" }
         refreshInstalled()
+        refreshLLMInstalled()
     }
 
     private func save(_ value: Any, _ key: String) {
@@ -255,6 +297,122 @@ final class AppModel {
         return path
     }
 
+    // MARK: 監査・翻訳のモデル (ローカル LLM)
+    struct LLMSelection: Equatable {
+        let id: String
+        let name: String
+        let url: URL
+        let spec: LLMModelSpec?
+    }
+
+    /// 選んでいる LLM
+    var currentLLM: LLMSelection {
+        if llmModelID.hasPrefix("file:") {
+            let name = String(llmModelID.dropFirst(5))
+            return LLMSelection(id: llmModelID, name: (name as NSString).deletingPathExtension,
+                                url: llmStore.url(forFile: name), spec: nil)
+        }
+        let spec = LLMCatalog.spec(id: llmModelID) ?? LLMCatalog.all[0]
+        return LLMSelection(id: spec.id, name: spec.displayName, url: llmStore.url(for: spec), spec: spec)
+    }
+
+    var isLLMInstalled: Bool {
+        let current = currentLLM
+        if let spec = current.spec { return installedLLMIDs.contains(spec.id) }
+        return customLLMFiles.contains(current.url.lastPathComponent)
+    }
+
+    func refreshLLMInstalled() {
+        installedLLMIDs = Set(LLMCatalog.all.filter { llmStore.isInstalled($0) }.map(\.id))
+        customLLMFiles = llmStore.customFiles()
+        // 選んでいた取り込みのモデルが消えていたら、一覧のおすすめに戻す
+        if llmModelID.hasPrefix("file:"), !customLLMFiles.contains(String(llmModelID.dropFirst(5))) {
+            llmModelID = LLMCatalog.defaultModelID
+        }
+    }
+
+    func llmAvailability(of spec: LLMModelSpec) -> ModelAvailability {
+        if let fraction = llmDownloads[spec.id] { return .downloading(fraction) }
+        return installedLLMIDs.contains(spec.id) ? .installed : .notInstalled
+    }
+
+    func downloadLLM(_ spec: LLMModelSpec) {
+        guard llmDownloadTasks[spec.id] == nil else { return }
+        llmDownloads[spec.id] = 0
+        llmDownloadTasks[spec.id] = Task {
+            defer {
+                llmDownloads[spec.id] = nil
+                llmDownloadTasks[spec.id] = nil
+            }
+            do {
+                try llmStore.ensureDirectory()
+                let resolved = try await HuggingFaceResolver.resolve(spec)
+                let size = resolved.expectedSize
+                let sha = resolved.sha256
+                try await ModelDownloader.download(
+                    from: resolved.url,
+                    to: llmStore.url(for: spec),
+                    validate: { FileHash.validateDownload(at: $0, expectedSize: size, sha256: sha) },
+                    onProgress: { [weak self] fraction, _, _ in
+                        Task { @MainActor in
+                            guard let self, self.llmDownloads[spec.id] != nil else { return }
+                            self.llmDownloads[spec.id] = fraction
+                        }
+                    }
+                )
+                refreshLLMInstalled()
+            } catch is CancellationError {
+            } catch let error as URLError where error.code == .cancelled {
+            } catch {
+                errorMessage = "\(spec.displayName) を取得できませんでした: \(error.localizedDescription)\n\nHugging Face (huggingface.co) に接続できない場合は、設定の「手元の GGUF を追加」から取り込めます。"
+            }
+        }
+    }
+
+    func cancelLLMDownload(_ spec: LLMModelSpec) {
+        llmDownloadTasks[spec.id]?.cancel()
+    }
+
+    func deleteLLM(_ spec: LLMModelSpec) {
+        deleteLLMFile(spec.fileName)
+    }
+
+    func deleteLLMFile(_ name: String) {
+        llm.unload()
+        do {
+            try llmStore.delete(fileNamed: name)
+        } catch {
+            errorMessage = "削除できませんでした: \(error.localizedDescription)"
+        }
+        refreshLLMInstalled()
+    }
+
+    func importLLMFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? .data]
+        panel.message = "llama.cpp で動く LLM (.gguf) を選んでください"
+        panel.prompt = "追加"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let name = try llmStore.importFile(from: url)
+            refreshLLMInstalled()
+            if let spec = LLMCatalog.all.first(where: { $0.fileName == name }) {
+                llmModelID = spec.id
+            } else {
+                llmModelID = "file:" + name
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func revealLLMFolder() {
+        try? llmStore.ensureDirectory()
+        NSWorkspace.shared.open(llmStore.directory)
+    }
+
     // MARK: ファイル
     func presentOpenPanel() {
         let panel = NSOpenPanel()
@@ -298,23 +456,56 @@ final class AppModel {
             job.cancelFlag.set()
             job.message = "中止しています…"
         default:
-            break
+            cancelPost(job)
+        }
+    }
+
+    /// 監査・翻訳を止める (反映済みの結果は残す)
+    func cancelPost(_ job: Job) {
+        job.postQueue.removeAll()
+        if job.postState != .idle {
+            job.postCancel.set()
         }
     }
 
     func remove(_ job: Job) {
         if job.isActive { cancel(job) }
+        cancelPost(job)
         jobs.removeAll { $0.id == job.id }
         if selectedJobID == job.id { select(jobs.first) }
+    }
+
+    private enum Work {
+        case transcribe(Job)
+        case post(Job, PostTask)
+    }
+
+    /// 次の仕事: 文字起こしが終わったジョブの監査・翻訳を先に (古い順)、その次に待っている文字起こし
+    private func nextWork() -> Work? {
+        if let job = jobs.last(where: { $0.status == .done && !$0.postQueue.isEmpty }) {
+            return .post(job, job.postQueue.removeFirst())
+        }
+        if let job = jobs.last(where: { $0.status == .queued }) {
+            return .transcribe(job)
+        }
+        return nil
     }
 
     private func ensureWorker() {
         guard worker == nil else { return }
         worker = Task { [weak self] in
             defer { self?.worker = nil }
-            while let self, let job = self.jobs.last(where: { $0.status == .queued }) {
-                await self.run(job)
+            while let self, let work = self.nextWork() {
+                switch work {
+                case .transcribe(let job):
+                    await self.run(job)
+                    if job.status == .done { self.schedulePostTasks(for: job, automatic: true) }
+                case .post(let job, let task):
+                    await self.runPost(task, for: job)
+                }
             }
+            // 手が空いたら LLM を手放す (数 GB のメモリを空ける。次に使うときは数秒で読み直せる)
+            self?.llm.unload()
         }
     }
 
@@ -322,6 +513,7 @@ final class AppModel {
         job.status = .running
         job.progress = 0
         job.error = nil
+        if MemoryBudget.isTight { llm.unload() }
         let spec = currentModel
         do {
             if !store.isInstalled(spec) {
@@ -405,6 +597,144 @@ final class AppModel {
                 job.message = "エラー"
             }
             cleanPartialTranscript(of: job)
+        }
+    }
+
+    // MARK: 監査・翻訳
+
+    /// 監査・翻訳を予約する。automatic は文字起こし直後の自動実行 (設定に従う)
+    func schedulePostTasks(for job: Job, automatic: Bool, tasks: [PostTask]? = nil) {
+        guard job.status == .done, let transcript = job.transcript, !transcript.segments.isEmpty else { return }
+        var wanted = tasks ?? []
+        if automatic {
+            if autoAudit { wanted.append(.audit) }
+            // 翻訳は LLM が手元にあるときだけ (無ければ画面で取得を案内する)
+            if autoTranslate, isLLMInstalled, transcript.translatableCount > 0 { wanted.append(.translate) }
+        }
+        for task in wanted where !job.postQueue.contains(task) && job.postState.task != task {
+            job.postQueue.append(task)
+        }
+        ensureWorker()
+    }
+
+    /// 監査をやり直す (前の監査の反映は元に戻してから見直す)
+    func audit(_ job: Job) {
+        schedulePostTasks(for: job, automatic: false, tasks: [.audit])
+    }
+
+    /// まだ訳していない区間を日本語に訳す
+    func translate(_ job: Job) {
+        guard isLLMInstalled else {
+            errorMessage = "日本語に訳すには、ローカル LLM「\(currentLLM.name)」が必要です。設定の「監査・翻訳」から取得してください。"
+            return
+        }
+        schedulePostTasks(for: job, automatic: false, tasks: [.translate])
+    }
+
+    /// 監査の 1 か所を反映する / 元に戻す
+    func setAuditChange(_ change: AuditChange, applied: Bool, in job: Job) {
+        guard var transcript = job.transcript else { return }
+        transcript.setChange(change.id, applied: applied)
+        job.transcript = transcript
+    }
+
+    func revertAudit(of job: Job) {
+        guard var transcript = job.transcript else { return }
+        transcript.revertAllChanges()
+        job.transcript = transcript
+    }
+
+    private func runPost(_ task: PostTask, for job: Job) async {
+        guard job.status == .done, let transcript = job.transcript, !transcript.segments.isEmpty else { return }
+        let flag = CancelFlag()
+        job.postCancel = flag
+        job.postNote = nil
+        let selection = currentLLM
+        let useLLM = isLLMInstalled
+        let glossary = initialPrompt
+        let language = transcript.language
+        defer { job.postState = .idle }
+
+        // メモリの少ない Mac では、LLM を読み込む前に Whisper を手放す
+        if useLLM && MemoryBudget.isTight { service.unload() }
+        let preparing = llm.isLoaded(modelPath: selection.url.path) ? "" : " (LLM を読み込み中)"
+
+        do {
+            switch task {
+            case .audit:
+                job.postState = .running(.audit, message: "監査中…" + (useLLM ? preparing : ""), progress: nil)
+                var base = transcript
+                base.revertAllChanges()
+                let segments = base.segments
+                let options = AuditOptions(glossary: glossary)
+                let report: AuditReport
+                if useLLM {
+                    report = try await llm.run(modelPath: selection.url.path, shouldCancel: { flag.isSet }) { engine in
+                        try Auditor.audit(segments, language: language, options: options, generator: engine,
+                                          modelName: selection.name, shouldCancel: { flag.isSet }) { done, total in
+                            Task { @MainActor in
+                                guard case .running(.audit, _, _) = job.postState, job.postCancel === flag else { return }
+                                job.postState = .running(.audit, message: "監査中 \(done)/\(total)",
+                                                         progress: total > 0 ? Double(done) / Double(total) : nil)
+                            }
+                        }
+                    }
+                } else {
+                    // 規則だけでも長い録音では時間がかかるので、画面を止めないよう裏で回す
+                    report = try await Task.detached(priority: .userInitiated) {
+                        try Auditor.audit(segments, language: language, options: options, generator: nil,
+                                          modelName: nil, shouldCancel: { flag.isSet })
+                    }.value
+                    job.postNote = "LLM が未取得のため、繰り返しの見直しだけを行いました。聞き取りミスも見直すには、設定の「監査・翻訳」から LLM を取得してください。"
+                }
+                if flag.isSet { throw LLMError.cancelled }
+                guard var current = job.transcript else { return }
+                current.adopt(report)
+                job.transcript = current
+
+            case .translate:
+                guard useLLM else { return }
+                job.postState = .running(.translate, message: "翻訳中…" + preparing, progress: nil)
+                let segments = transcript.segments
+                let sources = Dictionary(segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
+                let options = TranslationOptions(glossary: glossary)
+                let apply: @MainActor ([UUID: String]) -> Void = { batch in
+                    guard !batch.isEmpty, var t = job.transcript else { return }
+                    for i in t.segments.indices {
+                        let s = t.segments[i]
+                        // 訳しているあいだに監査で文が変わった区間には付けない
+                        if let translated = batch[s.id], sources[s.id] == s.text { t.segments[i].translation = translated }
+                    }
+                    t.translationModel = selection.name
+                    job.transcript = t
+                }
+                let (failed, all) = try await llm.run(modelPath: selection.url.path, shouldCancel: { flag.isSet }) { engine in
+                    var all: [UUID: String] = [:]
+                    let failed = try Translator.translate(segments, language: language, options: options, generator: engine,
+                                                          shouldCancel: { flag.isSet }) { batch, done, total in
+                        all.merge(batch) { a, _ in a }
+                        Task { @MainActor in
+                            apply(batch)
+                            guard case .running(.translate, _, _) = job.postState, job.postCancel === flag else { return }
+                            job.postState = .running(.translate, message: "翻訳中 \(done)/\(total)",
+                                                     progress: total > 0 ? Double(done) / Double(total) : nil)
+                        }
+                    }
+                    return (failed, all)
+                }
+                apply(all)
+                if failed > 0 {
+                    job.postNote = "\(failed) 区間は訳せませんでした。もう一度「翻訳」を押すと、残りだけを訳し直します。"
+                }
+            }
+        } catch let error as LLMError where error == .cancelled {
+            job.postNote = "中止しました。ここまでの結果は残しています。"
+        } catch {
+            if flag.isSet {
+                job.postNote = "中止しました。ここまでの結果は残しています。"
+            } else {
+                job.postNote = (task == .audit ? "監査" : "翻訳") + "できませんでした: " + error.localizedDescription
+            }
         }
     }
 
@@ -525,25 +855,45 @@ final class AppModel {
     }()
 
     // MARK: 書き出し
-    func export(as format: ExportFormat) {
+    func export(as format: ExportFormat, content: ExportContent = .original) {
         guard let job = selectedJob, let transcript = job.transcript else { return }
         let panel = NSSavePanel()
         let base = (job.name as NSString).deletingPathExtension
-        panel.nameFieldStringValue = "\(base.isEmpty ? "transcript" : base).\(format.fileExtension)"
+        panel.nameFieldStringValue = "\(base.isEmpty ? "transcript" : base)\(content.fileSuffix).\(format.fileExtension)"
         panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .plainText]
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            try Exporter.render(transcript, as: format).write(to: url, atomically: true, encoding: .utf8)
+            try Exporter.render(transcript, as: format, content: content).write(to: url, atomically: true, encoding: .utf8)
         } catch {
             errorMessage = "保存できませんでした: \(error.localizedDescription)"
         }
     }
 
+    /// 対訳で表示しているか (訳が 1 つでもあり、対訳表示がオン)
+    func isBilingual(_ transcript: Transcript) -> Bool {
+        showBilingual && (transcript.hasTranslation || transcript.translatableCount > 0)
+    }
+
+    /// 本文をコピーする。対訳表示のときは原文と日本語訳を並べたもの
     func copySelectedText() {
         guard let transcript = selectedJob?.transcript else { return }
+        let text: String
+        if isBilingual(transcript) && transcript.hasTranslation {
+            text = Exporter.txt(transcript, content: .bilingual)
+        } else {
+            text = transcript.text(withTimestamps: showTimestamps)
+        }
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(transcript.text(withTimestamps: showTimestamps), forType: .string)
+        pb.setString(text, forType: .string)
+    }
+}
+
+extension PostState {
+    /// 動いている仕事 (なければ nil)
+    var task: PostTask? {
+        if case .running(let task, _, _) = self { return task }
+        return nil
     }
 }

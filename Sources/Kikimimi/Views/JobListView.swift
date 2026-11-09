@@ -19,7 +19,7 @@ struct JobListView: View {
                 JobRow(job: job)
                     .tag(job.id)
                     .contextMenu {
-                        if job.isActive {
+                        if job.isActive || job.isPostActive {
                             Button("中止") { model.cancel(job) }
                         }
                         if let url = job.url {
@@ -54,6 +54,9 @@ struct JobRow: View {
                     if job.status == .running {
                         ProgressView(value: job.progress)
                             .controlSize(.mini)
+                    } else if case .running(_, _, let progress?) = job.postState {
+                        ProgressView(value: progress)
+                            .controlSize(.mini)
                     }
                 }
             }
@@ -65,7 +68,9 @@ struct JobRow: View {
         switch job.status {
         case .queued: return "clock"
         case .running: return "waveform"
-        case .done: return job.isRecording ? "mic.fill" : "doc.text"
+        case .done:
+            if let task = job.postState.task { return task == .audit ? "checkmark.seal" : "character.bubble" }
+            return job.isRecording ? "mic.fill" : "doc.text"
         case .failed: return "exclamationmark.triangle.fill"
         case .cancelled: return "xmark.circle"
         }
@@ -85,8 +90,12 @@ struct JobRow: View {
         case .queued: return "順番待ち"
         case .running: return job.message
         case .done:
+            if case .running(_, let message, _) = job.postState { return message }
             if let t = job.transcript {
-                return "\(TimeFormat.short(t.duration)) · \(t.segments.count) 区間"
+                var parts = ["\(TimeFormat.short(t.duration))", "\(t.segments.count) 区間"]
+                if t.hasTranslation { parts.append("対訳") }
+                if t.audit != nil { parts.append("監査済み") }
+                return parts.joined(separator: " · ")
             }
             return "完了"
         case .failed: return "エラー"

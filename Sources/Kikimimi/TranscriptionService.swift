@@ -41,6 +41,16 @@ final class TranscriptionService: @unchecked Sendable {
         return loaded
     }
 
+    /// 読み込んだモデルを手放す (メモリの少ない Mac で、LLM を動かす前に空ける)
+    func unload() {
+        queue.async {
+            self.lock.lock()
+            self.context = nil
+            self.contextHasVADMap = false
+            self.lock.unlock()
+        }
+    }
+
     /// モデルを先に読み込んでおく (録音中のプレビュー用)
     func preload(modelPath: String) async throws {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in

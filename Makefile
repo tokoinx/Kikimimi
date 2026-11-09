@@ -24,6 +24,6 @@ test:           ## コアのユニットテスト
 clean:          ## ビルド成果物を消す
 	rm -rf .build build
 
-reset:          ## 依存 (whisper.cpp) を取り直す
+reset:          ## 依存 (whisper.cpp / llama.cpp) を取り直す
 	swift package reset
 	rm -rf build

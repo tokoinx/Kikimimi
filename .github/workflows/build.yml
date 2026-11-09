@@ -45,10 +45,30 @@ jobs:
           APP=build/Kikimimi.app
           test -x "$APP/Contents/MacOS/Kikimimi"
           test -d "$APP/Contents/Frameworks/whisper.framework"
+          test -d "$APP/Contents/Frameworks/llama.framework"
           plutil -lint "$APP/Contents/Info.plist"
           otool -l "$APP/Contents/MacOS/Kikimimi" | grep -A2 LC_RPATH
           otool -L "$APP/Contents/MacOS/Kikimimi" | grep whisper.framework
+          otool -L "$APP/Contents/MacOS/Kikimimi" | grep llama.framework
           codesign --verify --strict --verbose=2 "$APP"
+
+      # 乱数の重みの小さな GGUF (本物の Qwen2 の語彙) で、組み立てたアプリの LLM 部分をひと通り動かす。
+      # whisper.framework と llama.framework を同じプロセスで使えることの確認も兼ねる。
+      - name: Make a tiny test GGUF
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet gguf numpy
+          curl -fsSL -o build/ggml-vocab-qwen2.gguf \
+            https://raw.githubusercontent.com/ggml-org/llama.cpp/b12211/models/ggml-vocab-qwen2.gguf
+          .venv/bin/python Scripts/make-tiny-gguf.py build/ggml-vocab-qwen2.gguf build/tiny.gguf chatml-think
+
+      - name: LLM self-test (CPU)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm build/tiny.gguf --cpu
+
+      - name: LLM self-test (Metal)
+        # GitHub の Mac は仮想 GPU なので、Metal が使えないことがある (結果は参考)
+        continue-on-error: true
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm build/tiny.gguf
 
       - name: Zip the app
         run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-xcode${{ matrix.xcode }}.zip"

@@ -40,14 +40,85 @@ struct SettingsView: View {
                 }
             }
 
+            Section("監査・翻訳 (ローカル LLM)") {
+                Toggle("文字起こしのあとに監査する (繰り返し・聞き取りミスの見直し)", isOn: $model.autoAudit)
+                Toggle("日本語以外の区間を、日本語に翻訳する", isOn: $model.autoTranslate)
+                Picker("LLM", selection: $model.llmModelID) {
+                    ForEach(LLMCatalog.all) { spec in
+                        Text(spec.displayName + (spec.recommended ? " (おすすめ)" : "")).tag(spec.id)
+                    }
+                    ForEach(model.customLLMFiles, id: \.self) { name in
+                        Text("手持ち: \(name)").tag("file:" + name)
+                    }
+                }
+                ForEach(LLMCatalog.all) { spec in
+                    LLMModelRow(spec: spec)
+                }
+                ForEach(model.customLLMFiles, id: \.self) { name in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(name)
+                            Text("取り込んだ GGUF").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("削除") { model.deleteLLMFile(name) }
+                    }
+                }
+                HStack {
+                    Button("手元の GGUF を追加…") { model.importLLMFile() }
+                    Button("LLM のフォルダを開く") { model.revealLLMFolder() }
+                }
+                Text("監査役は、同じ文の繰り返しと、文脈から見て明らかな聞き間違いを見つけます。自信のある直しだけを反映し、それ以外は「提案」として残すので、確かめてから反映できます。どの直しも元に戻せます。この Mac のメモリは \(MemoryBudget.physicalGB) GB です\(MemoryBudget.isTight ? " (少なめなので、文字起こしと LLM を交互に読み込みます)" : "")。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
-                Text("音声認識は whisper.cpp (OpenAI Whisper の C/C++ 実装) を使い、Mac の GPU (Metal) で動きます。音声は Mac の外に送られません。インターネットを使うのは、モデルを初めて取得するときだけです。")
+                Text("音声認識は whisper.cpp (OpenAI Whisper の C/C++ 実装)、監査と翻訳は llama.cpp と Qwen3.5 (どちらも無料・オープンソース) を使い、Mac の GPU (Metal) で動きます。音声も文字起こしの内容も Mac の外に送られません。インターネットを使うのは、モデルを初めて取得するときだけです。")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 640)
+        .frame(width: 600, height: 720)
+    }
+}
+
+struct LLMModelRow: View {
+    @Environment(AppModel.self) private var model
+    let spec: LLMModelSpec
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(spec.displayName + (spec.recommended ? " (おすすめ)" : ""))
+                Text("\(spec.summary) 約 \(TimeFormat.bytes(Int64(spec.approxMB) * 1_000_000))・\(spec.license)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if spec.recommendedMemoryGB > MemoryBudget.physicalGB {
+                    Text("この Mac (メモリ \(MemoryBudget.physicalGB) GB) では重いかもしれません")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+            Spacer()
+            switch model.llmAvailability(of: spec) {
+            case .installed:
+                Label("取得済み", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .labelStyle(.titleAndIcon)
+                Button("削除") { model.deleteLLM(spec) }
+            case .notInstalled:
+                Button("ダウンロード") { model.downloadLLM(spec) }
+            case .downloading(let fraction):
+                ProgressView(value: fraction)
+                    .frame(width: 90)
+                Text("\(Int(fraction * 100))%")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                Button("中止") { model.cancelLLMDownload(spec) }
+            }
+        }
     }
 }
 

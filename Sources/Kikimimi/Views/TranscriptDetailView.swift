@@ -52,12 +52,23 @@ struct TranscriptDetailView: View {
                     .padding(.bottom, 8)
             }
 
-            if job.transcript != nil {
-                controls
+            PostProcessBar(job: job)
+
+            if let transcript = job.transcript {
+                if job.status == .done, transcript.translatableCount > 0, !model.isLLMInstalled {
+                    LLMNeededBanner()
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                }
+                controls(transcript)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
                 Divider()
-                segmentList
+                if model.isBilingual(transcript) {
+                    BilingualHeader(language: transcript.language, showTimestamp: model.showTimestamps)
+                    Divider()
+                }
+                segmentList(transcript)
             } else {
                 Spacer()
             }
@@ -103,51 +114,82 @@ struct TranscriptDetailView: View {
     }
 
     // MARK: 操作列
-    private var controls: some View {
+    private func controls(_ transcript: Transcript) -> some View {
         @Bindable var model = model
+        let canPost = job.status == .done && !transcript.segments.isEmpty
         return HStack(spacing: 12) {
             TextField("結果を検索", text: $model.searchText)
                 .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 260)
+                .frame(maxWidth: 220)
             Toggle("時刻", isOn: $model.showTimestamps)
                 .toggleStyle(.checkbox)
+            if transcript.hasTranslation || transcript.translatableCount > 0 {
+                Toggle("対訳", isOn: $model.showBilingual)
+                    .toggleStyle(.checkbox)
+                    .help("原文と日本語訳を左右に並べる")
+            }
             Spacer()
+            AuditButton(job: job, transcript: transcript)
+                .disabled(!canPost)
+            if transcript.translatableCount > 0 {
+                Button {
+                    model.translate(job)
+                } label: {
+                    Label(transcript.untranslatedCount > 0 && transcript.hasTranslation ? "残りを翻訳" : "翻訳",
+                          systemImage: "character.bubble")
+                }
+                .help("日本語以外の区間を、Mac の中の LLM で日本語に訳す")
+                .disabled(!canPost || job.isPostActive || transcript.untranslatedCount == 0)
+            }
             Button {
                 model.copySelectedText()
             } label: {
                 Label("コピー", systemImage: "doc.on.doc")
             }
-            Menu {
-                ForEach(ExportFormat.allCases) { format in
-                    Button(format.displayName) { model.export(as: format) }
-                }
-            } label: {
-                Label("書き出す", systemImage: "square.and.arrow.up")
-            }
-            .menuStyle(.button)
-            .fixedSize()
-            .disabled(job.status != .done)
+            ExportMenu(transcript: transcript)
+                .disabled(job.status != .done)
         }
     }
 
     // MARK: 本文
-    private var filteredSegments: [TranscriptSegment] {
-        let segs = job.transcript?.segments ?? []
+    private func filteredSegments(_ transcript: Transcript) -> [TranscriptSegment] {
         let q = model.searchText.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return segs }
-        return segs.filter { $0.text.localizedCaseInsensitiveContains(q) }
+        guard !q.isEmpty else { return transcript.segments }
+        return transcript.segments.filter {
+            $0.text.localizedCaseInsensitiveContains(q) || ($0.translation?.localizedCaseInsensitiveContains(q) ?? false)
+        }
     }
 
-    private var segmentList: some View {
-        ScrollViewReader { proxy in
+    private func segmentList(_ transcript: Transcript) -> some View {
+        let segments = filteredSegments(transcript)
+        let bilingual = model.isBilingual(transcript)
+        let changes = Dictionary((transcript.audit?.changes ?? []).map { ($0.original.id, $0) },
+                                 uniquingKeysWith: { a, _ in a })
+        let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
+        return ScrollViewReader { proxy in
             List {
-                ForEach(filteredSegments) { seg in
-                    SegmentRow(
-                        segment: seg,
-                        showTimestamp: model.showTimestamps,
-                        highlight: model.searchText,
-                        isCurrent: isCurrent(seg)
-                    )
+                ForEach(segments) { seg in
+                    Group {
+                        if bilingual {
+                            BilingualRow(segment: seg,
+                                         japanese: transcript.japaneseText(of: seg),
+                                         isOriginalJapanese: seg.translation == nil
+                                            && !Script.needsTranslation(seg.text, transcriptLanguage: transcript.language),
+                                         isTranslating: translating,
+                                         change: changes[seg.id],
+                                         showTimestamp: model.showTimestamps,
+                                         highlight: model.searchText,
+                                         isCurrent: isCurrent(seg),
+                                         job: job)
+                        } else {
+                            SegmentRow(segment: seg,
+                                       change: changes[seg.id],
+                                       showTimestamp: model.showTimestamps,
+                                       highlight: model.searchText,
+                                       isCurrent: isCurrent(seg),
+                                       job: job)
+                        }
+                    }
                     .id(seg.id)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -156,19 +198,19 @@ struct TranscriptDetailView: View {
                         }
                     }
                 }
-                if filteredSegments.isEmpty {
+                if segments.isEmpty {
                     Text(emptyMessage)
                         .foregroundStyle(.secondary)
                 }
             }
             .listStyle(.inset)
             .onChange(of: model.player.currentTime) { _, _ in
-                if model.player.isPlaying, let cur = filteredSegments.first(where: isCurrent) {
+                if model.player.isPlaying, let cur = segments.first(where: isCurrent) {
                     withAnimation { proxy.scrollTo(cur.id, anchor: .center) }
                 }
             }
             .onChange(of: job.transcript?.segments.count ?? 0) { _, _ in
-                if job.status == .running, let last = filteredSegments.last {
+                if job.status == .running, let last = segments.last {
                     withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
             }
@@ -191,40 +233,439 @@ struct TranscriptDetailView: View {
     }
 }
 
+/// 検索語に色を付ける
+func highlighted(_ text: String, _ query: String) -> AttributedString {
+    var s = AttributedString(text)
+    let q = query.trimmingCharacters(in: .whitespaces)
+    guard !q.isEmpty else { return s }
+    var searchStart = s.startIndex
+    while searchStart < s.endIndex,
+          let r = s[searchStart...].range(of: q, options: [.caseInsensitive]) {
+        s[r].backgroundColor = Color.yellow.opacity(0.5)
+        searchStart = r.upperBound
+    }
+    return s
+}
+
 struct SegmentRow: View {
     let segment: TranscriptSegment
+    let change: AuditChange?
     let showTimestamp: Bool
     let highlight: String
     let isCurrent: Bool
+    let job: Job
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             if showTimestamp {
-                Text(TimeFormat.short(segment.start))
-                    .monospacedDigit()
-                    .font(.callout)
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 52, alignment: .trailing)
+                TimestampLabel(time: segment.start)
             }
-            Text(attributed)
+            Text(highlighted(segment.text, highlight))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if let change {
+                AuditBadge(change: change, job: job)
+            }
         }
         .padding(.vertical, 3)
         .listRowBackground(isCurrent ? Color.accentColor.opacity(0.12) : Color.clear)
     }
+}
 
-    private var attributed: AttributedString {
-        var s = AttributedString(segment.text)
-        let q = highlight.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return s }
-        var searchStart = s.startIndex
-        while searchStart < s.endIndex,
-              let r = s[searchStart...].range(of: q, options: [.caseInsensitive]) {
-            s[r].backgroundColor = Color.yellow.opacity(0.5)
-            searchStart = r.upperBound
+struct TimestampLabel: View {
+    let time: TimeInterval
+
+    var body: some View {
+        Text(TimeFormat.short(time))
+            .monospacedDigit()
+            .font(.callout)
+            .foregroundStyle(Color.accentColor)
+            .frame(width: 52, alignment: .trailing)
+    }
+}
+
+/// 対訳表示の見出し (左: 原文 / 右: 日本語訳)
+struct BilingualHeader: View {
+    let language: String?
+    let showTimestamp: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if showTimestamp {
+                Color.clear.frame(width: 52, height: 1)
+            }
+            Label("原文" + (language.map { "（\(Languages.name(for: $0))）" } ?? ""), systemImage: "text.quote")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Label("日本語訳", systemImage: "character.bubble")
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        return s
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 28)
+        .padding(.vertical, 6)
+    }
+}
+
+/// 対訳表示の 1 行 (左: 原文 / 右: 日本語訳)
+struct BilingualRow: View {
+    let segment: TranscriptSegment
+    let japanese: String?
+    /// もともと日本語の区間 (右の列には原文をそのまま薄く出す)
+    let isOriginalJapanese: Bool
+    let isTranslating: Bool
+    let change: AuditChange?
+    let showTimestamp: Bool
+    let highlight: String
+    let isCurrent: Bool
+    let job: Job
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            if showTimestamp {
+                TimestampLabel(time: segment.start)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(highlighted(segment.text, highlight))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let change {
+                    AuditBadge(change: change, job: job)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                if let japanese {
+                    Text(highlighted(japanese, highlight))
+                        .foregroundStyle(isOriginalJapanese ? Color.secondary : Color.primary)
+                        .textSelection(.enabled)
+                } else {
+                    Text(isTranslating ? "翻訳中…" : "未翻訳")
+                        .foregroundStyle(.tertiary)
+                        .italic()
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 3)
+        .listRowBackground(isCurrent ? Color.accentColor.opacity(0.12) : Color.clear)
+    }
+}
+
+/// 監査で直した / 直す提案がある区間の印。押すと内容を見て、反映・取り消しができる
+struct AuditBadge: View {
+    @Environment(AppModel.self) private var model
+    let change: AuditChange
+    let job: Job
+    @State private var showing = false
+
+    var body: some View {
+        Button {
+            showing = true
+        } label: {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(color.opacity(0.18), in: Capsule())
+                .foregroundStyle(color)
+        }
+        .buttonStyle(.plain)
+        .help(change.reason)
+        .popover(isPresented: $showing, arrowEdge: .trailing) {
+            AuditChangeDetail(change: change, job: job)
+                .padding(14)
+                .frame(width: 360)
+        }
+    }
+
+    private var title: String {
+        if change.isApplied { return change.kind == .fix ? "修正済み" : "削除済み" }
+        return change.kind == .fix ? "修正の提案" : "削除の提案"
+    }
+
+    private var color: Color {
+        change.isApplied ? .green : .orange
+    }
+}
+
+/// 監査の 1 か所の内容
+struct AuditChangeDetail: View {
+    @Environment(AppModel.self) private var model
+    let change: AuditChange
+    let job: Job
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(change.kind == .fix ? "聞き取りミスの修正" : "区間の削除",
+                      systemImage: change.kind == .fix ? "pencil" : "trash")
+                    .font(.headline)
+                Spacer()
+                Text(TimeFormat.short(change.original.start))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            Text(change.reason)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Text(change.original.text)
+                .strikethrough(change.kind == .delete || change.isApplied)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            if let replacement = change.replacement {
+                Label {
+                    Text(replacement).textSelection(.enabled)
+                } icon: {
+                    Image(systemName: "arrow.turn.down.right")
+                }
+            }
+            HStack {
+                Text(change.origin == .llm ? "見つけた: ローカル LLM" : "見つけた: 繰り返しの規則")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                if change.isApplied {
+                    Button("元に戻す") { model.setAuditChange(change, applied: false, in: job) }
+                } else {
+                    Button(change.kind == .fix ? "この修正を反映" : "この区間を消す") {
+                        model.setAuditChange(change, applied: true, in: job)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(.top, 4)
+        }
+    }
+}
+
+/// 監査の実行と、結果の一覧
+struct AuditButton: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    let transcript: Transcript
+    @State private var showing = false
+
+    var body: some View {
+        if let audit = transcript.audit {
+            Button {
+                showing = true
+            } label: {
+                Label(summary(audit), systemImage: "checkmark.seal")
+            }
+            .help("監査の結果を見る (直した所・直す提案)")
+            .popover(isPresented: $showing, arrowEdge: .bottom) {
+                AuditPanel(job: job, transcript: transcript)
+                    .frame(width: 460, height: 420)
+            }
+        } else {
+            Button {
+                model.audit(job)
+            } label: {
+                Label("監査", systemImage: "checkmark.seal")
+            }
+            .help(model.isLLMInstalled
+                  ? "繰り返しと聞き取りミスを、Mac の中の LLM で見直す"
+                  : "繰り返しを見直す (聞き取りミスも見直すには、設定から LLM を取得)")
+            .disabled(job.isPostActive)
+        }
+    }
+
+    private func summary(_ audit: AuditReport) -> String {
+        var parts: [String] = []
+        if audit.appliedFixes > 0 { parts.append("修正 \(audit.appliedFixes)") }
+        if audit.appliedDeletes > 0 { parts.append("削除 \(audit.appliedDeletes)") }
+        if audit.pendingSuggestions > 0 { parts.append("提案 \(audit.pendingSuggestions)") }
+        return parts.isEmpty ? "監査: 問題なし" : "監査: " + parts.joined(separator: " · ")
+    }
+}
+
+struct AuditPanel: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    let transcript: Transcript
+
+    var body: some View {
+        let audit = transcript.audit
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("監査の結果").font(.headline)
+                Spacer()
+                if let audit {
+                    Text(audit.model.map { "LLM: \($0)" } ?? "規則のみ")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Text("自信のある直しだけを反映しています。「提案」は確かめてから反映してください。どれもいつでも元に戻せます。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let audit, !audit.changes.isEmpty {
+                List(audit.changes) { change in
+                    HStack(alignment: .top, spacing: 8) {
+                        Toggle("", isOn: Binding(
+                            get: { change.isApplied },
+                            set: { model.setAuditChange(change, applied: $0, in: job) }
+                        ))
+                        .toggleStyle(.checkbox)
+                        .labelsHidden()
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(TimeFormat.short(change.original.start))
+                                    .monospacedDigit()
+                                    .foregroundStyle(Color.accentColor)
+                                Text(change.kind == .fix ? "修正" : "削除")
+                                    .font(.caption.weight(.semibold))
+                                Text(change.reason)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Text(change.original.text)
+                                .strikethrough(change.isApplied)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                            if let replacement = change.replacement {
+                                Text("→ " + replacement)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+                }
+                .listStyle(.inset)
+            } else {
+                Spacer()
+                Text("直す所は見つかりませんでした。")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                Spacer()
+            }
+            HStack {
+                Button("すべて元に戻す") { model.revertAudit(of: job) }
+                    .disabled((audit?.appliedFixes ?? 0) + (audit?.appliedDeletes ?? 0) == 0)
+                Spacer()
+                Button("監査をやり直す") { model.audit(job) }
+                    .disabled(job.isPostActive)
+            }
+        }
+        .padding(14)
+    }
+}
+
+/// 監査・翻訳の進み具合
+struct PostProcessBar: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if case .running(let task, let message, let progress) = job.postState {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: task == .audit ? "checkmark.seal" : "character.bubble")
+                        .foregroundStyle(Color.accentColor)
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let progress {
+                            ProgressView(value: progress)
+                        } else {
+                            ProgressView().progressViewStyle(.linear)
+                        }
+                        Text(message + (job.postQueue.isEmpty ? "" : "（このあと: " + queued + "）"))
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("中止") { model.cancelPost(job) }
+                }
+            } else if !job.postQueue.isEmpty {
+                Label("順番待ち: " + queued, systemImage: "clock")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            if let note = job.postNote {
+                Label(note, systemImage: "info.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, job.isPostActive || job.postNote != nil ? 10 : 0)
+    }
+
+    private var queued: String {
+        job.postQueue.map { $0 == .audit ? "監査" : "翻訳" }.joined(separator: "・")
+    }
+}
+
+/// 翻訳・監査に LLM が必要なことを知らせる
+struct LLMNeededBanner: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let selection = model.currentLLM
+        HStack(spacing: 12) {
+            Image(systemName: "character.bubble")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("日本語訳と聞き取りミスの監査には、Mac の中で動く LLM を使います")
+                    .font(.callout.weight(.semibold))
+                Text("\(selection.name) (約 \(selection.spec.map { TimeFormat.bytes(Int64($0.approxMB) * 1_000_000) } ?? "—")) を一度だけダウンロードします。文字起こしの内容は Mac の外に出ません。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if let spec = selection.spec {
+                switch model.llmAvailability(of: spec) {
+                case .downloading(let fraction):
+                    ProgressView(value: fraction).frame(width: 90)
+                    Text("\(Int(fraction * 100))%").monospacedDigit().foregroundStyle(.secondary)
+                    Button("中止") { model.cancelLLMDownload(spec) }
+                case .notInstalled:
+                    Button("ダウンロード") { model.downloadLLM(spec) }
+                        .buttonStyle(.borderedProminent)
+                case .installed:
+                    EmptyView()
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// 書き出し (原文 / 日本語訳 / 対訳 × 形式)
+struct ExportMenu: View {
+    @Environment(AppModel.self) private var model
+    let transcript: Transcript
+
+    var body: some View {
+        Menu {
+            ExportMenuItems(hasTranslation: transcript.hasTranslation)
+        } label: {
+            Label("書き出す", systemImage: "square.and.arrow.up")
+        }
+        .menuStyle(.button)
+        .fixedSize()
+    }
+}
+
+struct ExportMenuItems: View {
+    @Environment(AppModel.self) private var model
+    let hasTranslation: Bool
+
+    var body: some View {
+        if hasTranslation {
+            ForEach(ExportContent.allCases) { content in
+                Section(content.displayName) {
+                    ForEach(ExportFormat.allCases.filter { ExportContent.available(for: $0).contains(content) }) { format in
+                        Button(format.displayName) { model.export(as: format, content: content) }
+                    }
+                }
+            }
+        } else {
+            ForEach(ExportFormat.allCases) { format in
+                Button(format.displayName) { model.export(as: format) }
+            }
+        }
     }
 }
 

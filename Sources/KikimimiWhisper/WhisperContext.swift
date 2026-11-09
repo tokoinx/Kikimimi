@@ -1,6 +1,7 @@
 import Foundation
 import KikimimiCore
-import whisper
+// llama.framework と同じ名前の ggml の型がぶつからないよう、whisper はこのモジュールの中だけで使う
+internal import whisper
 
 /// 文字起こしの設定
 public struct WhisperOptions: Sendable {

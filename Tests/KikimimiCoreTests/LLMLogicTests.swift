@@ -1,0 +1,408 @@
+import XCTest
+@testable import KikimimiCore
+
+/// 決まった答えを返す偽の LLM。受け取った依頼を覚えておく。
+final class FakeGenerator: TextGenerating {
+    var contextLength = 8192
+    var prompts: [LLMPrompt] = []
+    let respond: (LLMPrompt) -> String
+
+    init(_ respond: @escaping (LLMPrompt) -> String) {
+        self.respond = respond
+    }
+
+    func tokenCount(_ text: String) -> Int { text.utf8.count / 3 + 1 }
+
+    func generate(_ prompt: LLMPrompt, shouldCancel: () -> Bool) throws -> String {
+        if shouldCancel() { throw LLMError.cancelled }
+        prompts.append(prompt)
+        return respond(prompt)
+    }
+}
+
+/// 依頼の中の「[n] 本文」の行を取り出す
+private func numberedLines(in prompt: LLMPrompt) -> [(Int, String)] {
+    prompt.user.split(separator: "\n").compactMap { line -> (Int, String)? in
+        guard line.hasPrefix("["), let close = line.firstIndex(of: "]"),
+              let n = Int(line[line.index(after: line.startIndex)..<close]) else { return nil }
+        return (n, String(line[line.index(close, offsetBy: 2)...]))
+    }
+}
+
+private func seg(_ start: TimeInterval, _ text: String, length: TimeInterval = 2) -> TranscriptSegment {
+    TranscriptSegment(start: start, end: start + length, text: text)
+}
+
+final class GrammarTests: XCTestCase {
+    func testLiteralEscaping() {
+        XCTAssertEqual(GBNF.literal("[1] "), "\"[1] \"")
+        XCTAssertEqual(GBNF.literal("a\"b\\c\n"), "\"a\\\"b\\\\c\\n\"")
+    }
+
+    func testNumberedLines() {
+        let g = GBNF.numberedLines(count: 3)
+        XCTAssertTrue(g.hasPrefix("root ::= \"[1] \" line \"\\n\" \"[2] \" line \"\\n\" \"[3] \" line \"\\n\""), g)
+        XCTAssertTrue(g.contains("line ::= [^\\r\\n]+"))
+    }
+
+    func testAuditActions() {
+        let g = GBNF.auditActions(count: 3)
+        XCTAssertTrue(g.contains("root ::= \"OK\\n\" | item+"))
+        XCTAssertTrue(g.contains("id ::= \"1\" | \"2\" | \"3\""))
+        XCTAssertTrue(g.contains("action ::= \"DEL\" note? | \"FIX \" text"))
+    }
+
+    func testCompleteLines() {
+        XCTAssertEqual(completeLines(of: "[1] a\n[2] b\n"), ["[1] a", "[2] b"])
+        XCTAssertEqual(completeLines(of: "[1] a\n[2] b が途中"), ["[1] a"])
+        XCTAssertEqual(completeLines(of: "[1] a\r\n[2] b\r\n"), ["[1] a", "[2] b"])
+        XCTAssertEqual(completeLines(of: ""), [])
+    }
+}
+
+final class TextAnalysisTests: XCTestCase {
+    func testScript() {
+        XCTAssertTrue(Script.needsTranslation("Hello, everyone."))
+        XCTAssertFalse(Script.needsTranslation("こんにちは。"))
+        XCTAssertFalse(Script.needsTranslation("Roblox Studio を開きます"))
+        XCTAssertFalse(Script.needsTranslation("以上です"))
+        XCTAssertFalse(Script.needsTranslation("以上"))
+        XCTAssertTrue(Script.needsTranslation("以上", transcriptLanguage: "zh"))
+        XCTAssertFalse(Script.needsTranslation("100%"))
+        XCTAssertFalse(Script.needsTranslation("…"))
+        XCTAssertTrue(Script.needsTranslation("Merci beaucoup"))
+        XCTAssertEqual(Script.englishName(for: "en"), "English")
+        XCTAssertEqual(Script.englishName(for: nil), "the original language")
+    }
+
+    func testSimilarity() {
+        XCTAssertEqual(TextSimilarity.distance("kitten", "sitting"), 3)
+        XCTAssertEqual(TextSimilarity.distance("", "abc"), 3)
+        XCTAssertEqual(TextSimilarity.ratio("Hello, world!", "hello world"), 1)
+        XCTAssertLessThan(TextSimilarity.ratio("apple pie", "banana split"), 0.5)
+    }
+}
+
+final class AuditorTests: XCTestCase {
+    func testFindRepeats() {
+        let segments = [
+            seg(0, "Today we will talk about the new release."),
+            seg(2, "Today we will talk about the new release."),        // 同じ文 (長い) → 自動で消す
+            seg(4, "Thank you."),
+            seg(6, "Thank you."),                                         // 短い → キーが 8 文字 → 提案
+            seg(8, "We shipped the update to every customer last week."),
+            seg(9.5, "We shipped the update to every customer last weak."), // ほぼ同じ・すぐ続く → 自動
+            seg(30, "We shipped the update to every customer last week."), // 10 秒以上あと → 何もしない
+            seg(33, "This is the part about pricing and plans."),
+            seg(34.5, "about pricing and plans"),                          // 一部の繰り返し・すぐ続く → 自動
+        ]
+        let changes = Auditor.findRepeats(segments)
+        let byID = Dictionary(uniqueKeysWithValues: changes.map { ($0.original.id, $0) })
+        XCTAssertEqual(byID[segments[1].id]?.isConfident, true)
+        XCTAssertEqual(byID[segments[1].id]?.kind, .delete)
+        XCTAssertEqual(byID[segments[3].id]?.isConfident, false)
+        XCTAssertEqual(byID[segments[5].id]?.isConfident, true)
+        XCTAssertNil(byID[segments[6].id])
+        XCTAssertEqual(byID[segments[8].id]?.isConfident, true)
+        XCTAssertNil(byID[segments[0].id])
+        XCTAssertEqual(changes.count, 4)
+    }
+
+    func testRepeatsSkipJapaneseShortReplies() {
+        let segments = [seg(0, "はい"), seg(1, "はい"), seg(2, "そうですね"), seg(3, "そうですね")]
+        XCTAssertTrue(Auditor.findRepeats(segments).isEmpty)
+    }
+
+    func testParse() {
+        let out = "[2] FIX the Roblox Studio editor\n[3] DEL duplicate of [2]\n[2] DEL again\n[9] DEL out of range\n[1] FIX 途中で"
+        let actions = Auditor.parse(out, count: 3)
+        XCTAssertEqual(actions[2], .fix("the Roblox Studio editor"))
+        XCTAssertEqual(actions[3], .delete("duplicate of [2]"))
+        XCTAssertNil(actions[1]) // 書き切っていない最後の行は使わない
+        XCTAssertNil(actions[9])
+        XCTAssertTrue(Auditor.parse("OK\n", count: 3).isEmpty)
+    }
+
+    func testFixAssessment() {
+        let small = Auditor.fixAssessment(original: "Open the Roblocks Studio app.", replacement: "Open the Roblox Studio app.", language: "en")
+        XCTAssertEqual(small.keep, true)
+        XCTAssertEqual(small.confident, true)
+        // 翻訳してしまった直しは受け付けない
+        let translated = Auditor.fixAssessment(original: "Open the app.", replacement: "アプリを開きます。", language: "en")
+        XCTAssertEqual(translated.keep, false)
+        // 丸ごと書き換えは受け付けない
+        let rewrite = Auditor.fixAssessment(original: "We met at noon.", replacement: "The weather was lovely all afternoon long.", language: "en")
+        XCTAssertEqual(rewrite.keep, false)
+        // 句読点だけの違いは直しにならない
+        XCTAssertEqual(Auditor.fixAssessment(original: "Hello world", replacement: "Hello, world.", language: "en").keep, false)
+        // 日本語の同音異義語
+        let ja = Auditor.fixAssessment(original: "会議の議事録を構成します", replacement: "会議の議事録を校正します", language: "ja")
+        XCTAssertEqual(ja.keep, true)
+        XCTAssertEqual(ja.confident, true)
+    }
+
+    func testAuditWithLLMAndApply() throws {
+        var segments = [
+            seg(0, "Welcome to the Roblocks Studio tutorial."),
+            seg(3, "First, open a new place."),
+            seg(6, "Thank you for watching."),
+            seg(9, "Then press the play button."),
+        ]
+        segments[0].translation = "古い訳"
+        let fake = FakeGenerator { prompt in
+            XCTAssertNotNil(prompt.grammar)
+            XCTAssertTrue(prompt.system.contains("English"))
+            XCTAssertTrue(prompt.user.contains("Roblox Studio"), "語彙のヒントを渡す")
+            return "[1] FIX Welcome to the Roblox Studio tutorial.\n[3] DEL hallucination\n"
+        }
+        let report = try Auditor.audit(segments, language: "en", options: AuditOptions(glossary: "Roblox Studio"),
+                                       generator: fake, modelName: "fake", shouldCancel: { false })
+        XCTAssertEqual(report.changes.count, 2)
+        XCTAssertEqual(report.model, "fake")
+        let fix = try XCTUnwrap(report.changes.first { $0.kind == .fix })
+        XCTAssertTrue(fix.isConfident)
+        let del = try XCTUnwrap(report.changes.first { $0.kind == .delete })
+        XCTAssertTrue(del.isConfident, "定番の誤認識なので裏付けあり")
+
+        var t = Transcript(sourceName: "x", segments: segments, language: "en")
+        t.adopt(report)
+        XCTAssertEqual(t.segments.count, 3)
+        XCTAssertEqual(t.segments[0].text, "Welcome to the Roblox Studio tutorial.")
+        XCTAssertNil(t.segments[0].translation, "文が変わったら訳し直す")
+        XCTAssertEqual(t.audit?.appliedFixes, 1)
+        XCTAssertEqual(t.audit?.appliedDeletes, 1)
+
+        // 削除を元に戻すと、元の位置に戻る
+        t.setChange(del.id, applied: false)
+        XCTAssertEqual(t.segments.map(\.text)[2], "Thank you for watching.")
+        XCTAssertEqual(t.segments.count, 4)
+        // 修正を元に戻すと、元の文と訳に戻る
+        t.setChange(fix.id, applied: false)
+        XCTAssertEqual(t.segments[0].text, "Welcome to the Roblocks Studio tutorial.")
+        XCTAssertEqual(t.segments[0].translation, "古い訳")
+        XCTAssertEqual(t.audit?.pendingSuggestions, 2)
+        // もう一度反映
+        t.setChange(fix.id, applied: true)
+        XCTAssertEqual(t.segments[0].text, "Welcome to the Roblox Studio tutorial.")
+        t.revertAllChanges()
+        XCTAssertEqual(t.segments.map(\.text), segments.map(\.text))
+    }
+
+    func testNumbersMakeLinesDifferent() {
+        XCTAssertFalse(TextSimilarity.isNearDuplicate("We have 3 options to choose from today.", "We have 4 options to choose from today.", minimumRatio: 0.8))
+        XCTAssertFalse(TextSimilarity.isNearDuplicate("第一章は導入の話をします", "第二章は導入の話をします", minimumRatio: 0.8))
+        XCTAssertTrue(TextSimilarity.isNearDuplicate("We have three options to choose from.", "We have three option to choose from.", minimumRatio: 0.8))
+        let steps = (1...4).map { seg(Double($0) * 2, "Step \($0): open the settings window.") }
+        XCTAssertTrue(Auditor.findRepeats(steps).isEmpty)
+    }
+
+    func testUnbackedDeleteAndTooManyFixesStaySuggestions() throws {
+        let segments = (0..<8).map { seg(Double($0) * 3, "Line number \($0) of a perfectly normal talk.") }
+        let fake = FakeGenerator { _ in
+            "[1] DEL looks odd\n[2] FIX Line number 1 of a perfectly normal walk.\n[3] FIX Line number 2 of a perfectly normal walk.\n"
+                + "[4] FIX Line number 3 of a perfectly normal walk.\n"
+        }
+        let report = try Auditor.audit(segments, language: "en", generator: fake, modelName: "fake", shouldCancel: { false })
+        XCTAssertEqual(report.changes.count, 4)
+        XCTAssertTrue(report.changes.allSatisfy { !$0.isConfident }, "半分近くを直したがる答えは提案どまり")
+        var t = Transcript(sourceName: "x", segments: segments)
+        t.adopt(report)
+        XCTAssertEqual(t.segments.map(\.text), segments.map(\.text), "提案は本文を変えない")
+        XCTAssertEqual(t.audit?.pendingSuggestions, 4)
+    }
+
+    func testRulesOnlyAndCancel() throws {
+        let segments = [seg(0, "The quick brown fox jumps."), seg(1, "The quick brown fox jumps.")]
+        let report = try Auditor.audit(segments, language: "en", generator: nil, modelName: nil, shouldCancel: { false })
+        XCTAssertEqual(report.changes.count, 1)
+        XCTAssertNil(report.model)
+        let fake = FakeGenerator { _ in "OK\n" }
+        XCTAssertThrowsError(try Auditor.audit(segments, language: "en", generator: fake, modelName: "f", shouldCancel: { true })) {
+            XCTAssertEqual($0 as? LLMError, .cancelled)
+        }
+    }
+
+    func testChunker() {
+        let chunks = LLMChunker.chunks(Array(0..<10), cost: { $0 == 5 ? 50 : 10 }, maxLines: 4, maxCost: 40)
+        XCTAssertEqual(chunks, [[0, 1, 2, 3], [4], [5], [6, 7, 8, 9]])
+        XCTAssertEqual(LLMChunker.chunks([], cost: { _ in 1 }, maxLines: 3, maxCost: 10), [])
+    }
+}
+
+final class TranslatorTests: XCTestCase {
+    func testTranslateInOrderAndSkipJapanese() throws {
+        let segments = [
+            seg(0, "Hello everyone."),
+            seg(2, "こんにちは。"),
+            seg(4, "Let's get started."),
+            seg(6, "100%"),
+        ]
+        let fake = FakeGenerator { prompt in
+            numberedLines(in: prompt).map { "[\($0.0)] 訳:\($0.1)" }.joined(separator: "\n") + "\n"
+        }
+        var collected: [UUID: String] = [:]
+        var progress: [(Int, Int)] = []
+        let failed = try Translator.translate(segments, language: "en", generator: fake, shouldCancel: { false }) { batch, done, total in
+            collected.merge(batch) { a, _ in a }
+            progress.append((done, total))
+        }
+        XCTAssertEqual(failed, 0)
+        XCTAssertEqual(collected[segments[0].id], "訳:Hello everyone.")
+        XCTAssertEqual(collected[segments[2].id], "訳:Let's get started.")
+        XCTAssertNil(collected[segments[1].id])
+        XCTAssertNil(collected[segments[3].id])
+        XCTAssertEqual(fake.prompts.count, 1)
+        XCTAssertEqual(fake.prompts[0].grammar, GBNF.numberedLines(count: 2))
+        XCTAssertNotNil(fake.prompts[0].maxLineBytes)
+        XCTAssertEqual(progress.last?.0, 2)
+        XCTAssertEqual(progress.last?.1, 2)
+    }
+
+    func testMissingLinesAreRetriedOneByOne() throws {
+        let segments = (0..<3).map { seg(Double($0) * 2, "Sentence \($0).") }
+        let fake = FakeGenerator { prompt in
+            let lines = numberedLines(in: prompt)
+            if lines.count > 1 { return "[1] 文 0\n[3] 文 2\n" } // 2 行目が抜けた
+            return "[1] 文 \(lines[0].1.dropFirst(9).dropLast())\n"
+        }
+        var collected: [UUID: String] = [:]
+        let failed = try Translator.translate(segments, language: "en", generator: fake, shouldCancel: { false }) { batch, _, _ in
+            collected.merge(batch) { a, _ in a }
+        }
+        XCTAssertEqual(failed, 0)
+        XCTAssertEqual(fake.prompts.count, 2)
+        XCTAssertEqual(collected[segments[1].id], "文 1")
+        XCTAssertEqual(collected[segments[2].id], "文 2")
+    }
+
+    func testContextUsesPreviousTranslations() throws {
+        var segments = (0..<4).map { seg(Double($0) * 2, "Line \($0) here.") }
+        segments[0].translation = "0 行目"
+        let fake = FakeGenerator { prompt in
+            numberedLines(in: prompt).map { "[\($0.0)] 訳" }.joined(separator: "\n") + "\n"
+        }
+        _ = try Translator.translate(segments, language: "en", options: TranslationOptions(maxLinesPerChunk: 2),
+                                     generator: fake, shouldCancel: { false }) { _, _, _ in }
+        XCTAssertEqual(fake.prompts.count, 2)
+        XCTAssertTrue(fake.prompts[0].user.contains("Line 0 here. => 0 行目"))
+        XCTAssertTrue(fake.prompts[1].user.contains("Line 2 here. => 訳"), fake.prompts[1].user)
+    }
+
+    func testImplausibleAndCancel() throws {
+        let segments = [seg(0, "Hi.")]
+        let fake = FakeGenerator { _ in "[1] " + String(repeating: "あ", count: 200) + "\n" }
+        let failed = try Translator.translate(segments, language: "en", generator: fake, shouldCancel: { false }) { _, _, _ in }
+        XCTAssertEqual(failed, 1)
+        XCTAssertThrowsError(try Translator.translate(segments, language: "en", generator: fake, shouldCancel: { true }) { _, _, _ in })
+    }
+}
+
+final class BilingualExportTests: XCTestCase {
+    private func sample() -> Transcript {
+        var t = Transcript(sourceName: "talk",
+                           segments: [seg(0, "Hello | world."), seg(2, "こんにちは"), seg(4, "Untranslated line.")],
+                           language: "en", model: "m", duration: 6, elapsed: 1)
+        t.segments[0].translation = "こんにちは、世界。"
+        t.translationModel = "Qwen3.5 4B"
+        return t
+    }
+
+    func testJapaneseText() {
+        let t = sample()
+        XCTAssertEqual(t.japaneseText(of: t.segments[0]), "こんにちは、世界。")
+        XCTAssertEqual(t.japaneseText(of: t.segments[1]), "こんにちは")
+        XCTAssertNil(t.japaneseText(of: t.segments[2]))
+        XCTAssertTrue(t.hasTranslation)
+        XCTAssertEqual(t.translatableCount, 2)
+        XCTAssertEqual(t.untranslatedCount, 1)
+    }
+
+    func testFormats() {
+        let t = sample()
+        XCTAssertEqual(Exporter.txt(t, content: .japanese), "こんにちは、世界。\nこんにちは\nUntranslated line.\n")
+        XCTAssertTrue(Exporter.txt(t, content: .bilingual).hasPrefix("[00:00] Hello | world.\n        こんにちは、世界。\n[00:02] こんにちは\n"))
+        let srt = Exporter.srt(t, content: .bilingual)
+        XCTAssertTrue(srt.hasPrefix("1\n00:00:00,000 --> 00:00:02,000\nHello | world.\nこんにちは、世界。\n"), srt)
+        XCTAssertTrue(srt.contains("2\n00:00:02,000 --> 00:00:04,000\nこんにちは\n"), "日本語の区間は 1 行だけ")
+        XCTAssertTrue(Exporter.vtt(t, content: .japanese).contains("00:00:00.000 --> 00:00:02.000\nこんにちは、世界。"))
+        let md = Exporter.markdown(t, content: .bilingual)
+        XCTAssertTrue(md.contains("翻訳: Qwen3.5 4B"))
+        XCTAssertTrue(md.contains("| 00:00 | Hello \\| world. | こんにちは、世界。 |"), md)
+        XCTAssertTrue(md.contains("| 00:04 | Untranslated line. |  |"))
+        let csv = Exporter.csv(t, content: .bilingual)
+        XCTAssertTrue(csv.hasPrefix("start,end,text,japanese\n0.000,2.000,\"Hello | world.\",\"こんにちは、世界。\"\n"), csv)
+        XCTAssertEqual(Exporter.render(t, as: .txt), Exporter.txt(t))
+        XCTAssertEqual(ExportContent.available(for: .json), [.original])
+    }
+
+    func testCodableRoundTripWithAuditAndTranslation() throws {
+        var t = sample()
+        t.adopt(AuditReport(changes: [AuditChange(kind: .delete, origin: .rule, original: t.segments[2],
+                                                  reason: "test", isConfident: true)],
+                            model: nil, reviewedCount: 3))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let back = try decoder.decode(Transcript.self, from: Data(Exporter.json(t).utf8))
+        XCTAssertEqual(back.segments.count, 2)
+        XCTAssertEqual(back.segments[0].translation, "こんにちは、世界。")
+        XCTAssertEqual(back.audit?.changes.first?.isApplied, true)
+        XCTAssertEqual(back.translationModel, "Qwen3.5 4B")
+        // 古い形式 (訳・監査なし) の JSON も読める
+        let old = #"{"sourceName":"a","segments":[{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","start":0,"end":1,"text":"x"}],"duration":1,"elapsed":0}"#
+        let legacy = try JSONDecoder().decode(Transcript.self, from: Data(old.utf8))
+        XCTAssertNil(legacy.segments[0].translation)
+        XCTAssertNil(legacy.audit)
+    }
+}
+
+final class LLMCatalogTests: XCTestCase {
+    func testCatalog() {
+        XCTAssertEqual(LLMCatalog.all.filter(\.recommended).map(\.id), [LLMCatalog.defaultModelID])
+        XCTAssertEqual(Set(LLMCatalog.all.map(\.id)).count, LLMCatalog.all.count)
+        XCTAssertEqual(LLMCatalog.spec(id: "qwen3.5-4b")?.fileName, "qwen3.5-4b.gguf")
+        XCTAssertEqual(LLMModelSpec.treeURL(repository: "bartowski/Qwen_Qwen3.5-4B-GGUF")?.absoluteString,
+                       "https://huggingface.co/api/models/bartowski/Qwen_Qwen3.5-4B-GGUF/tree/main")
+        XCTAssertEqual(LLMModelSpec.downloadURL(repository: "a/b", path: "sub dir/x.gguf")?.absoluteString,
+                       "https://huggingface.co/a/b/resolve/main/sub%20dir/x.gguf")
+    }
+
+    func testPickFile() throws {
+        let json = """
+        [
+          {"type":"file","oid":"1","size":1500,"path":"README.md"},
+          {"type":"file","oid":"2","size":900,"path":"mmproj-Qwen_Qwen3.5-4B-f16.gguf",
+           "lfs":{"oid":"\(String(repeating: "a", count: 64))","size":900000000,"pointerSize":135}},
+          {"type":"file","oid":"3","size":135,"path":"Qwen_Qwen3.5-4B-Q4_K_S.gguf",
+           "lfs":{"oid":"\(String(repeating: "b", count: 64))","size":2630000000,"pointerSize":135}},
+          {"type":"file","oid":"4","size":135,"path":"Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+           "lfs":{"oid":"\(String(repeating: "C", count: 64))","size":2780000000,"pointerSize":135}},
+          {"type":"directory","oid":"5","size":0,"path":"Q4_K_M"},
+          {"type":"file","oid":"6","size":135,"path":"Q4_K_M/Qwen_Qwen3.5-4B-Q4_K_M.gguf"}
+        ]
+        """
+        let entries = try JSONDecoder().decode([HFFileEntry].self, from: Data(json.utf8))
+        let spec = try XCTUnwrap(LLMCatalog.spec(id: "qwen3.5-4b"))
+        let picked = try XCTUnwrap(spec.pickFile(from: entries))
+        XCTAssertEqual(picked.path, "Qwen_Qwen3.5-4B-Q4_K_M.gguf")
+        XCTAssertEqual(picked.fileSize, 2_780_000_000)
+        XCTAssertEqual(picked.sha256, String(repeating: "c", count: 64))
+        XCTAssertNil(entries[0].sha256)
+
+        let unsloth = [HFFileEntry(type: "file", path: "Qwen3.5-2B-UD-Q4_K_XL.gguf", size: 1, lfs: nil),
+                       HFFileEntry(type: "file", path: "Qwen3.5-2B-BF16.gguf", size: 1, lfs: nil)]
+        XCTAssertEqual(spec.pickFile(from: unsloth)?.path, "Qwen3.5-2B-UD-Q4_K_XL.gguf")
+        XCTAssertNil(spec.pickFile(from: [HFFileEntry(type: "file", path: "model-Q4_K_M-00001-of-00002.gguf", size: 1, lfs: nil)]))
+    }
+
+    func testGGUFFile() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gguf = dir.appendingPathComponent("a.gguf")
+        try (Data("GGUF".utf8) + Data(count: 2_000_000)).write(to: gguf)
+        XCTAssertTrue(GGUFFile.isGGUF(at: gguf))
+        let ggml = dir.appendingPathComponent("b.bin")
+        try (Data([0x6c, 0x6d, 0x67, 0x67]) + Data(count: 2_000_000)).write(to: ggml)
+        XCTAssertFalse(GGUFFile.isGGUF(at: ggml))
+    }
+}

@@ -6,12 +6,15 @@ public struct TranscriptSegment: Codable, Hashable, Identifiable, Sendable {
     public var start: TimeInterval
     public var end: TimeInterval
     public var text: String
+    /// 日本語訳 (まだ訳していなければ nil)
+    public var translation: String?
 
-    public init(id: UUID = UUID(), start: TimeInterval, end: TimeInterval, text: String) {
+    public init(id: UUID = UUID(), start: TimeInterval, end: TimeInterval, text: String, translation: String? = nil) {
         self.id = id
         self.start = start
         self.end = max(start, end)
         self.text = text
+        self.translation = translation
     }
 
     public var duration: TimeInterval { end - start }
@@ -26,15 +29,22 @@ public struct Transcript: Codable, Hashable, Sendable {
     public var model: String?
     public var duration: TimeInterval
     public var elapsed: TimeInterval
+    /// 監査 (聞き取りミス・繰り返しの見直し) の結果
+    public var audit: AuditReport?
+    /// 翻訳に使った LLM の名前
+    public var translationModel: String?
 
     public init(sourceName: String, segments: [TranscriptSegment] = [], language: String? = nil,
-                model: String? = nil, duration: TimeInterval = 0, elapsed: TimeInterval = 0) {
+                model: String? = nil, duration: TimeInterval = 0, elapsed: TimeInterval = 0,
+                audit: AuditReport? = nil, translationModel: String? = nil) {
         self.sourceName = sourceName
         self.segments = segments
         self.language = language
         self.model = model
         self.duration = duration
         self.elapsed = elapsed
+        self.audit = audit
+        self.translationModel = translationModel
     }
 
     /// 本文 (1 区間 1 行)
@@ -54,6 +64,27 @@ public struct Transcript: Codable, Hashable, Sendable {
     /// 実時間比 (処理秒 / 音声秒)。小さいほど速い。
     public var realTimeFactor: Double? {
         duration > 0 && elapsed > 0 ? elapsed / duration : nil
+    }
+
+    /// 日本語訳が 1 つでもあるか
+    public var hasTranslation: Bool {
+        segments.contains { $0.translation != nil }
+    }
+
+    /// 日本語に訳す必要がある区間の数 (日本語の区間や、数字・記号だけの区間は数えない)
+    public var translatableCount: Int {
+        segments.filter { Script.needsTranslation($0.text, transcriptLanguage: language) }.count
+    }
+
+    /// 訳す必要があるのに、まだ訳がない区間の数
+    public var untranslatedCount: Int {
+        segments.filter { $0.translation == nil && Script.needsTranslation($0.text, transcriptLanguage: language) }.count
+    }
+
+    /// 右の列 (日本語) に出す文: 訳があれば訳、訳す必要のない区間は原文のまま
+    public func japaneseText(of segment: TranscriptSegment) -> String? {
+        if let t = segment.translation { return t }
+        return Script.needsTranslation(segment.text, transcriptLanguage: language) ? nil : segment.text
     }
 }
 

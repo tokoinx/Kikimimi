@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 CONFIG="${CONFIG:-release}"
 APP="build/Kikimimi.app"
 
-echo "▸ swift build -c $CONFIG (初回は whisper.cpp の取得と依存のビルドで数分かかります)"
+echo "▸ swift build -c $CONFIG (初回は whisper.cpp / llama.cpp の取得と依存のビルドで数分かかります)"
 swift build -c "$CONFIG" --product Kikimimi
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
 
@@ -16,16 +16,19 @@ cp "$BIN_DIR/Kikimimi" "$APP/Contents/MacOS/Kikimimi"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# whisper.framework を同梱する (ビルド先にコピーされていればそれを、無ければ展開済みの XCFramework から)
-FW="$BIN_DIR/whisper.framework"
-if [ ! -d "$FW" ]; then
-  FW="$(find .build/artifacts -type d -path '*whisper.xcframework/macos-*/whisper.framework' -print -quit 2>/dev/null || true)"
-fi
-if [ -z "$FW" ] || [ ! -d "$FW" ]; then
-  echo "✗ whisper.framework が見つかりません。'swift package reset' のあと、もう一度 make run を試してください。" >&2
-  exit 1
-fi
-ditto "$FW" "$APP/Contents/Frameworks/whisper.framework"
+# whisper.framework (音声認識) と llama.framework (監査・翻訳の LLM) を同梱する
+# (ビルド先にコピーされていればそれを、無ければ展開済みの XCFramework から)
+for NAME in whisper llama; do
+  FW="$BIN_DIR/$NAME.framework"
+  if [ ! -d "$FW" ]; then
+    FW="$(find .build/artifacts -type d -path "*$NAME.xcframework/macos-*/$NAME.framework" -print -quit 2>/dev/null || true)"
+  fi
+  if [ -z "$FW" ] || [ ! -d "$FW" ]; then
+    echo "✗ $NAME.framework が見つかりません。'swift package reset' のあと、もう一度 make run を試してください。" >&2
+    exit 1
+  fi
+  ditto "$FW" "$APP/Contents/Frameworks/$NAME.framework"
+done
 
 # 実行ファイルが Contents/Frameworks を探せるようにする (通常は Package.swift の設定で入っている)
 LOAD_COMMANDS="$(otool -l "$APP/Contents/MacOS/Kikimimi")"
@@ -43,5 +46,6 @@ fi
 
 # ad-hoc 署名 (中のフレームワーク → アプリ本体の順)。マイク許可を macOS に覚えてもらうために必要。
 codesign --force --sign - "$APP/Contents/Frameworks/whisper.framework"
+codesign --force --sign - "$APP/Contents/Frameworks/llama.framework"
 codesign --force --sign - "$APP"
 echo "✓ $APP"
