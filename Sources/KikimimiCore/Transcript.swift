@@ -82,6 +82,9 @@ public struct Transcript: Codable, Hashable, Sendable {
         /// 日本語以外が主な文字起こしか (自動翻訳と対訳表示の対象)。文字を含む区間の 2 割以上が日本語以外なら true。
         /// 日本語の講演に英語の相づちが数行まじる程度では false (対訳にしても右の列がほぼ原文の繰り返しになるため)
         public var isMainlyForeign = false
+
+        /// まだ数えていない状態 (すべて 0)
+        public init() {}
     }
 
     public var translationStats: TranslationStats {
