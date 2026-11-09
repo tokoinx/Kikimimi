@@ -221,6 +221,8 @@ public enum Auditor {
                 let segment = segments[index]
                 switch action {
                 case .delete(let note):
+                    // 理由に別の行の文を書いている: 番号の取り違え (4B で実際にあった)。使わない
+                    if noteQuotesAnotherLine(note, target: index, chunk: chunk, lines: lines) { continue }
                     let backed = deletionIsBacked(index, in: segments)
                     found.append(AuditChange(kind: .delete, origin: .llm, original: segment,
                                              reason: deletionReason(note, backed: backed), isConfident: backed))
@@ -291,6 +293,19 @@ public enum Auditor {
         if try ask(original, proposed) == "2" { votes += 1 }
         if try ask(proposed, original) == "1" { votes += 1 }
         return votes
+    }
+
+    /// 削除の理由に、対象とは別の行の文がそのまま書かれているか
+    static func noteQuotesAnotherLine(_ note: String, target: Int, chunk: [Int], lines: [String]) -> Bool {
+        let noteKey = TextSimilarity.key(note)
+        guard noteKey.count >= 8 else { return false }
+        let targetKey = TextSimilarity.key(lines[target])
+        if targetKey.contains(noteKey) || noteKey.contains(targetKey) { return false }
+        return chunk.contains { other in
+            guard other != target else { return false }
+            let otherKey = TextSimilarity.key(lines[other])
+            return otherKey.count >= 8 && (noteKey.contains(otherKey) || otherKey.contains(noteKey))
+        }
     }
 
     static func deletionReason(_ note: String, backed: Bool) -> String {

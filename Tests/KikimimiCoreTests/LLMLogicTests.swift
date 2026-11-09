@@ -85,6 +85,16 @@ final class TextAnalysisTests: XCTestCase {
         XCTAssertEqual(Script.englishName(for: nil), "the original language")
     }
 
+    func testNonJapaneseHan() {
+        XCTAssertTrue(Script.containsNonJapaneseHan("大家好，欢迎回到频道。"))
+        XCTAssertTrue(Script.containsNonJapaneseHan("我们开始吧"))
+        XCTAssertTrue(Script.containsNonJapaneseHan("約 400 Robux，五美元"), "中国語の読点")
+        XCTAssertFalse(Script.containsNonJapaneseHan("皆さん、こんにちは。Roblox Studio を開きます。"))
+        XCTAssertFalse(Script.containsNonJapaneseHan("髙橋さんと山﨑さん、時々"))
+        XCTAssertFalse(Script.containsNonJapaneseHan("Hello, world!"))
+        XCTAssertGreaterThan(JapaneseKanji.set.count, 6000)
+    }
+
     func testSimilarity() {
         XCTAssertEqual(TextSimilarity.distance("kitten", "sitting"), 3)
         XCTAssertEqual(TextSimilarity.distance("", "abc"), 3)
@@ -262,6 +272,16 @@ final class AuditorTests: XCTestCase {
         XCTAssertTrue(r3.changes[0].reason.contains("足す・削る"))
     }
 
+    func testDeleteWithWrongLineNumberIsIgnored() throws {
+        let segments = [seg(0, "The function runs every frame."), seg(3, "Thank you for watching."), seg(6, "That's it for today, see you next time.")]
+        // 3 行目を消せと言いながら、理由には 2 行目の文を書いている (番号の取り違え)
+        let fake = FakeGenerator { _ in "[3] DEL Thank you for watching.\nEND\n" }
+        let report = try Auditor.audit(segments, language: "en", generator: fake, modelName: "f", shouldCancel: { false })
+        XCTAssertFalse(report.changes.contains { $0.original.id == segments[2].id })
+        XCTAssertTrue(Auditor.noteQuotesAnotherLine("Thank you for watching.", target: 2, chunk: [0, 1, 2], lines: segments.map(\.text)))
+        XCTAssertFalse(Auditor.noteQuotesAnotherLine("duplicate of [2]", target: 2, chunk: [0, 1, 2], lines: segments.map(\.text)))
+    }
+
     func testStockPhraseIsSuggestion() {
         let changes = Auditor.findRepeats([seg(0, "ご視聴ありがとうございました"), seg(3, "Thanks for watching!")])
         XCTAssertEqual(changes.count, 2)
@@ -311,6 +331,8 @@ final class TranslatorTests: XCTestCase {
         XCTAssertEqual(fake.prompts.count, 1)
         XCTAssertEqual(fake.prompts[0].grammar, GBNF.numberedLines(count: 2))
         XCTAssertNotNil(fake.prompts[0].maxLineBytes)
+        XCTAssertTrue(fake.prompts[0].japaneseOnly)
+        XCTAssertEqual(fake.prompts[0].examples, Translator.examples, "日本語の手本を見せる")
         XCTAssertEqual(progress.last?.0, 2)
         XCTAssertEqual(progress.last?.1, 2)
     }
@@ -343,6 +365,13 @@ final class TranslatorTests: XCTestCase {
         XCTAssertEqual(fake.prompts.count, 2)
         XCTAssertTrue(fake.prompts[0].user.contains("Line 0 here. => 0 行目"))
         XCTAssertTrue(fake.prompts[1].user.contains("Line 2 here. => 訳"), fake.prompts[1].user)
+    }
+
+    func testChineseOutputIsRejected() throws {
+        let segments = [seg(0, "Hi everyone.")]
+        let fake = FakeGenerator { _ in "[1] 大家好，欢迎。\n" }
+        let failed = try Translator.translate(segments, language: "en", generator: fake, shouldCancel: { false }) { _, _, _ in }
+        XCTAssertEqual(failed, 1)
     }
 
     func testImplausibleAndCancel() throws {

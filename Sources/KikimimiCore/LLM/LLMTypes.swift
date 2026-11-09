@@ -12,13 +12,31 @@ public struct LLMPrompt: Sendable, Hashable {
     public var maxTokens: Int
     /// 出力の 1 行の長さの上限 (UTF-8 のバイト数)。超えたらそこで打ち切る (同じ語を延々と繰り返す暴走の歯止め)
     public var maxLineBytes: Int?
+    /// 手本のやりとり (依頼と答えの例)。本番の依頼の前に、会話の一部として見せる
+    public var examples: [LLMExample]
+    /// 日本語に出てこない文字 (簡体字など) を出させない (翻訳が中国語に流れるのを防ぐ)
+    public var japaneseOnly: Bool
 
-    public init(system: String, user: String, grammar: String? = nil, maxTokens: Int = 512, maxLineBytes: Int? = nil) {
+    public init(system: String, user: String, grammar: String? = nil, maxTokens: Int = 512, maxLineBytes: Int? = nil,
+                examples: [LLMExample] = [], japaneseOnly: Bool = false) {
         self.system = system
         self.user = user
         self.grammar = grammar
         self.maxTokens = maxTokens
         self.maxLineBytes = maxLineBytes
+        self.examples = examples
+        self.japaneseOnly = japaneseOnly
+    }
+}
+
+/// 手本のやりとり 1 回分
+public struct LLMExample: Sendable, Hashable {
+    public var user: String
+    public var assistant: String
+
+    public init(user: String, assistant: String) {
+        self.user = user
+        self.assistant = assistant
     }
 }
 

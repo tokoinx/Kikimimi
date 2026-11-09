@@ -59,6 +59,25 @@ public enum Translator {
         return parts.joined(separator: "\n\n")
     }
 
+    /// 手本のやりとり。小さなモデル (Qwen3.5 4B など) は指示だけだと訳文が中国語に流れることがあり、
+    /// 日本語の手本を 1 回見せると日本語で答える (あいさつの行は特に流れやすいので、手本にも入れておく)
+    static let examples = [
+        LLMExample(
+            user: """
+            Lines to translate:
+            [1] Hi everyone, thanks for joining us today.
+            [2] Let's take a look at the results.
+            [3] It costs about 20 dollars.
+            """,
+            assistant: """
+            [1] みなさん、今日はお集まりいただきありがとうございます。
+            [2] では、結果を見てみましょう。
+            [3] 費用は約 20 ドルです。
+
+            """
+        ),
+    ]
+
     /// 答えを読む (番号は 1 始まり)
     static func parse(_ output: String, count: Int) -> [Int: String] {
         var result: [Int: String] = [:]
@@ -73,10 +92,10 @@ public enum Translator {
         return result
     }
 
-    /// 訳として受け取ってよいか (延々と続く・空のものは捨てる)
+    /// 訳として受け取ってよいか (延々と続く・空のもの・中国語になったものは捨てる)
     static func isPlausible(_ translation: String, source: String) -> Bool {
         let t = translation.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return false }
+        guard !t.isEmpty, !Script.containsNonJapaneseHan(t) else { return false }
         return t.count <= source.count * 4 + 40
     }
 
@@ -139,13 +158,14 @@ public enum Translator {
                                shouldCancel: () -> Bool) throws -> [String?] {
         let user = userPrompt(lines: lines, context: context, glossary: options.glossary)
         let sourceTokens = lines.reduce(0) { $0 + generator.tokenCount($1) }
-        let promptTokens = generator.tokenCount(system) + generator.tokenCount(user) + 32
+        let exampleTokens = examples.reduce(0) { $0 + generator.tokenCount($1.user) + generator.tokenCount($1.assistant) + 16 }
+        let promptTokens = generator.tokenCount(system) + generator.tokenCount(user) + exampleTokens + 32
         let budget = min(generator.contextLength - promptTokens - 8, 32 + sourceTokens * 4 + lines.count * 12)
         guard budget > 8 else { return lines.map { _ in nil } }
         let longest = lines.map(\.utf8.count).max() ?? 0
         let output = try generator.generate(
             LLMPrompt(system: system, user: user, grammar: GBNF.numberedLines(count: lines.count), maxTokens: budget,
-                      maxLineBytes: longest * 3 + 120),
+                      maxLineBytes: longest * 3 + 120, examples: examples, japaneseOnly: true),
             shouldCancel: shouldCancel
         )
         let parsed = parse(output, count: lines.count)

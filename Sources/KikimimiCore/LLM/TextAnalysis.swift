@@ -75,6 +75,18 @@ public enum Script {
         return false
     }
 
+    /// 日本語の文には出てこない文字を含むか: cp932 に無い漢字 (们・这・欢 など簡体字の多く) と、中国語の読点「，」
+    public static func containsNonJapaneseHan(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            let v = scalar.value
+            if v == 0xFF0C { return true }
+            if (0x4E00...0x9FFF).contains(v) || (0x3400...0x4DBF).contains(v), !JapaneseKanji.set.contains(scalar) {
+                return true
+            }
+        }
+        return false
+    }
+
     /// 文字 (数字・記号以外) を含むか
     public static func hasLetters(_ text: String) -> Bool {
         text.unicodeScalars.contains { CharacterSet.letters.contains($0) }

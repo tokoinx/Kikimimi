@@ -49,6 +49,8 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     private let controlTexts: [String]
     /// 全語彙で文法を確かめるときの入れ物 (使い回す)
     private var allCandidates: [llama_token_data] = []
+    /// 日本語に出てこない文字を含むトークン (初めて日本語だけの出力を頼まれたときに作る)
+    private var nonJapaneseTokens: [Bool]?
     private let lock = NSLock()
 
     /// 候補として見る上位のトークン数
@@ -198,12 +200,13 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             position += n
         }
 
+        let banned = prompt.japaneseOnly ? japaneseBanList() : nil
         var output: [UInt8] = []
         var lineStart = 0
         var recent: [llama_token] = []
         for step in 0..<maxNew {
             if shouldCancel() { throw LLMError.cancelled }
-            guard let token = pick(grammar: grammar, recent: recent) else { break }
+            guard let token = pick(grammar: grammar, recent: recent, banned: banned) else { break }
             if llama_vocab_is_eog(vocab, token) { break }
             if let grammar { llama_sampler_accept(grammar, token) }
             output += piece(token)
@@ -234,9 +237,24 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         }
     }
 
+    /// 日本語に出てこない文字 (cp932 に無い漢字・中国語の読点) を含むトークンの一覧。
+    /// 途中で切れた UTF-8 のかけら (1 文字を数トークンで表す場合) は判定できないので外さない
+    private func japaneseBanList() -> [Bool] {
+        if let cached = nonJapaneseTokens { return cached }
+        var mask = [Bool](repeating: false, count: vocabSize)
+        for t in 0..<vocabSize {
+            let bytes = piece(llama_token(t))
+            guard !bytes.isEmpty, let text = String(bytes: bytes, encoding: .utf8) else { continue }
+            mask[t] = Script.containsNonJapaneseHan(text)
+        }
+        nonJapaneseTokens = mask
+        return mask
+    }
+
     /// 次のトークンを選ぶ。文法があれば、文法に合うものの中でいちばん確からしいもの。
     /// 上位の候補だけで文法を確かめ、どれも合わないときだけ全語彙を確かめる (毎回全語彙を確かめると遅い)。
-    private func pick(grammar: UnsafeMutablePointer<llama_sampler>?, recent: [llama_token]) -> llama_token? {
+    /// banned に当たるトークンは選ばない。
+    private func pick(grammar: UnsafeMutablePointer<llama_sampler>?, recent: [llama_token], banned: [Bool]?) -> llama_token? {
         guard let logits = llama_get_logits_ith(context, -1) else { return nil }
         let recentSet = Set(recent)
         func adjusted(_ id: llama_token, _ value: Float) -> Float {
@@ -249,7 +267,7 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         var minIndex = 0
         for i in 0..<vocabSize {
             let v = logits[i]
-            guard v.isFinite else { continue }
+            guard v.isFinite, banned?[i] != true else { continue }
             if top.count < Self.topK {
                 top.append((llama_token(i), v))
                 if top.count == Self.topK { minIndex = top.indices.min { top[$0].logit < top[$1].logit }! }
@@ -270,7 +288,8 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             allCandidates = [llama_token_data](repeating: llama_token_data(id: 0, logit: 0, p: 0), count: vocabSize)
         }
         for i in 0..<vocabSize {
-            allCandidates[i] = llama_token_data(id: llama_token(i), logit: adjusted(llama_token(i), logits[i]), p: 0)
+            let logit = banned?[i] == true ? -Float.infinity : adjusted(llama_token(i), logits[i])
+            allCandidates[i] = llama_token_data(id: llama_token(i), logit: logit, p: 0)
         }
         return allCandidates.withUnsafeMutableBufferPointer { buffer -> llama_token? in
             var array = llama_token_data_array(data: buffer.baseAddress, size: buffer.count, selected: -1, sorted: false)
@@ -339,13 +358,24 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     private func formatted(_ prompt: LLMPrompt) -> String {
         let system = sanitize(prompt.system)
         let user = sanitize(prompt.user)
+        let examples = prompt.examples.map { (sanitize($0.user), sanitize($0.assistant)) }
         switch format {
         case .chatML(let skipThinking):
-            var s = "<|im_start|>system\n\(system)<|im_end|>\n<|im_start|>user\n\(user)<|im_end|>\n<|im_start|>assistant\n"
+            var s = "<|im_start|>system\n\(system)<|im_end|>\n"
+            for (u, a) in examples {
+                s += "<|im_start|>user\n\(u)<|im_end|>\n<|im_start|>assistant\n\(a)<|im_end|>\n"
+            }
+            s += "<|im_start|>user\n\(user)<|im_end|>\n<|im_start|>assistant\n"
             if skipThinking { s += "<think>\n\n</think>\n\n" }
             return s
         case .builtin(let template):
-            return LlamaEngine.applyTemplate(template, [("system", system), ("user", user)])
+            var messages: [(role: String, content: String)] = [("system", system)]
+            for (u, a) in examples {
+                messages.append(("user", u))
+                messages.append(("assistant", a))
+            }
+            messages.append(("user", user))
+            return LlamaEngine.applyTemplate(template, messages)
                 ?? "\(system)\n\n\(user)\n\n"
         }
     }
