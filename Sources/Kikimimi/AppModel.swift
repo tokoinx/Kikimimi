@@ -862,6 +862,8 @@ final class AppModel {
         livePreviewText = ""
         let started = recordingStartedAt ?? Date()
         recordingStartedAt = nil
+        // 録音中に止めておいた監査・翻訳 (メモリの少ない Mac) を続ける
+        defer { ensureWorker() }
 
         guard samples.count >= Int(LiveRecorder.sampleRate / 2) else {
             errorMessage = "録音が短すぎます (0.5 秒未満)。"
