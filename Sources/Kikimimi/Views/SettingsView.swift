@@ -66,7 +66,12 @@ struct SettingsView: View {
                 }
                 HStack {
                     Button("手元の GGUF を追加…") { model.importLLMFile() }
+                        .disabled(model.importingLLM)
                     Button("LLM のフォルダを開く") { model.revealLLMFolder() }
+                    if model.importingLLM {
+                        ProgressView().controlSize(.small)
+                        Text("取り込み中…").foregroundStyle(.secondary)
+                    }
                 }
                 Text("監査役は、同じ文の繰り返しと、文脈から見て明らかな聞き間違いを見つけます。自信のある直しだけを反映し、それ以外は「提案」として残すので、確かめてから反映できます。どの直しも元に戻せます。この Mac のメモリは \(MemoryBudget.physicalGB) GB です\(MemoryBudget.isTight ? " (少なめなので、文字起こしと LLM を交互に読み込みます)" : "")。")
                     .font(.caption)

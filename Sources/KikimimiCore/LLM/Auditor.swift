@@ -20,28 +20,39 @@ public struct AuditOptions: Sendable {
 /// 1. 規則: すぐ前と同じ (またはほぼ同じ) 文がもう一度出ている区間を見つける。
 /// 2. ローカル LLM: 文脈から見て明らかな聞き間違い (同音の別の語・固有名詞の崩れ) と、
 ///    実際には話していない文 (無音のところの定番フレーズなど) を見つける。
+/// 3. 評価役: LLM の直しを、直す前と後のどちらが正しいか、並びを入れ替えて 2 回たずね直す。
 ///
-/// LLM の指摘はそのまま信じず、安全の基準 (直す量が少ない・言語が変わらない・繰り返しの裏付けがある) を
-/// 満たしたものだけを自動で反映する。満たさないものは「要確認」の提案として残し、利用者が選べるようにする。
+/// 自動で反映するのは、取り違えようのないものだけ (同じ文がすき間なく 2 度・評価役が 2 回とも認めた小さな直し)。
+/// 意味が変わりうる直し (数字・否定) や、本当にくり返して話した可能性のあるものは「提案」として残し、利用者が選ぶ。
 public enum Auditor {
     // MARK: 規則
 
     /// 前の区間を何個まで見るか、どれだけ時間が空いていたら比べないか
     static let lookBack = 3
     static let maximumGap: TimeInterval = 10
+    /// 同じ文の 2 度目を自動で消すのは、この長さ (比較用キーの文字数) 以上の文が、この秒数以内のすき間で続いたときだけ。
+    /// 「よろしくお願いいたします」を何人かが順に言う、などの本当のくり返しは提案どまりにする
+    static let confidentRepeatLength = 16
+    static let confidentRepeatGap: TimeInterval = 1.0
+
+    /// 句読点も含めた比較用の文 (「…木曜日です。」と「…木曜日ですか？」を区別する)
+    static func punctuatedKey(_ text: String) -> String {
+        let folded = text.precomposedStringWithCompatibilityMapping.lowercased()
+        return folded.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
 
     /// 規則で見つかる繰り返しと、定番の誤認識
     public static func findRepeats(_ segments: [TranscriptSegment]) -> [AuditChange] {
         let keys = segments.map { TextSimilarity.key($0.text) }
         let stockPhrases = Set(HallucinationFilter.phrases.map(TextSimilarity.key))
-        var deleted = Set<Int>()
+        var flagged = Set<Int>()
         var changes: [AuditChange] = []
         for i in segments.indices {
             // 無音や音楽のところで Whisper が出しがちな定番の文 (実際にそう話すこともあるので提案どまり)
             if stockPhrases.contains(keys[i]) {
                 changes.append(AuditChange(kind: .delete, origin: .rule, original: segments[i],
                                            reason: "無音や音楽のところで出やすい定番の誤認識の可能性", isConfident: false))
-                deleted.insert(i)
+                flagged.insert(i)
                 continue
             }
             guard i > 0 else { continue }
@@ -51,27 +62,36 @@ public enum Auditor {
             var looked = 0
             while j >= 0, looked < lookBack {
                 defer { j -= 1 }
-                if deleted.contains(j) { continue }
+                if flagged.contains(j) { continue }
                 looked += 1
-                guard segments[i].start - segments[j].end <= maximumGap else { break }
+                let gap = segments[i].start - segments[j].end
+                guard gap <= maximumGap else { break }
                 let kj = keys[j]
                 guard !kj.isEmpty else { continue }
-                // 時間が重なる・すぐ続く: 同じ音声を 2 度読んだ可能性が高い
-                let adjacent = segments[i].start <= segments[j].end + 1.0
+                let when = TimeFormat.short(segments[j].start)
                 let finding: (reason: String, confident: Bool)?
                 if ki == kj {
-                    finding = ("直前と同じ文の繰り返し (\(TimeFormat.short(segments[j].start)))", ki.count >= 12)
+                    // 句読点まで同じ文が、すき間なく続く: 同じ音声を 2 度読んだもの。
+                    // 句読点が違う (「〜です。」「〜ですか？」) ものは、聞き返しなど本当の発話なので見送る
+                    if punctuatedKey(segments[i].text) != punctuatedKey(segments[j].text) {
+                        finding = nil
+                    } else {
+                        let confident = ki.count >= confidentRepeatLength && gap <= confidentRepeatGap
+                        finding = ("直前と同じ文の繰り返し (\(when))" + (confident ? "" : "。本当にくり返して話した可能性もあるため要確認"),
+                                   confident)
+                    }
                 } else if min(ki.count, kj.count) >= 15, TextSimilarity.isNearDuplicate(ki, kj, minimumRatio: 0.85) {
-                    finding = ("直前とほぼ同じ文の繰り返し (\(TimeFormat.short(segments[j].start)))", adjacent)
+                    // 言い直し (「月曜に」→「火曜に」) のこともあるので、自動では消さない
+                    finding = ("直前とほぼ同じ文の繰り返し (\(when))。言い直しの可能性もあるため要確認", false)
                 } else if ki.count >= 10, kj.contains(ki) {
-                    finding = ("直前の文の一部の繰り返し (\(TimeFormat.short(segments[j].start)))", adjacent)
+                    finding = ("直前の文の一部の繰り返し (\(when))。要確認", false)
                 } else {
                     finding = nil
                 }
                 if let finding {
                     changes.append(AuditChange(kind: .delete, origin: .rule, original: segments[i],
                                                reason: finding.reason, isConfident: finding.confident))
-                    deleted.insert(i)
+                    flagged.insert(i)
                     break
                 }
             }
@@ -101,18 +121,49 @@ public enum Auditor {
         return (true, confident)
     }
 
-    /// 削除してよい裏付けがあるか (近くに同じような文がある / 定番の誤認識)
-    static func deletionIsBacked(_ index: Int, in segments: [TranscriptSegment]) -> Bool {
+    /// 否定の言い方 (足されたり消されたりすると、意味が逆になる)
+    static let negationWords: Set<String> = ["not", "no", "never", "none", "nothing", "nobody", "neither", "nor", "cannot"]
+    static let japaneseNegations = ["ない", "ません", "なかった", "ず", "ぬ", "無い"]
+    static let wordSeparators = CharacterSet.letters.union(CharacterSet(charactersIn: "'")).inverted
+
+    static func negationCount(_ text: String) -> Int {
+        let lower = text.lowercased().replacingOccurrences(of: "’", with: "'")
+        let words = lower.components(separatedBy: wordSeparators)
+        let english = words.filter { negationWords.contains($0) || $0.hasSuffix("n't") }.count
+        let japanese = japaneseNegations.reduce(0) { $0 + lower.components(separatedBy: $1).count - 1 }
+        return english + japanese
+    }
+
+    /// 自動では反映せず、確かめてもらうべき直しか (意味が変わりうる)。理由を返す
+    static func meaningRisk(original: String, fixed: String, wrong: String, right: String) -> String? {
+        if original.filter(\.isNumber) != fixed.filter(\.isNumber) { return "数字が変わる直し" }
+        if negationCount(original) != negationCount(fixed) { return "否定の有無が変わる直し" }
+        let kw = TextSimilarity.key(wrong), kr = TextSimilarity.key(right)
+        if kr.contains(kw) || kw.contains(kr) { return "語を足す・削るだけの直し" }
+        if kr.count * 2 < kw.count { return "語を大きく削る直し" }
+        if !Script.hasHan(original) && Script.hasHan(fixed) { return "漢字が新しく入る直し" }
+        return nil
+    }
+
+    /// 削除してよい裏付けがあるか: 近く (10 秒以内) に、同じかほぼ同じ文が「残る」形である。
+    /// keep は消さずに残る区間 (同じ答えが消そうとしている区間は裏付けにしない)
+    static func deletionIsBacked(_ index: Int, in segments: [TranscriptSegment], keep: (Int) -> Bool) -> Bool {
         let target = segments[index]
         let k = TextSimilarity.key(target.text)
-        if HallucinationFilter.phrases.contains(where: { TextSimilarity.key($0) == k }) { return true }
-        guard k.count >= 4 else { return false }
-        let near = segments.indices.filter { $0 != index && abs(segments[$0].start - target.start) <= 30 }
-        return near.contains { j in
+        guard k.count >= 8 else { return false }
+        return segments.indices.contains { j in
+            guard j != index, keep(j), abs(segments[j].start - target.start) <= maximumGap else { return false }
             let kj = TextSimilarity.key(segments[j].text)
-            guard !kj.isEmpty else { return false }
-            return kj == k || (k.count >= 6 && kj.contains(k)) || TextSimilarity.isNearDuplicate(kj, k, minimumRatio: 0.8)
+            guard kj.count >= 8 else { return false }
+            return kj == k || TextSimilarity.isNearDuplicate(kj, k, minimumRatio: 0.85)
         }
+    }
+
+    /// 書き換えすぎ (聞き取りミスの指摘ではなく、文の手直し) とみなす、直し (FIX) の数か。
+    /// 小さなまとまり (短い録音・最後の端数) では割合で、大きなまとまりでは数と割合で見る
+    static func isTooMany(_ count: Int, of lines: Int) -> Bool {
+        if lines < 10 { return count >= 2 && Double(count) >= Double(lines) * 0.5 }
+        return count >= 4 && Double(count) > Double(lines) * 0.4
     }
 
     // MARK: LLM
@@ -146,14 +197,21 @@ public enum Auditor {
         return actions
     }
 
-    /// 行の中の「聞き間違えた語」を「正しい語」に置き換える。行に見つからなければ nil (思い込みの直しは使わない)
+    /// 行の中の「聞き間違えた語」を「正しい語」に置き換える (最初の 1 か所だけ)。行に見つからなければ nil。
+    /// 英字の語は語の切れ目で合わせる (「can」を直すつもりで「scan」の中まで変えない)
     static func applyFix(to text: String, wrong: String, right: String) -> String? {
         guard TextSimilarity.key(wrong) != TextSimilarity.key(right) else { return nil }
-        if text.contains(wrong) {
-            return text.replacingOccurrences(of: wrong, with: right)
-        }
-        if let range = text.range(of: wrong, options: [.caseInsensitive, .widthInsensitive]) {
-            return text.replacingCharacters(in: range, with: right)
+        let isWordChar: (Character) -> Bool = { $0.isLetter || $0.isNumber || $0 == "'" || $0 == "’" }
+        let latin = wrong.unicodeScalars.contains { $0.isASCII && CharacterSet.letters.contains($0) }
+        let leading = latin && wrong.first.map(isWordChar) == true ? "(?<![\\p{L}\\p{N}'’])" : ""
+        let trailing = latin && wrong.last.map(isWordChar) == true ? "(?![\\p{L}\\p{N}'’])" : ""
+        let pattern = leading + NSRegularExpression.escapedPattern(for: wrong) + trailing
+        for options: NSRegularExpression.Options in [[], [.caseInsensitive]] {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { continue }
+            let ns = NSString(string: text)
+            if let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)) {
+                return ns.replacingCharacters(in: match.range, with: right)
+            }
         }
         return nil
     }
@@ -187,10 +245,11 @@ public enum Auditor {
         return parts.joined(separator: "\n\n")
     }
 
-    /// LLM で見直す。規則で消す区間は先に除いてから見せる。
+    /// LLM で見直す。onChunk には、まとまりごとの結果を渡す (途中で止めても、見終えた所までを使えるように)
     public static func review(_ segments: [TranscriptSegment], language: String?, options: AuditOptions,
                               generator: any TextGenerating, shouldCancel: () -> Bool,
-                              onProgress: (_ done: Int, _ total: Int) -> Void) throws -> [AuditChange] {
+                              onProgress: (_ done: Int, _ total: Int) -> Void,
+                              onChunk: (_ changes: [AuditChange]) -> Void = { _ in }) throws -> [AuditChange] {
         let lines = segments.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
         let candidates = lines.indices.filter { !TextSimilarity.key(lines[$0]).isEmpty }
         let chunks = LLMChunker.chunks(candidates,
@@ -215,15 +274,21 @@ public enum Auditor {
                           maxLineBytes: longest * 2 + 80),
                 shouldCancel: shouldCancel
             )
+            let actions = parse(output, count: chunk.count).sorted(by: { $0.key < $1.key })
+            // 同じ答えが消そうとしている区間は、ほかの削除の裏付けにしない (2 つの写しが互いを裏付けて両方消えるのを防ぐ)
+            let deleting = Set(actions.compactMap { item -> Int? in
+                if case .delete = item.value { return chunk[item.key - 1] }
+                return nil
+            })
             var found: [AuditChange] = []
-            for (n, action) in parse(output, count: chunk.count).sorted(by: { $0.key < $1.key }) {
+            for (n, action) in actions {
                 let index = chunk[n - 1]
                 let segment = segments[index]
                 switch action {
                 case .delete(let note):
                     // 理由に別の行の文を書いている: 番号の取り違え (4B で実際にあった)。使わない
                     if noteQuotesAnotherLine(note, target: index, chunk: chunk, lines: lines) { continue }
-                    let backed = deletionIsBacked(index, in: segments)
+                    let backed = deletionIsBacked(index, in: segments, keep: { !deleting.contains($0) })
                     found.append(AuditChange(kind: .delete, origin: .llm, original: segment,
                                              reason: deletionReason(note, backed: backed), isConfident: backed))
                 case .fix(let wrong, let right):
@@ -238,17 +303,15 @@ public enum Auditor {
                     guard votes > 0 else { continue }
                     // 行の大部分を差し替える直しは、聞き取りミスではなく書き換えの疑い
                     let wholesale = TextSimilarity.key(wrong).count > TextSimilarity.key(segment.text).count * 6 / 10
-                    // 語を足すだけ・削るだけの直し (助詞や語尾など) は、聞き間違いより文の手直しに近い
-                    let affixOnly = TextSimilarity.key(right).contains(TextSimilarity.key(wrong))
-                        || TextSimilarity.key(wrong).contains(TextSimilarity.key(right))
-                    let confident = assessment.confident && !wholesale && !affixOnly && votes == 2
+                    let risk = meaningRisk(original: segment.text, fixed: fixed, wrong: wrong, right: right)
+                    let confident = assessment.confident && !wholesale && risk == nil && votes == 2
                     let note: String
                     if confident {
                         note = ""
+                    } else if let risk {
+                        note = " (\(risk)のため要確認)"
                     } else if votes < 2 {
                         note = " (評価役の判断が割れたため要確認)"
-                    } else if affixOnly {
-                        note = " (語を足す・削るだけの直しのため要確認)"
                     } else {
                         note = " (直す量が多いため要確認)"
                     }
@@ -257,11 +320,12 @@ public enum Auditor {
                                              isConfident: confident))
                 }
             }
-            // 半分近くを直したがる答えは、聞き取りミスの指摘ではなく書き換え。すべて提案どまりにする
-            if found.count >= 4 && Double(found.count) > Double(chunk.count) * 0.4 {
+            // 半分近くの行を直したがる答えは、聞き取りミスの指摘ではなく書き換え。すべて提案どまりにする
+            if isTooMany(found.filter { $0.kind == .fix }.count, of: chunk.count) {
                 for k in found.indices { found[k].isConfident = false }
             }
             changes += found
+            onChunk(found)
             onProgress(done + 1, chunks.count)
         }
         return changes
@@ -316,24 +380,32 @@ public enum Auditor {
     }
 
     /// 規則 → LLM の順に見直し、1 区間 1 件にまとめた結果を返す。generator が nil なら規則だけ。
+    /// onPartial には、規則の結果と、LLM が見終えたまとまりまでの結果を渡す (途中で止めたり失敗したりしても、そこまでを使える)
     public static func audit(_ segments: [TranscriptSegment], language: String?, options: AuditOptions = AuditOptions(),
                              generator: (any TextGenerating)?, modelName: String?,
                              shouldCancel: () -> Bool,
-                             onProgress: (_ done: Int, _ total: Int) -> Void = { _, _ in }) throws -> AuditReport {
+                             onProgress: (_ done: Int, _ total: Int) -> Void = { _, _ in },
+                             onPartial: (AuditReport) -> Void = { _ in }) throws -> AuditReport {
         let ruleChanges = findRepeats(segments)
+        let ruled = Set(ruleChanges.map(\.original.id))
         let removed = Set(ruleChanges.filter(\.isConfident).map(\.original.id))
-        var changes = ruleChanges
-        if let generator {
-            let rest = segments.filter { !removed.contains($0.id) }
-            let llmChanges = try review(rest, language: language, options: options, generator: generator,
-                                        shouldCancel: shouldCancel, onProgress: onProgress)
-            // 規則の指摘がある区間は規則を優先する (理由がはっきりしているため)
-            let ruled = Set(ruleChanges.map(\.original.id))
-            changes += llmChanges.filter { !ruled.contains($0.original.id) }
-        }
         let order = Dictionary(segments.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
-        changes.sort { (order[$0.original.id] ?? 0) < (order[$1.original.id] ?? 0) }
-        return AuditReport(changes: changes, model: generator == nil ? nil : modelName, reviewedCount: segments.count)
+        func report(_ llmChanges: [AuditChange], model: String?) -> AuditReport {
+            // 規則の指摘がある区間は規則を優先する (理由がはっきりしているため)
+            var all = ruleChanges + llmChanges.filter { !ruled.contains($0.original.id) }
+            all.sort { (order[$0.original.id] ?? 0) < (order[$1.original.id] ?? 0) }
+            return AuditReport(changes: all, model: model, reviewedCount: segments.count)
+        }
+        onPartial(report([], model: nil))
+        guard let generator else { return report([], model: nil) }
+        let rest = segments.filter { !removed.contains($0.id) }
+        var soFar: [AuditChange] = []
+        let llmChanges = try review(rest, language: language, options: options, generator: generator,
+                                    shouldCancel: shouldCancel, onProgress: onProgress) { chunk in
+            soFar += chunk
+            onPartial(report(soFar, model: modelName))
+        }
+        return report(llmChanges, model: modelName)
     }
 }
 

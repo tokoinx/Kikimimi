@@ -51,12 +51,16 @@ public struct AuditReport: Codable, Hashable, Sendable {
     /// 見直した区間の数
     public var reviewedCount: Int
     public var date: Date
+    /// 利用者が自分で決めたこと (反映する / しない)。監査をやり直しても、同じ直しには同じ決定を当てる
+    public var userDecisions: [String: Bool]?
 
-    public init(changes: [AuditChange], model: String?, reviewedCount: Int, date: Date = Date()) {
+    public init(changes: [AuditChange], model: String?, reviewedCount: Int, date: Date = Date(),
+                userDecisions: [String: Bool]? = nil) {
         self.changes = changes
         self.model = model
         self.reviewedCount = reviewedCount
         self.date = date
+        self.userDecisions = userDecisions
     }
 
     public var appliedFixes: Int { changes.filter { $0.isApplied && $0.kind == .fix }.count }
@@ -70,36 +74,78 @@ public struct AuditReport: Codable, Hashable, Sendable {
     }
 }
 
+extension AuditChange {
+    /// 監査をやり直したときに「同じ直し」とみなすための印 (区間・種類・直した文)
+    var signature: String {
+        "\(original.id.uuidString)|\(kind.rawValue)|\(replacement ?? "")"
+    }
+}
+
 extension Transcript {
     /// 監査の結果を受け取り、自信のあるものだけ本文に反映する。前の監査の反映は先に元に戻す。
+    /// 利用者が前の監査で決めたこと (反映する / しない) は、同じ直しに引き継ぐ。
+    /// 結果として文が変わらなかった区間は、訳もそのまま残す。
     public mutating func adopt(_ report: AuditReport) {
+        let before = Dictionary(segments.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let decisions = audit?.userDecisions ?? [:]
         if let previous = audit {
             for change in previous.changes where change.isApplied {
                 revert(change)
             }
         }
         var report = report
+        report.userDecisions = decisions.isEmpty ? nil : decisions
         for i in report.changes.indices {
+            let wanted = decisions[report.changes[i].signature] ?? report.changes[i].isConfident
             report.changes[i].isApplied = false
-            if report.changes[i].isConfident, apply(report.changes[i]) {
+            if wanted, apply(report.changes[i]) {
                 report.changes[i].isApplied = true
+            }
+        }
+        // 文が前と同じに戻った区間は、前の訳 (と、文ごとの訳のまとまり) を戻す
+        for i in segments.indices {
+            guard let old = before[segments[i].id], old.text == segments[i].text,
+                  segments[i].translation == nil, old.translation != nil else { continue }
+            let covers = old.translationCovers ?? []
+            let intact = covers.allSatisfy { id in
+                guard let now = segments.first(where: { $0.id == id }), let was = before[id] else { return false }
+                return now.text == was.text
+            }
+            if intact {
+                segments[i].translation = old.translation
+                segments[i].translationCovers = old.translationCovers
             }
         }
         audit = report
     }
 
-    /// 1 つの直しを反映する / 元に戻す
+    /// 1 つの直しを反映する / 元に戻す (利用者の決定として覚えておく)
     public mutating func setChange(_ id: UUID, applied: Bool) {
         guard var report = audit, let i = report.changes.firstIndex(where: { $0.id == id }) else { return }
         let change = report.changes[i]
-        guard change.isApplied != applied else { return }
-        if applied {
-            guard apply(change) else { return }
-        } else {
-            revert(change)
+        var decisions = report.userDecisions ?? [:]
+        decisions[change.signature] = applied
+        report.userDecisions = decisions
+        if change.isApplied != applied {
+            if applied {
+                guard apply(change) else { return }
+            } else {
+                revert(change)
+            }
+            report.changes[i].isApplied = applied
         }
-        report.changes[i].isApplied = applied
         audit = report
+    }
+
+    /// 監査で直す前の区間 (監査をやり直すときは、ここから見直す)。利用者の決定は変えない
+    public var segmentsBeforeAudit: [TranscriptSegment] {
+        var copy = self
+        if let report = copy.audit {
+            for change in report.changes where change.isApplied {
+                copy.revert(change)
+            }
+        }
+        return copy.segments
     }
 
     /// すべての直しを元に戻す (監査の結果は提案として残す)
@@ -116,12 +162,14 @@ extension Transcript {
         guard let index = segments.firstIndex(where: { $0.id == change.original.id }) else { return false }
         switch change.kind {
         case .delete:
-            segments.remove(at: index)
+            // この区間を含む訳 (文ごとの訳) は、消した区間の分だけずれるので訳し直す
+            invalidateTranslation(of: change.original.id)
+            segments.removeAll { $0.id == change.original.id }
         case .fix:
             guard let text = change.replacement, !text.isEmpty else { return false }
+            // 文が変わったので、訳は訳し直す (文の続きとして含めていた訳も)
+            invalidateTranslation(of: change.original.id)
             segments[index].text = text
-            // 文が変わったので、訳は訳し直す
-            segments[index].translation = nil
         }
         return true
     }
@@ -135,8 +183,10 @@ extension Transcript {
             segments.insert(change.original, at: position)
         case .fix:
             guard let index = segments.firstIndex(where: { $0.id == change.original.id }) else { return }
+            invalidateTranslation(of: change.original.id)
             segments[index].text = change.original.text
             segments[index].translation = change.original.translation
+            segments[index].translationCovers = change.original.translationCovers
         }
     }
 }

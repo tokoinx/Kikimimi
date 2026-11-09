@@ -84,11 +84,12 @@ public struct LLMModelStore: Sendable {
             return name
         }
         let tmp = directory.appendingPathComponent(".import-\(UUID().uuidString).part")
-        try fm.copyItem(at: source, to: tmp)
         do {
+            try fm.copyItem(at: source, to: tmp)
             if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
             try fm.moveItem(at: tmp, to: dest)
         } catch {
+            // 写している途中で失敗しても (空き容量不足など)、数 GB の書きかけを残さない
             try? fm.removeItem(at: tmp)
             throw error
         }
@@ -115,23 +116,32 @@ public enum HuggingFaceResolver {
         }
     }
 
-    /// リポジトリのファイル一覧から選ぶ。一覧が取れなければ、決めておいた名前で取りにいく (大きさ・SHA-256 は確かめない)
+    /// リポジトリのファイル一覧から選ぶ。一覧が取れなければ (繋がらない・混み合っている・一覧の API だけ止められている など)、
+    /// 決めておいた名前で取りにいく (大きさ・SHA-256 は確かめない)
     public static func resolve(_ spec: LLMModelSpec, session: URLSession = .shared) async throws -> Resolved {
-        var reachedAny = false
+        var listed = false
         for repository in spec.repositories {
+            try Task.checkCancellation()
             guard let treeURL = LLMModelSpec.treeURL(repository: repository) else { continue }
             var request = URLRequest(url: treeURL)
             request.setValue("Kikimimi/1.1", forHTTPHeaderField: "User-Agent")
             request.timeoutInterval = 20
-            guard let (data, response) = try? await session.data(for: request) else { continue }
-            reachedAny = true
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-                  let entries = try? JSONDecoder().decode([HFFileEntry].self, from: data),
-                  let file = spec.pickFile(from: entries),
+            let fetched: (Data, URLResponse)
+            do {
+                fetched = try await session.data(for: request)
+            } catch {
+                // 中止は「繋がらない」と区別して、そのまま止める (決めておいた名前での取得に進まない)
+                if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
+                continue
+            }
+            guard let http = fetched.1 as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  let entries = try? JSONDecoder().decode([HFFileEntry].self, from: fetched.0) else { continue }
+            listed = true
+            guard let file = spec.pickFile(from: entries),
                   let url = LLMModelSpec.downloadURL(repository: repository, path: file.path) else { continue }
             return Resolved(url: url, expectedSize: file.fileSize, sha256: file.sha256)
         }
-        if !reachedAny, let first = spec.repositories.first,
+        if !listed, let first = spec.repositories.first,
            let url = LLMModelSpec.downloadURL(repository: first, path: spec.fallbackFileName) {
             return Resolved(url: url, expectedSize: nil, sha256: nil)
         }

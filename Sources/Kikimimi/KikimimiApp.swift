@@ -44,7 +44,7 @@ struct KikimimiApp: App {
                     if let job = model.selectedJob { model.cancel(job) }
                 }
                 .keyboardShortcut(".")
-                .disabled(model.selectedJob?.isActive != true)
+                .disabled(!(model.selectedJob.map { $0.isActive || $0.isPostActive } ?? false))
             }
             CommandGroup(after: .saveItem) {
                 Menu("書き出す") {

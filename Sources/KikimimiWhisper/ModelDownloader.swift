@@ -29,6 +29,8 @@ public final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unche
     private var continuation: CheckedContinuation<Void, Error>?
     private var session: URLSession?
     private var finishError: Error?
+    /// 中止を頼まれた (取得が終わっていても、ファイルを置かない)
+    private var cancelled = false
     private let lock = NSLock()
 
     private init(destination: URL, validate: @escaping Validator, onProgress: @escaping Progress) {
@@ -49,20 +51,30 @@ public final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unche
     private func run(_ url: URL) async throws {
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                var request = URLRequest(url: url)
+                request.setValue("Kikimimi/1.0", forHTTPHeaderField: "User-Agent")
+                // セッションと取得の仕事は、ロックの中でまとめて作る (中止と取り違えないように)
+                lock.lock()
+                if cancelled || Task.isCancelled {
+                    // 取得を始める前に中止された (onCancel はまだ止めるものが無かった)
+                    cancelled = true
+                    lock.unlock()
+                    cont.resume(throwing: CancellationError())
+                    return
+                }
                 let config = URLSessionConfiguration.default
                 config.timeoutIntervalForRequest = 60
                 config.timeoutIntervalForResource = 6 * 60 * 60
                 let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
-                lock.lock()
-                self.continuation = cont
+                continuation = cont
                 self.session = session
+                let task = session.downloadTask(with: request)
                 lock.unlock()
-                var request = URLRequest(url: url)
-                request.setValue("Kikimimi/1.0", forHTTPHeaderField: "User-Agent")
-                session.downloadTask(with: request).resume()
+                task.resume()
             }
         } onCancel: {
             self.lock.lock()
+            self.cancelled = true
             let session = self.session
             self.lock.unlock()
             session?.invalidateAndCancel()
@@ -85,6 +97,14 @@ public final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unche
         }
         guard validate(location) else {
             finishError = DownloadError.invalidFile
+            return
+        }
+        // 確かめているあいだ (数 GB の SHA-256 は数秒かかる) に中止された
+        lock.lock()
+        let wasCancelled = cancelled
+        lock.unlock()
+        if wasCancelled {
+            finishError = CancellationError()
             return
         }
         do {

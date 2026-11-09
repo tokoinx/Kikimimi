@@ -55,21 +55,26 @@ struct TranscriptDetailView: View {
             PostProcessBar(job: job)
 
             if let transcript = job.transcript {
+                // 翻訳の状況は、描くたびに 1 回だけ数える (長い録音では区間が数千あるため)。
+                // 文字起こしの最中は区間が増えるたびに描き直すので数えない (終わってから使う)
+                let stats = job.status == .done ? transcript.translationStats : Transcript.TranslationStats()
+                let bilingual = model.isBilingual(stats)
                 if job.status == .done, !transcript.segments.isEmpty, !model.isLLMInstalled, !model.llmBannerDismissed,
-                   (model.autoTranslate && transcript.isMainlyForeign) || model.autoAudit {
-                    LLMNeededBanner(wantsTranslation: transcript.isMainlyForeign)
+                   (model.autoTranslate && stats.isMainlyForeign) || model.autoAudit {
+                    LLMNeededBanner(wantsTranslation: stats.isMainlyForeign)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
                 }
-                controls(transcript)
+                controls(transcript, stats)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
                 Divider()
-                if model.isBilingual(transcript) {
+                if bilingual {
                     BilingualHeader(language: transcript.language, showTimestamp: model.showTimestamps)
                     Divider()
                 }
-                segmentList(transcript)
+                TranscriptListView(job: job, items: listItems(transcript, bilingual: bilingual),
+                                   bilingual: bilingual, emptyMessage: emptyMessage)
             } else {
                 Spacer()
             }
@@ -115,7 +120,7 @@ struct TranscriptDetailView: View {
     }
 
     // MARK: 操作列
-    private func controls(_ transcript: Transcript) -> some View {
+    private func controls(_ transcript: Transcript, _ stats: Transcript.TranslationStats) -> some View {
         @Bindable var model = model
         let canPost = job.status == .done && !transcript.segments.isEmpty
         return HStack(spacing: 12) {
@@ -124,7 +129,7 @@ struct TranscriptDetailView: View {
                 .frame(maxWidth: 220)
             Toggle("時刻", isOn: $model.showTimestamps)
                 .toggleStyle(.checkbox)
-            if transcript.hasTranslation || transcript.isMainlyForeign {
+            if stats.hasTranslation || stats.isMainlyForeign {
                 Toggle("対訳", isOn: $model.showBilingual)
                     .toggleStyle(.checkbox)
                     .help("原文と日本語訳を左右に並べる")
@@ -132,89 +137,48 @@ struct TranscriptDetailView: View {
             Spacer()
             AuditButton(job: job, transcript: transcript)
                 .disabled(!canPost)
-            if transcript.translatableCount > 0 {
+            if stats.translatable > 0 {
                 Button {
                     model.translate(job)
                 } label: {
-                    Label(transcript.untranslatedCount > 0 && transcript.hasTranslation ? "残りを翻訳" : "翻訳",
+                    Label(stats.untranslated > 0 && stats.hasTranslation ? "残りを翻訳" : "翻訳",
                           systemImage: "character.bubble")
                 }
                 .help("日本語以外の区間を、Mac の中の LLM で日本語に訳す")
-                .disabled(!canPost || job.isPostActive || transcript.untranslatedCount == 0)
+                .disabled(!canPost || job.isPostActive || stats.untranslated == 0)
             }
             Button {
                 model.copySelectedText()
             } label: {
                 Label("コピー", systemImage: "doc.on.doc")
             }
-            ExportMenu(transcript: transcript)
+            ExportMenu(hasTranslation: stats.hasTranslation)
                 .disabled(job.status != .done)
         }
     }
 
     // MARK: 本文
-    private func filteredSegments(_ transcript: Transcript) -> [TranscriptSegment] {
+    /// 一覧に出す行 (対訳表示なら訳ごと、そうでなければ区間ごと)。検索語で絞る
+    private func listItems(_ transcript: Transcript, bilingual: Bool) -> [TranscriptListItem] {
         let q = model.searchText.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return transcript.segments }
-        return transcript.segments.filter {
-            $0.text.localizedCaseInsensitiveContains(q) || ($0.translation?.localizedCaseInsensitiveContains(q) ?? false)
-        }
-    }
-
-    private func segmentList(_ transcript: Transcript) -> some View {
-        let segments = filteredSegments(transcript)
-        let bilingual = model.isBilingual(transcript)
         let changes = Dictionary((transcript.audit?.changes ?? []).map { ($0.original.id, $0) },
                                  uniquingKeysWith: { a, _ in a })
-        let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
-        return ScrollViewReader { proxy in
-            List {
-                ForEach(segments) { seg in
-                    Group {
-                        if bilingual {
-                            BilingualRow(segment: seg,
-                                         japanese: transcript.japaneseText(of: seg),
-                                         isOriginalJapanese: seg.translation == nil
-                                            && !Script.needsTranslation(seg.text, transcriptLanguage: transcript.language),
-                                         isTranslating: translating,
-                                         change: changes[seg.id],
-                                         showTimestamp: model.showTimestamps,
-                                         highlight: model.searchText,
-                                         isCurrent: isCurrent(seg),
-                                         job: job)
-                        } else {
-                            SegmentRow(segment: seg,
-                                       change: changes[seg.id],
-                                       showTimestamp: model.showTimestamps,
-                                       highlight: model.searchText,
-                                       isCurrent: isCurrent(seg),
-                                       job: job)
-                        }
-                    }
-                    .id(seg.id)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if job.url != nil {
-                            model.player.seek(to: seg.start, andPlay: true)
-                        }
-                    }
-                }
-                if segments.isEmpty {
-                    Text(emptyMessage)
-                        .foregroundStyle(.secondary)
-                }
+        let items: [TranscriptListItem]
+        if bilingual {
+            items = transcript.bilingualUnits().map { unit in
+                TranscriptListItem(id: unit.id, start: unit.start, end: unit.end, text: unit.text,
+                                   japanese: unit.japanese, isOriginalJapanese: unit.isOriginalJapanese,
+                                   changes: unit.segments.compactMap { changes[$0.id] })
             }
-            .listStyle(.inset)
-            .onChange(of: model.player.currentTime) { _, _ in
-                if model.player.isPlaying, let cur = segments.first(where: isCurrent) {
-                    withAnimation { proxy.scrollTo(cur.id, anchor: .center) }
-                }
+        } else {
+            items = transcript.segments.map { seg in
+                TranscriptListItem(id: seg.id, start: seg.start, end: seg.end, text: seg.text,
+                                   japanese: nil, isOriginalJapanese: false, changes: changes[seg.id].map { [$0] } ?? [])
             }
-            .onChange(of: job.transcript?.segments.count ?? 0) { _, _ in
-                if job.status == .running, let last = segments.last {
-                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
-                }
-            }
+        }
+        guard !q.isEmpty else { return items }
+        return items.filter {
+            $0.text.localizedCaseInsensitiveContains(q) || ($0.japanese?.localizedCaseInsensitiveContains(q) ?? false)
         }
     }
 
@@ -226,11 +190,73 @@ struct TranscriptDetailView: View {
         default: return ""
         }
     }
+}
 
-    private func isCurrent(_ seg: TranscriptSegment) -> Bool {
+/// 一覧の 1 行 (区間 1 つ、または訳 1 つ分の区間)
+struct TranscriptListItem: Identifiable, Hashable {
+    let id: UUID
+    let start: TimeInterval
+    let end: TimeInterval
+    let text: String
+    let japanese: String?
+    let isOriginalJapanese: Bool
+    /// この行に当たる監査の直し
+    let changes: [AuditChange]
+}
+
+/// 本文の一覧。再生位置 (0.2 秒ごとに変わる) を見るのはここだけにして、画面ぜんたいを描き直さない
+struct TranscriptListView: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    let items: [TranscriptListItem]
+    let bilingual: Bool
+    let emptyMessage: String
+
+    var body: some View {
+        let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
+        ScrollViewReader { proxy in
+            List {
+                ForEach(items) { item in
+                    Group {
+                        if bilingual {
+                            BilingualRow(item: item, isTranslating: translating, showTimestamp: model.showTimestamps,
+                                         highlight: model.searchText, isCurrent: isCurrent(item), job: job)
+                        } else {
+                            SegmentRow(item: item, showTimestamp: model.showTimestamps,
+                                       highlight: model.searchText, isCurrent: isCurrent(item), job: job)
+                        }
+                    }
+                    .id(item.id)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if job.url != nil {
+                            model.player.seek(to: item.start, andPlay: true)
+                        }
+                    }
+                }
+                if items.isEmpty {
+                    Text(emptyMessage)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .listStyle(.inset)
+            .onChange(of: model.player.currentTime) { _, _ in
+                if model.player.isPlaying, let cur = items.first(where: isCurrent) {
+                    withAnimation { proxy.scrollTo(cur.id, anchor: .center) }
+                }
+            }
+            .onChange(of: items.count) { _, _ in
+                if job.status == .running, let last = items.last {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
+            }
+        }
+    }
+
+    private func isCurrent(_ item: TranscriptListItem) -> Bool {
         guard model.player.url != nil, model.player.url == job.url else { return false }
         let t = model.player.currentTime
-        return t >= seg.start && t < max(seg.end, seg.start + 0.3)
+        return t >= item.start && t < max(item.end, item.start + 0.3)
     }
 }
 
@@ -249,8 +275,7 @@ func highlighted(_ text: String, _ query: String) -> AttributedString {
 }
 
 struct SegmentRow: View {
-    let segment: TranscriptSegment
-    let change: AuditChange?
+    let item: TranscriptListItem
     let showTimestamp: Bool
     let highlight: String
     let isCurrent: Bool
@@ -259,12 +284,12 @@ struct SegmentRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             if showTimestamp {
-                TimestampLabel(time: segment.start)
+                TimestampLabel(time: item.start)
             }
-            Text(highlighted(segment.text, highlight))
+            Text(highlighted(item.text, highlight))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if let change {
+            ForEach(item.changes) { change in
                 AuditBadge(change: change, job: job)
             }
         }
@@ -307,14 +332,10 @@ struct BilingualHeader: View {
     }
 }
 
-/// 対訳表示の 1 行 (左: 原文 / 右: 日本語訳)
+/// 対訳表示の 1 行 (左: 原文 / 右: 日本語訳)。文がいくつかの区間にまたがるときは、まとめて 1 行
 struct BilingualRow: View {
-    let segment: TranscriptSegment
-    let japanese: String?
-    /// もともと日本語の区間 (右の列には原文をそのまま薄く出す)
-    let isOriginalJapanese: Bool
+    let item: TranscriptListItem
     let isTranslating: Bool
-    let change: AuditChange?
     let showTimestamp: Bool
     let highlight: String
     let isCurrent: Bool
@@ -323,21 +344,21 @@ struct BilingualRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             if showTimestamp {
-                TimestampLabel(time: segment.start)
+                TimestampLabel(time: item.start)
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(highlighted(segment.text, highlight))
+                Text(highlighted(item.text, highlight))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if let change {
+                ForEach(item.changes) { change in
                     AuditBadge(change: change, job: job)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Group {
-                if let japanese {
+                if let japanese = item.japanese {
                     Text(highlighted(japanese, highlight))
-                        .foregroundStyle(isOriginalJapanese ? Color.secondary : Color.primary)
+                        .foregroundStyle(item.isOriginalJapanese ? Color.secondary : Color.primary)
                         .textSelection(.enabled)
                 } else {
                     Text(isTranslating ? "翻訳中…" : "未翻訳")
@@ -354,7 +375,6 @@ struct BilingualRow: View {
 
 /// 監査で直した / 直す提案がある区間の印。押すと内容を見て、反映・取り消しができる
 struct AuditBadge: View {
-    @Environment(AppModel.self) private var model
     let change: AuditChange
     let job: Job
     @State private var showing = false
@@ -646,12 +666,11 @@ struct LLMNeededBanner: View {
 
 /// 書き出し (原文 / 日本語訳 / 対訳 × 形式)
 struct ExportMenu: View {
-    @Environment(AppModel.self) private var model
-    let transcript: Transcript
+    let hasTranslation: Bool
 
     var body: some View {
         Menu {
-            ExportMenuItems(hasTranslation: transcript.hasTranslation)
+            ExportMenuItems(hasTranslation: hasTranslation)
         } label: {
             Label("書き出す", systemImage: "square.and.arrow.up")
         }

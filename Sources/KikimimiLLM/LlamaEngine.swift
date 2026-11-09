@@ -45,8 +45,8 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     private let batchSize: Int
     private var batch: llama_batch
     private let format: ChatFormat
-    /// 利用者の文に紛れ込んだ制御用の文字列 (<|im_end|> など) を取り除くための一覧
-    private let controlTexts: [String]
+    /// 利用者の文に紛れ込んだ制御用の文字列 (<|im_end|>・</think> など) を取り除くための一覧 (UTF-8)
+    private let controlTexts: [[UInt8]]
     /// 全語彙で文法を確かめるときの入れ物 (使い回す)
     private var allCandidates: [llama_token_data] = []
     /// 日本語に出てこない文字を含むトークン (初めて日本語だけの出力を頼まれたときに作る)
@@ -98,6 +98,9 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         cparams.n_batch = UInt32(max(32, options.batchSize))
         cparams.n_ubatch = UInt32(max(32, min(options.batchSize, 512)))
         cparams.n_seq_max = 1
+        // 読むのは毎回「最後のトークンの確率」1 行だけ。既定 (0 = n_batch 行) のままだと、語彙 25 万の Qwen3.5 では
+        // 使わない出力のために 400 MB 以上の作業領域 (Metal) を取ってしまう
+        cparams.n_outputs_max = 1
         cparams.n_threads = Int32(max(1, options.threads))
         cparams.n_threads_batch = Int32(max(1, options.threads))
         cparams.no_perf = true
@@ -119,12 +122,16 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         let n = llama_model_desc(model, &desc, desc.count)
         self.modelDescription = n > 0 ? String(cString: desc) : (modelPath as NSString).lastPathComponent
 
-        var controls: [String] = []
+        // 制御用のトークンと、タグの形をした利用者定義のトークン (<think> など。llama.cpp は常に特別扱いする)
+        var controls: [[UInt8]] = []
         for t in 0..<Int32(vocabSize) {
             let attr = llama_vocab_get_attr(vocab, t).rawValue
-            guard attr & LLAMA_TOKEN_ATTR_CONTROL.rawValue != 0, let cText = llama_vocab_get_text(vocab, t) else { continue }
+            let isControl = attr & LLAMA_TOKEN_ATTR_CONTROL.rawValue != 0
+            let isUserDefined = attr & LLAMA_TOKEN_ATTR_USER_DEFINED.rawValue != 0
+            guard isControl || isUserDefined, let cText = llama_vocab_get_text(vocab, t) else { continue }
             let text = String(cString: cText)
-            if text.count >= 3 { controls.append(text) }
+            let tagLike = (text.hasPrefix("<") && text.hasSuffix(">")) || (text.hasPrefix("[") && text.hasSuffix("]"))
+            if text.utf8.count >= 3, isControl || tagLike { controls.append(Array(text.utf8)) }
         }
         self.controlTexts = controls.sorted { $0.count > $1.count }
 
@@ -172,8 +179,7 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         defer { lock.unlock() }
         if shouldCancel() { throw LLMError.cancelled }
 
-        let text = formatted(prompt)
-        let tokens = tokenize(text, addSpecial: shouldAddSpecial(text), parseSpecial: true)
+        let tokens = promptTokens(prompt)
         guard !tokens.isEmpty else { return "" }
         let limit = contextLength - 8
         guard tokens.count < limit else { throw LLMError.promptTooLong(tokens: tokens.count, limit: limit) }
@@ -347,36 +353,69 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         return !text.hasPrefix(String(cString: cText))
     }
 
+    /// 利用者の文 (文字起こし・語彙のヒント) から制御用の文字列を取り除く。
+    /// バイト単位で、消えてなくなるまでくり返す (「<|im_<|im_end|>end|>」のように、消すと新しくできる形にも備える)
     private func sanitize(_ text: String) -> String {
-        var s = text
-        for control in controlTexts where s.contains(control) {
-            s = s.replacingOccurrences(of: control, with: "")
+        var bytes = Array(text.utf8)
+        var changed = true
+        var rounds = 0
+        while changed && rounds < 16 {
+            changed = false
+            rounds += 1
+            for pattern in controlTexts where bytes.count >= pattern.count {
+                var out: [UInt8] = []
+                out.reserveCapacity(bytes.count)
+                var i = 0
+                while i < bytes.count {
+                    if i + pattern.count <= bytes.count, bytes[i] == pattern[0], Array(bytes[i..<(i + pattern.count)]) == pattern {
+                        i += pattern.count
+                        changed = true
+                    } else {
+                        out.append(bytes[i])
+                        i += 1
+                    }
+                }
+                bytes = out
+            }
         }
-        return s
+        return String(decoding: bytes, as: UTF8.self)
     }
 
-    private func formatted(_ prompt: LLMPrompt) -> String {
-        let system = sanitize(prompt.system)
-        let user = sanitize(prompt.user)
-        let examples = prompt.examples.map { (sanitize($0.user), sanitize($0.assistant)) }
+    /// プロンプトのトークン。ChatML は「会話の枠」だけを特別なトークンとして読み、中身はふつうの文字として読む
+    /// (中身に <|im_end|> などが紛れても、会話の区切りにならない)
+    private func promptTokens(_ prompt: LLMPrompt) -> [llama_token] {
         switch format {
         case .chatML(let skipThinking):
-            var s = "<|im_start|>system\n\(system)<|im_end|>\n"
-            for (u, a) in examples {
-                s += "<|im_start|>user\n\(u)<|im_end|>\n<|im_start|>assistant\n\(a)<|im_end|>\n"
+            var tokens: [llama_token] = []
+            if llama_vocab_get_add_bos(vocab), llama_vocab_bos(vocab) >= 0 {
+                tokens.append(llama_vocab_bos(vocab))
             }
-            s += "<|im_start|>user\n\(user)<|im_end|>\n<|im_start|>assistant\n"
-            if skipThinking { s += "<think>\n\n</think>\n\n" }
-            return s
+            func frame(_ s: String) { tokens += tokenize(s, addSpecial: false, parseSpecial: true) }
+            func content(_ s: String) { tokens += tokenize(sanitize(s), addSpecial: false, parseSpecial: false) }
+            frame("<|im_start|>system\n")
+            content(prompt.system)
+            frame("<|im_end|>\n")
+            for example in prompt.examples {
+                frame("<|im_start|>user\n")
+                content(example.user)
+                frame("<|im_end|>\n<|im_start|>assistant\n")
+                content(example.assistant)
+                frame("<|im_end|>\n")
+            }
+            frame("<|im_start|>user\n")
+            content(prompt.user)
+            frame("<|im_end|>\n<|im_start|>assistant\n")
+            if skipThinking { frame("<think>\n\n</think>\n\n") }
+            return tokens
         case .builtin(let template):
-            var messages: [(role: String, content: String)] = [("system", system)]
-            for (u, a) in examples {
-                messages.append(("user", u))
-                messages.append(("assistant", a))
+            var messages: [(role: String, content: String)] = [("system", sanitize(prompt.system))]
+            for example in prompt.examples {
+                messages.append(("user", sanitize(example.user)))
+                messages.append(("assistant", sanitize(example.assistant)))
             }
-            messages.append(("user", user))
-            return LlamaEngine.applyTemplate(template, messages)
-                ?? "\(system)\n\n\(user)\n\n"
+            messages.append(("user", sanitize(prompt.user)))
+            let text = LlamaEngine.applyTemplate(template, messages) ?? messages.map(\.content).joined(separator: "\n\n") + "\n\n"
+            return tokenize(text, addSpecial: shouldAddSpecial(text), parseSpecial: true)
         }
     }
 

@@ -20,6 +20,19 @@ enum LLMSelfTest {
             let engine = try LlamaEngine(modelPath: modelPath, options: LlamaOptions(gpuLayers: useGPU ? -1 : 0))
             log("loaded: \(engine.modelDescription), context \(engine.contextLength) tokens, \(engine.chatFormatDescription), \(seconds(since: clock)) (\(useGPU ? "GPU" : "CPU"))")
 
+            // 生成そのものの確認: 文法で形を決めた答えが、そのとおりに返るか (乱数の重みのモデルでも成り立つ)
+            clock = Date()
+            let shaped = try engine.generate(
+                LLMPrompt(system: "Answer with two short lines.", user: "[1] hello\n[2] world",
+                          grammar: "root ::= \"[1] \" [a-z] [a-z]? \"\\n\" \"[2] \" [a-z] [a-z]? \"\\n\"", maxTokens: 32),
+                shouldCancel: { false })
+            let shapeOK = shaped.range(of: #"^\[1\] [a-z]{1,2}\n\[2\] [a-z]{1,2}\n$"#, options: .regularExpression) != nil
+            log("generate: \(shaped.debugDescription), \(seconds(since: clock))")
+            guard shapeOK else {
+                log("SELFTEST FAILED: the grammar-shaped answer came back malformed")
+                return 1
+            }
+
             let segments = [
                 TranscriptSegment(start: 0, end: 3, text: "Welcome to today's session about building games in Roblocks Studio."),
                 TranscriptSegment(start: 3, end: 6, text: "今日はよろしくお願いします。"),
@@ -31,7 +44,7 @@ enum LLMSelfTest {
             clock = Date()
             var translations: [UUID: String] = [:]
             let failed = try Translator.translate(segments, language: "en", generator: engine, shouldCancel: { false }) { batch, _, _ in
-                translations.merge(batch) { a, _ in a }
+                for result in batch { translations[result.head] = result.text }
             }
             log("translate: \(translations.count) translated, \(failed) failed, \(seconds(since: clock))")
             for s in segments {

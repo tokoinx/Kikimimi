@@ -68,17 +68,36 @@ public enum Exporter {
         s.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// 1 区間に書く文 (行のまとまり)
-    static func lines(_ t: Transcript, _ s: TranscriptSegment, _ content: ExportContent) -> [String] {
-        let original = clean(s.text)
+    /// 書き出す 1 行 (字幕なら 1 枚)。原文は区間ごと、日本語訳・対訳は訳ごと (文が区間をまたぐときは 1 つにまとめる)
+    struct Row {
+        var start: TimeInterval
+        var end: TimeInterval
+        var original: String
+        /// 日本語 (訳、またはもともと日本語の原文)。まだ訳がなければ nil
+        var japanese: String?
+    }
+
+    static func rows(_ t: Transcript, _ content: ExportContent) -> [Row] {
         switch content {
         case .original:
-            return [original]
+            return t.segments.map { Row(start: $0.start, end: $0.end, original: clean($0.text), japanese: nil) }
+        case .japanese, .bilingual:
+            return t.bilingualUnits().map {
+                Row(start: $0.start, end: $0.end, original: clean($0.text), japanese: $0.japanese.map(clean))
+            }
+        }
+    }
+
+    /// 1 行に書く文
+    static func lines(_ row: Row, _ content: ExportContent) -> [String] {
+        switch content {
+        case .original:
+            return [row.original]
         case .japanese:
-            return [clean(t.japaneseText(of: s) ?? original)]
+            return [row.japanese ?? row.original]
         case .bilingual:
-            guard let ja = t.japaneseText(of: s).map(clean), ja != original else { return [original] }
-            return [original, ja]
+            guard let ja = row.japanese, ja != row.original else { return [row.original] }
+            return [row.original, ja]
         }
     }
 
@@ -87,24 +106,24 @@ public enum Exporter {
         case .original:
             return t.text + "\n"
         case .japanese:
-            return t.segments.map { lines(t, $0, .japanese)[0] }.filter { !$0.isEmpty }.joined(separator: "\n") + "\n"
+            return rows(t, content).map { lines($0, content)[0] }.filter { !$0.isEmpty }.joined(separator: "\n") + "\n"
         case .bilingual:
-            return t.segments.map { s in
-                let l = lines(t, s, .bilingual)
-                return "[\(TimeFormat.short(s.start))] " + l[0] + (l.count > 1 ? "\n        " + l[1] : "")
+            return rows(t, content).map { row in
+                let l = lines(row, content)
+                return "[\(TimeFormat.short(row.start))] " + l[0] + (l.count > 1 ? "\n        " + l[1] : "")
             }.joined(separator: "\n") + "\n"
         }
     }
 
     public static func srt(_ t: Transcript, content: ExportContent = .original) -> String {
-        t.segments.enumerated().map { i, s in
-            "\(i + 1)\n\(TimeFormat.srt(s.start)) --> \(TimeFormat.srt(s.end))\n\(lines(t, s, content).joined(separator: "\n"))\n"
+        rows(t, content).enumerated().map { i, row in
+            "\(i + 1)\n\(TimeFormat.srt(row.start)) --> \(TimeFormat.srt(row.end))\n\(lines(row, content).joined(separator: "\n"))\n"
         }.joined(separator: "\n")
     }
 
     public static func vtt(_ t: Transcript, content: ExportContent = .original) -> String {
-        let body = t.segments.map { s in
-            "\(TimeFormat.vtt(s.start)) --> \(TimeFormat.vtt(s.end))\n\(lines(t, s, content).joined(separator: "\n"))\n"
+        let body = rows(t, content).map { row in
+            "\(TimeFormat.vtt(row.start)) --> \(TimeFormat.vtt(row.end))\n\(lines(row, content).joined(separator: "\n"))\n"
         }.joined(separator: "\n")
         return "WEBVTT\n\n" + body
     }
@@ -123,11 +142,11 @@ public enum Exporter {
                 s.replacingOccurrences(of: "|", with: "\\|").replacingOccurrences(of: "\n", with: " ")
             }
             out += ["| 時刻 | 原文 | 日本語訳 |", "| --- | --- | --- |"]
-            out += t.segments.map { s in
-                "| \(TimeFormat.short(s.start)) | \(cell(clean(s.text))) | \(cell(t.japaneseText(of: s).map(clean) ?? "")) |"
+            out += rows(t, content).map { row in
+                "| \(TimeFormat.short(row.start)) | \(cell(row.original)) | \(cell(row.japanese ?? "")) |"
             }
         case .original, .japanese:
-            out += t.segments.map { "- **\(TimeFormat.short($0.start))** \(lines(t, $0, content)[0])" }
+            out += rows(t, content).map { "- **\(TimeFormat.short($0.start))** \(lines($0, content)[0])" }
         }
         return out.joined(separator: "\n") + "\n"
     }
@@ -136,15 +155,15 @@ public enum Exporter {
         func q(_ s: String) -> String { "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }
         switch content {
         case .original, .japanese:
-            var rows = ["start,end,text"]
-            rows += t.segments.map { String(format: "%.3f,%.3f,", $0.start, $0.end) + q(lines(t, $0, content)[0]) }
-            return rows.joined(separator: "\n") + "\n"
+            var out = ["start,end,text"]
+            out += rows(t, content).map { String(format: "%.3f,%.3f,", $0.start, $0.end) + q(lines($0, content)[0]) }
+            return out.joined(separator: "\n") + "\n"
         case .bilingual:
-            var rows = ["start,end,text,japanese"]
-            rows += t.segments.map {
-                String(format: "%.3f,%.3f,", $0.start, $0.end) + q(clean($0.text)) + "," + q(t.japaneseText(of: $0).map(clean) ?? "")
+            var out = ["start,end,text,japanese"]
+            out += rows(t, content).map {
+                String(format: "%.3f,%.3f,", $0.start, $0.end) + q($0.original) + "," + q($0.japanese ?? "")
             }
-            return rows.joined(separator: "\n") + "\n"
+            return out.joined(separator: "\n") + "\n"
         }
     }
 

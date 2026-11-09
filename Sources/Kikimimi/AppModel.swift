@@ -102,6 +102,8 @@ final class AppModel {
     var llmDownloads: [String: Double] = [:]
     /// LLM の取得の案内を閉じた (この起動のあいだだけ)
     var llmBannerDismissed = false
+    /// 手元の GGUF を取り込んでいる
+    var importingLLM = false
 
     let store = ModelStore()
     let llmStore: LLMModelStore
@@ -352,6 +354,7 @@ final class AppModel {
             do {
                 try llmStore.ensureDirectory()
                 let resolved = try await HuggingFaceResolver.resolve(spec)
+                try Task.checkCancellation()
                 let size = resolved.expectedSize
                 let sha = resolved.sha256
                 try await ModelDownloader.download(
@@ -365,6 +368,7 @@ final class AppModel {
                         }
                     }
                 )
+                try Task.checkCancellation()
                 refreshLLMInstalled()
                 // 取得のきっかけになった結果 (いま開いているもの) を、そのまま LLM で見直し・翻訳する
                 if currentLLM.spec?.id == spec.id, let job = selectedJob, job.status == .done, let t = job.transcript {
@@ -407,16 +411,22 @@ final class AppModel {
         panel.message = "llama.cpp で動く LLM (.gguf) を選んでください"
         panel.prompt = "追加"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let name = try llmStore.importFile(from: url)
-            refreshLLMInstalled()
-            if let spec = LLMCatalog.all.first(where: { $0.fileName == name }) {
-                llmModelID = spec.id
-            } else {
-                llmModelID = "file:" + name
+        let store = llmStore
+        importingLLM = true
+        Task {
+            defer { importingLLM = false }
+            do {
+                // 数 GB を写すので、画面を止めないよう裏で行う
+                let name = try await Task.detached(priority: .userInitiated) { try store.importFile(from: url) }.value
+                refreshLLMInstalled()
+                if let spec = LLMCatalog.all.first(where: { $0.fileName == name }) {
+                    llmModelID = spec.id
+                } else {
+                    llmModelID = "file:" + name
+                }
+            } catch {
+                errorMessage = error.localizedDescription
             }
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -492,9 +502,11 @@ final class AppModel {
         case post(Job, PostTask)
     }
 
-    /// 次の仕事: 文字起こしが終わったジョブの監査・翻訳を先に (古い順)、その次に待っている文字起こし
+    /// 次の仕事: 文字起こしが終わったジョブの監査・翻訳を先に (古い順)、その次に待っている文字起こし。
+    /// メモリの少ない Mac では、録音中は監査・翻訳を始めない (プレビューの Whisper を手放さずに済むように。止めたら続ける)
     private func nextWork() -> Work? {
-        if let job = jobs.last(where: { $0.status == .done && !$0.postQueue.isEmpty }) {
+        let holdPost = isRecording && MemoryBudget.isTight
+        if !holdPost, let job = jobs.last(where: { $0.status == .done && !$0.postQueue.isEmpty }) {
             return .post(job, job.postQueue.removeFirst())
         }
         if let job = jobs.last(where: { $0.status == .queued }) {
@@ -623,9 +635,11 @@ final class AppModel {
             // 翻訳は LLM が手元にあり、日本語以外が主な文字起こしのときだけ (LLM が無ければ画面で取得を案内する)
             if autoTranslate, isLLMInstalled, transcript.isMainlyForeign { wanted.append(.translate) }
         }
-        for task in wanted where !job.postQueue.contains(task) && job.postState.task != task {
-            job.postQueue.append(task)
-        }
+        let added = wanted.filter { !job.postQueue.contains($0) && job.postState.task != $0 }
+        guard !added.isEmpty else { return }
+        // 前のお知らせは、新しく頼まれたときに消す (続けて動く仕事が、前の仕事の失敗の知らせを消さないように)
+        if job.postState == .idle { job.postNote = nil }
+        job.postQueue += added
         ensureWorker()
     }
 
@@ -660,7 +674,6 @@ final class AppModel {
         guard job.status == .done, let transcript = job.transcript, !transcript.segments.isEmpty else { return }
         let flag = CancelFlag()
         job.postCancel = flag
-        job.postNote = nil
         let selection = currentLLM
         let useLLM = isLLMInstalled
         let glossary = initialPrompt
@@ -674,35 +687,47 @@ final class AppModel {
         do {
             switch task {
             case .audit:
-                job.postState = .running(.audit, message: "監査中…" + (useLLM ? preparing : ""), progress: nil)
-                var base = transcript
-                base.revertAllChanges()
-                let segments = base.segments
+                job.postState = .running(.audit, message: "監査中…", progress: nil)
+                let segments = transcript.segmentsBeforeAudit
                 let options = AuditOptions(glossary: glossary)
-                let report: AuditReport
-                if useLLM {
-                    report = try await llm.run(modelPath: selection.url.path, shouldCancel: { flag.isSet }) { engine in
-                        try Auditor.audit(segments, language: language, options: options, generator: engine,
-                                          modelName: selection.name, shouldCancel: { flag.isSet }) { done, total in
-                            Task { @MainActor in
-                                guard case .running(.audit, _, _) = job.postState, job.postCancel === flag else { return }
-                                job.postState = .running(.audit, message: "監査中 \(done)/\(total)",
-                                                         progress: total > 0 ? Double(done) / Double(total) : nil)
-                            }
-                        }
-                    }
-                } else {
-                    // 規則だけでも長い録音では時間がかかるので、画面を止めないよう裏で回す
-                    report = try await Task.detached(priority: .userInitiated) {
-                        try Auditor.audit(segments, language: language, options: options, generator: nil,
-                                          modelName: nil, shouldCancel: { flag.isSet })
-                    }.value
-                    job.postNote = "LLM が未取得のため、繰り返しの見直しだけを行いました。聞き取りミスも見直すには、設定の「監査・翻訳」から LLM を取得してください。"
-                }
+                // 規則だけの見直しは数秒で終わるので、先に反映しておく (LLM が失敗・中止しても、ここまでは残る)。
+                // 長い録音では時間がかかるので、画面を止めないよう裏で回す
+                let rules = try await Task.detached(priority: .userInitiated) {
+                    try Auditor.audit(segments, language: language, options: options, generator: nil,
+                                      modelName: nil, shouldCancel: { flag.isSet })
+                }.value
                 if flag.isSet { throw LLMError.cancelled }
-                guard var current = job.transcript else { return }
-                current.adopt(report)
-                job.transcript = current
+                adopt(rules, in: job)
+                guard useLLM else {
+                    job.postNote = "LLM が未取得のため、繰り返しの見直しだけを行いました。聞き取りミスも見直すには、設定の「監査・翻訳」から LLM を取得してください。"
+                    return
+                }
+                job.postState = .running(.audit, message: "監査中…" + preparing, progress: nil)
+                let partial = LockedBox<AuditReport>()
+                do {
+                    let report = try await llm.run(modelPath: selection.url.path, shouldCancel: { flag.isSet }) { engine in
+                        try Auditor.audit(segments, language: language, options: options, generator: engine,
+                                          modelName: selection.name, shouldCancel: { flag.isSet },
+                                          onProgress: { done, total in
+                                              Task { @MainActor in
+                                                  guard case .running(.audit, _, _) = job.postState, job.postCancel === flag else { return }
+                                                  job.postState = .running(.audit, message: "監査中 \(done)/\(total)",
+                                                                           progress: total > 0 ? Double(done) / Double(total) : nil)
+                                              }
+                                          },
+                                          onPartial: { partial.value = $0 })
+                    }
+                    adopt(report, in: job)
+                } catch {
+                    // 中止・失敗: LLM が見終えたまとまりまでの結果を反映する (規則の結果は反映済み)
+                    if let done = partial.value, done.model != nil { adopt(done, in: job) }
+                    if flag.isSet || (error as? LLMError) == .cancelled {
+                        job.postNote = "監査を中止しました。見終えた所までの結果を反映しています。"
+                    } else {
+                        job.postNote = "LLM で見直せなかったため、繰り返しの見直しだけを反映しました: " + error.localizedDescription
+                    }
+                    return
+                }
 
             case .translate:
                 guard useLLM else { return }
@@ -710,21 +735,18 @@ final class AppModel {
                 let segments = transcript.segments
                 let sources = Dictionary(segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
                 let options = TranslationOptions(glossary: glossary)
-                let apply: @MainActor ([UUID: String]) -> Void = { batch in
+                let apply: @MainActor ([TranslationResult]) -> Void = { batch in
                     guard !batch.isEmpty, var t = job.transcript else { return }
-                    for i in t.segments.indices {
-                        let s = t.segments[i]
-                        // 訳しているあいだに監査で文が変わった区間には付けない
-                        if let translated = batch[s.id], sources[s.id] == s.text { t.segments[i].translation = translated }
-                    }
+                    // 訳しているあいだに監査で文が変わった区間には付けない
+                    for result in batch { t.apply(result, sources: sources) }
                     t.translationModel = selection.name
                     job.transcript = t
                 }
                 let (failed, all) = try await llm.run(modelPath: selection.url.path, shouldCancel: { flag.isSet }) { engine in
-                    var all: [UUID: String] = [:]
+                    var all: [TranslationResult] = []
                     let failed = try Translator.translate(segments, language: language, options: options, generator: engine,
                                                           shouldCancel: { flag.isSet }) { batch, done, total in
-                        all.merge(batch) { a, _ in a }
+                        all += batch
                         Task { @MainActor in
                             apply(batch)
                             guard case .running(.translate, _, _) = job.postState, job.postCancel === flag else { return }
@@ -748,6 +770,13 @@ final class AppModel {
                 job.postNote = (task == .audit ? "監査" : "翻訳") + "できませんでした: " + error.localizedDescription
             }
         }
+    }
+
+    /// 監査の結果を本文に反映する (前の監査の反映は元に戻し、利用者の決定は引き継ぐ)
+    private func adopt(_ report: AuditReport, in job: Job) {
+        guard var current = job.transcript else { return }
+        current.adopt(report)
+        job.transcript = current
     }
 
     /// 中止・失敗したジョブの途中結果にも、完了時と同じ繰り返しの後始末をかける (画面に残り、コピーもできるため)。
@@ -788,8 +817,9 @@ final class AppModel {
         recordingStartedAt = Date()
         livePreviewText = ""
 
-        // プレビューのために、取得済みならモデルを先に読み込んでおく
+        // プレビューのために、取得済みならモデルを先に読み込んでおく (メモリの少ない Mac では LLM を先に手放す)
         let spec = currentModel
+        if MemoryBudget.isTight { llm.unload() }
         if store.isInstalled(spec) {
             let path = store.url(for: spec).path
             Task { try? await service.preload(modelPath: path) }
@@ -883,15 +913,16 @@ final class AppModel {
     }
 
     /// 対訳で表示しているか (対訳表示がオンで、日本語以外が主な文字起こしか、訳が 1 つでもある)
-    func isBilingual(_ transcript: Transcript) -> Bool {
-        showBilingual && (transcript.hasTranslation || transcript.isMainlyForeign)
+    func isBilingual(_ stats: Transcript.TranslationStats) -> Bool {
+        showBilingual && (stats.hasTranslation || stats.isMainlyForeign)
     }
 
     /// 本文をコピーする。対訳表示のときは原文と日本語訳を並べたもの
     func copySelectedText() {
         guard let transcript = selectedJob?.transcript else { return }
         let text: String
-        if isBilingual(transcript) && transcript.hasTranslation {
+        let stats = transcript.translationStats
+        if isBilingual(stats) && stats.hasTranslation {
             text = Exporter.txt(transcript, content: .bilingual)
         } else {
             text = transcript.text(withTimestamps: showTimestamps)
@@ -899,6 +930,17 @@ final class AppModel {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(text, forType: .string)
+    }
+}
+
+/// スレッドをまたいで最新の値を受け渡す入れ物
+final class LockedBox<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value?
+
+    var value: Value? {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); stored = newValue; lock.unlock() }
     }
 }
 

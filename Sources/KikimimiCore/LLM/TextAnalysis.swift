@@ -46,6 +46,15 @@ public enum TextSimilarity {
 
 /// 文がどの言語の文字で書かれているか (翻訳が要るかの判定用)。
 public enum Script {
+    /// CharacterSet.letters は呼ぶたびに作り直されて遅いので、1 回だけ作る
+    private static let letters = CharacterSet.letters
+
+    /// 中国語の仲間の言語コード (Whisper は広東語を "yue" と返す)
+    static func isChineseFamily(_ code: String?) -> Bool {
+        guard let code = code?.lowercased() else { return false }
+        return code.hasPrefix("zh") || code.hasPrefix("yue")
+    }
+
     private static func isKana(_ v: UInt32) -> Bool {
         (0x3040...0x30FF).contains(v) || (0x31F0...0x31FF).contains(v) || (0xFF66...0xFF9F).contains(v)
     }
@@ -57,20 +66,19 @@ public enum Script {
 
     /// 日本語の文か。かなを含むか、漢字だけで書かれていて (英字なし) 文字起こしの言語が中国語でなければ日本語とみなす。
     public static func isJapanese(_ text: String, transcriptLanguage: String? = nil) -> Bool {
-        var kana = 0, han = 0, otherLetters = 0
+        var han = 0, otherLetters = 0
         for scalar in text.unicodeScalars {
             let v = scalar.value
             if isKana(v) {
-                kana += 1
+                return true
             } else if isHan(v) {
                 han += 1
-            } else if CharacterSet.letters.contains(scalar) {
+            } else if letters.contains(scalar) {
                 otherLetters += 1
             }
         }
-        if kana > 0 { return true }
         if han > 0 && otherLetters == 0 {
-            return !(transcriptLanguage?.hasPrefix("zh") ?? false)
+            return !isChineseFamily(transcriptLanguage)
         }
         return false
     }
@@ -89,7 +97,12 @@ public enum Script {
 
     /// 文字 (数字・記号以外) を含むか
     public static func hasLetters(_ text: String) -> Bool {
-        text.unicodeScalars.contains { CharacterSet.letters.contains($0) }
+        text.unicodeScalars.contains { letters.contains($0) }
+    }
+
+    /// 漢字を含むか
+    static func hasHan(_ text: String) -> Bool {
+        text.unicodeScalars.contains { isHan($0.value) }
     }
 
     /// 日本語に訳す必要があるか (日本語ではなく、文字を含む)
@@ -102,6 +115,7 @@ public enum Script {
         switch code?.lowercased() {
         case "en": return "English"
         case "zh": return "Chinese"
+        case "yue": return "Cantonese"
         case "ko": return "Korean"
         case "es": return "Spanish"
         case "fr": return "French"

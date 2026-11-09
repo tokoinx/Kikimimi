@@ -4,13 +4,13 @@ import Foundation
 public struct TranslationOptions: Sendable {
     /// 固有名詞などの正しい表記 (設定の「語彙のヒント」)
     public var glossary: String?
-    /// 1 度に訳す区間の数と、その長さの上限 (トークン数)
+    /// 1 度に訳す行の数と、その長さの上限 (トークン数)
     public var maxLinesPerChunk: Int
     public var maxTokensPerChunk: Int
-    /// 文脈として見せる、直前の訳済みの区間の数
+    /// 文脈として見せる、直前の訳済みの行の数
     public var contextLines: Int
 
-    public init(glossary: String? = nil, maxLinesPerChunk: Int = 12, maxTokensPerChunk: Int = 500, contextLines: Int = 3) {
+    public init(glossary: String? = nil, maxLinesPerChunk: Int = 10, maxTokensPerChunk: Int = 500, contextLines: Int = 3) {
         self.glossary = glossary
         self.maxLinesPerChunk = maxLinesPerChunk
         self.maxTokensPerChunk = maxTokensPerChunk
@@ -18,16 +18,69 @@ public struct TranslationOptions: Sendable {
     }
 }
 
+/// 1 つの訳 (文ごと)。head の区間に訳を置き、covers の区間はその訳に含める
+public struct TranslationResult: Sendable, Hashable {
+    public var head: UUID
+    public var covers: [UUID]
+    public var text: String
+}
+
 /// 翻訳役: 日本語以外の区間を、ローカル LLM で日本語に訳す。
 ///
-/// 区間ごとに番号を付けて数行ずつまとめて訳し、出力は文法で「同じ番号・同じ行数」に縛る
-/// (訳が隣の区間にずれたり、まとめられたりしない)。読めなかった行は 1 行ずつ訳し直す。
+/// Whisper の区間は文の途中で切れることが多い。区間ごとに訳すと、日本語の語順のせいで訳が隣の区間にずれる
+/// (本物の Qwen3.5 4B で起きた) ので、続いている区間を文ごとにまとめて 1 行として訳す。
+/// 行には番号を付けて数行ずつ訳し、出力は文法で「同じ番号・同じ行数」に縛る。読めなかった行は 1 行ずつ訳し直す。
 public enum Translator {
-    /// 訳す必要があり、まだ訳がない区間の位置
+    /// 1 文としてまとめる区間の数と長さの上限、区間のすき間 (これより空いていたら別の文)
+    static let maxSegmentsPerSentence = 4
+    static let maxCharactersPerSentence = 400
+    static let maxGapInSentence: TimeInterval = 1.5
+
+    /// 訳す必要があり、まだ訳がない区間の位置 (ほかの区間の訳に含まれているものは除く)
     public static func pendingIndices(_ segments: [TranscriptSegment], language: String?) -> [Int] {
-        segments.indices.filter {
-            segments[$0].translation == nil && Script.needsTranslation(segments[$0].text, transcriptLanguage: language)
+        var covered = Set<UUID>()
+        for s in segments where s.translation != nil {
+            covered.formUnion(s.translationCovers ?? [])
         }
+        return segments.indices.filter {
+            segments[$0].translation == nil && !covered.contains(segments[$0].id)
+                && Script.needsTranslation(segments[$0].text, transcriptLanguage: language)
+        }
+    }
+
+    /// 文の終わりか (句点・疑問符・感嘆符、またはそのあとに閉じかっこ・引用符)
+    static func endsSentence(_ text: String) -> Bool {
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while let last = trimmed.last, "\"'”’)）」』]".contains(last) {
+            trimmed.removeLast()
+        }
+        guard let last = trimmed.last else { return true }
+        return ".?!。？！…♪".contains(last)
+    }
+
+    /// 訳す区間を、文ごとのまとまりに分ける (位置の並び)
+    static func sentenceUnits(_ pending: [Int], in segments: [TranscriptSegment]) -> [[Int]] {
+        var units: [[Int]] = []
+        var current: [Int] = []
+        var characters = 0
+        for index in pending {
+            if let last = current.last {
+                let continues = index == last + 1
+                    && segments[index].start - segments[last].end <= maxGapInSentence
+                    && !endsSentence(segments[last].text)
+                    && current.count < maxSegmentsPerSentence
+                    && characters + segments[index].text.count <= maxCharactersPerSentence
+                if !continues {
+                    units.append(current)
+                    current = []
+                    characters = 0
+                }
+            }
+            current.append(index)
+            characters += segments[index].text.count
+        }
+        if !current.isEmpty { units.append(current) }
+        return units
     }
 
     static func systemPrompt(language: String?) -> String {
@@ -37,26 +90,13 @@ public enum Translator {
         from \(lang) into natural, easy-to-read Japanese.
         - Write Japanese only (kana and kanji). Never write Chinese.
         - Output exactly one line for each input line, in the same order, starting with the same number, like "[3] 訳文".
-        - Translate every line separately. Never merge, split, skip or reorder lines, even when a sentence continues on the next line.
+        - Each line is one sentence or a part of one. Translate every line on its own line. Never merge, split, skip or reorder lines.
         - Translate the meaning faithfully. Keep numbers and units accurate.
         - Keep every name and term from the glossary exactly as written, in the same letters (do not turn them into katakana). \
         Write other well-known names in their usual Japanese form.
         - If a line is already Japanese, copy it unchanged.
         - Output only the translations, with no notes.
         """
-    }
-
-    static func userPrompt(lines: [String], context: [(source: String, translation: String)], glossary: String?) -> String {
-        var parts: [String] = []
-        if let g = glossary?.trimmingCharacters(in: .whitespacesAndNewlines), !g.isEmpty {
-            parts.append("Glossary (keep exactly as written): \(g)")
-        }
-        if !context.isEmpty {
-            parts.append("Previous lines, already translated (context only, do not output):\n"
-                + context.map { "\($0.source) => \($0.translation)" }.joined(separator: "\n"))
-        }
-        parts.append("Lines to translate:\n" + lines.enumerated().map { "[\($0.offset + 1)] \($0.element)" }.joined(separator: "\n"))
-        return parts.joined(separator: "\n\n")
     }
 
     /// 手本のやりとり。小さなモデル (Qwen3.5 4B など) は指示だけだと訳文が中国語に流れることがあり、
@@ -77,6 +117,19 @@ public enum Translator {
             """
         ),
     ]
+
+    static func userPrompt(lines: [String], context: [(source: String, translation: String)], glossary: String?) -> String {
+        var parts: [String] = []
+        if let g = glossary?.trimmingCharacters(in: .whitespacesAndNewlines), !g.isEmpty {
+            parts.append("Glossary (keep exactly as written): \(g)")
+        }
+        if !context.isEmpty {
+            parts.append("Previous lines, already translated (context only, do not output):\n"
+                + context.map { "\($0.source) => \($0.translation)" }.joined(separator: "\n"))
+        }
+        parts.append("Lines to translate:\n" + lines.enumerated().map { "[\($0.offset + 1)] \($0.element)" }.joined(separator: "\n"))
+        return parts.joined(separator: "\n\n")
+    }
 
     /// 答えを読む (番号は 1 始まり)
     static func parse(_ output: String, count: Int) -> [Int: String] {
@@ -99,54 +152,55 @@ public enum Translator {
         return t.count <= source.count * 4 + 40
     }
 
-    /// まだ訳していない区間を訳す。1 まとまり訳すごとに onChunk (区間 ID → 訳) を呼ぶ。
+    /// まだ訳していない区間を、文ごとに訳す。1 まとまり訳すごとに onChunk を呼ぶ (done / total は区間の数)。
     /// 戻り値は、最後まで訳せなかった区間の数。
     @discardableResult
     public static func translate(_ segments: [TranscriptSegment], language: String?, options: TranslationOptions = TranslationOptions(),
                                  generator: any TextGenerating, shouldCancel: () -> Bool,
-                                 onChunk: (_ translations: [UUID: String], _ done: Int, _ total: Int) -> Void) throws -> Int {
-        let lines = segments.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                 onChunk: (_ results: [TranslationResult], _ done: Int, _ total: Int) -> Void) throws -> Int {
         let pending = pendingIndices(segments, language: language)
-        let chunks = LLMChunker.chunks(pending, cost: { generator.tokenCount(lines[$0]) + 4 },
+        let units = sentenceUnits(pending, in: segments)
+        let sources = units.map { unit in Transcript.join(unit.map { segments[$0].text }) }
+        let chunks = LLMChunker.chunks(Array(units.indices), cost: { generator.tokenCount(sources[$0]) + 4 },
                                        maxLines: options.maxLinesPerChunk, maxCost: options.maxTokensPerChunk)
         let system = systemPrompt(language: language)
         // 文脈用に、訳しながら訳を覚えておく (最初から訳がある区間も使う)
-        var known: [Int: String] = [:]
-        for i in segments.indices {
-            if let t = segments[i].translation { known[i] = t }
+        var known: [(position: Int, source: String, translation: String)] = segments.indices.compactMap { i in
+            guard let t = segments[i].translation else { return nil }
+            return (i, segments[i].text, t)
         }
         var failed = 0
-        onChunk([:], 0, pending.count)
         var done = 0
+        onChunk([], 0, pending.count)
         for chunk in chunks {
             if shouldCancel() { throw LLMError.cancelled }
-            let first = chunk[0]
-            let context = (max(0, first - options.contextLines)..<first).compactMap { i -> (source: String, translation: String)? in
-                guard let t = known[i] else { return nil }
-                return (lines[i], t)
-            }
-            var results = try translateLines(chunk.map { lines[$0] }, context: context, language: language,
+            let first = units[chunk[0]][0]
+            let context = known.filter { $0.position < first }.suffix(options.contextLines)
+                .map { (source: $0.source, translation: $0.translation) }
+            var results = try translateLines(chunk.map { sources[$0] }, context: Array(context), language: language,
                                              system: system, options: options, generator: generator,
                                              shouldCancel: shouldCancel)
             // 読めなかった行は 1 行ずつ訳し直す
             if chunk.count > 1 {
                 for k in chunk.indices where results[k] == nil {
                     if shouldCancel() { throw LLMError.cancelled }
-                    results[k] = try translateLines([lines[chunk[k]]], context: context, language: language,
+                    results[k] = try translateLines([sources[chunk[k]]], context: Array(context), language: language,
                                                     system: system, options: options, generator: generator,
                                                     shouldCancel: shouldCancel)[0]
                 }
             }
-            var batch: [UUID: String] = [:]
-            for (k, index) in chunk.enumerated() {
+            var batch: [TranslationResult] = []
+            for (k, u) in chunk.enumerated() {
+                let unit = units[u]
                 if let t = results[k] {
-                    batch[segments[index].id] = t
-                    known[index] = t
+                    batch.append(TranslationResult(head: segments[unit[0]].id, covers: unit.dropFirst().map { segments[$0].id }, text: t))
+                    known.append((unit[0], sources[u], t))
                 } else {
-                    failed += 1
+                    failed += unit.count
                 }
+                done += unit.count
             }
-            done += chunk.count
+            known.sort { $0.position < $1.position }
             onChunk(batch, done, pending.count)
         }
         return failed
@@ -173,5 +227,18 @@ public enum Translator {
             guard let t = parsed[k + 1], isPlausible(t, source: lines[k]) else { return nil }
             return t
         }
+    }
+}
+
+extension Transcript {
+    /// 訳を 1 つ置く。訳したあいだに監査で文が変わっていた区間 (sources と違う) には置かない
+    @discardableResult
+    public mutating func apply(_ result: TranslationResult, sources: [UUID: String]) -> Bool {
+        let ids = [result.head] + result.covers
+        guard ids.allSatisfy({ id in segments.first { $0.id == id }?.text == sources[id] }),
+              let index = segments.firstIndex(where: { $0.id == result.head }) else { return false }
+        segments[index].translation = result.text
+        segments[index].translationCovers = result.covers.isEmpty ? nil : result.covers
+        return true
     }
 }
