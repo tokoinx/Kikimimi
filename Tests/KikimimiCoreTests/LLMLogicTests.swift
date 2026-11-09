@@ -317,6 +317,18 @@ final class BilingualExportTests: XCTestCase {
         XCTAssertEqual(t.untranslatedCount, 1)
     }
 
+    func testMainlyForeign() {
+        let english = Transcript(sourceName: "a", segments: [seg(0, "Hello."), seg(1, "こんにちは"), seg(2, "Bye.")], language: "en")
+        XCTAssertTrue(english.isMainlyForeign)
+        // 日本語の講演に英語の相づちが少しだけ
+        let japanese = Transcript(sourceName: "b", segments: (0..<9).map { seg(Double($0), "これは \($0) 番目の話です") } + [seg(9, "OK.")],
+                                  language: "ja")
+        XCTAssertFalse(japanese.isMainlyForeign)
+        XCTAssertEqual(japanese.translatableCount, 1)
+        XCTAssertFalse(Transcript(sourceName: "c", segments: [seg(0, "100")]).isMainlyForeign)
+        XCTAssertFalse(Transcript(sourceName: "d").isMainlyForeign)
+    }
+
     func testFormats() {
         let t = sample()
         XCTAssertEqual(Exporter.txt(t, content: .japanese), "こんにちは、世界。\nこんにちは\nUntranslated line.\n")

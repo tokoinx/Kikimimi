@@ -362,6 +362,11 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     }
 
     private static let setUpOnce: Void = {
+        // llama.cpp は読み込みの様子などを大量に出すので、エラーだけを残す (初期化の出力も抑えるため先に設定する)
+        llama_log_set({ level, text, _ in
+            guard level == GGML_LOG_LEVEL_ERROR, let text else { return }
+            fputs(String(cString: text), stderr)
+        }, nil)
         #if os(Linux)
         // 検証用の Linux 版 llama.cpp は CPU の処理部を別ファイルにしている (macOS 版は中に組み込み済み)
         if let dir = ProcessInfo.processInfo.environment["GGML_BACKEND_DIR"], !dir.isEmpty {
@@ -371,11 +376,6 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         }
         #endif
         llama_backend_init()
-        // llama.cpp は読み込みの様子などを大量に出すので、エラーだけを残す
-        llama_log_set({ level, text, _ in
-            guard level == GGML_LOG_LEVEL_ERROR, let text else { return }
-            fputs(String(cString: text), stderr)
-        }, nil)
     }()
 
     private static func setUp() {

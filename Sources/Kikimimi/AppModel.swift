@@ -100,6 +100,8 @@ final class AppModel {
     var installedLLMIDs: Set<String> = []
     var customLLMFiles: [String] = []
     var llmDownloads: [String: Double] = [:]
+    /// LLM の取得の案内を閉じた (この起動のあいだだけ)
+    var llmBannerDismissed = false
 
     let store = ModelStore()
     let llmStore: LLMModelStore
@@ -245,6 +247,9 @@ final class AppModel {
             case .vad:
                 vadRetryAfter = nil
                 errorMessage = "無音検出 (VAD) モデルを追加しました。"
+            @unknown default:
+                // KikimimiWhisper は library evolution でビルドしているため、将来の値にも備える
+                refreshInstalled()
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -361,6 +366,13 @@ final class AppModel {
                     }
                 )
                 refreshLLMInstalled()
+                // 取得のきっかけになった結果 (いま開いているもの) を、そのまま LLM で見直し・翻訳する
+                if currentLLM.spec?.id == spec.id, let job = selectedJob, job.status == .done, let t = job.transcript {
+                    var tasks: [PostTask] = []
+                    if autoAudit, t.audit?.model == nil { tasks.append(.audit) }
+                    if autoTranslate, t.isMainlyForeign, t.untranslatedCount > 0 { tasks.append(.translate) }
+                    if !tasks.isEmpty { schedulePostTasks(for: job, automatic: false, tasks: tasks) }
+                }
             } catch is CancellationError {
             } catch let error as URLError where error.code == .cancelled {
             } catch {
@@ -608,8 +620,8 @@ final class AppModel {
         var wanted = tasks ?? []
         if automatic {
             if autoAudit { wanted.append(.audit) }
-            // 翻訳は LLM が手元にあるときだけ (無ければ画面で取得を案内する)
-            if autoTranslate, isLLMInstalled, transcript.translatableCount > 0 { wanted.append(.translate) }
+            // 翻訳は LLM が手元にあり、日本語以外が主な文字起こしのときだけ (LLM が無ければ画面で取得を案内する)
+            if autoTranslate, isLLMInstalled, transcript.isMainlyForeign { wanted.append(.translate) }
         }
         for task in wanted where !job.postQueue.contains(task) && job.postState.task != task {
             job.postQueue.append(task)
@@ -870,9 +882,9 @@ final class AppModel {
         }
     }
 
-    /// 対訳で表示しているか (訳が 1 つでもあり、対訳表示がオン)
+    /// 対訳で表示しているか (対訳表示がオンで、日本語以外が主な文字起こしか、訳が 1 つでもある)
     func isBilingual(_ transcript: Transcript) -> Bool {
-        showBilingual && (transcript.hasTranslation || transcript.translatableCount > 0)
+        showBilingual && (transcript.hasTranslation || transcript.isMainlyForeign)
     }
 
     /// 本文をコピーする。対訳表示のときは原文と日本語訳を並べたもの

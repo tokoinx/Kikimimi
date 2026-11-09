@@ -55,8 +55,9 @@ struct TranscriptDetailView: View {
             PostProcessBar(job: job)
 
             if let transcript = job.transcript {
-                if job.status == .done, transcript.translatableCount > 0, !model.isLLMInstalled {
-                    LLMNeededBanner()
+                if job.status == .done, !transcript.segments.isEmpty, !model.isLLMInstalled, !model.llmBannerDismissed,
+                   (model.autoTranslate && transcript.isMainlyForeign) || model.autoAudit {
+                    LLMNeededBanner(wantsTranslation: transcript.isMainlyForeign)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
                 }
@@ -123,7 +124,7 @@ struct TranscriptDetailView: View {
                 .frame(maxWidth: 220)
             Toggle("時刻", isOn: $model.showTimestamps)
                 .toggleStyle(.checkbox)
-            if transcript.hasTranslation || transcript.translatableCount > 0 {
+            if transcript.hasTranslation || transcript.isMainlyForeign {
                 Toggle("対訳", isOn: $model.showBilingual)
                     .toggleStyle(.checkbox)
                     .help("原文と日本語訳を左右に並べる")
@@ -598,15 +599,19 @@ struct PostProcessBar: View {
 /// 翻訳・監査に LLM が必要なことを知らせる
 struct LLMNeededBanner: View {
     @Environment(AppModel.self) private var model
+    /// 日本語以外が主な文字起こし (翻訳も案内する)
+    let wantsTranslation: Bool
 
     var body: some View {
         let selection = model.currentLLM
         HStack(spacing: 12) {
-            Image(systemName: "character.bubble")
+            Image(systemName: wantsTranslation ? "character.bubble" : "checkmark.seal")
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 2) {
-                Text("日本語訳と聞き取りミスの監査には、Mac の中で動く LLM を使います")
+                Text(wantsTranslation
+                     ? "日本語訳と聞き取りミスの監査には、Mac の中で動く LLM を使います"
+                     : "聞き取りミスの監査には、Mac の中で動く LLM を使います (いまは繰り返しだけを見直しています)")
                     .font(.callout.weight(.semibold))
                 Text("\(selection.name) (約 \(selection.spec.map { TimeFormat.bytes(Int64($0.approxMB) * 1_000_000) } ?? "—")) を一度だけダウンロードします。文字起こしの内容は Mac の外に出ません。")
                     .font(.caption)
@@ -626,6 +631,13 @@ struct LLMNeededBanner: View {
                     EmptyView()
                 }
             }
+            Button {
+                model.llmBannerDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help("閉じる (設定の「監査・翻訳」からいつでも取得できます)")
         }
         .padding(12)
         .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))

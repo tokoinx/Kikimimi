@@ -81,6 +81,17 @@ public struct Transcript: Codable, Hashable, Sendable {
         segments.filter { $0.translation == nil && Script.needsTranslation($0.text, transcriptLanguage: language) }.count
     }
 
+    /// 日本語以外が主な文字起こしか (自動翻訳と対訳表示の対象)。文字を含む区間の 2 割以上が日本語以外なら true。
+    /// 日本語の講演に英語の相づちが数行まじる程度では false (対訳にしても右の列がほぼ原文の繰り返しになるため)
+    public var isMainlyForeign: Bool {
+        var lettered = 0, foreign = 0
+        for s in segments where Script.hasLetters(s.text) {
+            lettered += 1
+            if Script.needsTranslation(s.text, transcriptLanguage: language) { foreign += 1 }
+        }
+        return lettered > 0 && Double(foreign) >= Double(lettered) * 0.2
+    }
+
     /// 右の列 (日本語) に出す文: 訳があれば訳、訳す必要のない区間は原文のまま
     public func japaneseText(of segment: TranscriptSegment) -> String? {
         if let t = segment.translation { return t }

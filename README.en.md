@@ -6,22 +6,25 @@
 
 [日本語 README](README.md)
 
-A native Mac app written in Swift / SwiftUI. Recognition runs on **whisper.cpp** (a C/C++ implementation of OpenAI Whisper) on the Apple Silicon GPU via Metal.
-Your audio stays on your Mac. The only network access is the one-time model download.
+A native Mac app written in Swift / SwiftUI. Recognition runs on **whisper.cpp** (a C/C++ implementation of OpenAI Whisper); the auditor and the translator run on **llama.cpp** with a small free LLM (**Qwen3.5**). Both use the Apple Silicon GPU via Metal.
+Neither your audio nor the transcript leaves your Mac. The only network access is the one-time model downloads.
 
 - Drop audio or video files (mp3 / m4a / wav / aiff / caf / mp4 / mov …) to get a timestamped transcript
 - Finder's "Open With" and drops on the Dock icon work too
 - Text appears sentence by sentence while it is being recognized, and any job can be cancelled
 - Microphone recording, with a live preview of the last few seconds while you record; the full recording is transcribed carefully when you stop
 - Click a line to play from that point; search highlights matches
-- Export to txt / srt / vtt / Markdown / csv / json
+- **Auditor**: after transcription, a reviewer looks for repeated sentences and misheard words. Only confident corrections are applied; the rest are kept as suggestions. Every change can be reviewed and undone
+- **English → Japanese translation**: the original on the left, the Japanese translation on the right (Chinese, Korean and others can be translated to Japanese too)
+- Export to txt / srt / vtt / Markdown / csv / json (original, Japanese, or both side by side)
 - Japanese, English, Chinese, Korean and more, with automatic language detection
 
 ## Requirements
 
 - macOS 14 Sonoma or later. Apple Silicon recommended (Intel Macs work on the CPU, more slowly)
 - Xcode 16 or later, or the Command Line Tools (`xcode-select --install`)
-- About 1 GB of free disk space (the recommended model is about 574 MB)
+- About 1 GB of free disk space (the recommended speech model is about 574 MB), plus about 3 GB for the auditor and translator (the recommended LLM is about 2.8 GB)
+- 8 GB of memory or more (16 GB or more for the 9B LLM)
 
 ## Build and run
 
@@ -33,8 +36,8 @@ make run
 
 `make run` does the following:
 
-1. `swift build -c release` (the first build downloads the prebuilt whisper.cpp framework, about 54 MB, from GitHub)
-2. Assembles `build/Kikimimi.app` and embeds whisper.framework
+1. `swift build -c release` (the first build downloads the prebuilt whisper.cpp and llama.cpp frameworks, about 54 MB + 65 MB, from GitHub)
+2. Assembles `build/Kikimimi.app` and embeds whisper.framework and llama.framework
 3. Ad-hoc signs the app
 4. Launches it (if Kikimimi is already running, it quits that copy first)
 
@@ -52,6 +55,35 @@ make install
 
 Recording (⌘R) asks for microphone permission the first time.
 
+To use the auditor and the translator, download the LLM once with the "ダウンロード" (Download) button on the result screen, or from Settings › 監査・翻訳 (Audit & translation). After that, every finished transcript is audited automatically, and English (or other non-Japanese) segments are translated into Japanese.
+
+## Audit and translation (local LLM)
+
+A small LLM running on your Mac reads the transcript once more.
+
+- **Auditor (repetition and mishearing)**
+  - Rules: finds a line that repeats the previous one exactly, almost exactly, or in part (lines that differ in their numbers are kept as different lines).
+  - LLM: finds clear mishearings in context (a similar-sounding wrong word, a mangled proper noun) and lines that were never spoken (such as "Thank you for watching." over silence or music).
+  - Guardrails: the LLM is not trusted blindly. A fix is applied automatically only when it changes little and keeps the language (it is not a translation); a deletion only when a similar line is nearby or it is a known hallucination. If an answer wants to change nearly half of the lines it reviewed, it is treated as a rewrite and every change becomes a suggestion.
+  - Open the list from "監査: 修正 3 · 削除 2 · 提案 1" (Audit: fixed / deleted / suggestions) on the result screen to apply or undo each change. The badge next to a line shows the same details.
+- **Translator (into Japanese)**
+  - Non-Japanese segments are translated a few lines at a time. The output is constrained with a llama.cpp grammar (GBNF) down to the line numbers and the line count, so a translation cannot slip onto the neighbouring line. Lines that could not be read are retried one at a time.
+  - The original is on the left and the Japanese translation on the right; segments that were already Japanese appear dimmed on the right. Toggle this with the "対訳" (Bilingual) checkbox.
+  - Names in the "Vocabulary hint" setting are also used by the auditor and the translator.
+- You can run them by hand too: audit ⇧⌘K, translate ⇧⌘T (or the buttons on the result screen).
+
+| LLM | Best for | Size | Memory |
+|---|---|---|---|
+| Qwen3.5 4B | The balanced default | about 2.8 GB | 8 GB or more |
+| Qwen3.5 2B (light) | Speed first; less accurate | about 1.3 GB | 8 GB or more |
+| Qwen3.5 9B (accurate) | The smartest, and the slowest | about 6.2 GB | 16 GB or more |
+
+- All are free Apache-2.0 models. The Q4_K_M GGUF is fetched from Hugging Face, and its size and SHA-256 are checked before it is saved to `~/Library/Application Support/Kikimimi/Models/LLM`.
+- Any GGUF that llama.cpp can run can be added with "手元の GGUF を追加…" (Add a local GGUF) in Settings.
+- Rough timing: for a one-hour English talk on an M1, the audit takes a few minutes and the translation 10–20 minutes with the 4B model (translations appear on the right as they are produced). Pick the 2B model when you are in a hurry.
+- On Macs with less than 12 GB of memory, the speech model and the LLM are loaded in turn so they never use memory at the same time.
+- A small LLM is not as smart as a large cloud model. That is why the auditor applies only confident changes automatically and leaves the rest as suggestions; check the suggestions before you rely on an important transcript.
+
 ## Choosing a model
 
 | Model | Best for | Size |
@@ -68,14 +100,18 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 - **Prefer accuracy**: uses beam search. Turn it off for faster results.
 - **Skip silence (VAD)**: skips silent parts, which is faster and avoids hallucinations on silence (downloads a 0.9 MB VAD model automatically).
 - **Remove common hallucinations and runaway repetition**: drops stock phrases Whisper tends to produce on silence or music, such as "ご視聴ありがとうございました" (Thanks for watching), but only when the segment is likely not speech. When the same line repeats back to back 4 or more times (or a group of 2–3 lines cycles 3 or more times), only the first occurrence is kept, and a phrase repeated 6 or more times within one line is collapsed to one. The same words spoken minutes apart, emphasis such as "No, no, no, no, no.", and amounts or numbers are kept.
-- **Vocabulary hint**: list proper nouns or jargon (for example: Roblox Studio) so they come out spelled that way.
+- **Vocabulary hint**: list proper nouns or jargon (for example: Roblox Studio) so they come out spelled that way. The auditor and the translator use it too.
+- **Audit & translation (local LLM)**: whether to audit automatically after each transcription, whether to translate non-Japanese segments automatically, and which LLM to use. Download, delete and import LLMs here as well.
 
 ## Troubleshooting
 
 - **The model download fails**: the app needs to reach Hugging Face (huggingface.co). If it is blocked on your network, get these files elsewhere and add them with "手元のファイルを追加…" (Add a local file) in Settings:
   - Speech model: `ggml-large-v3-turbo-q5_0.bin` (huggingface.co/ggerganov/whisper.cpp)
   - VAD model: `ggml-silero-v6.2.0.bin` (huggingface.co/ggml-org/whisper-vad). Optional; if it cannot be downloaded, the app retries every 10 minutes.
-- **`make run` says whisper.framework is missing**: run the following, then `make run` again.
+- **The LLM download fails**: like the speech models, it needs Hugging Face. If it is blocked, get a Qwen3.5 GGUF elsewhere (for example `Qwen_Qwen3.5-4B-Q4_K_M.gguf`) and add it with "手元の GGUF を追加…" in Settings.
+- **Translation is slow or the Mac gets sluggish**: switch the LLM to "Qwen3.5 2B" in Settings. You can stop a translation at any time; what was translated is kept, and "残りを翻訳" (Translate the rest) continues from there.
+- **You disagree with a correction**: uncheck it in the "監査: …" list to undo it, or use "すべて元に戻す" (Undo all).
+- **`make run` says whisper.framework or llama.framework is missing**: run the following, then `make run` again.
 
   ```bash
   swift package reset
@@ -102,19 +138,29 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | Finder "Open With" / dropping on the Dock icon | Not verified (implemented only) |
 | Intel Macs | Not verified |
 | Fix for the same sentence repeating through long recordings (1.0.1) | Verified in a reproduction (tiny model, 5 minutes of audio with music in between). Awaiting a re-check on the real lecture recording |
+| Audit and translation logic (rules, guardrails, line alignment, apply/undo, exports) | Unit tests (with a fake LLM) |
+| llama.cpp b12211 usage (grammar-constrained generation, cut-offs, cancellation, neutralized control tokens, Japanese UTF-8) | Checked against the real llama.cpp (Linux build) with a tiny random-weight GGUF |
+| whisper.framework and llama.framework in one app | GitHub Actions runs the built app's `--selftest-llm` on every push |
+| Audit and translation quality and speed with the real Qwen3.5 | Not verified yet (awaiting a run on real hardware) |
 
 ## Tests
 
-The parts that do not depend on the UI (export, model catalog, WAV, hallucination filter) live in `KikimimiCore` and are unit tested:
+The parts that do not depend on the UI (export, model catalog, WAV, hallucination filter, auditor, translator) live in `KikimimiCore` and are unit tested:
 
 ```bash
 swift test
 ```
 
+There is also a diagnostic that exercises the LLM inside the built app (no window opens; add `--cpu` to stay off the GPU):
+
+```bash
+build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf
+```
+
 ## Layout
 
 ```
-Package.swift            Dependency: the official whisper.cpp v1.9.2 XCFramework (checksum pinned)
+Package.swift            Dependencies: the official whisper.cpp v1.9.2 and llama.cpp b12211 XCFrameworks (checksums pinned)
 Sources/
   KikimimiCore/          Platform-independent core
     Transcript.swift     Segments, results, time formatting
@@ -122,19 +168,32 @@ Sources/
     ModelCatalog.swift   Model list, download URLs, model file validation
     HallucinationFilter.swift  Removes common hallucinations
     WAV.swift            Saves recordings (16-bit PCM)
+    LLM/                 Auditor and translator (the LLM-independent parts)
+      Auditor.swift      Repetition rules, reading the LLM's findings, guardrails
+      AuditReport.swift  Audit results, apply and undo
+      Translator.swift   Translation a few lines at a time, retries
+      Grammar.swift      GBNF grammars that constrain the output
+      LLMCatalog.swift   LLM list and how to pick the file to download
+      TextAnalysis.swift Similarity, "is this Japanese?"
   KikimimiWhisper/       Thin layer over the whisper.cpp C API
     WhisperContext.swift Inference, progress, per-segment callbacks, cancellation
     ModelStore.swift     Model location, import, delete
     ModelDownloader.swift Download with progress (validated before it is moved into place)
+    LLMModelStore.swift  LLM location and import, reading the Hugging Face file list, SHA-256 check
+  KikimimiLLM/           Thin layer over the llama.cpp C API
+    LlamaEngine.swift    Loading, chat templates, grammar-constrained greedy generation, cancellation
   Kikimimi/              The macOS app (SwiftUI + AVFoundation)
     AppModel.swift       State, job queue, settings
     TranscriptionService.swift  Dedicated inference thread, model reuse
+    LLMService.swift     Dedicated LLM thread, model reuse
+    LLMSelfTest.swift    --selftest-llm (diagnostics and CI)
     AudioDecoder.swift   Audio/video to 16 kHz mono
     LiveRecorder.swift   Microphone recording
     PlayerController.swift  Playback and seeking
     Views/               UI
 Resources/               Info.plist, icon
 Scripts/build-app.sh     Assembles the .app
+Scripts/make-tiny-gguf.py  Makes a tiny GGUF for smoke tests (CI)
 ```
 
 ## Design notes
@@ -142,11 +201,14 @@ Scripts/build-app.sh     Assembles the .app
 - **Why whisper.cpp**: it runs on macOS 14, is fast on Metal, and ships an official prebuilt XCFramework, so there is no C/C++ build step. Accuracy matches OpenAI Whisper because it uses the same models.
 - **SpeechAnalyzer on macOS 26** is a future option; the engine is isolated so it can be swapped in.
 - **Long audio and runaway repetition**: Whisper works in 30-second windows. By default whisper.cpp feeds the text recognized in the previous window to the next one as context; `no_context` does not stop that (it only discards context from a previous call). Kikimimi sets `n_max_text_ctx = 0`, which matches OpenAI's `condition_on_previous_text=False`. A vocabulary hint is attached to every window with `carry_initial_prompt`, with `n_max_text_ctx` limited to the hint's token count + 1 so no previous text gets in. When a window does fall into repetition, the retry picks the best of 5 candidates even in beam search (`greedy.best_of = 5`, as whisper-cli does; the default would sample just one). The repetition threshold (`entropy_thold`) stays at the default 2.4: raising it made normal speech retry more often, slowed things down, and in our reproduction turned easy-to-collapse repeated lines over music into varied hallucinations. Anything left over is cleaned up afterwards.
+- **Why a local LLM for auditing and translation**: it is free, keeps the transcript on your Mac and works offline. llama.cpp is fast on Metal and ships an official prebuilt XCFramework. To keep a small model's output well-formed, it is constrained with a GBNF grammar down to the line numbers and the line count, and a line that grows too long is cut off (a guard against runaway repetition). Tokens are chosen greedily, so the same input always gives the same answer.
+- **whisper.cpp and llama.cpp side by side**: the two frameworks each embed a different version of ggml.h. Putting both C modules into one Swift compilation makes their type definitions clash, so each C module is used only inside its wrapper (`internal import`), and the wrappers and KikimimiCore are built with library evolution so the app target never imports them. The overlapping symbols were checked as well; the two libraries never call into each other.
 - **Signing**: ad-hoc. To distribute the app, sign it with a Developer ID and notarize it.
 
 ## Known limitations
 
 - No speaker diarization.
+- Translation goes one way only: into Japanese.
 - The recording preview covers only the last 12 seconds (the whole recording is transcribed again when you stop).
 
 ## License
@@ -158,3 +220,5 @@ Downloaded at build time or at run time (not included in this repository):
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) v1.9.2 XCFramework (MIT): downloaded from GitHub at build time
 - Whisper models (MIT, OpenAI) converted for whisper.cpp: downloaded from [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) on first use
 - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT) converted for whisper.cpp: likewise ([ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad))
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) b12211 XCFramework (MIT): downloaded from GitHub at build time
+- [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) GGUF: downloaded from Hugging Face when you use the auditor or translator (quantized by [bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF) / [unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF))

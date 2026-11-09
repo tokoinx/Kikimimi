@@ -6,22 +6,25 @@
 
 [English README](README.en.md)
 
-Swift / SwiftUI で書いたネイティブ Mac アプリです。音声認識には **whisper.cpp** (OpenAI Whisper の C/C++ 実装) を使い、Apple Silicon の GPU (Metal) で動きます。
-音声は Mac の外に出ません。インターネットを使うのは、最初に音声認識モデルを取得するときだけです。
+Swift / SwiftUI で書いたネイティブ Mac アプリです。音声認識には **whisper.cpp** (OpenAI Whisper の C/C++ 実装)、監査と翻訳には **llama.cpp** と無料の小さな LLM (**Qwen3.5**) を使い、どちらも Apple Silicon の GPU (Metal) で動きます。
+音声も文字起こしの内容も Mac の外に出ません。インターネットを使うのは、最初にモデルを取得するときだけです。
 
 - 音声・動画ファイル (mp3 / m4a / wav / aiff / caf / mp4 / mov …) をドロップ → 時刻付きで文字起こし
 - Finder の「このアプリケーションで開く」や Dock アイコンへのドロップでも追加できます
 - 認識できた文から順に画面へ表示。途中で中止もできます
 - マイク録音 (録音中は数秒ごとに直近の内容をプレビュー、止めると全体をていねいに認識)
 - 行をクリックして該当箇所から再生、検索ハイライト
-- 書き出し: txt / srt / vtt / Markdown / csv / json
+- **監査役**: 文字起こしのあと、同じ文の繰り返しと聞き取りミスを見直します。自信のある直しだけを反映し、それ以外は「提案」として残します。どの直しも一覧で確かめて元に戻せます
+- **英語 → 日本語の翻訳**: 左に原文、右に日本語訳を並べて表示します (中国語・韓国語なども日本語に訳せます)
+- 書き出し: txt / srt / vtt / Markdown / csv / json (原文・日本語訳・対訳)
 - 言語: 日本語・英語・中国語・韓国語など (自動判定も可)
 
 ## 必要なもの
 
 - macOS 14 (Sonoma) 以降。Apple Silicon 推奨 (Intel Mac でも CPU で動きますが遅くなります)
 - Xcode 16 以降、または Command Line Tools (`xcode-select --install`)
-- 空きディスク 1 GB 程度 (おすすめモデルが約 574 MB)
+- 空きディスク 1 GB 程度 (おすすめの音声認識モデルが約 574 MB)。監査・翻訳も使うなら、さらに約 3 GB (おすすめの LLM が約 2.8 GB)
+- メモリ 8 GB 以上 (LLM の 9B モデルは 16 GB 以上)
 
 ## ビルドと起動
 
@@ -33,8 +36,8 @@ make run
 
 `make run` は次をまとめて行います。
 
-1. `swift build -c release` (初回は whisper.cpp のビルド済みフレームワーク約 54 MB を GitHub から取得)
-2. `build/Kikimimi.app` の組み立てと whisper.framework の同梱
+1. `swift build -c release` (初回は whisper.cpp と llama.cpp のビルド済みフレームワーク 約 54 MB + 約 65 MB を GitHub から取得)
+2. `build/Kikimimi.app` の組み立てと whisper.framework / llama.framework の同梱
 3. ad-hoc 署名
 4. 起動 (ききみみが起動中なら、いったん終了させてから新しいものを開きます)
 
@@ -52,6 +55,35 @@ make install
 
 録音 (⌘R) を使うと、初回だけマイク許可のダイアログが出ます。
 
+監査と翻訳を使うときは、結果の画面に出る「ダウンロード」(または 設定 › 監査・翻訳) で LLM を一度だけ取得します。取得後は、文字起こしが終わるたびに自動で監査し、英語などの区間を日本語に訳します。
+
+## 監査と翻訳 (ローカル LLM)
+
+文字起こしの結果を、Mac の中で動く小さな LLM がもう一度読み直します。
+
+- **監査役 (聞き取りミス・繰り返しの見直し)**
+  - 規則: すぐ前と同じ文・ほぼ同じ文・一部の繰り返しを見つけます (数字が違う文は別の文として残します)。
+  - LLM: 文脈から見て明らかな聞き間違い (同音の別の語、崩れた固有名詞) と、実際には話していない文 (無音や音楽のところの「Thank you for watching.」など) を見つけます。
+  - 安全の基準: LLM の指摘はそのまま信じません。直す量が少ない・言語が変わらない (翻訳になっていない)・削除なら近くに同じ文があるか定番の誤認識、を満たすものだけを自動で反映します。1 回の見直しで半分近くを直したがる答えは、書き換えとみなしてすべて提案どまりにします。
+  - 結果の画面の「監査: 修正 3 · 削除 2 · 提案 1」から一覧を開き、1 か所ずつ反映・取り消しができます。行の横の印 (修正済み / 修正の提案 など) を押しても確かめられます。
+- **翻訳役 (日本語へ)**
+  - 日本語以外の区間を数行ずつまとめて日本語に訳します。番号と行数を llama.cpp の文法 (GBNF) で縛るので、訳が隣の行にずれません。読めなかった行は 1 行ずつ訳し直します。
+  - 画面は左に原文、右に日本語訳。もともと日本語の区間は、右の列に原文を薄く出します。「対訳」のチェックで切り替えられます。
+  - 設定の「語彙のヒント」に書いた固有名詞は、監査と翻訳でもその表記を使います。
+- 手動でも実行できます: 監査 ⇧⌘K、翻訳 ⇧⌘T (結果の画面のボタンでも)。
+
+| LLM | 向いている用途 | サイズ | メモリ |
+|---|---|---|---|
+| Qwen3.5 4B | 監査と翻訳のバランスが良い。迷ったらこれ | 約 2.8 GB | 8 GB 以上 |
+| Qwen3.5 2B (軽量) | 速さ優先。精度は控えめ | 約 1.3 GB | 8 GB 以上 |
+| Qwen3.5 9B (高精度) | いちばん賢いが遅い | 約 6.2 GB | 16 GB 以上 |
+
+- どれも Apache-2.0 の無料モデルです。量子化 Q4_K_M の GGUF を Hugging Face から取得し、大きさと SHA-256 を確かめてから保存します。保存先は `~/Library/Application Support/Kikimimi/Models/LLM` です。
+- 手持ちの GGUF (llama.cpp で動くもの) も、設定の「手元の GGUF を追加…」で使えます。
+- 目安: 1 時間の英語の講演なら、M1 で監査に数分、翻訳に 10〜20 分ほどかかります (4B の場合。訳は終わった所から順に右の列に出ます)。急ぐときは 2B を選んでください。
+- メモリ 12 GB 未満の Mac では、音声認識のモデルと LLM を交互に読み込んで、同時にメモリを使わないようにしています。
+- 小さな LLM なので、クラウドの大きなモデルほど賢くはありません。監査は「自信のあるものだけ自動、それ以外は提案」にしてあるので、大事な文書では提案を確かめてから使ってください。
+
 ## モデルの選び方
 
 | モデル | 向いている用途 | サイズ |
@@ -68,14 +100,18 @@ make install
 - **精度を優先する**: ビームサーチで認識します。オフにすると速くなります。
 - **無音を飛ばす (VAD)**: 無音部分を飛ばして処理を速くし、無音での誤認識を減らします (VAD モデル約 0.9 MB を自動取得)。
 - **定番の誤認識と、同じ文の繰り返しを取り除く**: 無音や BGM のところで Whisper が出しがちな「ご視聴ありがとうございました」などを、発話が無さそうなときだけ取り除きます。間を空けずに同じ文が 4 回以上 (2〜3 文の組なら 3 周以上) 続いたときは最初の 1 回だけ残し、1 文の中で同じ語句が 6 回以上続くときも 1 回にまとめます。数分おきに同じことを言う場面や、「No, no, no, no, no.」のような強調、金額・番号は残します。
-- **語彙のヒント**: 固有名詞や専門用語 (例: Roblox Studio, ロブロックス) を書いておくと、その表記で出やすくなります。
+- **語彙のヒント**: 固有名詞や専門用語 (例: Roblox Studio, ロブロックス) を書いておくと、その表記で出やすくなります。監査と翻訳でも使います。
+- **監査・翻訳 (ローカル LLM)**: 文字起こしのあとに自動で監査するか、日本語以外の区間を自動で訳すか、どの LLM を使うかを選べます。LLM の取得・削除・取り込みもここで行います。
 
 ## うまくいかないとき
 
 - **モデルのダウンロードが失敗する**: Hugging Face (huggingface.co) に接続できる必要があります。会社のネットワーク等で繋がらない場合は、別の環境で次のファイルを入手し、設定の「手元のファイルを追加…」で取り込めます。
   - 音声認識モデル: `ggml-large-v3-turbo-q5_0.bin` (huggingface.co/ggerganov/whisper.cpp)
   - 無音検出 (VAD) モデル: `ggml-silero-v6.2.0.bin` (huggingface.co/ggml-org/whisper-vad)。無くても動きます。取れなかったときは 10 分おきに取り直します。
-- **`make run` で whisper.framework が見つからないと言われる**: 次を実行してから、もう一度 `make run` してください。
+- **LLM のダウンロードが失敗する**: 音声認識モデルと同じく Hugging Face に接続できる必要があります。繋がらない場合は、別の環境で Qwen3.5 の GGUF (例: `Qwen_Qwen3.5-4B-Q4_K_M.gguf`) を入手し、設定の「手元の GGUF を追加…」で取り込めます。
+- **翻訳が遅い / Mac が重くなる**: 設定で LLM を「Qwen3.5 2B (軽量)」に替えてください。翻訳は「中止」でいつでも止められ、訳せた所までは残ります。「残りを翻訳」で続きから訳せます。
+- **監査の直しが気に入らない**: 「監査: …」の一覧で、その直しのチェックを外すと元に戻ります。「すべて元に戻す」もあります。
+- **`make run` で whisper.framework / llama.framework が見つからないと言われる**: 次を実行してから、もう一度 `make run` してください。
 
   ```bash
   swift package reset
@@ -102,19 +138,29 @@ make install
 | Finder の「このアプリケーションで開く」/ Dock へのドロップ | 未確認 (実装のみ) |
 | Intel Mac | 未確認 |
 | 長い録音で同じ文が延々と続く不具合の修正 (1.0.1) | 再現実験で確認 (tiny モデル、音楽をはさんだ 5 分の音声)。実際の講演録音での再確認待ち |
+| 監査・翻訳の仕組み (規則・安全の基準・行のずれ防止・反映と取り消し・書き出し) | ユニットテストで確認 (偽の LLM を使う) |
+| llama.cpp b12211 の呼び出し方 (文法つき生成・打ち切り・中止・制御文字の無害化・日本語の UTF-8) | 本物の llama.cpp (Linux 版) と乱数の重みの小さな GGUF で確認 |
+| whisper.framework と llama.framework を 1 つのアプリで使う | GitHub Actions で、組み立てたアプリの `--selftest-llm` を毎回実行 |
+| 本物の Qwen3.5 での監査・翻訳の質と速さ | 未確認 (実機での確認待ち) |
 
 ## テスト
 
-書き出し・モデル一覧・WAV・誤認識フィルタなど UI に依存しない部分は `KikimimiCore` に分けてあり、テストできます。
+書き出し・モデル一覧・WAV・誤認識フィルタ・監査・翻訳など UI に依存しない部分は `KikimimiCore` に分けてあり、テストできます。
 
 ```bash
 swift test
 ```
 
+組み立てたアプリで LLM をひと通り動かす診断もあります (画面は出ません。`--cpu` で GPU を使わずに動かします)。
+
+```bash
+build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf
+```
+
 ## 構成
 
 ```
-Package.swift            依存: whisper.cpp v1.9.2 の公式 XCFramework (チェックサム固定)
+Package.swift            依存: whisper.cpp v1.9.2 / llama.cpp b12211 の公式 XCFramework (チェックサム固定)
 Sources/
   KikimimiCore/          プラットフォーム非依存のコア
     Transcript.swift     区間・結果のモデル、時刻フォーマット
@@ -122,19 +168,32 @@ Sources/
     ModelCatalog.swift   モデル一覧と配布元 URL、モデルファイルの検証
     HallucinationFilter.swift  定番の誤認識の除去
     WAV.swift            録音の保存 (16-bit PCM)
+    LLM/                 監査役・翻訳役 (LLM に依存しない部分)
+      Auditor.swift      繰り返しの規則、LLM の指摘の読み取りと安全の基準
+      AuditReport.swift  監査の結果、反映と取り消し
+      Translator.swift   数行ずつの翻訳、読めなかった行の訳し直し
+      Grammar.swift      出力の形を縛る GBNF 文法
+      LLMCatalog.swift   LLM の一覧と、配布元から取るファイルの選び方
+      TextAnalysis.swift 似ている度合い、日本語かどうか
   KikimimiWhisper/       whisper.cpp の C API を包む層
     WhisperContext.swift 推論・進捗・区間ごとの通知・中止
     ModelStore.swift     モデルの保存場所・取り込み・削除
     ModelDownloader.swift 進捗つきダウンロード (検証してから配置)
+    LLMModelStore.swift  LLM の保存場所・取り込み、配布元の一覧の読み取り、SHA-256 の確認
+  KikimimiLLM/           llama.cpp の C API を包む層
+    LlamaEngine.swift    読み込み・チャットテンプレート・文法つきの貪欲法の生成・中止
   Kikimimi/              macOS アプリ (SwiftUI + AVFoundation)
     AppModel.swift       状態・ジョブの順番待ち・設定
     TranscriptionService.swift  推論専用スレッド、モデルの使い回し
+    LLMService.swift     LLM 専用スレッド、モデルの使い回し
+    LLMSelfTest.swift    --selftest-llm (診断・CI 用)
     AudioDecoder.swift   音声/動画 → 16 kHz モノラル
     LiveRecorder.swift   マイク録音
     PlayerController.swift  再生・シーク
     Views/               画面
 Resources/               Info.plist、アイコン
 Scripts/build-app.sh     .app の組み立て
+Scripts/make-tiny-gguf.py  動作確認用の小さな GGUF を作る (CI 用)
 ```
 
 ## 設計メモ
@@ -142,11 +201,14 @@ Scripts/build-app.sh     .app の組み立て
 - **whisper.cpp を選んだ理由**: macOS 14 で動き、Metal で速く、ビルド済みの公式 XCFramework があるので C/C++ のビルドが不要です。日本語の精度は OpenAI Whisper と同じモデルなので同等です。
 - **macOS 26 の SpeechAnalyzer** は将来の選択肢です。macOS 26 に上げた場合は、エンジンを差し替えられる構成にしてあります。
 - **長い音声と繰り返しの暴走**: Whisper は 30 秒ずつ処理します。whisper.cpp の既定では、直前の区間で認識した文章を次の区間の手がかりとして渡します。`no_context` はこれを止めません (前回の呼び出しの文脈を捨てるだけです)。そこで `n_max_text_ctx = 0` にして区間どうしの引き継ぎを止め、OpenAI 版の `condition_on_previous_text=False` と同じ動きにしています。語彙のヒントは `carry_initial_prompt` で毎区間に付け、`n_max_text_ctx` を「ヒントのトークン数 + 1」に絞って、前の区間の文章が入らないようにしています。区間内で繰り返しになったときの言い直しは、ビームサーチでも 5 候補から選びます (`greedy.best_of = 5`、whisper-cli と同じ。既定のままだと 1 候補だけの抽選になります)。繰り返しとみなす基準 (`entropy_thold`) は既定の 2.4 のままです。上げると普通の発話でも言い直しが増えて遅くなり、音楽部分のでたらめな文もかえって片付けにくくなることを、再現実験で確かめました。それでも残った分は後始末で片付けます。
+- **監査と翻訳にローカル LLM を選んだ理由**: 無料で、音声の内容を外へ出さずに済み、オフラインでも動くからです。llama.cpp は Metal で速く、ビルド済みの公式 XCFramework があります。小さなモデルでも形が崩れないよう、出力は GBNF 文法で「番号・行数」まで縛り、1 行が長すぎたら打ち切ります (同じ語を延々と出す暴走の歯止め)。答えは貪欲法で決めるので、同じ入力には同じ答えを返します。
+- **whisper.cpp と llama.cpp の同居**: 2 つのフレームワークは、版の違う ggml.h をそれぞれ持っています。Swift で両方の C モジュールを 1 つのコンパイルに入れると型の定義がぶつかるので、C モジュールは各ラッパーの中だけで使い (`internal import`)、ラッパーと KikimimiCore を library evolution でビルドして、アプリ本体のコンパイルに持ち込まないようにしています。実行時の記号の重なりも確かめてあります (互いに呼び合うことはありません)。
 - **署名**: ad-hoc 署名です。人に配る場合は Developer ID での署名と公証に差し替えてください。
 
 ## 既知の制限
 
 - 話者分離はありません。
+- 翻訳は日本語への一方向だけです。
 - 録音中のプレビューは直近 12 秒ぶんだけです (止めると全体を認識し直します)。
 
 ## ライセンス
@@ -158,3 +220,5 @@ MIT License ([LICENSE](LICENSE))。
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) v1.9.2 の XCFramework (MIT): ビルド時に GitHub から取得
 - Whisper のモデル (MIT, OpenAI) を whisper.cpp 形式にしたもの: 初回に [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) から取得
 - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT) を whisper.cpp 形式にしたもの: 同上 ([ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad))
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) b12211 の XCFramework (MIT): ビルド時に GitHub から取得
+- [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) の GGUF: 監査・翻訳を使うときに Hugging Face ([bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF) / [unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) の量子化版) から取得
