@@ -32,6 +32,9 @@ public enum MixedLanguageRules {
     public static let shortTrustedConfidence = 0.95
     /// 信じられない区切りは、前の区切りとの間がこれ未満なら前の言語に、そうでなければ次の言語に合わせる
     public static let borrowPreviousBelowPauseSeconds = 1.0
+    /// これだけ話している区切りは、確からしさが低くても前後の言語を借りずに、判定のとおりにする
+    /// (低いのは言語が混ざっているからで、多い側は聞き取れている。前の言語を借りると、9 割が英語の 26 秒を日本語で文字にした)
+    public static let longChunkOwnGuessSeconds = 8.0
     /// 混ざっていて分けて判定し直した部分は、確からしさが低くても、発話がこれ以上あれば判定のとおりにする
     /// (低いのは言語が混ざっているからで、多い側の言語は聞き取れている。前後の言語を借りると、多い側をまるごと取り違える)
     public static let majorityMinSpeechSeconds = 2.0
@@ -39,13 +42,17 @@ public enum MixedLanguageRules {
     // MARK: 言語が混ざっていそうな区切り
 
     /// 発話がこれ以上あり、確からしさが `refineBelow` 未満の区切りは、分けて判定し直す
-    /// (本物の日本語の区切りは 0.977 まで下がるので 0.99 にはしない。間の無い切り替わりを含む区切りは 0.873・0.938・0.986)
+    /// (英語と日本語が半分ずつの区切りでも 0.954 と出た。1 つの言語の区切りは、本物の日本語の講演で 0.977 以上、
+    /// 英語の朗読と JFK で 0.998 以上なので、0.97 未満なら混ざっているとみなす)
     public static let refineMinSpeechSeconds = 4.0
-    public static let refineBelow = 0.95
+    public static let refineBelow = 0.97
     /// 区切りの中の長い間 (最大 2 か所) で分けるとき、それぞれの長さの下限
     public static let pieceMinSeconds = 2.0
-    /// これ以上長く、確からしさが `bisectBelow` 未満の部分は、間の無い切り替わりを二分探索で探す
-    public static let bisectMinSeconds = 6.0
+    /// これ以上長く、確からしさが `bisectBelow` 未満の部分は、間の無い切り替わりを二分探索で探す。
+    /// `bisectLongSeconds` 以上の部分は 4 秒の窓、それより短い部分は 2 秒の窓で探す
+    /// (4.9 秒の部分を探さなかったため、英語の終わりの 1 秒を日本語で文字にして失った)
+    public static let bisectMinSeconds = 4.0
+    public static let bisectLongSeconds = 6.0
     public static let bisectBelow = 0.97
     /// 二分探索で聞く長さ・探索をやめる幅・回数の上限
     public static let bisectWindowSeconds = 4.0
@@ -55,10 +62,39 @@ public enum MixedLanguageRules {
     public static let bisectMaxSteps = 5
     /// 切り替わりの位置は、探索の幅の前後これだけの中で、VAD の発話らしさがいちばん低いところ
     public static let cutSearchMarginSeconds = 0.25
-    /// 分けて判定し直す回数の上限: (それまでの区切りの数 × 0.35 + 5) 回。超えたら、確からしさ 0.85 未満の区切りだけ
+    /// 二分探索の窓の判定がこの確からしさ未満なら、その窓に両方の言語が入っている (切り替わりは窓の中)。
+    /// 9 割が日本語の窓が英語 0.565 と出て、切り替わりを幅の外へ追い出し、日本語の 2 秒を失った
+    public static let uncertainProbe = 0.8
+    /// 分けて判定し直す回数の上限: (それまでの区切りの数 × 0.35 + 5) 回。超えても、確からしさが `trustedConfidence`
+    /// 未満の区切り (そのままでは前後の言語を借りる区切り) は分けて判定し直す
     public static let refineBudgetPerChunk = 0.35
     public static let refineBudgetBase = 5.0
-    public static let overBudgetRefineBelow = 0.85
+    public static let overBudgetRefineBelow = 0.90
+
+    // MARK: 区切りの中ほどに挟まった、別の言語の短い発話 (島)
+
+    /// 島を探す区切りの言語。英語の講義に挟まる日本語の一言は、英語で文字にすると訳されずに消えるので探す。
+    /// 日本語の中の英語の語は、日本語のまま文字にしても残るので探さない (日本語だけの講演の時間と結果を変えない)
+    public static let islandHosts: Set<String> = ["en"]
+    /// 別の言語の確率が、そのファイルの (島を探す言語の) 区切りの中央値の 5 倍以上、かつ 0.002 以上の区切りで探す。
+    /// 中央値が分かるまで (区切り 5 つ) は 0.005 以上。英語だけの区切りは 0.0000〜0.0014 (雑音入りでも)、
+    /// 1〜3 秒の日本語の差し込みを含む 25 秒前後の区切りは 0.0036〜0.036 だった
+    public static let islandMinimumOther = 0.002
+    public static let islandMedianFactor = 5.0
+    public static let islandDefaultOther = 0.005
+    public static let islandMedianMinSamples = 5
+    /// 半分にしていき、これ以下の長さになったら判定のとおりにする
+    public static let islandMaxSeconds = 4.0
+    /// 半分を詳しく見るのは、別の言語の確率がこれ以上のときだけ (区切りで探し始めるときは、そのファイルのしきい値も下回らないこと。
+    /// 雑音の多い英語で、英語だけの半分を延々と調べないように)
+    public static let islandFloor = 0.005
+    /// 4 秒以下で、別の言語の確率がこれ以上なのに信じられない部分は、もう一度だけ分ける (両端にこれだけ残す)
+    public static let islandTrimOther = 0.25
+    public static let islandTrimEdgeSeconds = 0.5
+    /// 島を探す判定の回数の上限: (それまでの区切りの数 × 16 + 10) 回。1 つの島を見つけるのに 8〜14 回かかるので、
+    /// どの区切りにも相づちが挟まる録音でも探し続けられる。英語だけの区切りは、半分にした 2 回で止まる
+    public static let islandBudgetPerChunk = 16.0
+    public static let islandBudgetBase = 10.0
 
     // MARK: 文字にする単位
 
@@ -101,9 +137,13 @@ public enum MixedLanguageRules {
     public static let repairPadSeconds = 0.2
     /// 別の言語だと、この確からしさ以上で判定されたときだけ、その言語で文字にし直す
     public static let repairConfidence = 0.9
-    /// 直すのは、ファイルの発話の 1 割まで (時間がかかりすぎないように)。短いファイルでも 30 秒までは直せる
+    /// 文字にし直すのは、ファイルの発話の 1 割まで (時間がかかりすぎないように)。短いファイルでも 30 秒までは直せる。
+    /// 判定し直しただけ (同じ言語だった) のところは数えない
     public static let repairSpeechShare = 0.10
     public static let repairMinimumSeconds = 30.0
+    /// 直しで行う判定の回数の上限: (区切りの数 × 1 + 30) 回
+    public static let repairDetectionsPerChunk = 1.0
+    public static let repairDetectionsBase = 30.0
 
     // MARK: 進み具合
 

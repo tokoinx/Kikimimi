@@ -36,6 +36,12 @@ public enum Translator {
     static let maxCharactersPerSentence = 400
     static let maxGapInSentence: TimeInterval = 1.5
 
+    /// 訳す必要がある区間か。「日本語＋英語」で日本語 (日) とわかっている区間は、かなが無くても (「Ruth先生」など) 訳さない
+    static func needsTranslation(_ segment: TranscriptSegment, transcriptLanguage: String?) -> Bool {
+        segment.language != "ja"
+            && Script.needsTranslation(segment.text, transcriptLanguage: segment.language ?? transcriptLanguage)
+    }
+
     /// 訳す必要があり、まだ訳がない区間の位置 (ほかの区間の訳に含まれているものは除く)
     public static func pendingIndices(_ segments: [TranscriptSegment], language: String?) -> [Int] {
         var covered = Set<UUID>()
@@ -44,7 +50,7 @@ public enum Translator {
         }
         return segments.indices.filter {
             segments[$0].translation == nil && !covered.contains(segments[$0].id)
-                && Script.needsTranslation(segments[$0].text, transcriptLanguage: segments[$0].language ?? language)
+                && needsTranslation(segments[$0], transcriptLanguage: language)
         }
     }
 

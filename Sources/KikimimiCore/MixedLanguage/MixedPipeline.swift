@@ -60,7 +60,11 @@ public struct MixedReport: Codable, Hashable, Sendable {
     /// 判定の回数 (区切りごと・分けて判定し直した分・直しの分)
     public var detections = 0
     public var refinementDetections = 0
+    /// 区切りの中ほどに挟まった別の言語 (島) を探した判定の回数
+    public var islandDetections = 0
     public var repairDetections = 0
+    /// 上限を超えたため、点検に引っかかったのに見なかったところの数
+    public var repairsSkipped = 0
     /// whisper で文字にした回数 (範囲ごと・直しの分)
     public var decodes = 0
     public var repairDecodes = 0
@@ -183,6 +187,16 @@ public enum MixedPipeline {
         // 3. 区切りごとに判定し、言語が決まった範囲から文字にする
         var planner = LanguagePlanner(candidates: candidates, totalSamples: samples.count)
         var extraDetections = 0
+        var islandDetections = 0
+        // 言語ごとの、混ざっていない区切りの「別の言語の確率」(島を探すしきい値を、このファイルに合わせて決める)
+        var cleanOther: [String: [Double]] = [:]
+        func islandThreshold(_ host: String) -> Double {
+            let values = cleanOther[host] ?? []
+            guard values.count >= R.islandMedianMinSamples, let median = DecodeCheck.median(values) else {
+                return R.islandDefaultOther
+            }
+            return max(R.islandMinimumOther, R.islandMedianFactor * median)
+        }
         for (index, chunk) in chunks.enumerated() {
             var guess: LanguageGuess? = nil
             if chunk.speechSeconds >= R.minDetectSpeechSeconds {
@@ -201,6 +215,23 @@ public enum MixedPipeline {
                     parts = outcome.parts
                     refined = true
                 }
+            } else if let g = guess {
+                // 確かそうでも、別の言語の確率がこのファイルのふつうより高ければ、中ほどに短い別の言語が挟まっていないか探す
+                let threshold = islandThreshold(g.language)
+                let budget = R.islandBudgetPerChunk * Double(index + 1) + R.islandBudgetBase
+                var foundIsland = false
+                if SwitchSearch.needsIslandSearch(g, speechSeconds: chunk.speechSeconds, threshold: threshold),
+                   Double(islandDetections) < budget {
+                    let outcome = try SwitchSearch.islands(chunk, host: g, map: map, floor: threshold, detect: detect)
+                    islandDetections += outcome.detections
+                    report.islandDetections += outcome.detections
+                    report.switches += outcome.switches
+                    parts = outcome.parts
+                    refined = true
+                    foundIsland = outcome.parts.contains { $0.guess?.language != g.language }
+                }
+                // 島が見つかった区切りは数えない (相づちの多い録音で中央値が上がり、後の島を探さなくなる)
+                if !foundIsland { cleanOther[g.language, default: []].append(1 - g.confidence) }
             }
             detectedSpeech += chunk.speechSamples
             reportWork()
@@ -215,8 +246,9 @@ public enum MixedPipeline {
         let check = DecodeCheck(speech: useVAD ? map : nil, segments: decoded.flatMap(\.segments))
         let repairLimit = max(Int(Double(map.totalSpeechSamples) * R.repairSpeechShare), R.samples(R.repairMinimumSeconds))
         var repairedSpeech = 0
+        let repairDetectionLimit = Int(R.repairDetectionsPerChunk * Double(chunks.count) + R.repairDetectionsBase)
         var finals: [DecodedSegment] = []
-        let regions = decoded.map { repairRegions(run: $0.run, segments: $0.segments, check: check, report: &report) }
+        let regions = decoded.map { repairRegions(run: $0.run, segments: $0.segments, map: map, check: check, report: &report) }
         let totalRegions = max(1, regions.reduce(0) { $0 + $1.count })
         var doneRegions = 0
         for ((run, segments), runRegions) in zip(decoded, regions) {
@@ -224,12 +256,14 @@ public enum MixedPipeline {
             for region in runRegions {
                 try checkCancel()
                 doneRegions += 1
-                let speech = map.speechSamples(in: region)
-                guard repairedSpeech + speech <= repairLimit else { continue }
-                repairedSpeech += speech
+                guard report.repairDetections < repairDetectionLimit, repairedSpeech < repairLimit else {
+                    report.repairsSkipped += 1
+                    continue
+                }
                 if let repaired = try repair(region, run: run, current: result, map: map, check: check,
                                              detect: detect, engine: engine, samples: samples, options: options,
-                                             useVAD: useVAD, report: &report) {
+                                             useVAD: useVAD, repairedSpeech: &repairedSpeech, repairLimit: repairLimit,
+                                             report: &report) {
                     result = repaired
                 }
                 progress(1 - R.progressRepairShare + R.progressRepairShare * 0.9 * Double(doneRegions) / Double(totalRegions))
@@ -262,8 +296,9 @@ public enum MixedPipeline {
                                  language: Script.spokenLanguage(of: text, among: candidates, fallback: raw.language))
     }
 
-    /// 直す範囲: 点検で引っかかった区間 (間が 1 秒未満ならまとめる) と、抜けているところ。前後を少し広げ、範囲の中に収める
-    private static func repairRegions(run: DecodeRun, segments: [DecodedSegment], check: DecodeCheck,
+    /// 直す範囲: 点検で引っかかった区間 (間が 1 秒未満ならまとめる) と、抜けているところ。前後を少し広げ、範囲の中に収める。
+    /// 28 秒より長い範囲は、区切りと同じように分ける (whisper の言語判定は先頭の 30 秒しか聞かない)
+    private static func repairRegions(run: DecodeRun, segments: [DecodedSegment], map: SpeechMap, check: DecodeCheck,
                                       report: inout MixedReport) -> [Range<Int>] {
         let pad = R.samples(R.repairPadSeconds)
         var regions: [Range<Int>] = []
@@ -300,14 +335,39 @@ public enum MixedPipeline {
                 merged.append(r)
             }
         }
-        return merged
+        let maxLength = R.samples(R.maxChunkSeconds)
+        var out: [Range<Int>] = []
+        for r in merged {
+            guard r.count > maxLength else {
+                out.append(r)
+                continue
+            }
+            let inside = SpeechMap(spans: map.spans(in: r), levels: map.levels, hop: map.hop,
+                                   totalSamples: map.totalSamples, fromVAD: map.fromVAD)
+            let pieces = SpeechChunker.chunks(inside)
+            guard pieces.count > 1 else {
+                out.append(r)
+                continue
+            }
+            // すき間なく分ける (境目は間の真ん中)
+            var start = r.lowerBound
+            for k in pieces.indices {
+                let end = k + 1 < pieces.count
+                    ? max(start, (pieces[k].range.upperBound + pieces[k + 1].range.lowerBound) / 2) : r.upperBound
+                if end > start { out.append(start..<end) }
+                start = end
+            }
+        }
+        return out
     }
 
-    /// 1 か所を直す: 判定し直して別の言語なら、その言語で文字にし直し、良くなったときだけ入れ替える
+    /// 1 か所を直す: 判定し直して別の言語なら、その言語で文字にし直し、良くなったときだけ入れ替える。
+    /// 両端が同じ言語で中ほどに別の言語が挟まっている (英語 → 日本語 → 英語) ときも、その部分だけを文字にし直す
     private static func repair<Engine: MixedEngine>(_ region: Range<Int>, run: DecodeRun, current: [DecodedSegment],
                                                     map: SpeechMap, check: DecodeCheck,
                                                     detect: (Range<Int>) throws -> LanguageGuess?,
                                                     engine: Engine, samples: [Float], options: Options, useVAD: Bool,
+                                                    repairedSpeech: inout Int, repairLimit: Int,
                                                     report: inout MixedReport) throws -> [DecodedSegment]? {
         let inRegion: (DecodedSegment) -> Bool = { s in
             let mid = R.samples((s.start + s.end) / 2)
@@ -327,18 +387,23 @@ public enum MixedPipeline {
 
         // 言語ごとに文字にし直す部分
         var plan: [(range: Range<Int>, language: String)] = []
-        if region.count >= R.samples(R.bisectMinSeconds), guess.confidence < R.bisectBelow {
-            let b = try SwitchSearch.bisect(region, map: map, detect: detect)
-            report.repairDetections += b.detections
-            if let cut = b.cut, let head = b.head, let tail = b.tail {
-                plan = [(region.lowerBound..<cut, head.language), (cut..<region.upperBound, tail.language)]
-            }
-        }
-        if plan.isEmpty, guess.language != run.language, guess.confidence >= R.repairConfidence {
+        if guess.language != run.language, guess.confidence >= R.repairConfidence {
             plan = [(region, guess.language)]
+        } else if region.count >= R.samples(R.bisectMinSeconds), guess.confidence < R.bisectBelow {
+            let found = try SwitchSearch.locate(SpeechChunk(range: region, spans: map.spans(in: region)), guess: guess,
+                                                map: map, detect: detect)
+            report.repairDetections += found.detections
+            plan = contiguousPlan(found.parts, in: region, fallback: run.language)
         }
         // 判定も同じ言語なら、言語の取り違えではない (音楽・雑音・本当の繰り返し): 元のまま
         guard plan.contains(where: { $0.language != run.language }) else { return nil }
+        // 文字にし直す分だけを、上限から引く
+        let redecode = plan.reduce(0) { $0 + map.speechSamples(in: $1.range) }
+        guard repairedSpeech + redecode <= repairLimit else {
+            report.repairsSkipped += 1
+            return nil
+        }
+        repairedSpeech += redecode
 
         var fresh: [DecodedSegment] = []
         for part in plan where !part.range.isEmpty {
@@ -349,8 +414,40 @@ public enum MixedPipeline {
             entry.decodedAs.append(part.language)
         }
         entry.after = Transcript.join(fresh.map(\.text))
+        // 仕上げのフィルタで消える文しか無いなら、元の文を消さない (点検は文を消さない)
+        let kept = { (list: [DecodedSegment]) in
+            list.filter { transcriptSegment($0, candidates: options.candidates, filter: options.filterHallucinations) != nil }
+        }
+        guard !kept(fresh).isEmpty || kept(old).isEmpty else { return nil }
         guard check.isBetter(fresh, than: old, in: region) else { return nil }
         entry.accepted = true
         return current.filter { !inRegion($0) } + fresh
+    }
+
+    /// 判定し直した部分を、すき間なく並んだ (言語, 範囲) にする。部分と部分の境目は間の真ん中。
+    /// 信じられない短い部分は fallback (直す範囲の、もとの言語)
+    static func contiguousPlan(_ parts: [SwitchSearch.Part], in region: Range<Int>,
+                               fallback: String) -> [(range: Range<Int>, language: String)] {
+        var plan: [(range: Range<Int>, language: String)] = []
+        var start = region.lowerBound
+        for k in parts.indices {
+            let part = parts[k]
+            var language = fallback
+            if let g = part.guess,
+               LanguagePlanner.isTrusted(g, speechSeconds: part.chunk.speechSeconds)
+                || part.chunk.speechSeconds >= R.majorityMinSpeechSeconds {
+                language = g.language
+            }
+            let end = k + 1 < parts.count
+                ? min(region.upperBound, max(start, (part.chunk.range.upperBound + parts[k + 1].chunk.range.lowerBound) / 2))
+                : region.upperBound
+            if let last = plan.last, last.language == language {
+                plan[plan.count - 1] = (last.range.lowerBound..<end, language)
+            } else if end > start {
+                plan.append((start..<end, language))
+            }
+            start = end
+        }
+        return plan
     }
 }

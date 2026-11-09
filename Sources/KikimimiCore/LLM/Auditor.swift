@@ -355,6 +355,12 @@ public enum Auditor {
                 case .fix(let wrong, let right):
                     // 指摘された語が行に無い・何も変わらない直しは使わない
                     guard let fixed = applyFix(to: segment.text, wrong: wrong, right: right) else { continue }
+                    // 「日本語＋英語」: 行の言語 (日・英) が文字の上で変わる直しは、聞き取りミスの直しではなく訳なので使わない
+                    // (「Ruth先生」→「Ruth-san」のように、かなの無い日本語の行は、文字だけの判定では言語の変化に気づけない)
+                    if let own = segment.language,
+                       Script.spokenLanguage(of: fixed, among: ["ja", "en"], fallback: own) != own {
+                        continue
+                    }
                     let lineLanguage = segment.language ?? language
                     let assessment = fixAssessment(original: segment.text, replacement: fixed, language: lineLanguage)
                     guard assessment.keep else { continue }

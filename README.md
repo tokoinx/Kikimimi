@@ -249,9 +249,9 @@ MIT License ([LICENSE](LICENSE))。
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) v1.9.2 の XCFramework (MIT): ビルド時に GitHub から取得
 - Whisper のモデル (MIT, OpenAI) を whisper.cpp 形式にしたもの: 初回に [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) から取得
 - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT) を whisper.cpp 形式にしたもの: 同上 ([ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad))
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) b12211 の XCFramework (MIT): ビルド時に GitHub から取得
+- [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) の GGUF: 監査・翻訳を使うときに Hugging Face ([unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) / [bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF) の量子化版) から取得
 
 テスト用にリポジトリに含むもの:
 
 - `Tests/Fixtures/mixed-en-ja.wav`: [FLEURS](https://huggingface.co/datasets/google/fleurs) (Google, CC BY 4.0) の英語と日本語の朗読をつないだもの。詳しくは [Tests/Fixtures/README.md](Tests/Fixtures/README.md)
-- [llama.cpp](https://github.com/ggml-org/llama.cpp) b12211 の XCFramework (MIT): ビルド時に GitHub から取得
-- [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) の GGUF: 監査・翻訳を使うときに Hugging Face ([unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) / [bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF) の量子化版) から取得

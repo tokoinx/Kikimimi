@@ -108,11 +108,13 @@ jobs:
           --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin
           --languages ja,en --cpu --expect Tests/Fixtures/mixed-en-ja.expect.json --report build/selftest-whisper.json
 
+      # 1 つの言語の設定の通り道だけを確かめる (whisper.cpp の中の VAD は 4 スレッド決め打ちで、3 コアの実行環境では
+      # とても遅いので、先頭の 16 秒だけにする)
       - name: Whisper self-test (日本語, CPU)
         run: >-
           build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper Tests/Fixtures/mixed-en-ja.wav
           --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin
-          --languages ja --cpu
+          --languages ja --cpu --to 16
 
       - name: Zip the app
         run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-xcode${{ matrix.xcode }}.zip"

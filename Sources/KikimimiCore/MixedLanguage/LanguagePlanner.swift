@@ -87,8 +87,10 @@ public struct LanguagePlanner: Sendable {
         if chunk.forcedCutBefore, !pending.isEmpty {
             resolvePending(next: nil, into: &out)
         }
+        // 長い区切りと、分けて判定し直した部分は、確からしさが低くても判定のとおりにする (多い側の言語は聞き取れている)
         let trusted = Self.isTrusted(candidateGuess, speechSeconds: chunk.speechSeconds)
             || (majority && candidateGuess != nil && chunk.speechSeconds >= R.majorityMinSpeechSeconds)
+            || (candidateGuess != nil && chunk.speechSeconds >= R.longChunkOwnGuessSeconds)
         if trusted, let g = candidateGuess {
             resolvePending(next: g.language, into: &out)
             resolve(chunk, guess: g, trusted: true, language: g.language, into: &out)

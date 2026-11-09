@@ -38,6 +38,8 @@ enum WhisperSelfTest {
         var audio: String
         var model: String
         var languages: [String]
+        /// --from (秒)。segments と report の時刻は、どちらもファイルの始めから数える
+        var from: Double
         var audioSeconds: Double
         var wallSeconds: Double
         var peakFootprintMB: Double?
@@ -70,6 +72,15 @@ enum WhisperSelfTest {
         let candidates = codes.count >= 2 ? codes : []
         let language = codes.first ?? "ja"
         let useGPU = !args.contains("--cpu")
+        // --from / --to は秒 (149) か [時:]分:秒 (2:29)。読めない値で黙ってファイル全体を文字にしない
+        var cut: [String: Double] = [:]
+        for name in ["--from", "--to"] where args.contains(name) {
+            guard let text = value(name), let seconds = Self.seconds(text) else {
+                log("usage: \(name) takes seconds (149) or m:ss (2:29), not \"\(value(name) ?? "")\"")
+                return 2
+            }
+            cut[name] = seconds
+        }
 
         log("whisper.cpp: " + WhisperContext.systemInfo.trimmingCharacters(in: .whitespacesAndNewlines))
         log("model: \(modelPath) (\(useGPU ? "GPU" : "CPU"))")
@@ -80,8 +91,11 @@ enum WhisperSelfTest {
             var clock = Date()
             var samples = try decode(URL(fileURLWithPath: audioPath))
             let rate = Double(MixedLanguageRules.sampleRate)
-            let from = value("--from").flatMap(Double.init).map { max(0, min(samples.count, Int($0 * rate))) } ?? 0
-            let to = value("--to").flatMap(Double.init).map { max(from, min(samples.count, Int($0 * rate))) } ?? samples.count
+            let length = Double(samples.count) / rate
+            let fromSeconds = min(cut["--from"] ?? 0, length)
+            let toSeconds = min(max(cut["--to"] ?? length, fromSeconds), length)
+            let from = min(samples.count, Int(fromSeconds * rate))
+            let to = max(from, min(samples.count, Int(toSeconds * rate)))
             if from > 0 || to < samples.count { samples = Array(samples[from..<to]) }
             let offset = Double(from) / rate
             let audioSeconds = Double(samples.count) / rate
@@ -121,13 +135,13 @@ enum WhisperSelfTest {
                        audioSeconds > 0 ? wall / audioSeconds : 0, peak))
 
             if let path = value("--report") {
-                let out = Output(audio: audioPath, model: modelPath, languages: codes, audioSeconds: audioSeconds,
+                let out = Output(audio: audioPath, model: modelPath, languages: codes, from: offset, audioSeconds: audioSeconds,
                                  wallSeconds: wall, peakFootprintMB: peak > 0 ? peak : nil, language: output.language,
                                  segments: output.segments.map {
                                      Output.Segment(start: $0.start + offset, end: $0.end + offset, language: $0.language,
                                                     text: $0.text)
                                  },
-                                 report: output.report)
+                                 report: output.report.map { shifted($0, by: offset) })
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
                 try encoder.encode(out).write(to: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
@@ -184,6 +198,51 @@ enum WhisperSelfTest {
         return failures
     }
 
+    /// 秒数 (149, 149.5) か [時:]分:秒 (2:29, 1:02:29.5) を秒にする。0 以上の有限の値でなければ nil
+    static func seconds(_ text: String) -> Double? {
+        let parts = text.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+        guard (1...3).contains(parts.count) else { return nil }
+        var total = 0.0
+        for (i, part) in parts.enumerated() {
+            guard let v = Double(part), v.isFinite, v >= 0 else { return nil }
+            // 分・秒は 60 未満、時・分は整数
+            if i > 0, v >= 60 { return nil }
+            if i < parts.count - 1, v != v.rounded() { return nil }
+            total = total * 60 + v
+        }
+        return total
+    }
+
+    /// 診断の記録の時刻に offset (--from) を足す (長さ・秒数はそのまま)
+    static func shifted(_ report: MixedReport, by offset: Double) -> MixedReport {
+        guard offset != 0 else { return report }
+        var r = report
+        for i in r.chunks.indices {
+            r.chunks[i].start += offset
+            r.chunks[i].end += offset
+        }
+        for i in r.switches.indices {
+            r.switches[i].start += offset
+            r.switches[i].end += offset
+            r.switches[i].bracketStart += offset
+            r.switches[i].bracketEnd += offset
+            r.switches[i].cut += offset
+        }
+        for i in r.runs.indices {
+            r.runs[i].start += offset
+            r.runs[i].end += offset
+        }
+        for i in r.flagged.indices {
+            r.flagged[i].start += offset
+            r.flagged[i].end += offset
+        }
+        for i in r.repairs.indices {
+            r.repairs[i].start += offset
+            r.repairs[i].end += offset
+        }
+        return r
+    }
+
     private static func printReport(_ r: MixedReport, offset: Double) {
         func t(_ seconds: Double) -> String { String(format: "%.2f", seconds + offset) }
         log(String(format: "VAD: %@ in %.1f s, %.1f s of speech", r.usedVAD ? "on" : "off", r.vadSeconds, r.speechSeconds))
@@ -194,8 +253,12 @@ enum WhisperSelfTest {
                 + (c.trusted ? "" : " (untrusted)") + " -> \(c.language)")
         }
         for s in r.switches {
-            log("  switch without a pause in \(t(s.start))-\(t(s.end)): \(s.head) -> \(s.tail) at \(t(s.cut))"
-                + " (searched \(t(s.bracketStart))-\(t(s.bracketEnd)))")
+            if s.kind == "island" {
+                log("  \(s.tail) inside \(s.head) in \(t(s.start))-\(t(s.end)): \(t(s.cut))-\(t(s.bracketEnd))")
+            } else {
+                log("  switch without a pause in \(t(s.start))-\(t(s.end)): \(s.head) -> \(s.tail) at \(t(s.cut))"
+                    + " (searched \(t(s.bracketStart))-\(t(s.bracketEnd)))")
+            }
         }
         log("runs (\(r.runs.count)):")
         for run in r.runs {
@@ -215,8 +278,9 @@ enum WhisperSelfTest {
                 if p.accepted { log("    before: \(p.before)\n    after:  \(p.after)") }
             }
         }
-        log("language detections: \(r.detections) chunks + \(r.refinementDetections) refinement + \(r.repairDetections) repair;"
-            + " decodes: \(r.decodes) runs + \(r.repairDecodes) repair")
+        log("language detections: \(r.detections) chunks + \(r.refinementDetections) refinement + \(r.islandDetections) island search"
+            + " + \(r.repairDetections) repair; decodes: \(r.decodes) runs + \(r.repairDecodes) repair"
+            + (r.repairsSkipped > 0 ? "; \(r.repairsSkipped) flagged regions skipped (over the repair limit)" : ""))
     }
 
     private static func tag(_ language: String?) -> String {

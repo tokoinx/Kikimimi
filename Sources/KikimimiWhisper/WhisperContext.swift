@@ -185,6 +185,7 @@ public final class WhisperContext: @unchecked Sendable {
                 whisper_full(ctx, params.raw, buffer.baseAddress, Int32(buffer.count))
             }
         }
+        markBrokenIfStateFreed(rc)
         if shouldCancel() { throw WhisperError.cancelled }
         try check(rc)
 
@@ -227,13 +228,17 @@ public final class WhisperContext: @unchecked Sendable {
     /// whisper_full の戻り値を確かめる
     private func check(_ rc: Int32) throws {
         guard rc != 0 else { return }
-        if rc == -7 {
-            // whisper.cpp が状態を解放済み (whisper_full_with_state の KV キャッシュの作り直しに失敗)
-            brokenLock.lock()
-            broken = true
-            brokenLock.unlock()
-        }
+        markBrokenIfStateFreed(rc)
         throw WhisperError.failed(rc)
+    }
+
+    /// -7 なら、whisper.cpp が状態を解放済み (whisper_full_with_state の KV キャッシュの作り直しに失敗)。
+    /// 中止と重なっても必ず印を付ける (印が無いと、次の文字起こしが解放済みの状態を使ってしまう)
+    private func markBrokenIfStateFreed(_ rc: Int32) {
+        guard rc == -7 else { return }
+        brokenLock.lock()
+        broken = true
+        brokenLock.unlock()
     }
 
     // MARK: - whisper_full の設定
@@ -448,6 +453,13 @@ public final class WhisperContext: @unchecked Sendable {
         guard rc == 0 else { return nil }
         var probs = [Float](repeating: 0, count: Int(whisper_lang_max_id()) + 1)
         guard whisper_lang_auto_detect(ctx, 0, n, &probs) >= 0 else { return nil }
+        // 言語判定は [SOT] だけを読ませた次のトークンの確率を、状態の logits の 1 行目に残す。whisper.cpp v1.9.2 は、
+        // 次の whisper_full の最初の 30 秒の「無音らしさ」(no_speech_prob) をその 1 行目から読むので、別の音声の値が混ざり、
+        // 言い直しをせずに 30 秒ぶんの文を捨てることがある。読み込んだばかりの状態と同じく 0 に戻す
+        // (判定に成功した直後の logits は、ちょうど語彙の数の 1 行)
+        if let logits = whisper_get_logits(ctx) {
+            logits.update(repeating: 0, count: Int(whisper_n_vocab(ctx)))
+        }
         return candidates.map { code in
             let id = Int(whisper_lang_id(code))
             return id >= 0 && id < probs.count ? probs[id] : 0
@@ -472,6 +484,7 @@ public final class WhisperContext: @unchecked Sendable {
                 return whisper_full(ctx, params.raw, base + range.lowerBound, Int32(range.count))
             }
         }
+        markBrokenIfStateFreed(rc)
         if shouldCancel() { throw WhisperError.cancelled }
         try check(rc)
 

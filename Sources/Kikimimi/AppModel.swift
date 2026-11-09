@@ -486,6 +486,8 @@ final class AppModel {
     /// 同じファイルを、別の言語の設定でもう一度文字起こしする (新しいジョブ。設定の言語は変えない)
     func retranscribe(_ job: Job, languageCode code: String) {
         guard let url = job.url else { return }
+        // 置き換える文字起こしの監査・翻訳は止める (待っていると、やり直しがその後ろに回る。反映済みの結果は残す)
+        cancelPost(job)
         let again = Job(name: job.name, url: url)
         again.languageCode = code
         jobs.insert(again, at: 0)

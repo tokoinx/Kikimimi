@@ -105,6 +105,11 @@ public struct Transcript: Codable, Hashable, Sendable {
         segment.language ?? language
     }
 
+    /// 日本語に訳す必要がある区間か (日本語の文字でも、「日本語＋英語」で日本語とわかっている区間でもない)
+    public func needsTranslation(_ segment: TranscriptSegment) -> Bool {
+        Translator.needsTranslation(segment, transcriptLanguage: language)
+    }
+
     /// 翻訳の状況 (画面の表示に使う。区間を 1 回だけ見て数える)
     public struct TranslationStats: Equatable, Sendable {
         /// 日本語訳が 1 つでもある
@@ -129,7 +134,7 @@ public struct Transcript: Codable, Hashable, Sendable {
             if s.translation != nil { stats.hasTranslation = true }
             guard Script.hasLetters(s.text) else { continue }
             lettered += 1
-            guard Script.needsTranslation(s.text, transcriptLanguage: language(of: s)) else { continue }
+            guard needsTranslation(s) else { continue }
             stats.translatable += 1
             if s.translation == nil && !covered.contains(s.id) { stats.untranslated += 1 }
         }
@@ -154,7 +159,7 @@ public struct Transcript: Codable, Hashable, Sendable {
     /// 右の列 (日本語) に出す文: 訳があれば訳、訳す必要のない区間は原文のまま (文の続きの区間は nil)
     public func japaneseText(of segment: TranscriptSegment) -> String? {
         if let t = segment.translation { return t }
-        return Script.needsTranslation(segment.text, transcriptLanguage: language(of: segment)) ? nil : segment.text
+        return needsTranslation(segment) ? nil : segment.text
     }
 
     /// 対訳の 1 行 (1 つの訳と、それに当たる区間)。ふつうは 1 区間、文が分かれていれば数区間
@@ -189,7 +194,7 @@ public struct Transcript: Codable, Hashable, Sendable {
                     i += 1
                 }
             }
-            let needs = Script.needsTranslation(head.text, transcriptLanguage: language(of: head))
+            let needs = needsTranslation(head)
             units.append(BilingualUnit(segments: members,
                                        japanese: head.translation ?? (needs ? nil : head.text),
                                        isOriginalJapanese: head.translation == nil && !needs))

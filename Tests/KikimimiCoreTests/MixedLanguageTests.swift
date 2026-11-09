@@ -20,6 +20,15 @@ final class MixedLanguageTests: XCTestCase {
         (187.8, 188.96), (189.95, 192.16), (192.25, 195.04), (195.29, 201.41), (201.76, 207.97),
     ]
 
+    /// VAD の発話らしさ (発話は 0.9、間は 0.05)。いちばん静かなところで切る処理を、本物の VAD に近づける
+    private func vadLevels(_ spans: [Range<Int>], total: Int) -> [Float] {
+        var levels = [Float](repeating: 0.05, count: total / 512 + 1)
+        for span in spans {
+            for k in (span.lowerBound / 512)..<min(levels.count, span.upperBound / 512) { levels[k] = 0.9 }
+        }
+        return levels
+    }
+
     private var mixMap: SpeechMap {
         SpeechMap(spans: mixSpans.map { s($0.0)..<s($0.1) }, totalSamples: s(208.4))
     }
@@ -284,9 +293,88 @@ final class MixedLanguageTests: XCTestCase {
         XCTAssertEqual(outcome.switches[0].cut, 133.77, accuracy: 1.6)
         XCTAssertEqual(outcome.parts.first?.chunk.range.lowerBound, chunk.range.lowerBound)
         XCTAssertEqual(outcome.parts.last?.chunk.range.upperBound, chunk.range.upperBound)
-        XCTAssertTrue(SwitchSearch.needsRefinement(LanguageGuess(language: "ja", confidence: 0.94), speechSeconds: 4))
-        XCTAssertFalse(SwitchSearch.needsRefinement(LanguageGuess(language: "ja", confidence: 0.96), speechSeconds: 20))
+        XCTAssertTrue(SwitchSearch.needsRefinement(LanguageGuess(language: "ja", confidence: 0.96), speechSeconds: 4))
+        XCTAssertFalse(SwitchSearch.needsRefinement(LanguageGuess(language: "ja", confidence: 0.975), speechSeconds: 20))
         XCTAssertFalse(SwitchSearch.needsRefinement(LanguageGuess(language: "ja", confidence: 0.5), speechSeconds: 3.9))
+    }
+
+    func testBisectionNarrowsToAnUncertainProbe() throws {
+        // 34.17 秒で日本語 → 英語。切り替わりをまたぐ窓は、多い側ではない言語を低い確からしさで返すことがある
+        // (本物の turbo: 日本語 3.6 秒 + 英語 0.3 秒の窓が「英語 0.565」)。確からしさの低い窓のほうへ幅を動かさない
+        let switchAt = 34.17
+        let detect: (Range<Int>) -> LanguageGuess? = { range in
+            let a = Double(range.lowerBound) / 16_000, b = Double(range.upperBound) / 16_000
+            let before = max(0, min(b, switchAt) - a), after = max(0, b - max(a, switchAt))
+            if before == 0 { return LanguageGuess(language: "en", confidence: 0.999) }
+            if after == 0 { return LanguageGuess(language: "ja", confidence: 0.999) }
+            return LanguageGuess(language: "en", confidence: 0.6)   // またいだ窓は、いつも「英語」と自信なく答える
+        }
+        let map = SpeechMap(spans: [s(27.9)..<s(42.34)], totalSamples: s(45))
+        let b = SwitchSearch.bisect(s(27.9)..<s(42.34), map: map, detect: detect)
+        let cut = Double(try XCTUnwrap(b.cut)) / 16_000
+        XCTAssertEqual(cut, switchAt, accuracy: 1.3)
+        let bracket = try XCTUnwrap(b.bracket)
+        XCTAssertLessThanOrEqual(Double(bracket.lowerBound) / 16_000, switchAt + 0.25)
+        XCTAssertGreaterThanOrEqual(Double(bracket.upperBound) / 16_000, switchAt - 0.25)
+    }
+
+    func testShortPiecesAreSearchedWithTwoSecondWindows() throws {
+        // 4.9 秒の部分の 1 秒目で英語 → 日本語 (4 秒の窓では両端とも日本語に聞こえる)
+        let count = Counter()
+        let map = SpeechMap(spans: [s(116.64)..<s(121.54)], totalSamples: s(125))
+        let b = SwitchSearch.bisect(s(116.64)..<s(121.54), map: map, detect: fakeDetector(switchAt: 117.82, calls: count))
+        XCTAssertEqual(b.head?.language, "en")
+        XCTAssertEqual(b.tail?.language, "ja")
+        XCTAssertEqual(Double(try XCTUnwrap(b.cut)) / 16_000, 117.82, accuracy: 1.0)
+        // 4 秒未満は探さない
+        XCTAssertNil(SwitchSearch.bisect(s(0)..<s(3.9), map: map, detect: fakeDetector(switchAt: 1, calls: count)).cut)
+    }
+
+    func testIslandSearchFindsAShortInterjectionInTheMiddle() throws {
+        // 25 秒の英語の区切りの 11〜13 秒に、2 秒の日本語 (区切り全体では英語 0.99 に聞こえる)
+        let count = Counter()
+        let spans = [s(0)..<s(10.8), s(11.0)..<s(13.0), s(13.3)..<s(25)]
+        let map = SpeechMap(spans: spans, levels: vadLevels(spans, total: s(25)), totalSamples: s(25))
+        let chunk = SpeechChunk(range: s(0)..<s(25), spans: map.spans)
+        let detect: (Range<Int>) -> LanguageGuess? = { range in
+            count.value += 1
+            let a = Double(range.lowerBound) / 16_000, b = Double(range.upperBound) / 16_000
+            let ja = max(0, min(b, 13.0) - max(a, 11.0)), all = b - a
+            let share = all > 0 ? ja / all : 0
+            // whisper と同じく、少ない側をほとんど聞き取らない
+            let pja = share >= 0.75 ? 0.99 : (share <= 0.25 ? (share > 0 ? 0.01 : 0.0001) : share)
+            return pja >= 0.5 ? LanguageGuess(language: "ja", confidence: pja) : LanguageGuess(language: "en", confidence: 1 - pja)
+        }
+        let host = LanguageGuess(language: "en", confidence: 0.99)
+        XCTAssertTrue(SwitchSearch.needsIslandSearch(host, speechSeconds: 24.5, threshold: 0.005))
+        XCTAssertFalse(SwitchSearch.needsIslandSearch(LanguageGuess(language: "en", confidence: 0.9999), speechSeconds: 24.5,
+                                                      threshold: 0.002))
+        XCTAssertFalse(SwitchSearch.needsIslandSearch(LanguageGuess(language: "ja", confidence: 0.98), speechSeconds: 24.5,
+                                                      threshold: 0.005))
+        let outcome = SwitchSearch.islands(chunk, host: host, map: map, detect: detect)
+        XCTAssertEqual(outcome.detections, count.value)
+        XCTAssertEqual(outcome.parts.map { $0.guess?.language }, ["en", "ja", "en"])
+        guard outcome.parts.count == 3 else { return }
+        let island = outcome.parts[1].chunk
+        XCTAssertEqual(sec(island.range.lowerBound), 11.0, accuracy: 0.6)
+        XCTAssertEqual(sec(island.range.upperBound), 13.0, accuracy: 0.6)
+        XCTAssertEqual(outcome.switches.map(\.kind), ["island"])
+        XCTAssertLessThanOrEqual(outcome.detections, 14)
+        // 英語だけ (日本語の確率がとても低い) なら、半分にしたところで止まり、英語のまま
+        let pure = SwitchSearch.islands(chunk, host: host, map: map, detect: { _ in LanguageGuess(language: "en", confidence: 0.9999) })
+        XCTAssertEqual(pure.parts.map { $0.guess?.language }, ["en"])
+        XCTAssertEqual(pure.detections, 2)
+    }
+
+    func testLongChunksKeepTheirOwnGuess() {
+        // 26 秒の区切りが英語 0.89 (信じられる確からしさに届かない): 前の日本語を借りず、英語のまま
+        let runs = plan([(chunk(0, 10), LanguageGuess(language: "ja", confidence: 0.99)),
+                         (chunk(10.3, 36.5), LanguageGuess(language: "en", confidence: 0.89))], total: 37)
+        XCTAssertEqual(runs.map(\.language), ["ja", "en"])
+        // 短い区切りは、これまでどおり前の言語を借りる
+        let short = plan([(chunk(0, 10), LanguageGuess(language: "ja", confidence: 0.99)),
+                          (chunk(10.3, 15), LanguageGuess(language: "en", confidence: 0.89))], total: 16)
+        XCTAssertEqual(short.map(\.language), ["ja"])
     }
 
     // MARK: - 点検
@@ -335,6 +423,16 @@ final class MixedLanguageTests: XCTestCase {
         var log: [String] = []
         var cancelAfterDecodes: Int? = nil
         var cancelled = false
+        /// 本物の turbo のように、英語として文字にすると日本語の部分を訳さずに飛ばす (false なら、訳のような文を返す)
+        var englishDropsJapanese = false
+        /// 少ない側 (1/4 以下) の言語の確率。whisper はほとんど聞き取らない
+        var minorityProbability: Float = 0.01
+        /// この時刻より前の英語の区間は、繰り返しの多い文にする (点検に引っかかるが、言語は正しい)
+        var repetitiveEnglishBefore: Double = 0
+        /// 日本語として文字にし直すと、何も返さない
+        var japaneseDecodeEmpty = false
+        /// 本物の whisper のように、言語の切り替わりに関係なく 8 秒ずつの区間にする (区間が切り替わりをまたぐ)
+        var segmentsIgnoreSwitches = false
 
         init(blocks: [Block], spans: [Range<Int>]) {
             self.blocks = blocks
@@ -342,7 +440,13 @@ final class MixedLanguageTests: XCTestCase {
         }
 
         func speechMap(of samples: [Float]) throws -> SpeechMap? {
-            useVAD ? SpeechMap(spans: spans, totalSamples: samples.count) : nil
+            guard useVAD else { return nil }
+            // 本物の VAD のように、間で発話らしさが下がる (いちばん静かなところで切る処理のため)
+            var levels = [Float](repeating: 0.05, count: samples.count / 512 + 1)
+            for span in spans {
+                for k in (span.lowerBound / 512)..<min(levels.count, span.upperBound / 512) { levels[k] = 0.9 }
+            }
+            return SpeechMap(spans: spans, levels: levels, totalSamples: samples.count)
         }
 
         private func overlap(_ a: Range<Int>, _ b: Range<Int>) -> Int {
@@ -358,7 +462,7 @@ final class MixedLanguageTests: XCTestCase {
             }
             guard ja + en > 0 else { return nil }
             var pj = Float(ja) / Float(ja + en)
-            if pj >= 0.75 { pj = 0.99 } else if pj <= 0.25 { pj = 0.01 }
+            if pj >= 0.75 { pj = 1 - minorityProbability } else if pj <= 0.25 { pj = pj > 0 ? minorityProbability : 0.0001 }
             let p: [String: Float] = ["ja": pj, "en": 1 - pj]
             return candidates.map { p[$0] ?? 0 }
         }
@@ -395,6 +499,36 @@ final class MixedLanguageTests: XCTestCase {
                 cancelAfterDecodes = n - 1
             }
             var out: [DecodedSegment] = []
+            if segmentsIgnoreSwitches {
+                var t = range.lowerBound
+                while t < range.upperBound {
+                    let end = min(range.upperBound, t + 8 * 16_000)
+                    var texts: [String] = []
+                    var lp = -0.15
+                    for b in blocks {
+                        let a = max(b.range.lowerBound, t), e = min(b.range.upperBound, end)
+                        guard e - a >= 16_000 else { continue }
+                        if b.language == language {
+                            texts.append(Self.text(seconds: Double(e - a) / 16_000, language: language, seed: a))
+                        } else if language == "en" {
+                            if !englishDropsJapanese { texts.append("The heat is not too high in the summer."); lp = -0.9 }
+                        } else {
+                            texts.append(String(repeating: "彼は、", count: 40))
+                            lp = -0.3
+                        }
+                    }
+                    if !texts.isEmpty {
+                        let seg = DecodedSegment(start: Double(t) / 16_000, end: Double(end) / 16_000,
+                                                 text: texts.joined(separator: " "), tokenCount: 24, meanLogProb: lp,
+                                                 language: language)
+                        onSegment(seg)
+                        out.append(seg)
+                    }
+                    t = end
+                }
+                onProgress(1)
+                return out
+            }
             for b in blocks {
                 let a = max(b.range.lowerBound, range.lowerBound), e = min(b.range.upperBound, range.upperBound)
                 guard e - a >= 16_000 else { continue }
@@ -407,15 +541,21 @@ final class MixedLanguageTests: XCTestCase {
                     let text: String
                     let lp: Double
                     if b.language == language {
-                        text = Self.text(seconds: seconds, language: language, seed: t)
+                        if language == "ja", japaneseDecodeEmpty { break }
+                        // 繰り返しの多い文: 同じ句を 5 回 (1 区間の中の繰り返しとしては縮められない回数。文字の量はふつう)
+                        text = language == "en" && Double(t) / 16_000 < repetitiveEnglishBefore
+                            ? String(repeating: Self.text(seconds: seconds / 5, language: "en", seed: t) + " ", count: 5)
+                            : Self.text(seconds: seconds, language: language, seed: t)
                         lp = -0.15
                     } else if language == "ja" {
+                        if japaneseDecodeEmpty { break }
                         // 英語の音声を日本語で文字にしたときの暴走 (最初の区間だけで、あとは抜ける)
                         guard first else { break }
                         text = String(repeating: "彼は、", count: 40)
                         lp = -0.3
                     } else {
-                        // 日本語の音声を英語で文字にした、訳のような文
+                        // 日本語の音声を英語で文字にした: 本物の turbo は飛ばす。訳のような文を返すこともある
+                        if englishDropsJapanese { break }
                         text = "The heat is not too high."
                         lp = -1.1
                     }
@@ -517,7 +657,8 @@ final class MixedLanguageTests: XCTestCase {
         XCTAssertEqual(japanese.count, 1, out.segments.map(\.text).joined(separator: " / "))
         XCTAssertEqual(japanese.first?.start ?? 0, 40, accuracy: 0.3)
         XCTAssertFalse(out.segments.contains { $0.text.contains("heat") })
-        XCTAssertEqual(out.report.repairs.filter(\.accepted).count, 1)
+        // 文字にする前に、区切りを分けて判定し直すか、島として見つかる
+        XCTAssertGreaterThan(out.report.refinementDetections + out.report.islandDetections, 0)
     }
 
     func testPipelineRepairsAMisjudgedRegionOnlyWhenTheLanguageDiffers() throws {
@@ -533,10 +674,119 @@ final class MixedLanguageTests: XCTestCase {
                                         options: MixedPipeline.Options(candidates: ["ja", "en"]))
         XCTAssertEqual(out.segments.filter { $0.language == "ja" }.count, 1, out.segments.map(\.text).joined(separator: " / "))
         XCTAssertFalse(out.segments.contains { $0.text.contains("heat") })
+        // 区切りの中ほどの島として見つかる (文字にする前に、日本語の部分を分け出す)。直しは要らない
+        XCTAssertGreaterThan(out.report.islandDetections, 0)
+        XCTAssertFalse(out.report.repairs.contains(where: \.accepted))
+        XCTAssertEqual(out.report.runs.map(\.language), ["en", "ja", "en"])
+    }
+
+    func testPipelineFindsAJapaneseInterjectionThatEnglishDecodingWouldDrop() throws {
+        // 英語の講義の 40〜42.5 秒に、日本語の一言。英語 0.99 の区切りの中に入り、英語で文字にすると消える (本物の turbo と同じ)
+        let blocks = [
+            ScriptedEngine.Block(range: s(0)..<s(40), language: "en"),
+            ScriptedEngine.Block(range: s(40)..<s(42.5), language: "ja"),
+            ScriptedEngine.Block(range: s(42.5)..<s(60), language: "en"),
+        ]
+        let engine = ScriptedEngine(blocks: blocks, spans: [s(0)..<s(39.8), s(40.1)..<s(42.4), s(42.7)..<s(60)])
+        engine.englishDropsJapanese = true
+        let out = try MixedPipeline.run(samples: [Float](repeating: 0, count: s(60)), engine: engine,
+                                        options: MixedPipeline.Options(candidates: ["ja", "en"]))
+        let japanese = out.segments.filter { $0.language == "ja" }
+        XCTAssertEqual(japanese.count, 1, out.segments.map(\.text).joined(separator: " / "))
+        XCTAssertEqual(japanese.first?.start ?? 0, 40, accuracy: 0.3)
+        XCTAssertGreaterThan(out.report.islandDetections, 0)
+        XCTAssertEqual(out.report.switches.filter { $0.kind == "island" }.count, 1)
+        XCTAssertEqual(out.report.runs.map(\.language), ["en", "ja", "en"])
+    }
+
+    func testFrequentInterjectionsAreAllFound() throws {
+        // 25 秒ごとに 2 秒の日本語が挟まる 4 分の英語: 見つかった島は「ふつうの区切り」に数えないので、最後まで探し続ける
+        var blocks: [ScriptedEngine.Block] = []
+        var spans: [Range<Int>] = []
+        var t = 0.0
+        for _ in 0..<10 {
+            blocks.append(ScriptedEngine.Block(range: s(t)..<s(t + 11), language: "en"))
+            blocks.append(ScriptedEngine.Block(range: s(t + 11)..<s(t + 13), language: "ja"))
+            blocks.append(ScriptedEngine.Block(range: s(t + 13)..<s(t + 24), language: "en"))
+            spans += [s(t)..<s(t + 10.8), s(t + 11.1)..<s(t + 12.9), s(t + 13.2)..<s(t + 24)]
+            t += 25
+        }
+        let engine = ScriptedEngine(blocks: blocks, spans: spans)
+        engine.englishDropsJapanese = true
+        let out = try MixedPipeline.run(samples: [Float](repeating: 0, count: s(t)), engine: engine,
+                                        options: MixedPipeline.Options(candidates: ["ja", "en"]))
+        XCTAssertEqual(out.segments.filter { $0.language == "ja" }.count, 10,
+                       out.report.switches.map { String(format: "%.1f-%.1f", $0.cut, $0.bracketEnd) }.joined(separator: " ")
+                       + " | " + out.report.chunks.map { String(format: "%.1f-%.1f %@ %.4f", $0.start, $0.end, $0.language, $0.confidence ?? -1) }
+                       .joined(separator: ", ") + " | island \(out.report.islandDetections)")
+    }
+
+    func testPureEnglishIsNotSearchedForIslands() throws {
+        // 英語だけ: 区切りの日本語の確率はとても低い (0.0001) ので、島は探さない
+        let engine = ScriptedEngine(blocks: [ScriptedEngine.Block(range: s(0)..<s(120), language: "en")],
+                                    spans: stride(from: 0.0, to: 120.0, by: 5.0).map { s($0)..<s($0 + 4.7) })
+        let out = try MixedPipeline.run(samples: [Float](repeating: 0, count: s(120)), engine: engine,
+                                        options: MixedPipeline.Options(candidates: ["ja", "en"]))
+        XCTAssertEqual(out.report.islandDetections, 0)
+        XCTAssertEqual(out.report.refinementDetections, 0)
+        XCTAssertEqual(out.report.detections, out.report.chunks.count)
+        XCTAssertTrue(out.segments.allSatisfy { $0.language == "en" })
+    }
+
+    func testRepairFindsAJapaneseRemarkBetweenTwoEnglishParts() throws {
+        // 区切りの判定では聞き取れない 6 秒の日本語 (少ない側の確率 0.0001)。whisper の区間は切り替わりをまたぎ、
+        // 英語と訳のような文が混ざった 2 つの区間が点検に引っかかる。直す範囲は 英語 → 日本語 → 英語 で、両端は英語。
+        // 中ほどの島を探して、日本語の部分だけを日本語で文字にし直す
+        // 6 秒の日本語は 27 秒の区切りの 2 割 (区切りの判定は英語 0.9999。分け直しも島探しも始まらない)
+        let blocks = [
+            ScriptedEngine.Block(range: s(0)..<s(12), language: "en"),
+            ScriptedEngine.Block(range: s(12)..<s(18), language: "ja"),
+            ScriptedEngine.Block(range: s(18)..<s(60), language: "en"),
+        ]
+        let engine = ScriptedEngine(blocks: blocks, spans: [s(0)..<s(11.8), s(12.0)..<s(17.8), s(18.0)..<s(27), s(28)..<s(60)])
+        engine.minorityProbability = 0.0001
+        engine.segmentsIgnoreSwitches = true
+        let out = try MixedPipeline.run(samples: [Float](repeating: 0, count: s(50)), engine: engine,
+                                        options: MixedPipeline.Options(candidates: ["ja", "en"]))
+        XCTAssertTrue(out.segments.contains { $0.language == "ja" }, out.segments.map(\.text).joined(separator: " / "))
+        XCTAssertFalse(out.segments.contains { $0.text.contains("heat") })
         XCTAssertEqual(out.report.repairs.filter(\.accepted).count, 1)
-        // ほかの区間は点検に引っかからない (直しを試していない)
-        XCTAssertEqual(out.report.repairs.count, 1)
-        XCTAssertEqual(out.report.runs.map(\.language), ["en"])
+    }
+
+    func testAnEmptyRedecodeNeverDeletesText() throws {
+        // 日本語として文字にし直すと何も返らない: 元の文 (訳のような文) を消さずに残す
+        let blocks = [
+            ScriptedEngine.Block(range: s(0)..<s(40), language: "en"),
+            ScriptedEngine.Block(range: s(40)..<s(45), language: "ja"),
+            ScriptedEngine.Block(range: s(45)..<s(60), language: "en"),
+        ]
+        let engine = ScriptedEngine(blocks: blocks, spans: [s(0)..<s(60)])
+        engine.minorityProbability = 0.0001
+        engine.japaneseDecodeEmpty = true
+        let out = try MixedPipeline.run(samples: [Float](repeating: 0, count: s(60)), engine: engine,
+                                        options: MixedPipeline.Options(candidates: ["ja", "en"]))
+        XCTAssertTrue(out.segments.contains { $0.text.contains("heat") })
+        XCTAssertFalse(out.report.repairs.contains(where: \.accepted))
+    }
+
+    func testRegionsThatKeepTheirLanguageDoNotUseUpTheRepairBudget() throws {
+        // 最初の 60 秒は繰り返しの多い英語 (点検に引っかかるが英語のまま)。その後の 100〜105 秒の日本語を、上限を気にせず直せる
+        let blocks = [
+            ScriptedEngine.Block(range: s(0)..<s(100), language: "en"),
+            ScriptedEngine.Block(range: s(100)..<s(105), language: "ja"),
+            ScriptedEngine.Block(range: s(105)..<s(120), language: "en"),
+        ]
+        let engine = ScriptedEngine(blocks: blocks, spans: stride(from: 0.0, to: 120.0, by: 5.0).map { s($0)..<s($0 + 4.8) })
+        engine.minorityProbability = 0.0001
+        engine.repetitiveEnglishBefore = 60
+        let out = try MixedPipeline.run(samples: [Float](repeating: 0, count: s(120)), engine: engine,
+                                        options: MixedPipeline.Options(candidates: ["ja", "en"]))
+        let kept = out.report.repairs.filter { $0.decodedAs.isEmpty }
+        XCTAssertGreaterThan(kept.reduce(0.0) { $0 + $1.end - $1.start }, 30, "regions only re-detected")
+        XCTAssertTrue(out.segments.contains { $0.language == "ja" },
+                      out.segments.map(\.text).joined(separator: " / ") + "\n" + String(describing: out.report.repairs)
+                      + "\n" + String(describing: out.report.flagged) + "\n" + String(describing: out.report.chunks))
+        XCTAssertEqual(out.report.repairsSkipped, 0)
     }
 
     func testPipelineCancels() {
@@ -598,6 +848,36 @@ final class MixedLanguageTests: XCTestCase {
         XCTAssertEqual(system, Translator.systemPrompt(language: "en"))
         XCTAssertEqual(Translator.sourceLanguage(of: t.segments), "ja")
         XCTAssertNil(Translator.sourceLanguage(of: [TranscriptSegment(start: 0, end: 1, text: "a")]))
+    }
+
+    func testJapaneseLinesWithoutKanaAreNotTranslated() throws {
+        // 「Ruth先生」(かなが無い) は文字だけでは日本語と言えないが、「日本語＋英語」で日本語の区間とわかっている
+        let t = Transcript(sourceName: "x", segments: [
+            TranscriptSegment(start: 0, end: 5, text: "First, open Roblox Studio and add a part", language: "en"),
+            TranscriptSegment(start: 5.2, end: 6.5, text: "Ruth先生", language: "ja"),
+            TranscriptSegment(start: 6.8, end: 9, text: "will now show you how to add a part.", language: "en"),
+        ], language: "en")
+        XCTAssertEqual(Translator.pendingIndices(t.segments, language: t.language), [0, 2])
+        XCTAssertFalse(t.needsTranslation(t.segments[1]))
+        XCTAssertEqual(t.japaneseText(of: t.segments[1]), "Ruth先生")
+        XCTAssertEqual(t.translationStats.translatable, 2)
+        // 言語の無い区間 (1 つの言語の文字起こし) は、これまでどおり文字で決める
+        XCTAssertTrue(Transcript(sourceName: "y", segments: [], language: "en")
+            .needsTranslation(TranscriptSegment(start: 0, end: 1, text: "Ruth先生")))
+    }
+
+    func testAuditorRejectsFixesThatChangeTheLineLanguage() throws {
+        let segments = [
+            TranscriptSegment(start: 0, end: 5, text: "Welcome to the session about Roblox Studio.", language: "en"),
+            TranscriptSegment(start: 5, end: 7, text: "Ruth先生", language: "ja"),
+        ]
+        let generator = FakeGenerator { prompt in
+            if prompt.user.contains("Lines to check") { return "[2] FIX Ruth先生 => Ruth-san\nEND" }
+            return "2"
+        }
+        let changes = try Auditor.review(segments, language: "en", options: AuditOptions(), generator: generator,
+                                         shouldCancel: { false }, onProgress: { _, _ in })
+        XCTAssertTrue(changes.isEmpty, String(describing: changes))
     }
 
     func testAuditorPromptMentionsBothLanguagesOnlyWhenMixed() throws {

@@ -99,6 +99,13 @@ final class TranscriptionService: @unchecked Sendable {
             return try ctx.transcribe(samples: samples, options: options,
                                       onProgress: onProgress, onSegment: onSegment,
                                       shouldCancel: shouldCancel)
+        } catch WhisperError.failed(let code) where code == -7 && !shouldCancel() {
+            // whisper.cpp が内部の状態を解放した (メモリ不足で KV キャッシュを作り直せなかった)。VAD とは関係ないので、
+            // 読み込み直して同じ設定で 1 回だけやり直す (使えなくなったコンテキストは loadedContext が読み込み直す)
+            let fresh = try loadedContext(modelPath, vad: usesVAD)
+            return try fresh.transcribe(samples: samples, options: options,
+                                        onProgress: onProgress, onSegment: onSegment,
+                                        shouldCancel: shouldCancel)
         } catch WhisperError.failed where usesVAD && !shouldCancel() {
             // VAD モデルが読めない等。VAD なしでやり直す
             var plainOptions = options
