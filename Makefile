@@ -1,4 +1,4 @@
-.PHONY: app run install test clean reset
+.PHONY: app run doctor install test clean reset
 
 app:            ## Kikimimi.app を build/ に作る
 	Scripts/build-app.sh
@@ -12,6 +12,13 @@ run: app        ## ビルドして起動 (起動中の Kikimimi は先に終了�
 		sleep 0.5; \
 	fi
 	open build/Kikimimi.app
+	@sleep 4; if ! pgrep -x Kikimimi >/dev/null; then \
+		echo "✗ 起動していません。原因を調べます (make doctor と同じ)"; \
+		Scripts/doctor.sh || true; \
+	fi
+
+doctor:         ## 起動しないときの診断 (結果は build/doctor.txt)
+	@Scripts/doctor.sh
 
 install: app    ## /Applications にコピー
 	rm -rf /Applications/Kikimimi.app

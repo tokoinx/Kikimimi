@@ -4,7 +4,8 @@ import KikimimiCore
 import SwiftUI
 
 /// 起動の入り口。`--selftest-llm <GGUF>` / `--selftest-whisper <音声>` のときは画面を出さずに、
-/// LLM / 文字起こしの動作確認だけをして終わる (診断・CI 用)
+/// LLM / 文字起こしの動作確認だけをして終わる (診断・CI 用)。
+/// `--selftest-launch` は、ふつうに起動して、数秒後にウインドウができたかを確かめて終わる (起動しないときの診断用)
 @main
 enum KikimimiMain {
     static func main() {
@@ -15,6 +16,9 @@ enum KikimimiMain {
         }
         if args.contains("--selftest-whisper") {
             exit(WhisperSelfTest.run(arguments: args))
+        }
+        if args.contains("--selftest-launch") {
+            LaunchSelfTest.arm(arguments: args)
         }
         KikimimiApp.main()
     }

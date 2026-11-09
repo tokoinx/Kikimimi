@@ -4,7 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIG="${CONFIG:-release}"
-APP="build/Kikimimi.app"
+FINAL="build/Kikimimi.app"
+# 途中で失敗しても前のアプリを壊さないよう、別の名前で組み立てて、最後に入れ替える
+APP="build/Kikimimi.app.new"
 
 echo "▸ swift build -c $CONFIG (初回は whisper.cpp / llama.cpp の取得と依存のビルドで数分かかります)"
 swift build -c "$CONFIG" --product Kikimimi
@@ -48,4 +50,8 @@ fi
 codesign --force --sign - "$APP/Contents/Frameworks/whisper.framework"
 codesign --force --sign - "$APP/Contents/Frameworks/llama.framework"
 codesign --force --sign - "$APP"
-echo "✓ $APP"
+codesign --verify --strict "$APP"
+
+rm -rf "$FINAL"
+mv "$APP" "$FINAL"
+echo "✓ $FINAL"

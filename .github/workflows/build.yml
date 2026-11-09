@@ -11,15 +11,18 @@ permissions:
 
 jobs:
   macos:
-    name: macOS 15 / Xcode ${{ matrix.xcode }}
-    runs-on: macos-15
-    timeout-minutes: 40
+    name: ${{ matrix.os }} / Xcode ${{ matrix.xcode }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        # 16.2: Swift 6.0。macOS 14 Sonoma で動く最後の Xcode (利用者の環境に合わせる)
-        # 26.3: 最新の Xcode / Swift
-        xcode: ["16.2", "26.3"]
+        include:
+          # macOS 14 Sonoma + Xcode 16.2 (Swift 6.0): 利用者の環境と同じ組み合わせ。ここで実際に起動させる
+          - { os: macos-14, xcode: "16.2" }
+          # 16.2: macOS 14 で動く最後の Xcode。26.3: 最新の Xcode / Swift
+          - { os: macos-15, xcode: "16.2" }
+          - { os: macos-15, xcode: "26.3" }
     steps:
       - uses: actions/checkout@v7
 
@@ -64,6 +67,31 @@ jobs:
           otool -L "$APP/Contents/MacOS/Kikimimi" | grep whisper.framework
           otool -L "$APP/Contents/MacOS/Kikimimi" | grep llama.framework
           codesign --verify --strict --verbose=2 "$APP"
+
+      # 起動そのものの確認: ふつうに起動して、数秒後にウインドウができているかを確かめる
+      # (--selftest-llm / --selftest-whisper は画面を出さないので、起動時に落ちる不具合を見つけられない)
+      - name: Launch self-test (started from the shell)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --report build/launch-direct.txt
+
+      - name: Launch self-test (started with open, as make run does)
+        run: |
+          open -n -W build/Kikimimi.app --args --selftest-launch 5 --report "$PWD/build/launch-open.txt"
+          cat build/launch-open.txt
+          grep -q "LAUNCH SELFTEST OK" build/launch-open.txt
+
+      - name: Doctor script
+        run: Scripts/doctor.sh
+
+      - name: Crash reports (when a launch step failed)
+        if: failure()
+        run: |
+          sleep 5
+          ls -la ~/Library/Logs/DiagnosticReports/ || true
+          for f in ~/Library/Logs/DiagnosticReports/Kikimimi*; do
+            [ -f "$f" ] || continue
+            echo "== $f"
+            head -c 30000 "$f"
+          done
 
       # 乱数の重みの小さな GGUF (本物の Qwen2 の語彙) で、組み立てたアプリの LLM 部分をひと通り動かす。
       # whisper.framework と llama.framework を同じプロセスで使えることの確認も兼ねる。
@@ -117,10 +145,10 @@ jobs:
           --languages ja --cpu --to 16
 
       - name: Zip the app
-        run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-xcode${{ matrix.xcode }}.zip"
+        run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-${{ matrix.os }}-xcode${{ matrix.xcode }}.zip"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: Kikimimi-xcode${{ matrix.xcode }}
-          path: build/Kikimimi-xcode${{ matrix.xcode }}.zip
+          name: Kikimimi-${{ matrix.os }}-xcode${{ matrix.xcode }}
+          path: build/Kikimimi-${{ matrix.os }}-xcode${{ matrix.xcode }}.zip
           retention-days: 14
