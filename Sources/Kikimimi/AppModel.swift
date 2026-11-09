@@ -704,7 +704,12 @@ final class AppModel {
                 // 前に LLM で監査してあれば、やり直しの結果は最後にまとめて反映する
                 // (途中で規則だけの結果を反映すると、前の LLM の直しといっしょに訳まで外れてしまう。中止したら前の結果のまま)
                 let hadLLMAudit = transcript.audit?.model != nil
-                if !hadLLMAudit || !useLLM {
+                // LLM を消したあとで、LLM の監査をやり直そうとした: 規則だけで上書きすると前の LLM の直しと訳が外れるので、そのままにする
+                if hadLLMAudit && !useLLM {
+                    job.postNote = "LLM が見つからないため、前の監査の結果のままにしました。LLM でもう一度見直すには、設定の「監査・翻訳」から LLM を取得してください。"
+                    return
+                }
+                if !hadLLMAudit {
                     // 規則だけの見直しは数秒で終わるので、先に反映しておく (LLM が失敗・中止しても、ここまでは残る)。
                     // 長い録音では時間がかかるので、画面を止めないよう裏で回す
                     let rules = try await Task.detached(priority: .userInitiated) {
