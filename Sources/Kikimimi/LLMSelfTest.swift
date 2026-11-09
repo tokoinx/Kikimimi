@@ -18,7 +18,7 @@ enum LLMSelfTest {
         do {
             var clock = Date()
             let engine = try LlamaEngine(modelPath: modelPath, options: LlamaOptions(gpuLayers: useGPU ? -1 : 0))
-            log("loaded: \(engine.modelDescription), context \(engine.contextLength) tokens, \(seconds(since: clock)) (\(useGPU ? "GPU" : "CPU"))")
+            log("loaded: \(engine.modelDescription), context \(engine.contextLength) tokens, \(engine.chatFormatDescription), \(seconds(since: clock)) (\(useGPU ? "GPU" : "CPU"))")
 
             let segments = [
                 TranscriptSegment(start: 0, end: 3, text: "Welcome to today's session about building games in Roblocks Studio."),

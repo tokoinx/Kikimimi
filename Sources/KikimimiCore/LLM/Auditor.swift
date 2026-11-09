@@ -30,12 +30,21 @@ public enum Auditor {
     static let lookBack = 3
     static let maximumGap: TimeInterval = 10
 
-    /// 規則で見つかる繰り返し
+    /// 規則で見つかる繰り返しと、定番の誤認識
     public static func findRepeats(_ segments: [TranscriptSegment]) -> [AuditChange] {
         let keys = segments.map { TextSimilarity.key($0.text) }
+        let stockPhrases = Set(HallucinationFilter.phrases.map(TextSimilarity.key))
         var deleted = Set<Int>()
         var changes: [AuditChange] = []
-        for i in segments.indices where i > 0 {
+        for i in segments.indices {
+            // 無音や音楽のところで Whisper が出しがちな定番の文 (実際にそう話すこともあるので提案どまり)
+            if stockPhrases.contains(keys[i]) {
+                changes.append(AuditChange(kind: .delete, origin: .rule, original: segments[i],
+                                           reason: "無音や音楽のところで出やすい定番の誤認識の可能性", isConfident: false))
+                deleted.insert(i)
+                continue
+            }
+            guard i > 0 else { continue }
             let ki = keys[i]
             guard ki.count >= 8 else { continue }
             var j = i - 1
@@ -110,7 +119,8 @@ public enum Auditor {
 
     enum Action: Equatable {
         case delete(String)
-        case fix(String)
+        /// 聞き間違えた語 → 正しい語 (行ぜんたいは書き直させない)
+        case fix(wrong: String, right: String)
     }
 
     /// LLM の答えを読む (番号は 1 始まり)。同じ番号が何度も出たら最初のものを使う
@@ -126,11 +136,26 @@ public enum Auditor {
                 let note = rest.dropFirst(3).trimmingCharacters(in: .whitespaces)
                 actions[n] = .delete(note)
             } else if rest.hasPrefix("FIX") {
-                let text = rest.dropFirst(3).trimmingCharacters(in: .whitespaces)
-                if !text.isEmpty { actions[n] = .fix(text) }
+                let parts = rest.dropFirst(3).components(separatedBy: "=>")
+                guard parts.count == 2 else { continue }
+                let wrong = parts[0].trimmingCharacters(in: .whitespaces)
+                let right = parts[1].trimmingCharacters(in: .whitespaces)
+                if !wrong.isEmpty, !right.isEmpty { actions[n] = .fix(wrong: wrong, right: right) }
             }
         }
         return actions
+    }
+
+    /// 行の中の「聞き間違えた語」を「正しい語」に置き換える。行に見つからなければ nil (思い込みの直しは使わない)
+    static func applyFix(to text: String, wrong: String, right: String) -> String? {
+        guard TextSimilarity.key(wrong) != TextSimilarity.key(right) else { return nil }
+        if text.contains(wrong) {
+            return text.replacingOccurrences(of: wrong, with: right)
+        }
+        if let range = text.range(of: wrong, options: [.caseInsensitive, .widthInsensitive]) {
+            return text.replacingCharacters(in: range, with: right)
+        }
+        return nil
     }
 
     static func systemPrompt(language: String?) -> String {
@@ -139,14 +164,14 @@ public enum Auditor {
         You are a careful proofreader of automatic speech recognition (ASR) transcripts. \
         The transcript is mostly in \(lang). Each numbered line is one subtitle segment.
         Report only clear recognition errors:
-        - FIX: a word or name was misheard (a similar-sounding wrong word, a broken proper noun, words that make no sense in context). \
-        Write the whole corrected line. Change as little as possible. Keep the speaker's wording, style and language. \
-        Never translate, summarize, rephrase or add punctuation-only changes.
+        - FIX: a word or name was misheard (a similar-sounding wrong word, a broken proper noun, a word that makes no sense in context). \
+        Write only the wrong words as they appear in the line and the correct words, like "[3] FIX whirled => world". \
+        Keep the speaker's language. Never translate or rephrase, never add or remove particles, endings or small words, \
+        and never fix punctuation, grammar or style.
         - DEL: the line is not real speech: a duplicate of a nearby line created by the recognizer, \
         or a typical hallucination such as "Thank you for watching." during silence or music.
-        Most lines are correct. If you are not sure, leave the line alone.
-        Output one action per problem, such as "[3] FIX corrected line" or "[5] DEL duplicate of [4]". \
-        If every line is fine, output "OK".
+        Skip every line that is fine. Most lines are fine. If you are not sure, skip the line.
+        List the problems in line order, then write "END". If nothing is wrong, write only "END".
         """
     }
 
@@ -180,9 +205,9 @@ public enum Auditor {
             let contextStart = max(0, (chunk.first ?? 0) - 2)
             let context = Array(lines[contextStart..<(chunk.first ?? 0)])
             let user = userPrompt(lines: chunk.map { lines[$0] }, context: context, glossary: options.glossary)
-            let sourceTokens = chunk.reduce(0) { $0 + generator.tokenCount(lines[$1]) }
             let promptTokens = generator.tokenCount(system) + generator.tokenCount(user) + 32
-            let budget = min(generator.contextLength - promptTokens - 8, 64 + sourceTokens * 2)
+            // 答えは問題のある行だけの短い指摘 (1 行あたり十数トークン)
+            let budget = min(generator.contextLength - promptTokens - 8, 48 + chunk.count * 32)
             guard budget > 16 else { continue }
             let longest = chunk.map { lines[$0].utf8.count }.max() ?? 0
             let output = try generator.generate(
@@ -190,29 +215,82 @@ public enum Auditor {
                           maxLineBytes: longest * 2 + 80),
                 shouldCancel: shouldCancel
             )
-            let actions = parse(output, count: chunk.count)
-            // 半分近くを直したがる答えは、聞き取りミスの指摘ではなく書き換え。すべて提案どまりにする
-            let tooMany = actions.count >= 4 && Double(actions.count) > Double(chunk.count) * 0.4
-            for (n, action) in actions.sorted(by: { $0.key < $1.key }) {
+            var found: [AuditChange] = []
+            for (n, action) in parse(output, count: chunk.count).sorted(by: { $0.key < $1.key }) {
                 let index = chunk[n - 1]
                 let segment = segments[index]
                 switch action {
                 case .delete(let note):
                     let backed = deletionIsBacked(index, in: segments)
-                    changes.append(AuditChange(kind: .delete, origin: .llm, original: segment,
-                                               reason: deletionReason(note, backed: backed),
-                                               isConfident: backed && !tooMany))
-                case .fix(let text):
-                    let assessment = fixAssessment(original: segment.text, replacement: text, language: language)
+                    found.append(AuditChange(kind: .delete, origin: .llm, original: segment,
+                                             reason: deletionReason(note, backed: backed), isConfident: backed))
+                case .fix(let wrong, let right):
+                    // 指摘された語が行に無い・何も変わらない直しは使わない
+                    guard let fixed = applyFix(to: segment.text, wrong: wrong, right: right) else { continue }
+                    let assessment = fixAssessment(original: segment.text, replacement: fixed, language: language)
                     guard assessment.keep else { continue }
-                    changes.append(AuditChange(kind: .fix, origin: .llm, original: segment, replacement: text,
-                                               reason: assessment.confident ? "聞き取りミスの修正" : "聞き取りミスの可能性 (直す量が多いため要確認)",
-                                               isConfident: assessment.confident && !tooMany))
+                    // 評価役: 直す前と後のどちらが正しいかを、もう一度たずねる。どちらの並びでも直す前を選んだら捨てる
+                    let votes = try judgeVotes(original: segment.text, proposed: fixed,
+                                               context: Array(lines[max(0, index - 2)..<index]), language: language,
+                                               generator: generator, shouldCancel: shouldCancel)
+                    guard votes > 0 else { continue }
+                    // 行の大部分を差し替える直しは、聞き取りミスではなく書き換えの疑い
+                    let wholesale = TextSimilarity.key(wrong).count > TextSimilarity.key(segment.text).count * 6 / 10
+                    // 語を足すだけ・削るだけの直し (助詞や語尾など) は、聞き間違いより文の手直しに近い
+                    let affixOnly = TextSimilarity.key(right).contains(TextSimilarity.key(wrong))
+                        || TextSimilarity.key(wrong).contains(TextSimilarity.key(right))
+                    let confident = assessment.confident && !wholesale && !affixOnly && votes == 2
+                    let note: String
+                    if confident {
+                        note = ""
+                    } else if votes < 2 {
+                        note = " (評価役の判断が割れたため要確認)"
+                    } else if affixOnly {
+                        note = " (語を足す・削るだけの直しのため要確認)"
+                    } else {
+                        note = " (直す量が多いため要確認)"
+                    }
+                    found.append(AuditChange(kind: .fix, origin: .llm, original: segment, replacement: fixed,
+                                             reason: "聞き取りミス: 「\(wrong)」→「\(right)」" + note,
+                                             isConfident: confident))
                 }
             }
+            // 半分近くを直したがる答えは、聞き取りミスの指摘ではなく書き換え。すべて提案どまりにする
+            if found.count >= 4 && Double(found.count) > Double(chunk.count) * 0.4 {
+                for k in found.indices { found[k].isConfident = false }
+            }
+            changes += found
             onProgress(done + 1, chunks.count)
         }
         return changes
+    }
+
+    // MARK: 評価役
+
+    static func judgeSystemPrompt(language: String?) -> String {
+        let lang = Script.englishName(for: language)
+        return """
+        You check corrections of an automatic speech recognition (ASR) transcript in \(lang). \
+        Two versions of one line are shown. Choose the one that is more likely to be what the speaker actually said: \
+        natural, correct \(lang) that fits the context. Answer with the number only.
+        """
+    }
+
+    /// 評価役: 直す前と直した後のどちらが正しいかを、並びを入れ替えて 2 回たずねる。直した後を選んだ回数 (0〜2) を返す
+    /// (小さなモデルは「1 番目を選びがち」などの癖があるので、2 回とも選ばれたときだけ信じる)
+    static func judgeVotes(original: String, proposed: String, context: [String], language: String?,
+                           generator: any TextGenerating, shouldCancel: () -> Bool) throws -> Int {
+        let system = judgeSystemPrompt(language: language)
+        let contextText = context.isEmpty ? "" : "Context (the lines just before):\n" + context.map { "- \($0)" }.joined(separator: "\n") + "\n\n"
+        func ask(_ first: String, _ second: String) throws -> String {
+            let user = contextText + "Which version of the line is correct?\n1: \(first)\n2: \(second)"
+            return try generator.generate(LLMPrompt(system: system, user: user, grammar: GBNF.choice, maxTokens: 2),
+                                          shouldCancel: shouldCancel).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        var votes = 0
+        if try ask(original, proposed) == "2" { votes += 1 }
+        if try ask(proposed, original) == "1" { votes += 1 }
+        return votes
     }
 
     static func deletionReason(_ note: String, backed: Bool) -> String {

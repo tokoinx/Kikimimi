@@ -36,17 +36,21 @@ public enum GBNF {
         """
     }
 
-    /// 監査の答え: 問題が無ければ `OK`、あれば `[k] DEL 理由` / `[k] FIX 直した文` の行を 1 つ以上。
+    /// 監査の答え: 問題のある行だけを番号の小さい順に 1 回ずつ (`[k] DEL 理由` / `[k] FIX 誤 => 正`)、最後に `END`。
+    /// 同じ行をくり返したり、一覧を何周も出したりできない形にしてある (小さなモデルはそうしがち)。
     public static func auditActions(count: Int) -> String {
         precondition(count > 0)
-        let ids = (1...count).map { literal("\($0)") }.joined(separator: " | ")
-        return """
-        root ::= \(literal("OK\n")) | item+
-        item ::= \(literal("[")) id \(literal("] ")) action \(literal("\n"))
-        action ::= \(literal("DEL")) note? | \(literal("FIX ")) text
-        note ::= \(literal(" ")) text
-        id ::= \(ids)
-        text ::= [^\\r\\n]+
-        """
+        var rules = ["root ::= " + (1...count).map { "i\($0)?" }.joined(separator: " ") + " " + literal("END\n")]
+        for k in 1...count {
+            rules.append("i\(k) ::= \(literal("[\(k)] ")) action \(literal("\n"))")
+        }
+        rules.append("action ::= \(literal("DEL")) note? | \(literal("FIX ")) phrase \(literal(" => ")) phrase")
+        // 語句と理由は短く縛る (行まるごとの書き換えや、答えの途中で考え込むのを防ぐ)
+        rules.append("note ::= \(literal(" ")) [^\\r\\n]{1,60}")
+        rules.append("phrase ::= [^\\r\\n=>]{1,40}")
+        return rules.joined(separator: "\n")
     }
+
+    /// 2 つのうちどちらかを選ばせる (`1` か `2`)
+    public static let choice = "root ::= \"1\" | \"2\""
 }

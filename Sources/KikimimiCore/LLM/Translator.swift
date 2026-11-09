@@ -35,9 +35,12 @@ public enum Translator {
         return """
         You are an expert subtitle translator. Translate each numbered line of a speech transcript \
         from \(lang) into natural, easy-to-read Japanese.
+        - Write Japanese only (kana and kanji). Never write Chinese.
         - Output exactly one line for each input line, in the same order, starting with the same number, like "[3] 訳文".
         - Translate every line separately. Never merge, split, skip or reorder lines, even when a sentence continues on the next line.
-        - Keep names, numbers and units accurate. Write well-known names in their usual Japanese form, otherwise keep the original spelling.
+        - Translate the meaning faithfully. Keep numbers and units accurate.
+        - Keep every name and term from the glossary exactly as written, in the same letters (do not turn them into katakana). \
+        Write other well-known names in their usual Japanese form.
         - If a line is already Japanese, copy it unchanged.
         - Output only the translations, with no notes.
         """
@@ -46,7 +49,7 @@ public enum Translator {
     static func userPrompt(lines: [String], context: [(source: String, translation: String)], glossary: String?) -> String {
         var parts: [String] = []
         if let g = glossary?.trimmingCharacters(in: .whitespacesAndNewlines), !g.isEmpty {
-            parts.append("Names and terms in this recording (keep these spellings): \(g)")
+            parts.append("Glossary (keep exactly as written): \(g)")
         }
         if !context.isEmpty {
             parts.append("Previous lines, already translated (context only, do not output):\n"

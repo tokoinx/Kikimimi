@@ -136,6 +136,14 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         }
     }
 
+    /// 会話の組み立て方 (診断用)
+    public var chatFormatDescription: String {
+        switch format {
+        case .chatML(let skipThinking): return skipThinking ? "ChatML (思考を省く)" : "ChatML"
+        case .builtin: return "モデル付属のテンプレート"
+        }
+    }
+
     deinit {
         llama_batch_free(batch)
         llama_free(context)

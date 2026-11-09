@@ -107,27 +107,28 @@ public struct HFFileEntry: Decodable, Hashable, Sendable {
 public enum LLMCatalog {
     public static let defaultModelID = "qwen3.5-4b"
 
+    // 大きさは Hugging Face の一覧 (2026-11) の Q4_K_M の値。unsloth の方が少し小さいので先に試す
     public static let all: [LLMModelSpec] = [
         LLMModelSpec(
             id: "qwen3.5-4b", displayName: "Qwen3.5 4B",
             summary: "監査と翻訳のバランスが良い。迷ったらこれ。メモリ 8 GB の Mac でも動く。",
-            approxMB: 2780, recommendedMemoryGB: 8,
-            repositories: ["bartowski/Qwen_Qwen3.5-4B-GGUF", "unsloth/Qwen3.5-4B-GGUF"],
-            fallbackFileName: "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+            approxMB: 2741, recommendedMemoryGB: 8,
+            repositories: ["unsloth/Qwen3.5-4B-GGUF", "bartowski/Qwen_Qwen3.5-4B-GGUF"],
+            fallbackFileName: "Qwen3.5-4B-Q4_K_M.gguf",
             license: "Apache-2.0", recommended: true),
         LLMModelSpec(
             id: "qwen3.5-2b", displayName: "Qwen3.5 2B (軽量)",
             summary: "速くて軽い。精度は 4B より控えめ。",
-            approxMB: 1310, recommendedMemoryGB: 8,
+            approxMB: 1281, recommendedMemoryGB: 8,
             repositories: ["unsloth/Qwen3.5-2B-GGUF", "bartowski/Qwen_Qwen3.5-2B-GGUF"],
             fallbackFileName: "Qwen3.5-2B-Q4_K_M.gguf",
             license: "Apache-2.0"),
         LLMModelSpec(
             id: "qwen3.5-9b", displayName: "Qwen3.5 9B (高精度)",
             summary: "いちばん賢いが遅い。メモリ 16 GB 以上の Mac 向け。",
-            approxMB: 6170, recommendedMemoryGB: 16,
-            repositories: ["bartowski/Qwen_Qwen3.5-9B-GGUF", "unsloth/Qwen3.5-9B-GGUF"],
-            fallbackFileName: "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+            approxMB: 5681, recommendedMemoryGB: 16,
+            repositories: ["unsloth/Qwen3.5-9B-GGUF", "bartowski/Qwen_Qwen3.5-9B-GGUF"],
+            fallbackFileName: "Qwen3.5-9B-Q4_K_M.gguf",
             license: "Apache-2.0"),
     ]
 

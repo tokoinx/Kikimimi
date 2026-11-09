@@ -20,6 +20,14 @@ final class FakeGenerator: TextGenerating {
     }
 }
 
+/// 評価役への問い (1: … / 2: …) に、指定した語を含む方の番号で答える
+private func vote(for marker: String, in prompt: LLMPrompt) -> String {
+    for line in prompt.user.split(separator: "\n") where line.hasPrefix("1: ") || line.hasPrefix("2: ") {
+        if line.contains(marker) { return String(line.prefix(1)) }
+    }
+    return "1"
+}
+
 /// 依頼の中の「[n] 本文」の行を取り出す
 private func numberedLines(in prompt: LLMPrompt) -> [(Int, String)] {
     prompt.user.split(separator: "\n").compactMap { line -> (Int, String)? in
@@ -47,9 +55,11 @@ final class GrammarTests: XCTestCase {
 
     func testAuditActions() {
         let g = GBNF.auditActions(count: 3)
-        XCTAssertTrue(g.contains("root ::= \"OK\\n\" | item+"))
-        XCTAssertTrue(g.contains("id ::= \"1\" | \"2\" | \"3\""))
-        XCTAssertTrue(g.contains("action ::= \"DEL\" note? | \"FIX \" text"))
+        XCTAssertTrue(g.hasPrefix("root ::= i1? i2? i3? \"END\\n\"\n"), g)
+        XCTAssertTrue(g.contains("i2 ::= \"[2] \" action \"\\n\""))
+        XCTAssertTrue(g.contains("action ::= \"DEL\" note? | \"FIX \" phrase \" => \" phrase"))
+        XCTAssertTrue(g.contains("phrase ::= [^\\r\\n=>]{1,40}"))
+        XCTAssertTrue(g.contains("note ::= \" \" [^\\r\\n]{1,60}"))
     }
 
     func testCompleteLines() {
@@ -114,13 +124,23 @@ final class AuditorTests: XCTestCase {
     }
 
     func testParse() {
-        let out = "[2] FIX the Roblox Studio editor\n[3] DEL duplicate of [2]\n[2] DEL again\n[9] DEL out of range\n[1] FIX 途中で"
-        let actions = Auditor.parse(out, count: 3)
-        XCTAssertEqual(actions[2], .fix("the Roblox Studio editor"))
+        let out = "[2] FIX Roblocks => Roblox\n[3] DEL duplicate of [2]\n[2] DEL again\n[9] DEL out of range\n[4] FIX no arrow\nEND\n[1] FIX 途中 => で"
+        let actions = Auditor.parse(out, count: 4)
+        XCTAssertEqual(actions[2], .fix(wrong: "Roblocks", right: "Roblox"))
         XCTAssertEqual(actions[3], .delete("duplicate of [2]"))
-        XCTAssertNil(actions[1]) // 書き切っていない最後の行は使わない
+        XCTAssertNil(actions[4], "=> の無い直しは読まない")
+        XCTAssertNil(actions[1], "書き切っていない最後の行は使わない")
         XCTAssertNil(actions[9])
-        XCTAssertTrue(Auditor.parse("OK\n", count: 3).isEmpty)
+        XCTAssertTrue(Auditor.parse("END\n", count: 3).isEmpty)
+    }
+
+    func testApplyFix() {
+        XCTAssertEqual(Auditor.applyFix(to: "Open Roblocks Studio. Roblocks is fun.", wrong: "Roblocks", right: "Roblox"),
+                       "Open Roblox Studio. Roblox is fun.")
+        XCTAssertEqual(Auditor.applyFix(to: "fall through the Whirled", wrong: "whirled", right: "world"), "fall through the world")
+        XCTAssertEqual(Auditor.applyFix(to: "議事録を構成します", wrong: "構成", right: "校正"), "議事録を校正します")
+        XCTAssertNil(Auditor.applyFix(to: "Hello world", wrong: "planet", right: "earth"), "行に無い語は直さない")
+        XCTAssertNil(Auditor.applyFix(to: "Hello world", wrong: "world", right: "World."), "何も変わらない直しは使わない")
     }
 
     func testFixAssessment() {
@@ -152,27 +172,33 @@ final class AuditorTests: XCTestCase {
         let fake = FakeGenerator { prompt in
             XCTAssertNotNil(prompt.grammar)
             XCTAssertTrue(prompt.system.contains("English"))
+            if prompt.grammar == GBNF.choice { return vote(for: "Roblox Studio tutorial", in: prompt) }
             XCTAssertTrue(prompt.user.contains("Roblox Studio"), "語彙のヒントを渡す")
-            return "[1] FIX Welcome to the Roblox Studio tutorial.\n[3] DEL hallucination\n"
+            return "[1] FIX Roblocks => Roblox\n[3] DEL hallucination\nEND\n"
         }
         let report = try Auditor.audit(segments, language: "en", options: AuditOptions(glossary: "Roblox Studio"),
                                        generator: fake, modelName: "fake", shouldCancel: { false })
         XCTAssertEqual(report.changes.count, 2)
         XCTAssertEqual(report.model, "fake")
         let fix = try XCTUnwrap(report.changes.first { $0.kind == .fix })
-        XCTAssertTrue(fix.isConfident)
+        XCTAssertTrue(fix.isConfident, "評価役が 2 回とも直した方を選んだ")
+        XCTAssertEqual(fake.prompts.filter { $0.grammar == GBNF.choice }.count, 2)
+        // 定番の文は規則が先に見つけ、実際にそう話すこともあるので提案どまり (LLM の削除より規則を優先)
         let del = try XCTUnwrap(report.changes.first { $0.kind == .delete })
-        XCTAssertTrue(del.isConfident, "定番の誤認識なので裏付けあり")
+        XCTAssertEqual(del.origin, .rule)
+        XCTAssertFalse(del.isConfident)
 
         var t = Transcript(sourceName: "x", segments: segments, language: "en")
         t.adopt(report)
-        XCTAssertEqual(t.segments.count, 3)
+        XCTAssertEqual(t.segments.count, 4)
         XCTAssertEqual(t.segments[0].text, "Welcome to the Roblox Studio tutorial.")
         XCTAssertNil(t.segments[0].translation, "文が変わったら訳し直す")
         XCTAssertEqual(t.audit?.appliedFixes, 1)
-        XCTAssertEqual(t.audit?.appliedDeletes, 1)
+        XCTAssertEqual(t.audit?.appliedDeletes, 0)
 
-        // 削除を元に戻すと、元の位置に戻る
+        // 提案の削除を反映すると消え、元に戻すと元の位置に戻る
+        t.setChange(del.id, applied: true)
+        XCTAssertEqual(t.segments.count, 3)
         t.setChange(del.id, applied: false)
         XCTAssertEqual(t.segments.map(\.text)[2], "Thank you for watching.")
         XCTAssertEqual(t.segments.count, 4)
@@ -198,9 +224,9 @@ final class AuditorTests: XCTestCase {
 
     func testUnbackedDeleteAndTooManyFixesStaySuggestions() throws {
         let segments = (0..<8).map { seg(Double($0) * 3, "Line number \($0) of a perfectly normal talk.") }
-        let fake = FakeGenerator { _ in
-            "[1] DEL looks odd\n[2] FIX Line number 1 of a perfectly normal walk.\n[3] FIX Line number 2 of a perfectly normal walk.\n"
-                + "[4] FIX Line number 3 of a perfectly normal walk.\n"
+        let fake = FakeGenerator { prompt in
+            if prompt.grammar == GBNF.choice { return vote(for: "walk", in: prompt) }
+            return "[1] DEL looks odd\n[2] FIX talk => walk\n[3] FIX talk => walk\n[4] FIX talk => walk\n[5] FIX talk => talk\n[6] FIX zebra => horse\nEND\n"
         }
         let report = try Auditor.audit(segments, language: "en", generator: fake, modelName: "fake", shouldCancel: { false })
         XCTAssertEqual(report.changes.count, 4)
@@ -211,12 +237,43 @@ final class AuditorTests: XCTestCase {
         XCTAssertEqual(t.audit?.pendingSuggestions, 4)
     }
 
+    func testJudgeVotes() throws {
+        let segments = [seg(0, "Make sure the part doesn't fall through the whirled."), seg(3, "本日は新しい話をします。")]
+        // 評価役がいつも 1 番目を選ぶ (位置の癖): 1 票だけ → 提案どまり
+        let biased = FakeGenerator { prompt in
+            prompt.grammar == GBNF.choice ? "1" : "[1] FIX whirled => world\nEND\n"
+        }
+        let r1 = try Auditor.audit([segments[0]], language: "en", generator: biased, modelName: "f", shouldCancel: { false })
+        XCTAssertEqual(r1.changes.count, 1)
+        XCTAssertFalse(r1.changes[0].isConfident)
+        XCTAssertTrue(r1.changes[0].reason.contains("評価役"))
+        // 評価役が 2 回とも直す前を選ぶ: 直しを捨てる
+        let refuse = FakeGenerator { prompt in
+            prompt.grammar == GBNF.choice ? vote(for: "whirled", in: prompt) : "[1] FIX whirled => world\nEND\n"
+        }
+        XCTAssertTrue(try Auditor.audit([segments[0]], language: "en", generator: refuse, modelName: "f", shouldCancel: { false }).changes.isEmpty)
+        // 助詞を削るだけの直しは、評価役が認めても提案どまり
+        let particle = FakeGenerator { prompt in
+            prompt.grammar == GBNF.choice ? vote(for: "本日新しい", in: prompt) : "[1] FIX 本日は => 本日\nEND\n"
+        }
+        let r3 = try Auditor.audit([segments[1]], language: "ja", generator: particle, modelName: "f", shouldCancel: { false })
+        XCTAssertEqual(r3.changes.count, 1)
+        XCTAssertFalse(r3.changes[0].isConfident)
+        XCTAssertTrue(r3.changes[0].reason.contains("足す・削る"))
+    }
+
+    func testStockPhraseIsSuggestion() {
+        let changes = Auditor.findRepeats([seg(0, "ご視聴ありがとうございました"), seg(3, "Thanks for watching!")])
+        XCTAssertEqual(changes.count, 2)
+        XCTAssertTrue(changes.allSatisfy { $0.kind == .delete && !$0.isConfident && $0.origin == .rule })
+    }
+
     func testRulesOnlyAndCancel() throws {
         let segments = [seg(0, "The quick brown fox jumps."), seg(1, "The quick brown fox jumps.")]
         let report = try Auditor.audit(segments, language: "en", generator: nil, modelName: nil, shouldCancel: { false })
         XCTAssertEqual(report.changes.count, 1)
         XCTAssertNil(report.model)
-        let fake = FakeGenerator { _ in "OK\n" }
+        let fake = FakeGenerator { _ in "END\n" }
         XCTAssertThrowsError(try Auditor.audit(segments, language: "en", generator: fake, modelName: "f", shouldCancel: { true })) {
             XCTAssertEqual($0 as? LLMError, .cancelled)
         }

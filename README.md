@@ -23,7 +23,7 @@ Swift / SwiftUI で書いたネイティブ Mac アプリです。音声認識�
 
 - macOS 14 (Sonoma) 以降。Apple Silicon 推奨 (Intel Mac でも CPU で動きますが遅くなります)
 - Xcode 16 以降、または Command Line Tools (`xcode-select --install`)
-- 空きディスク 1 GB 程度 (おすすめの音声認識モデルが約 574 MB)。監査・翻訳も使うなら、さらに約 3 GB (おすすめの LLM が約 2.8 GB)
+- 空きディスク 1 GB 程度 (おすすめの音声認識モデルが約 574 MB)。監査・翻訳も使うなら、さらに約 3 GB (おすすめの LLM が約 2.7 GB)
 - メモリ 8 GB 以上 (LLM の 9B モデルは 16 GB 以上)
 
 ## ビルドと起動
@@ -64,7 +64,9 @@ make install
 - **監査役 (聞き取りミス・繰り返しの見直し)**
   - 規則: すぐ前と同じ文・ほぼ同じ文・一部の繰り返しを見つけます (数字が違う文は別の文として残します)。
   - LLM: 文脈から見て明らかな聞き間違い (同音の別の語、崩れた固有名詞) と、実際には話していない文 (無音や音楽のところの「Thank you for watching.」など) を見つけます。
-  - 安全の基準: LLM の指摘はそのまま信じません。直す量が少ない・言語が変わらない (翻訳になっていない)・削除なら近くに同じ文があるか定番の誤認識、を満たすものだけを自動で反映します。1 回の見直しで半分近くを直したがる答えは、書き換えとみなしてすべて提案どまりにします。
+  - 直し方: LLM には行ぜんたいを書き直させず、「聞き間違えた語 => 正しい語」だけを答えさせて、元の行のその語だけを置き換えます (行に無い語の指摘は使いません)。答えの形は文法で「問題のある行だけを番号順に 1 回ずつ、最後に END」に縛ってあるので、同じ指摘をくり返す暴走が起きません。
+  - **評価役**: LLM が出した直しは、「直す前」と「直した後」のどちらが実際に話された文かを、並びを入れ替えて 2 回たずね直します。2 回とも直した方を選んだときだけ自動で反映し、判断が割れたら提案どまり、2 回とも直す前を選んだら捨てます (小さなモデルの「1 番目を選びがち」などの癖を打ち消すためです)。
+  - 安全の基準: さらに、直す量が少ない・言語が変わらない (翻訳になっていない)・語を足す/削るだけの手直し (助詞や語尾) ではない、削除なら近くに同じ文がある、を満たすものだけを自動で反映します。1 回の見直しで半分近くを直したがる答えは、書き換えとみなしてすべて提案どまりにします。「ご視聴ありがとうございました」のような定番の文は、実際にそう話すこともあるので提案どまりです。
   - 結果の画面の「監査: 修正 3 · 削除 2 · 提案 1」から一覧を開き、1 か所ずつ反映・取り消しができます。行の横の印 (修正済み / 修正の提案 など) を押しても確かめられます。
 - **翻訳役 (日本語へ)**
   - 日本語以外の区間を数行ずつまとめて日本語に訳します。番号と行数を llama.cpp の文法 (GBNF) で縛るので、訳が隣の行にずれません。読めなかった行は 1 行ずつ訳し直します。
@@ -74,9 +76,9 @@ make install
 
 | LLM | 向いている用途 | サイズ | メモリ |
 |---|---|---|---|
-| Qwen3.5 4B | 監査と翻訳のバランスが良い。迷ったらこれ | 約 2.8 GB | 8 GB 以上 |
+| Qwen3.5 4B | 監査と翻訳のバランスが良い。迷ったらこれ | 約 2.7 GB | 8 GB 以上 |
 | Qwen3.5 2B (軽量) | 速さ優先。精度は控えめ | 約 1.3 GB | 8 GB 以上 |
-| Qwen3.5 9B (高精度) | いちばん賢いが遅い | 約 6.2 GB | 16 GB 以上 |
+| Qwen3.5 9B (高精度) | いちばん賢いが遅い | 約 5.7 GB | 16 GB 以上 |
 
 - どれも Apache-2.0 の無料モデルです。量子化 Q4_K_M の GGUF を Hugging Face から取得し、大きさと SHA-256 を確かめてから保存します。保存先は `~/Library/Application Support/Kikimimi/Models/LLM` です。
 - 手持ちの GGUF (llama.cpp で動くもの) も、設定の「手元の GGUF を追加…」で使えます。
@@ -108,7 +110,7 @@ make install
 - **モデルのダウンロードが失敗する**: Hugging Face (huggingface.co) に接続できる必要があります。会社のネットワーク等で繋がらない場合は、別の環境で次のファイルを入手し、設定の「手元のファイルを追加…」で取り込めます。
   - 音声認識モデル: `ggml-large-v3-turbo-q5_0.bin` (huggingface.co/ggerganov/whisper.cpp)
   - 無音検出 (VAD) モデル: `ggml-silero-v6.2.0.bin` (huggingface.co/ggml-org/whisper-vad)。無くても動きます。取れなかったときは 10 分おきに取り直します。
-- **LLM のダウンロードが失敗する**: 音声認識モデルと同じく Hugging Face に接続できる必要があります。繋がらない場合は、別の環境で Qwen3.5 の GGUF (例: `Qwen_Qwen3.5-4B-Q4_K_M.gguf`) を入手し、設定の「手元の GGUF を追加…」で取り込めます。
+- **LLM のダウンロードが失敗する**: 音声認識モデルと同じく Hugging Face に接続できる必要があります。繋がらない場合は、別の環境で Qwen3.5 の GGUF (例: huggingface.co/unsloth/Qwen3.5-4B-GGUF の `Qwen3.5-4B-Q4_K_M.gguf`) を入手し、設定の「手元の GGUF を追加…」で取り込めます。
 - **翻訳が遅い / Mac が重くなる**: 設定で LLM を「Qwen3.5 2B (軽量)」に替えてください。翻訳は「中止」でいつでも止められ、訳せた所までは残ります。「残りを翻訳」で続きから訳せます。
 - **監査の直しが気に入らない**: 「監査: …」の一覧で、その直しのチェックを外すと元に戻ります。「すべて元に戻す」もあります。
 - **`make run` で whisper.framework / llama.framework が見つからないと言われる**: 次を実行してから、もう一度 `make run` してください。
@@ -221,4 +223,4 @@ MIT License ([LICENSE](LICENSE))。
 - Whisper のモデル (MIT, OpenAI) を whisper.cpp 形式にしたもの: 初回に [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) から取得
 - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT) を whisper.cpp 形式にしたもの: 同上 ([ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad))
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) b12211 の XCFramework (MIT): ビルド時に GitHub から取得
-- [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) の GGUF: 監査・翻訳を使うときに Hugging Face ([bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF) / [unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) の量子化版) から取得
+- [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) の GGUF: 監査・翻訳を使うときに Hugging Face ([unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) / [bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF) の量子化版) から取得

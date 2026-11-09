@@ -23,7 +23,7 @@ Neither your audio nor the transcript leaves your Mac. The only network access i
 
 - macOS 14 Sonoma or later. Apple Silicon recommended (Intel Macs work on the CPU, more slowly)
 - Xcode 16 or later, or the Command Line Tools (`xcode-select --install`)
-- About 1 GB of free disk space (the recommended speech model is about 574 MB), plus about 3 GB for the auditor and translator (the recommended LLM is about 2.8 GB)
+- About 1 GB of free disk space (the recommended speech model is about 574 MB), plus about 3 GB for the auditor and translator (the recommended LLM is about 2.7 GB)
 - 8 GB of memory or more (16 GB or more for the 9B LLM)
 
 ## Build and run
@@ -64,7 +64,9 @@ A small LLM running on your Mac reads the transcript once more.
 - **Auditor (repetition and mishearing)**
   - Rules: finds a line that repeats the previous one exactly, almost exactly, or in part (lines that differ in their numbers are kept as different lines).
   - LLM: finds clear mishearings in context (a similar-sounding wrong word, a mangled proper noun) and lines that were never spoken (such as "Thank you for watching." over silence or music).
-  - Guardrails: the LLM is not trusted blindly. A fix is applied automatically only when it changes little and keeps the language (it is not a translation); a deletion only when a similar line is nearby or it is a known hallucination. If an answer wants to change nearly half of the lines it reviewed, it is treated as a rewrite and every change becomes a suggestion.
+  - How fixes are made: the LLM never rewrites a line. It answers only "misheard words => correct words", and just those words are replaced in the original line (a suggestion whose words are not in the line is ignored). The answer is constrained by a grammar to "only the problem lines, each once, in line order, then END", so it cannot run away repeating itself.
+  - **Evaluator**: every fix the LLM proposes is checked again by asking which version, before or after, is what was actually said, twice with the order swapped. It is applied automatically only if the corrected version wins both times; a split vote leaves it as a suggestion, and losing both times discards it (this cancels small models' habit of favouring the first option, for example).
+  - Guardrails: on top of that, a fix is applied automatically only when it changes little, keeps the language (it is not a translation) and is not merely adding or dropping words (particles, endings); a deletion only when a similar line is nearby. If an answer wants to change nearly half of the lines it reviewed, it is treated as a rewrite and every change becomes a suggestion. Stock phrases such as "Thanks for watching" are only suggested for deletion, since people do say them.
   - Open the list from "監査: 修正 3 · 削除 2 · 提案 1" (Audit: fixed / deleted / suggestions) on the result screen to apply or undo each change. The badge next to a line shows the same details.
 - **Translator (into Japanese)**
   - Non-Japanese segments are translated a few lines at a time. The output is constrained with a llama.cpp grammar (GBNF) down to the line numbers and the line count, so a translation cannot slip onto the neighbouring line. Lines that could not be read are retried one at a time.
@@ -74,9 +76,9 @@ A small LLM running on your Mac reads the transcript once more.
 
 | LLM | Best for | Size | Memory |
 |---|---|---|---|
-| Qwen3.5 4B | The balanced default | about 2.8 GB | 8 GB or more |
+| Qwen3.5 4B | The balanced default | about 2.7 GB | 8 GB or more |
 | Qwen3.5 2B (light) | Speed first; less accurate | about 1.3 GB | 8 GB or more |
-| Qwen3.5 9B (accurate) | The smartest, and the slowest | about 6.2 GB | 16 GB or more |
+| Qwen3.5 9B (accurate) | The smartest, and the slowest | about 5.7 GB | 16 GB or more |
 
 - All are free Apache-2.0 models. The Q4_K_M GGUF is fetched from Hugging Face, and its size and SHA-256 are checked before it is saved to `~/Library/Application Support/Kikimimi/Models/LLM`.
 - Any GGUF that llama.cpp can run can be added with "手元の GGUF を追加…" (Add a local GGUF) in Settings.
@@ -108,7 +110,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 - **The model download fails**: the app needs to reach Hugging Face (huggingface.co). If it is blocked on your network, get these files elsewhere and add them with "手元のファイルを追加…" (Add a local file) in Settings:
   - Speech model: `ggml-large-v3-turbo-q5_0.bin` (huggingface.co/ggerganov/whisper.cpp)
   - VAD model: `ggml-silero-v6.2.0.bin` (huggingface.co/ggml-org/whisper-vad). Optional; if it cannot be downloaded, the app retries every 10 minutes.
-- **The LLM download fails**: like the speech models, it needs Hugging Face. If it is blocked, get a Qwen3.5 GGUF elsewhere (for example `Qwen_Qwen3.5-4B-Q4_K_M.gguf`) and add it with "手元の GGUF を追加…" in Settings.
+- **The LLM download fails**: like the speech models, it needs Hugging Face. If it is blocked, get a Qwen3.5 GGUF elsewhere (for example `Qwen3.5-4B-Q4_K_M.gguf` from huggingface.co/unsloth/Qwen3.5-4B-GGUF) and add it with "手元の GGUF を追加…" in Settings.
 - **Translation is slow or the Mac gets sluggish**: switch the LLM to "Qwen3.5 2B" in Settings. You can stop a translation at any time; what was translated is kept, and "残りを翻訳" (Translate the rest) continues from there.
 - **You disagree with a correction**: uncheck it in the "監査: …" list to undo it, or use "すべて元に戻す" (Undo all).
 - **`make run` says whisper.framework or llama.framework is missing**: run the following, then `make run` again.
@@ -221,4 +223,4 @@ Downloaded at build time or at run time (not included in this repository):
 - Whisper models (MIT, OpenAI) converted for whisper.cpp: downloaded from [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) on first use
 - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT) converted for whisper.cpp: likewise ([ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad))
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) b12211 XCFramework (MIT): downloaded from GitHub at build time
-- [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) GGUF: downloaded from Hugging Face when you use the auditor or translator (quantized by [bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF) / [unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF))
+- [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) GGUF: downloaded from Hugging Face when you use the auditor or translator (quantized by [unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) / [bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF))
