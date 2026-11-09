@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// `Kikimimi --selftest-launch [秒] [--reopen | --reopen-external] [--report <ファイル>]`
+/// `Kikimimi --selftest-launch [秒] [--reopen | --reopen-menu | --reopen-external] [--restore-windows] [--report <ファイル>]`
 ///
 /// ふつうに起動して (画面も出す)、数秒後にメインのウインドウが見えているかを確かめて終わる。
 /// 「起動しない」ときの診断 (`make doctor`) と、CI での起動の確認に使う。
@@ -25,7 +25,8 @@ enum LaunchSelfTest {
             return arguments[i + 1]
         }()
         let external = arguments.contains("--reopen-external")
-        let reopen = external || arguments.contains("--reopen")
+        let viaMenu = arguments.contains("--reopen-menu")
+        let reopen = external || viaMenu || arguments.contains("--reopen")
         let header = [
             LaunchLog.versionLine + " launch self-test",
             LaunchLog.environmentLine,
@@ -52,6 +53,8 @@ enum LaunchSelfTest {
             // ウインドウを全部閉じても動き続ける状態 (作業中と同じ) にしてから、呼び戻せるかを確かめる
             MainActor.assumeIsolated {
                 AppDelegate.shared?.keepRunningWithoutWindows = true
+                // --reopen-menu: ウインドウの開き方を忘れさせて、メニューの動作で開く道を確かめる
+                if viaMenu { AppDelegate.shared?.openMainWindow = nil }
                 for window in MainWindow.all() { window.close() }
             }
             let afterFirst = first

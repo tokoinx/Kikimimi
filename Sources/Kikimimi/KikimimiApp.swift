@@ -28,6 +28,12 @@ enum KikimimiMain {
             LaunchSelfTest.arm(arguments: args)
         }
         LaunchLog.note("launch: \(LaunchLog.versionLine); \(LaunchLog.environmentLine); other instances: \(LaunchLog.otherInstances())")
+        // 前回のウインドウの状態を復元しない。強制終了の後 (make run は前のアプリを終了させてから起動する) の起動では、
+        // macOS が復元しようとして、ウインドウが 1 つも無いまま動いていることがあった (CI で、3 回目の起動で再現)。
+        // 復元するものは無い (文字起こしの結果は保存していない) ので、いつも新しいウインドウで始める
+        if !args.contains("--restore-windows") {
+            UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true, "NSQuitAlwaysKeepsWindows": false])
+        }
         KikimimiApp.main()
     }
 }
@@ -47,8 +53,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 呼ばれたときに、こちらでウインドウを開き直した回数 (確認用)
     private(set) var windowsReopened = 0
 
+    /// メニューの「メインウインドウを表示」の名前 (ウインドウが 1 つも無いときは、このメニューの動作で開く)
+    static let showMainWindowTitle = "メインウインドウを表示"
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // 起動したのにウインドウが出ていなければ、開く (復元の失敗など、理由を問わない)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard let self, !self.keepRunningWithoutWindows else { return }
+            if MainWindow.all().isEmpty {
+                LaunchLog.note("no main window 1.5 s after launch")
+                self.showMainWindow(openIfMissing: true)
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -72,13 +93,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let window = windows.first(where: { $0.isVisible }) ?? windows.first(where: { $0.isMiniaturized }) {
             if window.isMiniaturized { window.deminiaturize(nil) }
             window.makeKeyAndOrderFront(nil)
-        } else if openIfMissing, let openMainWindow {
+        } else if openIfMissing {
             windowsReopened += 1
-            LaunchLog.note("no main window: opening one")
-            openMainWindow()
+            if let openMainWindow {
+                LaunchLog.note("no main window: opening one")
+                openMainWindow()
+            } else if performShowMainWindowMenuItem() {
+                // まだ 1 度もウインドウが出ていない (開き方を受け取っていない) ときは、メニューの動作を使う
+                LaunchLog.note("no main window: opened one through the menu command")
+            } else {
+                LaunchLog.note("no main window, and no way to open one was found")
+            }
         }
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
+
+    /// メニューの「メインウインドウを表示」を実行する (SwiftUI の openWindow は画面の部品の中でしか使えないため)
+    private func performShowMainWindowMenuItem() -> Bool {
+        guard let main = NSApplication.shared.mainMenu else { return false }
+        for top in main.items {
+            guard let menu = top.submenu else { continue }
+            menu.update()
+            let index = menu.indexOfItem(withTitle: Self.showMainWindowTitle)
+            if index >= 0 {
+                menuOpening = true
+                defer { menuOpening = false }
+                menu.performActionForItem(at: index)
+                return true
+            }
+        }
+        return false
+    }
+
+    /// メニューの動作をこちらから実行しているあいだ (メニューの側で、もう一度ここへ戻ってこないように)
+    private(set) var menuOpening = false
 }
 
 /// メインのウインドウ (設定のウインドウなどを除く)
@@ -116,16 +164,16 @@ private struct ShowMainWindowButton: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("メインウインドウを表示") {
-            if let delegate = AppDelegate.shared {
-                if delegate.openMainWindow == nil {
-                    let openWindow = openWindow
-                    delegate.openMainWindow = { openWindow(id: MainWindow.id) }
-                }
-                delegate.showMainWindow(openIfMissing: true)
-            } else {
+        Button(AppDelegate.showMainWindowTitle) {
+            guard let delegate = AppDelegate.shared, !delegate.menuOpening else {
                 openWindow(id: MainWindow.id)
+                return
             }
+            if delegate.openMainWindow == nil {
+                let openWindow = openWindow
+                delegate.openMainWindow = { openWindow(id: MainWindow.id) }
+            }
+            delegate.showMainWindow(openIfMissing: true)
         }
         .keyboardShortcut("0")
     }

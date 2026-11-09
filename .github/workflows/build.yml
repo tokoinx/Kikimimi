@@ -82,6 +82,33 @@ jobs:
       - name: Launch self-test (the window comes back on a reopen request)
         run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --reopen --report build/launch-reopen.txt
 
+      - name: Launch self-test (the window comes back through the menu command)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --reopen-menu --report build/launch-menu.txt
+
+      # 強制終了をくり返した後の起動 (make run は前のアプリを終了させてから起動する) でも、ウインドウが出ること
+      - name: Launch self-test (after the app was killed several times)
+        run: |
+          for i in 1 2 3; do
+            open -n build/Kikimimi.app
+            sleep 4
+            pkill -KILL -x Kikimimi || true
+            sleep 1
+          done
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --report build/launch-after-kill.txt
+
+      # 参考: 前回のウインドウの状態を復元させると (これまでの動き)、ウインドウが出るかどうか
+      - name: Launch self-test (with window restoration, for reference)
+        continue-on-error: true
+        run: |
+          for i in 1 2; do
+            open -n build/Kikimimi.app --args --restore-windows
+            sleep 4
+            pkill -KILL -x Kikimimi || true
+            sleep 1
+          done
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --restore-windows --report build/launch-restore.txt
+          tail -5 ~/Library/Logs/Kikimimi/launch.log
+
       - name: Launch self-test (plain open while a copy without windows is running)
         run: |
           rm -f build/launch-external.txt
