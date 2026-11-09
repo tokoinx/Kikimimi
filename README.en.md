@@ -18,6 +18,7 @@ Neither your audio nor the transcript leaves your Mac. The only network access i
 - **English → Japanese translation**: the original on the left, the Japanese translation on the right (Chinese, Korean and others can be translated to Japanese too)
 - Export to txt / srt / vtt / Markdown / csv / json (original, Japanese, or both side by side)
 - Japanese, English, Chinese, Korean and more, with automatic language detection
+- **日本語＋英語 (Japanese + English)**: for recordings that switch between Japanese and English, such as an English lecturer with a Japanese interpreter. Each stretch of speech gets its own language and is transcribed in it; lines are tagged 英 or 日 and only the English lines are translated (about twice the time of the Japanese setting)
 
 ## Requirements
 
@@ -157,6 +158,12 @@ The parts that do not depend on the UI (export, model catalog, WAV, hallucinatio
 swift test
 ```
 
+There is also a transcription diagnostic in the built app (no window opens). It prints the language found for each chunk, the stretches transcribed in one go, what the checks flagged and what was re-transcribed, each line's language, the time taken and the memory used. Without `--model` / `--vad` it uses the models downloaded in the app. `--from` / `--to` (seconds) cut out a part, `--languages ja` uses the Japanese setting, and `--report` writes the result as JSON.
+
+```bash
+build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper ~/Downloads/lecture.mp3 --languages ja,en --from 120 --to 240 --report ~/Desktop/kikimimi-report.json
+```
+
 There is also a diagnostic that exercises the LLM inside the built app (no window opens). It translates and audits sample lines with the downloaded LLM and prints the timings. With `--strict` it also checks that every translation is Japanese and that the mishearing (Roblocks → Roblox) gets fixed; add `--cpu` to stay off the GPU.
 
 ```bash
@@ -181,8 +188,15 @@ Sources/
       Grammar.swift      GBNF grammars that constrain the output
       LLMCatalog.swift   LLM list and how to pick the file to download
       TextAnalysis.swift Similarity, "is this Japanese?"
+    MixedLanguage/       日本語＋英語 (the whisper-independent parts)
+      SpeechMap.swift    Speech spans and the chunks whose language is detected
+      LanguagePlanner.swift  Deciding each chunk's language and the stretches transcribed in one go
+      SwitchSearch.swift Splitting mixed chunks and finding switches with no pause
+      DecodeCheck.swift  Checks on the transcribed text, vocabulary hint per language
+      MixedPipeline.swift  The whole flow (detect, transcribe, check and repair)
   KikimimiWhisper/       Thin layer over the whisper.cpp C API
-    WhisperContext.swift Inference, progress, per-segment callbacks, cancellation
+    WhisperContext.swift Inference, progress, per-segment callbacks, cancellation, VAD and language detection
+    MixedTranscription.swift  Connects whisper to the 日本語＋英語 flow
     ModelStore.swift     Model location, import, delete
     ModelDownloader.swift Download with progress (validated before it is moved into place)
     LLMModelStore.swift  LLM location and import, reading the Hugging Face file list, SHA-256 check
@@ -193,6 +207,7 @@ Sources/
     TranscriptionService.swift  Dedicated inference thread, model reuse
     LLMService.swift     Dedicated LLM thread, model reuse
     LLMSelfTest.swift    --selftest-llm (diagnostics and CI)
+    WhisperSelfTest.swift  --selftest-whisper (diagnostics and CI)
     AudioDecoder.swift   Audio/video to 16 kHz mono
     LiveRecorder.swift   Microphone recording
     PlayerController.swift  Playback and seeking
@@ -200,6 +215,7 @@ Sources/
 Resources/               Info.plist, icon
 Scripts/build-app.sh     Assembles the .app
 Scripts/make-tiny-gguf.py  Makes a tiny GGUF for smoke tests (CI)
+Tests/Fixtures/          A short English/Japanese recording (for --selftest-whisper in CI)
 ```
 
 ## Design notes
@@ -209,11 +225,14 @@ Scripts/make-tiny-gguf.py  Makes a tiny GGUF for smoke tests (CI)
 - **Long audio and runaway repetition**: Whisper works in 30-second windows. By default whisper.cpp feeds the text recognized in the previous window to the next one as context; `no_context` does not stop that (it only discards context from a previous call). Kikimimi sets `n_max_text_ctx = 0`, which matches OpenAI's `condition_on_previous_text=False`. A vocabulary hint is attached to every window with `carry_initial_prompt`, with `n_max_text_ctx` limited to the hint's token count + 1 so no previous text gets in. When a window does fall into repetition, the retry picks the best of 5 candidates even in beam search (`greedy.best_of = 5`, as whisper-cli does; the default would sample just one). The repetition threshold (`entropy_thold`) stays at the default 2.4: raising it made normal speech retry more often, slowed things down, and in our reproduction turned easy-to-collapse repeated lines over music into varied hallucinations. Anything left over is cleaned up afterwards.
 - **Why a local LLM for auditing and translation**: it is free, keeps the transcript on your Mac and works offline. llama.cpp is fast on Metal and ships an official prebuilt XCFramework. To keep a small model's output well-formed, it is constrained with a GBNF grammar down to the line numbers and the line count, and a line that grows too long is cut off (a guard against runaway repetition). Tokens are chosen greedily, so the same input always gives the same answer.
 - **whisper.cpp and llama.cpp side by side**: the two frameworks each embed a different version of ggml.h. Putting both C modules into one Swift compilation makes their type definitions clash, so each C module is used only inside its wrapper (`internal import`), and the wrappers and KikimimiCore are built with library evolution so the app target never imports them. The overlapping symbols were checked as well; the two libraries never call into each other.
+- **日本語＋英語 (Japanese + English)**: whisper transcribes 30 seconds at a time under one language token (`<|ja|>` and so on). VAD squeezes pauses to 0.1 s, so in a recording that switches between English and Japanese one 30-second window holds both. Hearing English under the Japanese token loops into 「彼は、彼は、…」, and the clean-up pass shortens that to the single broken Japanese line left inside the English (reproduced on English and Japanese read in turns, with a 25% error rate). Automatic detection does not help either: it decides once, on the first 30 seconds. With 日本語＋英語 the speech found by VAD is packed into chunks of 28 s or less, and whisper's language detection compares Japanese and English only for each chunk (without that restriction, short clips come out as Chinese or Korean). A chunk with an unsure result is split at its long pauses and detected again, and a switch with no pause is found by bisecting with 4 s and 2 s windows. Neighbouring chunks of the same language are joined (up to 10 minutes) and transcribed in that language with the same settings as the Japanese setting. The result gets cheap checks: repetition, low confidence, an amount of text that does not fit the speaking time, and speech with no text. A flagged region is detected again; if it is the other language, it is transcribed in that language and replaced only when the result is better (if it is the same language, the text stays: the checks never delete text). The thresholds were measured on English and Japanese read speech (FLEURS) and on a Japanese talk.
 - **Signing**: ad-hoc. To distribute the app, sign it with a Developer ID and notarize it.
 
 ## Known limitations
 
-- No speaker diarization.
+- No speaker diarization. 日本語＋英語 splits by the language being spoken, not by voice.
+- Even with 日本語＋英語, about 1.5 s around a switch with no pause can be lost, and insertions shorter than about 3 s (backchannels) may come out in the surrounding language or be dropped.
+- Automatic detection decides the language once, from the first 30 seconds, so use 日本語＋英語 for recordings that switch languages.
 - Translation goes one way only: into Japanese.
 - The recording preview covers only the last 12 seconds (the whole recording is transcribed again when you stop).
 
@@ -226,5 +245,9 @@ Downloaded at build time or at run time (not included in this repository):
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) v1.9.2 XCFramework (MIT): downloaded from GitHub at build time
 - Whisper models (MIT, OpenAI) converted for whisper.cpp: downloaded from [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) on first use
 - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT) converted for whisper.cpp: likewise ([ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad))
+
+Included in this repository for the tests:
+
+- `Tests/Fixtures/mixed-en-ja.wav`: English and Japanese read speech from [FLEURS](https://huggingface.co/datasets/google/fleurs) (Google, CC BY 4.0), joined. See [Tests/Fixtures/README.md](Tests/Fixtures/README.md)
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) b12211 XCFramework (MIT): downloaded from GitHub at build time
 - [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) GGUF: downloaded from Hugging Face when you use the auditor or translator (quantized by [unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) / [bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF))

@@ -16,14 +16,15 @@ final class TranscriptionService: @unchecked Sendable {
     func isReady(modelPath: String, vad: Bool) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        return context?.modelPath == modelPath && (vad || !contextHasVADMap)
+        return context?.modelPath == modelPath && context?.isUsable == true && (vad || !contextHasVADMap)
     }
 
     /// `queue` の上でだけ呼ぶ (読み込みは同時に 1 本)。数秒かかる読み込みの間はロックを持たない。
     /// - Parameter vad: これから VAD あり (true) / なし (false) で認識する。nil は時刻を使わない先読み。
     private func loadedContext(_ modelPath: String, vad: Bool?) throws -> WhisperContext {
         lock.lock()
-        if let context, context.modelPath == modelPath, !(vad == false && contextHasVADMap) {
+        // 使えなくなったコンテキスト (whisper.cpp が内部の状態を解放した) は読み込み直す
+        if let context, context.modelPath == modelPath, context.isUsable, !(vad == false && contextHasVADMap) {
             if vad == true { contextHasVADMap = true }
             lock.unlock()
             return context

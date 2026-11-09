@@ -11,15 +11,18 @@ public struct TranscriptSegment: Codable, Hashable, Identifiable, Sendable {
     /// 1 つの文が何区間かに分かれているとき、この区間の訳に一緒に含めた後ろの区間の ID。
     /// 文の途中で区間を区切って訳すと、日本語の語順のせいで訳が隣の区間にずれるので、文ごとに訳す
     public var translationCovers: [UUID]?
+    /// この区間で話されている言語 (「日本語＋英語」で文字にしたときだけ入る。ほかは文字起こし全体の言語を使う)
+    public var language: String?
 
     public init(id: UUID = UUID(), start: TimeInterval, end: TimeInterval, text: String, translation: String? = nil,
-                translationCovers: [UUID]? = nil) {
+                translationCovers: [UUID]? = nil, language: String? = nil) {
         self.id = id
         self.start = start
         self.end = max(start, end)
         self.text = text
         self.translation = translation
         self.translationCovers = translationCovers
+        self.language = language
     }
 
     public var duration: TimeInterval { end - start }
@@ -29,7 +32,7 @@ public struct TranscriptSegment: Codable, Hashable, Identifiable, Sendable {
 public struct Transcript: Codable, Hashable, Sendable {
     public var sourceName: String
     public var segments: [TranscriptSegment]
-    /// 言語コード (ja, en など)。自動判定の結果が入る。
+    /// 言語コード (ja, en など)。自動判定の結果が入る。「日本語＋英語」では、いちばん長く話されていた言語
     public var language: String?
     public var model: String?
     public var duration: TimeInterval
@@ -71,6 +74,37 @@ public struct Transcript: Codable, Hashable, Sendable {
         duration > 0 && elapsed > 0 ? elapsed / duration : nil
     }
 
+    /// 区間ごとの言語 (「日本語＋英語」で文字にしたもの) を、話された時間の長い順に並べたもの。区間に言語が無ければ空
+    public var spokenLanguages: [String] {
+        var seconds: [String: TimeInterval] = [:]
+        var order: [String] = []
+        for s in segments {
+            guard let code = s.language else { continue }
+            if seconds[code] == nil { order.append(code) }
+            seconds[code, default: 0] += s.duration
+        }
+        // 同じ長さなら先に出てきた言語を前に (並びを毎回同じにする)
+        return order.enumerated()
+            .sorted { a, b in
+                let ta = seconds[a.element] ?? 0, tb = seconds[b.element] ?? 0
+                return ta != tb ? ta > tb : a.offset < b.offset
+            }
+            .map(\.element)
+    }
+
+    /// 画面や書き出しに出す言語の名前。2 つ以上の言語なら「英語＋日本語」のようにつなぐ
+    public var languageLabel: String? {
+        let spoken = spokenLanguages
+        if spoken.count >= 2 { return spoken.map { Languages.name(for: $0) }.joined(separator: "＋") }
+        guard let code = language ?? spoken.first, !code.isEmpty else { return nil }
+        return Languages.name(for: code)
+    }
+
+    /// 区間の言語 (区間に無ければ文字起こし全体の言語)
+    public func language(of segment: TranscriptSegment) -> String? {
+        segment.language ?? language
+    }
+
     /// 翻訳の状況 (画面の表示に使う。区間を 1 回だけ見て数える)
     public struct TranslationStats: Equatable, Sendable {
         /// 日本語訳が 1 つでもある
@@ -95,7 +129,7 @@ public struct Transcript: Codable, Hashable, Sendable {
             if s.translation != nil { stats.hasTranslation = true }
             guard Script.hasLetters(s.text) else { continue }
             lettered += 1
-            guard Script.needsTranslation(s.text, transcriptLanguage: language) else { continue }
+            guard Script.needsTranslation(s.text, transcriptLanguage: language(of: s)) else { continue }
             stats.translatable += 1
             if s.translation == nil && !covered.contains(s.id) { stats.untranslated += 1 }
         }
@@ -120,7 +154,7 @@ public struct Transcript: Codable, Hashable, Sendable {
     /// 右の列 (日本語) に出す文: 訳があれば訳、訳す必要のない区間は原文のまま (文の続きの区間は nil)
     public func japaneseText(of segment: TranscriptSegment) -> String? {
         if let t = segment.translation { return t }
-        return Script.needsTranslation(segment.text, transcriptLanguage: language) ? nil : segment.text
+        return Script.needsTranslation(segment.text, transcriptLanguage: language(of: segment)) ? nil : segment.text
     }
 
     /// 対訳の 1 行 (1 つの訳と、それに当たる区間)。ふつうは 1 区間、文が分かれていれば数区間
@@ -132,6 +166,8 @@ public struct Transcript: Codable, Hashable, Sendable {
         public var isOriginalJapanese: Bool
 
         public var id: UUID { segments[0].id }
+        /// 原文の言語 (「日本語＋英語」で文字にしたときだけ入る。先頭の区間の言語)
+        public var language: String? { segments[0].language }
         public var start: TimeInterval { segments[0].start }
         public var end: TimeInterval { segments[segments.count - 1].end }
         /// 原文 (区間をつないだもの)
@@ -153,7 +189,7 @@ public struct Transcript: Codable, Hashable, Sendable {
                     i += 1
                 }
             }
-            let needs = Script.needsTranslation(head.text, transcriptLanguage: language)
+            let needs = Script.needsTranslation(head.text, transcriptLanguage: language(of: head))
             units.append(BilingualUnit(segments: members,
                                        japanese: head.translation ?? (needs ? nil : head.text),
                                        isOriginalJapanese: head.translation == nil && !needs))

@@ -116,6 +116,47 @@ public enum Script {
         hasLetters(text) && !isJapanese(text, transcriptLanguage: transcriptLanguage)
     }
 
+    /// かなを含むか
+    public static func hasKana(_ text: String) -> Bool {
+        text.unicodeScalars.contains { isKana($0.value) }
+    }
+
+    private static func isBasicLatin(_ v: UInt32) -> Bool {
+        (0x41...0x5A).contains(v) || (0x61...0x7A).contains(v)
+    }
+
+    /// 文の文字から、candidates のうちどの言語で話されたものかを決める (「日本語＋英語」の区間の言語)。
+    /// かなを含めば日本語、漢字だけ (英字なし) なら日本語、英字だけ (かな・漢字なし) なら英語。
+    /// 文字が無い・英字と漢字が混ざるなど、文字から決められなければ fallback (文字にしたときに指定した言語)。
+    /// large-v3 系は、英語の音声を日本語の指定で文字にしても英語の文を返すことがあるので、指定した言語より文字を信じる
+    public static func spokenLanguage(of text: String, among candidates: [String], fallback: String) -> String {
+        var han = 0, latin = 0
+        for scalar in text.unicodeScalars {
+            let v = scalar.value
+            if isKana(v) {
+                return candidates.contains("ja") ? "ja" : fallback
+            } else if isHan(v) {
+                han += 1
+            } else if isBasicLatin(v) {
+                latin += 1
+            }
+        }
+        if han > 0 && latin == 0 { return candidates.contains("ja") ? "ja" : fallback }
+        if latin > 0 && han == 0 { return candidates.contains("en") ? "en" : fallback }
+        return fallback
+    }
+
+    /// プロンプトに書く、いくつかの言語の名前 (英語)。例: ["en", "ja"] → "English and Japanese"
+    public static func englishNames(_ codes: [String]) -> String {
+        let names = codes.map { $0.lowercased() == "ja" ? "Japanese" : englishName(for: $0) }
+        switch names.count {
+        case 0: return englishName(for: nil)
+        case 1: return names[0]
+        case 2: return "\(names[0]) and \(names[1])"
+        default: return names.dropLast().joined(separator: ", ") + ", and " + names[names.count - 1]
+        }
+    }
+
     /// プロンプトに書く言語名 (英語)
     public static func englishName(for code: String?) -> String {
         switch code?.lowercased() {

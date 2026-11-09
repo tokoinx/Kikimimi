@@ -1,0 +1,26 @@
+{
+  "intervals": [
+    {
+      "start": 0.3,
+      "end": 15.36,
+      "language": "en"
+    },
+    {
+      "start": 16.06,
+      "end": 26.07,
+      "language": "ja"
+    },
+    {
+      "start": 26.77,
+      "end": 36.02,
+      "language": "en"
+    },
+    {
+      "start": 36.02,
+      "end": 47.49,
+      "language": "ja"
+    }
+  ],
+  "maxSegmentSeconds": 30,
+  "margin": 1.5
+}

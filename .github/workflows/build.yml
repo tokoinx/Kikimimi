@@ -83,6 +83,37 @@ jobs:
         continue-on-error: true
         run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm build/tiny.gguf
 
+      # 「日本語＋英語」: 英語と日本語が入れ替わる 47 秒の録音 (FLEURS の朗読) を、いちばん小さな whisper のモデル (tiny) で
+      # 文字にし、区間ごとの言語が合っているか (間を空けずに入れ替わるところも) を確かめる。1 つの言語の設定でも動かす
+      - name: Fetch the whisper test models
+        run: |
+          mkdir -p build/whisper-models
+          for attempt in 1 2 3 4; do
+            if curl -fsSL -o build/whisper-models/ggml-tiny.bin \
+                 https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin \
+               && curl -fsSL -o build/whisper-models/ggml-silero-v6.2.0.bin \
+                 https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin; then
+              break
+            fi
+            echo "::warning::fetching the whisper test models failed (attempt $attempt); retrying"
+            sleep $((attempt * 15))
+          done
+          cd build/whisper-models
+          echo "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21  ggml-tiny.bin" | shasum -a 256 -c
+          echo "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987  ggml-silero-v6.2.0.bin" | shasum -a 256 -c
+
+      - name: Whisper self-test (日本語＋英語, CPU)
+        run: >-
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper Tests/Fixtures/mixed-en-ja.wav
+          --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin
+          --languages ja,en --cpu --expect Tests/Fixtures/mixed-en-ja.expect.json --report build/selftest-whisper.json
+
+      - name: Whisper self-test (日本語, CPU)
+        run: >-
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper Tests/Fixtures/mixed-en-ja.wav
+          --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin
+          --languages ja --cpu
+
       - name: Zip the app
         run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-xcode${{ matrix.xcode }}.zip"
 

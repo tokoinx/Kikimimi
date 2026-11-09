@@ -27,9 +27,17 @@ struct TranscriptionSettingsForm: View {
         @Bindable var model = model
         Form {
             Section("文字起こし") {
-                Picker("言語", selection: $model.languageCode) {
-                    ForEach(Languages.all) { language in
-                        Text(language.name).tag(language.code)
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker("言語", selection: $model.languageCode) {
+                        ForEach(Languages.all) { language in
+                            Text(language.name).tag(language.code)
+                        }
+                    }
+                    if model.languageCode == Languages.japaneseEnglish.code {
+                        Text("日本語と英語が入れ替わる録音向けです。区切りごとに、話している言語を日本語か英語かで判定して、その言語で文字にします。判定のぶん、「日本語」の設定のおよそ 2 倍の時間がかかります。どちらか一方だけの録音には、その言語を選んでください。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Picker("モデル", selection: $model.modelID) {

@@ -1,0 +1,356 @@
+import Foundation
+
+/// 「日本語＋英語」の文字起こしで使う、音声認識の部品 (whisper.cpp)。テストでは台本どおりに答える偽物を使う
+public protocol MixedEngine: AnyObject {
+    /// 音声全体の発話の区間 (VAD)。VAD を使わない設定なら nil。VAD を使う設定で動かなければ、エラーを投げる
+    func speechMap(of samples: [Float]) throws -> SpeechMap?
+    /// range の言語を判定する。candidates と同じ順の確率 (判定できなければ nil)
+    func detectLanguage(_ samples: [Float], range: Range<Int>, candidates: [String]) throws -> [Float]?
+    /// range を language で文字にする。時刻は音声全体の秒。
+    /// onProgress は 0...1 (この範囲の中の進み具合)、onSegment は文字にできた区間を順に受け取る
+    func decode(_ samples: [Float], range: Range<Int>, language: String, hint: String?, useVAD: Bool,
+                onProgress: (Double) -> Void, onSegment: (DecodedSegment) -> Void) throws -> [DecodedSegment]
+}
+
+public enum MixedPipelineError: Error, Equatable {
+    case cancelled
+}
+
+/// 診断用の記録 (`--selftest-whisper` が出す)。数値は秒
+public struct MixedReport: Codable, Hashable, Sendable {
+    public struct Run: Codable, Hashable, Sendable {
+        public var start: Double
+        public var end: Double
+        public var language: String
+        public var speech: Double
+        public var segments: Int
+        public var seconds: Double
+    }
+
+    public struct Flagged: Codable, Hashable, Sendable {
+        public var start: Double
+        public var end: Double
+        public var flags: [String]
+        public var text: String
+    }
+
+    public struct Repair: Codable, Hashable, Sendable {
+        public var start: Double
+        public var end: Double
+        public var runLanguage: String
+        public var detected: String?
+        public var confidence: Double?
+        /// 文字にし直した部分と、その言語
+        public var decodedAs: [String]
+        public var accepted: Bool
+        public var before: String
+        public var after: String
+    }
+
+    public var usedVAD = false
+    public var candidates: [String] = []
+    public var audioSeconds = 0.0
+    public var speechSeconds = 0.0
+    public var vadSeconds = 0.0
+    public var chunks: [LanguagePlanner.Decision] = []
+    public var switches: [SwitchSearch.Found] = []
+    public var runs: [Run] = []
+    public var flagged: [Flagged] = []
+    public var repairs: [Repair] = []
+    /// 判定の回数 (区切りごと・分けて判定し直した分・直しの分)
+    public var detections = 0
+    public var refinementDetections = 0
+    public var repairDetections = 0
+    /// whisper で文字にした回数 (範囲ごと・直しの分)
+    public var decodes = 0
+    public var repairDecodes = 0
+    /// 区間の言語ごとの秒数
+    public var languageSeconds: [String: Double] = [:]
+
+    public init() {}
+}
+
+/// 「日本語＋英語」の文字起こし: VAD → 区切り → 区切りごとの言語判定 (混ざっていれば切り替わりを探す) →
+/// 同じ言語の区切りをつないで、その言語で文字にする → 安い点検で引っかかったところを、別の言語なら文字にし直す。
+///
+/// 言語は candidates (["ja", "en"]) の中からだけ選ぶ (候補を絞らない判定は、短い音声で中国語・韓国語などを作り出す)。
+public enum MixedPipeline {
+    private typealias R = MixedLanguageRules
+
+    public struct Options: Sendable {
+        public var candidates: [String]
+        /// 語彙のヒント (言語ごとに `GlossaryHint` で合わせて渡す)
+        public var glossary: String?
+        public var filterHallucinations: Bool
+        /// 必ず切る位置 (話者の切り替わり。サンプル番号)
+        public var forcedCuts: [Int]
+
+        public init(candidates: [String], glossary: String? = nil, filterHallucinations: Bool = true, forcedCuts: [Int] = []) {
+            self.candidates = candidates
+            self.glossary = glossary
+            self.filterHallucinations = filterHallucinations
+            self.forcedCuts = forcedCuts
+        }
+    }
+
+    public struct Output: Sendable {
+        public var segments: [TranscriptSegment]
+        /// いちばん長く話されていた言語 (区間が無ければ nil)
+        public var language: String?
+        public var report: MixedReport
+    }
+
+    public static func run<Engine: MixedEngine>(samples: [Float], engine: Engine, options: Options,
+                                                 onProgress: (Double) -> Void = { _ in },
+                                                 onSegment: (TranscriptSegment) -> Void = { _ in },
+                                                 shouldCancel: () -> Bool = { false }) throws -> Output {
+        let candidates = options.candidates.isEmpty ? ["ja"] : options.candidates
+        var report = MixedReport()
+        report.candidates = candidates
+        report.audioSeconds = R.seconds(samples.count)
+        guard !samples.isEmpty else { return Output(segments: [], language: nil, report: report) }
+
+        var reported = 0.0
+        func progress(_ value: Double) {
+            let v = min(1, max(reported, value))
+            if v > reported {
+                reported = v
+                onProgress(v)
+            }
+        }
+        func checkCancel() throws {
+            if shouldCancel() { throw MixedPipelineError.cancelled }
+        }
+
+        // 1. VAD
+        let vadStarted = Date()
+        let vadMap = try engine.speechMap(of: samples)
+        report.vadSeconds = Date().timeIntervalSince(vadStarted)
+        let useVAD = vadMap != nil
+        let map = vadMap ?? SpeechMap.withoutVAD(samples)
+        report.usedVAD = useVAD
+        try checkCancel()
+        progress(R.progressAfterVAD)
+
+        // 2. 区切り
+        let chunks = useVAD ? SpeechChunker.chunks(map, forcedCuts: options.forcedCuts) : SpeechChunker.fixedChunks(map)
+        let totalSpeech = max(1, chunks.reduce(0) { $0 + $1.speechSamples })
+        report.speechSeconds = R.seconds(chunks.reduce(0) { $0 + $1.speechSamples })
+        var detectedSpeech = 0
+        var decodedSpeech = 0
+        func reportWork() {
+            let work = (R.progressDetectShare * Double(detectedSpeech) + R.progressDecodeShare * Double(decodedSpeech))
+                / Double(totalSpeech)
+            progress(R.progressAfterVAD + (1 - R.progressAfterVAD - R.progressRepairShare) * min(1, work))
+        }
+
+        func detect(_ range: Range<Int>) throws -> LanguageGuess? {
+            try checkCancel()
+            guard let probs = try engine.detectLanguage(samples, range: range, candidates: candidates) else { return nil }
+            return LanguageGuess(probabilities: probs, candidates: candidates)
+        }
+
+        // 画面への途中表示は、今の「日本語」と同じふるいを通す
+        var stream = RepetitionFilter.Streaming()
+        func live(_ raw: DecodedSegment) {
+            guard let segment = transcriptSegment(raw, candidates: candidates, filter: options.filterHallucinations) else { return }
+            if options.filterHallucinations, !stream.accept(segment) { return }
+            onSegment(segment)
+        }
+
+        var decoded: [(run: DecodeRun, segments: [DecodedSegment])] = []
+        func decodeRun(_ run: DecodeRun) throws {
+            try checkCancel()
+            let started = Date()
+            let base = decodedSpeech
+            let segments = try engine.decode(samples, range: run.range, language: run.language,
+                                             hint: GlossaryHint.hint(options.glossary, for: run.language), useVAD: useVAD,
+                                             onProgress: { p in
+                                                 decodedSpeech = base + Int(Double(run.speechSamples) * min(1, max(0, p)))
+                                                 reportWork()
+                                             },
+                                             onSegment: live)
+            try checkCancel()
+            decodedSpeech = base + run.speechSamples
+            reportWork()
+            report.decodes += 1
+            report.runs.append(MixedReport.Run(start: R.seconds(run.range.lowerBound), end: R.seconds(run.range.upperBound),
+                                               language: run.language, speech: R.seconds(run.speechSamples),
+                                               segments: segments.count, seconds: Date().timeIntervalSince(started)))
+            decoded.append((run, segments))
+        }
+
+        // 3. 区切りごとに判定し、言語が決まった範囲から文字にする
+        var planner = LanguagePlanner(candidates: candidates, totalSamples: samples.count)
+        var extraDetections = 0
+        for (index, chunk) in chunks.enumerated() {
+            var guess: LanguageGuess? = nil
+            if chunk.speechSeconds >= R.minDetectSpeechSeconds {
+                guess = try detect(chunk.range)
+                report.detections += 1
+            }
+            var parts = [SwitchSearch.Part(chunk: chunk, guess: guess)]
+            var refined = false
+            if SwitchSearch.needsRefinement(guess, speechSeconds: chunk.speechSeconds) {
+                let budget = R.refineBudgetPerChunk * Double(index + 1) + R.refineBudgetBase
+                if Double(extraDetections) < budget || (guess?.confidence ?? 0) < R.overBudgetRefineBelow {
+                    let outcome = try SwitchSearch.refine(chunk, guess: guess, map: map, detect: detect)
+                    extraDetections += outcome.detections
+                    report.refinementDetections += outcome.detections
+                    report.switches += outcome.switches
+                    parts = outcome.parts
+                    refined = true
+                }
+            }
+            detectedSpeech += chunk.speechSamples
+            reportWork()
+            for part in parts {
+                for run in planner.add(part.chunk, guess: part.guess, majority: refined) { try decodeRun(run) }
+            }
+        }
+        for run in planner.finish() { try decodeRun(run) }
+        report.chunks = planner.decisions
+
+        // 4. 点検と直し
+        let check = DecodeCheck(speech: useVAD ? map : nil, segments: decoded.flatMap(\.segments))
+        let repairLimit = max(Int(Double(map.totalSpeechSamples) * R.repairSpeechShare), R.samples(R.repairMinimumSeconds))
+        var repairedSpeech = 0
+        var finals: [DecodedSegment] = []
+        let regions = decoded.map { repairRegions(run: $0.run, segments: $0.segments, check: check, report: &report) }
+        let totalRegions = max(1, regions.reduce(0) { $0 + $1.count })
+        var doneRegions = 0
+        for ((run, segments), runRegions) in zip(decoded, regions) {
+            var result = segments
+            for region in runRegions {
+                try checkCancel()
+                doneRegions += 1
+                let speech = map.speechSamples(in: region)
+                guard repairedSpeech + speech <= repairLimit else { continue }
+                repairedSpeech += speech
+                if let repaired = try repair(region, run: run, current: result, map: map, check: check,
+                                             detect: detect, engine: engine, samples: samples, options: options,
+                                             useVAD: useVAD, report: &report) {
+                    result = repaired
+                }
+                progress(1 - R.progressRepairShare + R.progressRepairShare * 0.9 * Double(doneRegions) / Double(totalRegions))
+            }
+            finals += result
+        }
+        progress(1 - R.progressRepairShare * 0.1)
+
+        // 5. 仕上げ (今の「日本語」と同じフィルタ)
+        finals.sort { $0.start != $1.start ? $0.start < $1.start : $0.end < $1.end }
+        var out = finals.compactMap { transcriptSegment($0, candidates: candidates, filter: options.filterHallucinations) }
+        if options.filterHallucinations { out = RepetitionFilter.clean(out) }
+        var seconds: [String: Double] = [:]
+        for s in out { seconds[s.language ?? candidates[0], default: 0] += s.duration }
+        report.languageSeconds = seconds
+        // 同じ長さなら候補の順 (先頭の言語) を優先する
+        let rank = { (code: String) in candidates.firstIndex(of: code) ?? candidates.count }
+        let dominant = seconds.max { a, b in a.value != b.value ? a.value < b.value : rank(a.key) > rank(b.key) }?.key
+        return Output(segments: out, language: dominant, report: report)
+    }
+
+    /// whisper の区間を、文字起こしの区間にする (1 区間の中の繰り返しをまとめ、定番の誤認識を除き、文字から言語を決める)
+    static func transcriptSegment(_ raw: DecodedSegment, candidates: [String], filter: Bool) -> TranscriptSegment? {
+        var text = raw.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if filter { text = RepetitionFilter.collapseInlineRepeats(text) }
+        if text.isEmpty || (filter && HallucinationFilter.shouldDrop(text: text, noSpeechProbability: raw.noSpeechProbability)) {
+            return nil
+        }
+        return TranscriptSegment(start: raw.start, end: raw.end, text: text,
+                                 language: Script.spokenLanguage(of: text, among: candidates, fallback: raw.language))
+    }
+
+    /// 直す範囲: 点検で引っかかった区間 (間が 1 秒未満ならまとめる) と、抜けているところ。前後を少し広げ、範囲の中に収める
+    private static func repairRegions(run: DecodeRun, segments: [DecodedSegment], check: DecodeCheck,
+                                      report: inout MixedReport) -> [Range<Int>] {
+        let pad = R.samples(R.repairPadSeconds)
+        var regions: [Range<Int>] = []
+        var current: Range<Int>? = nil
+        let mergeGap = R.samples(R.repairMergeGapSeconds)
+        for s in segments {
+            let flags = check.flags(s)
+            guard !flags.isEmpty else { continue }
+            report.flagged.append(MixedReport.Flagged(start: s.start, end: s.end, flags: flags.map(\.rawValue).sorted(),
+                                                      text: String(s.text.prefix(120))))
+            let r = R.samples(s.start)..<max(R.samples(s.start) + 1, R.samples(s.end))
+            if let c = current, r.lowerBound - c.upperBound < mergeGap {
+                current = c.lowerBound..<max(c.upperBound, r.upperBound)
+            } else {
+                if let c = current { regions.append(c) }
+                current = r
+            }
+        }
+        if let c = current { regions.append(c) }
+        for gap in check.uncovered(in: run.range, segments: segments) {
+            report.flagged.append(MixedReport.Flagged(start: R.seconds(gap.lowerBound), end: R.seconds(gap.upperBound),
+                                                      flags: [DecodeFlag.uncovered.rawValue], text: ""))
+            regions.append(gap)
+        }
+        // 広げて範囲の中に収め、重なりをまとめる
+        let padded = regions.map { r in
+            max(run.range.lowerBound, r.lowerBound - pad)..<min(run.range.upperBound, r.upperBound + pad)
+        }.filter { !$0.isEmpty }.sorted { $0.lowerBound < $1.lowerBound }
+        var merged: [Range<Int>] = []
+        for r in padded {
+            if let last = merged.last, r.lowerBound <= last.upperBound {
+                merged[merged.count - 1] = last.lowerBound..<max(last.upperBound, r.upperBound)
+            } else {
+                merged.append(r)
+            }
+        }
+        return merged
+    }
+
+    /// 1 か所を直す: 判定し直して別の言語なら、その言語で文字にし直し、良くなったときだけ入れ替える
+    private static func repair<Engine: MixedEngine>(_ region: Range<Int>, run: DecodeRun, current: [DecodedSegment],
+                                                    map: SpeechMap, check: DecodeCheck,
+                                                    detect: (Range<Int>) throws -> LanguageGuess?,
+                                                    engine: Engine, samples: [Float], options: Options, useVAD: Bool,
+                                                    report: inout MixedReport) throws -> [DecodedSegment]? {
+        let inRegion: (DecodedSegment) -> Bool = { s in
+            let mid = R.samples((s.start + s.end) / 2)
+            return region.contains(mid)
+        }
+        let old = current.filter(inRegion)
+        var entry = MixedReport.Repair(start: R.seconds(region.lowerBound), end: R.seconds(region.upperBound),
+                                       runLanguage: run.language, detected: nil, confidence: nil, decodedAs: [],
+                                       accepted: false, before: Transcript.join(old.map(\.text)), after: "")
+        defer { report.repairs.append(entry) }
+
+        let guess = try detect(region)
+        report.repairDetections += 1
+        entry.detected = guess?.language
+        entry.confidence = guess?.confidence
+        guard let guess else { return nil }
+
+        // 言語ごとに文字にし直す部分
+        var plan: [(range: Range<Int>, language: String)] = []
+        if region.count >= R.samples(R.bisectMinSeconds), guess.confidence < R.bisectBelow {
+            let b = try SwitchSearch.bisect(region, map: map, detect: detect)
+            report.repairDetections += b.detections
+            if let cut = b.cut, let head = b.head, let tail = b.tail {
+                plan = [(region.lowerBound..<cut, head.language), (cut..<region.upperBound, tail.language)]
+            }
+        }
+        if plan.isEmpty, guess.language != run.language, guess.confidence >= R.repairConfidence {
+            plan = [(region, guess.language)]
+        }
+        // 判定も同じ言語なら、言語の取り違えではない (音楽・雑音・本当の繰り返し): 元のまま
+        guard plan.contains(where: { $0.language != run.language }) else { return nil }
+
+        var fresh: [DecodedSegment] = []
+        for part in plan where !part.range.isEmpty {
+            fresh += try engine.decode(samples, range: part.range, language: part.language,
+                                       hint: GlossaryHint.hint(options.glossary, for: part.language), useVAD: useVAD,
+                                       onProgress: { _ in }, onSegment: { _ in })
+            report.repairDecodes += 1
+            entry.decodedAs.append(part.language)
+        }
+        entry.after = Transcript.join(fresh.map(\.text))
+        guard check.isBetter(fresh, than: old, in: region) else { return nil }
+        entry.accepted = true
+        return current.filter { !inRegion($0) } + fresh
+    }
+}

@@ -75,15 +75,20 @@ public enum Exporter {
         var original: String
         /// 日本語 (訳、またはもともと日本語の原文)。まだ訳がなければ nil
         var japanese: String?
+        /// 原文の言語 (「日本語＋英語」で文字にしたときだけ)
+        var language: String? = nil
     }
 
     static func rows(_ t: Transcript, _ content: ExportContent) -> [Row] {
         switch content {
         case .original:
-            return t.segments.map { Row(start: $0.start, end: $0.end, original: clean($0.text), japanese: nil) }
+            return t.segments.map {
+                Row(start: $0.start, end: $0.end, original: clean($0.text), japanese: nil, language: $0.language)
+            }
         case .japanese, .bilingual:
             return t.bilingualUnits().map {
-                Row(start: $0.start, end: $0.end, original: clean($0.text), japanese: $0.japanese.map(clean))
+                Row(start: $0.start, end: $0.end, original: clean($0.text), japanese: $0.japanese.map(clean),
+                    language: $0.language)
             }
         }
     }
@@ -131,7 +136,7 @@ public enum Exporter {
     public static func markdown(_ t: Transcript, content: ExportContent = .original) -> String {
         var out = ["# \(t.sourceName)", ""]
         var meta: [String] = []
-        if let l = t.language { meta.append("言語: \(Languages.name(for: l))") }
+        if let l = t.languageLabel { meta.append("言語: \(l)") }
         if t.duration > 0 { meta.append("長さ: \(TimeFormat.short(t.duration))") }
         if let m = t.model { meta.append("モデル: \(m)") }
         if content != .original, let m = t.translationModel { meta.append("翻訳: \(m)") }
@@ -153,15 +158,21 @@ public enum Exporter {
 
     public static func csv(_ t: Transcript, content: ExportContent = .original) -> String {
         func q(_ s: String) -> String { "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }
+        // 2 つ以上の言語が混ざるとき (「日本語＋英語」) だけ、最後に原文の言語の列を足す (ほかはこれまでと同じ形)
+        let mixed = t.spokenLanguages.count >= 2
+        let languageHeader = mixed ? ",language" : ""
+        func language(_ row: Row) -> String { mixed ? "," + (row.language ?? "") : "" }
         switch content {
         case .original, .japanese:
-            var out = ["start,end,text"]
-            out += rows(t, content).map { String(format: "%.3f,%.3f,", $0.start, $0.end) + q(lines($0, content)[0]) }
+            var out = ["start,end,text" + languageHeader]
+            out += rows(t, content).map {
+                String(format: "%.3f,%.3f,", $0.start, $0.end) + q(lines($0, content)[0]) + language($0)
+            }
             return out.joined(separator: "\n") + "\n"
         case .bilingual:
-            var out = ["start,end,text,japanese"]
+            var out = ["start,end,text,japanese" + languageHeader]
             out += rows(t, content).map {
-                String(format: "%.3f,%.3f,", $0.start, $0.end) + q($0.original) + "," + q($0.japanese ?? "")
+                String(format: "%.3f,%.3f,", $0.start, $0.end) + q($0.original) + "," + q($0.japanese ?? "") + language($0)
             }
             return out.joined(separator: "\n") + "\n"
         }

@@ -18,6 +18,7 @@ Swift / SwiftUI で書いたネイティブ Mac アプリです。音声認識�
 - **英語 → 日本語の翻訳**: 左に原文、右に日本語訳を並べて表示します (中国語・韓国語なども日本語に訳せます)
 - 書き出し: txt / srt / vtt / Markdown / csv / json (原文・日本語訳・対訳)
 - 言語: 日本語・英語・中国語・韓国語など (自動判定も可)
+- **日本語＋英語**: 英語の講師と日本語の通訳のように、日本語と英語が入れ替わる録音向けの設定です。区切りごとに話している言語を判定し、その言語で文字にします。行には「英」「日」の印が付き、英語の行だけを訳します (時間は「日本語」のおよそ 2 倍)
 
 ## 必要なもの
 
@@ -157,6 +158,12 @@ make install
 swift test
 ```
 
+組み立てたアプリで文字起こしを動かす診断もあります (画面は出ません)。区切りごとの言語の判定・文字にした範囲・点検で引っかかったところと直し・区間ごとの言語・かかった時間・使ったメモリを表示します。モデルと VAD は、指定が無ければアプリで取得したものを使います。`--from` / `--to` (秒) で一部だけ、`--languages ja` で「日本語」の設定、`--report` で結果を JSON に書き出します。
+
+```bash
+build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper ~/Downloads/lecture.mp3 --languages ja,en --from 120 --to 240 --report ~/Desktop/kikimimi-report.json
+```
+
 組み立てたアプリで LLM をひと通り動かす診断もあります (画面は出ません)。取得した LLM で例文を訳し、監査し、かかった時間を表示します。`--strict` を付けると、訳がすべて日本語か・聞き間違い (Roblocks → Roblox) を直せたかまで確かめます。`--cpu` で GPU を使わずに動かします。
 
 ```bash
@@ -181,8 +188,15 @@ Sources/
       Grammar.swift      出力の形を縛る GBNF 文法
       LLMCatalog.swift   LLM の一覧と、配布元から取るファイルの選び方
       TextAnalysis.swift 似ている度合い、日本語かどうか
+    MixedLanguage/       「日本語＋英語」(whisper に依存しない部分)
+      SpeechMap.swift    発話の区間と、言語を判定する区切り
+      LanguagePlanner.swift  区切りの言語の決め方と、まとめて文字にする範囲
+      SwitchSearch.swift 言語の混ざった区切りの分け方と、間の無い切り替わりの探し方
+      DecodeCheck.swift  文字にした結果の点検、言語ごとの語彙のヒント
+      MixedPipeline.swift  全体の流れ (判定 → 文字起こし → 点検と直し)
   KikimimiWhisper/       whisper.cpp の C API を包む層
-    WhisperContext.swift 推論・進捗・区間ごとの通知・中止
+    WhisperContext.swift 推論・進捗・区間ごとの通知・中止、VAD・言語判定
+    MixedTranscription.swift  「日本語＋英語」の流れに whisper をつなぐ
     ModelStore.swift     モデルの保存場所・取り込み・削除
     ModelDownloader.swift 進捗つきダウンロード (検証してから配置)
     LLMModelStore.swift  LLM の保存場所・取り込み、配布元の一覧の読み取り、SHA-256 の確認
@@ -193,6 +207,7 @@ Sources/
     TranscriptionService.swift  推論専用スレッド、モデルの使い回し
     LLMService.swift     LLM 専用スレッド、モデルの使い回し
     LLMSelfTest.swift    --selftest-llm (診断・CI 用)
+    WhisperSelfTest.swift  --selftest-whisper (診断・CI 用)
     AudioDecoder.swift   音声/動画 → 16 kHz モノラル
     LiveRecorder.swift   マイク録音
     PlayerController.swift  再生・シーク
@@ -200,6 +215,7 @@ Sources/
 Resources/               Info.plist、アイコン
 Scripts/build-app.sh     .app の組み立て
 Scripts/make-tiny-gguf.py  動作確認用の小さな GGUF を作る (CI 用)
+Tests/Fixtures/          英日交互の短い録音 (CI の --selftest-whisper 用)
 ```
 
 ## 設計メモ
@@ -209,11 +225,14 @@ Scripts/make-tiny-gguf.py  動作確認用の小さな GGUF を作る (CI 用)
 - **長い音声と繰り返しの暴走**: Whisper は 30 秒ずつ処理します。whisper.cpp の既定では、直前の区間で認識した文章を次の区間の手がかりとして渡します。`no_context` はこれを止めません (前回の呼び出しの文脈を捨てるだけです)。そこで `n_max_text_ctx = 0` にして区間どうしの引き継ぎを止め、OpenAI 版の `condition_on_previous_text=False` と同じ動きにしています。語彙のヒントは `carry_initial_prompt` で毎区間に付け、`n_max_text_ctx` を「ヒントのトークン数 + 1」に絞って、前の区間の文章が入らないようにしています。区間内で繰り返しになったときの言い直しは、ビームサーチでも 5 候補から選びます (`greedy.best_of = 5`、whisper-cli と同じ。既定のままだと 1 候補だけの抽選になります)。繰り返しとみなす基準 (`entropy_thold`) は既定の 2.4 のままです。上げると普通の発話でも言い直しが増えて遅くなり、音楽部分のでたらめな文もかえって片付けにくくなることを、再現実験で確かめました。それでも残った分は後始末で片付けます。
 - **監査と翻訳にローカル LLM を選んだ理由**: 無料で、音声の内容を外へ出さずに済み、オフラインでも動くからです。llama.cpp は Metal で速く、ビルド済みの公式 XCFramework があります。小さなモデルでも形が崩れないよう、出力は GBNF 文法で「番号・行数」まで縛り、1 行が長すぎたら打ち切ります (同じ語を延々と出す暴走の歯止め)。答えは貪欲法で決めるので、同じ入力には同じ答えを返します。
 - **whisper.cpp と llama.cpp の同居**: 2 つのフレームワークは、版の違う ggml.h をそれぞれ持っています。Swift で両方の C モジュールを 1 つのコンパイルに入れると型の定義がぶつかるので、C モジュールは各ラッパーの中だけで使い (`internal import`)、ラッパーと KikimimiCore を library evolution でビルドして、アプリ本体のコンパイルに持ち込まないようにしています。実行時の記号の重なりも確かめてあります (互いに呼び合うことはありません)。
+- **日本語＋英語**: whisper は 30 秒ずつ、1 つの言語の指定 (`<|ja|>` など) で文字にします。VAD は間を 0.1 秒に詰めるので、英語と日本語が入れ替わる録音では、1 つの 30 秒に両方の言語が入ります。日本語の指定で英語を聞くと「彼は、彼は、…」のような繰り返しになり、それを後始末で縮めたものが、英語の中に 1 行だけ残る崩れた日本語の正体でした (英日を交互に並べた録音で再現。誤りは 25%)。自動判定も、最初の 30 秒で 1 回決めるだけなので役に立ちません。「日本語＋英語」では、VAD で見つけた発話を 28 秒以内の区切りにまとめ、区切りごとに whisper の言語判定を日本語と英語の 2 つだけで比べます (候補を絞らないと、短い音声で中国語や韓国語を作り出します)。判定が揺れる区切りは、中の長い間で分けて判定し直し、間を空けずに入れ替わるところは 4 秒・2 秒の窓の二分探索で探します。同じ言語の区切りをつないで (最長 10 分)、今の「日本語」と同じ設定でその言語で文字にし、繰り返し・自信の低さ・話した長さに合わない文字の量・抜けを安く点検します。引っかかったところは判定し直し、別の言語なら、その言語で文字にし直して、良くなったときだけ入れ替えます (同じ言語なら元のまま。点検は文を消しません)。数値は、英日の朗読 (FLEURS) と日本語の講演で測って決めました。
 - **署名**: ad-hoc 署名です。人に配る場合は Developer ID での署名と公証に差し替えてください。
 
 ## 既知の制限
 
-- 話者分離はありません。
+- 話者分離はありません。「日本語＋英語」は声ではなく、話している言語で区切ります。
+- 「日本語＋英語」でも、間を空けずに入れ替わるところでは前後 1.5 秒ほどが抜けることがあり、3 秒より短い差し込み (相づちなど) は、前後の言語で文字になったり抜けたりします。
+- 自動判定は最初の 30 秒で言語を 1 回決めるだけなので、言語が入れ替わる録音には「日本語＋英語」を使ってください。
 - 翻訳は日本語への一方向だけです。
 - 録音中のプレビューは直近 12 秒ぶんだけです (止めると全体を認識し直します)。
 
@@ -226,5 +245,9 @@ MIT License ([LICENSE](LICENSE))。
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) v1.9.2 の XCFramework (MIT): ビルド時に GitHub から取得
 - Whisper のモデル (MIT, OpenAI) を whisper.cpp 形式にしたもの: 初回に [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) から取得
 - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT) を whisper.cpp 形式にしたもの: 同上 ([ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad))
+
+テスト用にリポジトリに含むもの:
+
+- `Tests/Fixtures/mixed-en-ja.wav`: [FLEURS](https://huggingface.co/datasets/google/fleurs) (Google, CC BY 4.0) の英語と日本語の朗読をつないだもの。詳しくは [Tests/Fixtures/README.md](Tests/Fixtures/README.md)
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) b12211 の XCFramework (MIT): ビルド時に GitHub から取得
 - [Qwen3.5](https://huggingface.co/Qwen) (Apache-2.0) の GGUF: 監査・翻訳を使うときに Hugging Face ([unsloth](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF) / [bartowski](https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF) の量子化版) から取得

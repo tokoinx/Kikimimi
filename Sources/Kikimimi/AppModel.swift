@@ -24,6 +24,10 @@ final class Job: Identifiable {
     let cancelFlag = CancelFlag()
     /// 録音した音声 (ファイルから読み直さずに使う)
     @ObservationIgnored var samples: [Float]?
+    /// 文字起こしの言語 (nil なら、始めるときの設定)。始めたら、使った言語が入る
+    var languageCode: String?
+    /// 「日本語＋英語でやり直す」の案内を閉じた
+    var mixedSuggestionDismissed = false
 
     // 文字起こしのあとの監査・翻訳
     /// これから行う監査・翻訳
@@ -479,6 +483,17 @@ final class AppModel {
         ensureWorker()
     }
 
+    /// 同じファイルを、別の言語の設定でもう一度文字起こしする (新しいジョブ。設定の言語は変えない)
+    func retranscribe(_ job: Job, languageCode code: String) {
+        guard let url = job.url else { return }
+        let again = Job(name: job.name, url: url)
+        again.languageCode = code
+        jobs.insert(again, at: 0)
+        job.mixedSuggestionDismissed = true
+        select(again)
+        ensureWorker()
+    }
+
     func select(_ job: Job?) {
         selectedJobID = job?.id
         searchText = ""
@@ -588,8 +603,13 @@ final class AppModel {
             job.transcript = Transcript(sourceName: job.name, model: spec.id, duration: duration)
             job.message = service.isReady(modelPath: modelURL.path, vad: vadPath != nil) ? "認識中…" : "モデルを読み込み中…"
 
+            // 「日本語＋英語」は、区切りごとに日本語か英語かを判定して、その言語で文字にする
+            let code = job.languageCode ?? languageCode
+            job.languageCode = code
+            let candidates = Languages.candidates(for: code) ?? []
             let options = WhisperOptions(
-                language: languageCode,
+                language: candidates.first ?? code,
+                languageCandidates: candidates,
                 useBeamSearch: preferAccuracy,
                 vadModelPath: vadPath,
                 initialPrompt: initialPrompt,
@@ -913,8 +933,10 @@ final class AppModel {
             guard window.count >= Int(LiveRecorder.sampleRate) else { continue }
             let spec = currentModel
             guard store.isInstalled(spec) else { continue }
+            let candidates = Languages.candidates(for: languageCode) ?? []
             let options = WhisperOptions(
-                language: languageCode,
+                language: candidates.first ?? languageCode,
+                languageCandidates: candidates,
                 useBeamSearch: false,
                 singleSegment: true,
                 noTimestamps: true,

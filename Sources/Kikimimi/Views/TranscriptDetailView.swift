@@ -59,6 +59,12 @@ struct TranscriptDetailView: View {
                 // 文字起こしの最中は区間が増えるたびに描き直すので数えない (終わってから使う)
                 let stats = job.status == .done ? transcript.translationStats : Transcript.TranslationStats()
                 let bilingual = model.isBilingual(stats)
+                if job.status == .done, job.languageCode == "ja", job.url != nil, !job.mixedSuggestionDismissed,
+                   transcript.spokenLanguages.isEmpty, stats.isMainlyForeign {
+                    MixedLanguageSuggestion(job: job)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                }
                 if job.status == .done, !transcript.segments.isEmpty, !model.isLLMInstalled, !model.llmBannerDismissed,
                    (model.autoTranslate && stats.isMainlyForeign) || model.autoAudit {
                     LLMNeededBanner(wantsTranslation: stats.isMainlyForeign)
@@ -70,7 +76,7 @@ struct TranscriptDetailView: View {
                     .padding(.vertical, 8)
                 Divider()
                 if bilingual {
-                    BilingualHeader(language: transcript.language, showTimestamp: model.showTimestamps)
+                    BilingualHeader(label: transcript.languageLabel, showTimestamp: model.showTimestamps)
                     Divider()
                 }
                 TranscriptListView(job: job, items: listItems(transcript, bilingual: bilingual),
@@ -114,7 +120,7 @@ struct TranscriptDetailView: View {
     private var subtitle: String {
         guard let t = job.transcript else { return "" }
         var parts: [String] = []
-        if let l = t.language { parts.append(Languages.name(for: l)) }
+        if let l = t.languageLabel { parts.append(l) }
         if let m = t.model, let spec = ModelCatalog.spec(id: m) { parts.append(spec.displayName) }
         return parts.joined(separator: " · ")
     }
@@ -163,17 +169,21 @@ struct TranscriptDetailView: View {
         let q = model.searchText.trimmingCharacters(in: .whitespaces)
         let changes = Dictionary((transcript.audit?.changes ?? []).map { ($0.original.id, $0) },
                                  uniquingKeysWith: { a, _ in a })
+        // 「日本語＋英語」で 2 つの言語が混ざるときだけ、行に言語の印 (英・日) を付ける
+        let tags = transcript.spokenLanguages.count >= 2
         let items: [TranscriptListItem]
         if bilingual {
             items = transcript.bilingualUnits().map { unit in
                 TranscriptListItem(id: unit.id, start: unit.start, end: unit.end, text: unit.text,
                                    japanese: unit.japanese, isOriginalJapanese: unit.isOriginalJapanese,
-                                   changes: unit.segments.compactMap { changes[$0.id] })
+                                   changes: unit.segments.compactMap { changes[$0.id] },
+                                   languageTag: tags ? LanguageTag.short(unit.language) : nil)
             }
         } else {
             items = transcript.segments.map { seg in
                 TranscriptListItem(id: seg.id, start: seg.start, end: seg.end, text: seg.text,
-                                   japanese: nil, isOriginalJapanese: false, changes: changes[seg.id].map { [$0] } ?? [])
+                                   japanese: nil, isOriginalJapanese: false, changes: changes[seg.id].map { [$0] } ?? [],
+                                   languageTag: tags ? LanguageTag.short(seg.language) : nil)
             }
         }
         guard !q.isEmpty else { return items }
@@ -202,6 +212,34 @@ struct TranscriptListItem: Identifiable, Hashable {
     let isOriginalJapanese: Bool
     /// この行に当たる監査の直し
     let changes: [AuditChange]
+    /// 原文の言語の印 (英・日)。2 つの言語が混ざる文字起こしのときだけ
+    var languageTag: String? = nil
+}
+
+/// 行の言語の印
+enum LanguageTag {
+    static func short(_ code: String?) -> String? {
+        switch code {
+        case "ja": return "日"
+        case "en": return "英"
+        default: return nil
+        }
+    }
+}
+
+/// 行の頭の言語の印 (英・日)
+struct LanguageTagLabel: View {
+    let tag: String?
+
+    var body: some View {
+        if let tag {
+            Text(tag)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+                .help(tag == "英" ? "英語で話している区間" : "日本語で話している区間")
+        }
+    }
 }
 
 /// 本文の一覧。再生位置 (0.2 秒ごとに変わる) を見るのはここだけにして、画面ぜんたいを描き直さない
@@ -286,6 +324,7 @@ struct SegmentRow: View {
             if showTimestamp {
                 TimestampLabel(time: item.start)
             }
+            LanguageTagLabel(tag: item.languageTag)
             Text(highlighted(item.text, highlight))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -312,7 +351,8 @@ struct TimestampLabel: View {
 
 /// 対訳表示の見出し (左: 原文 / 右: 日本語訳)
 struct BilingualHeader: View {
-    let language: String?
+    /// 原文の言語の名前 (「英語」「英語＋日本語」など)
+    let label: String?
     let showTimestamp: Bool
 
     var body: some View {
@@ -320,7 +360,7 @@ struct BilingualHeader: View {
             if showTimestamp {
                 Color.clear.frame(width: 52, height: 1)
             }
-            Label("原文" + (language.map { "（\(Languages.name(for: $0))）" } ?? ""), systemImage: "text.quote")
+            Label("原文" + (label.map { "（\($0)）" } ?? ""), systemImage: "text.quote")
                 .frame(maxWidth: .infinity, alignment: .leading)
             Label("日本語訳", systemImage: "character.bubble")
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -347,6 +387,7 @@ struct BilingualRow: View {
                 TimestampLabel(time: item.start)
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
+                LanguageTagLabel(tag: item.languageTag)
                 Text(highlighted(item.text, highlight))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -613,6 +654,42 @@ struct PostProcessBar: View {
 
     private var queued: String {
         job.postQueue.map { $0 == .audit ? "監査" : "翻訳" }.joined(separator: "・")
+    }
+}
+
+/// 「日本語」で文字にしたら、英語が多かった: 「日本語＋英語」でやり直すよう案内する
+/// (英語の講師と日本語の通訳のように言語が入れ替わる録音は、1 つの言語に決めて文字にすると、英語の部分が崩れやすい)
+struct MixedLanguageSuggestion: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "globe")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("英語の多い録音でした。日本語と英語が入れ替わるなら、「日本語＋英語」で文字起こしし直せます")
+                    .font(.callout.weight(.semibold))
+                Text("区切りごとに日本語か英語かを判定し、その言語で文字にします。言語を 1 つに決めたときに崩れた行が直ることがあります。時間はおよそ 2 倍かかります。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button("日本語＋英語でやり直す") {
+                model.retranscribe(job, languageCode: Languages.japaneseEnglish.code)
+            }
+            .buttonStyle(.borderedProminent)
+            Button {
+                job.mixedSuggestionDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help("閉じる (言語は、上の言語のメニューや設定でも選べます)")
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

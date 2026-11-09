@@ -271,11 +271,14 @@ public enum Auditor {
         return nil
     }
 
-    static func systemPrompt(language: String?) -> String {
+    /// mixed: 区間ごとの言語 (2 つ以上のとき。「日本語＋英語」で文字にしたもの)
+    static func systemPrompt(language: String?, mixed: [String]? = nil) -> String {
         let lang = Script.englishName(for: language)
+        let scope = mixed.map { "The transcript mixes \(Script.englishNames($0)); each line is in one of them. Keep each line's language." }
+            ?? "The transcript is mostly in \(lang)."
         return """
         You are a careful proofreader of automatic speech recognition (ASR) transcripts. \
-        The transcript is mostly in \(lang). Each numbered line is one subtitle segment.
+        \(scope) Each numbered line is one subtitle segment.
         Report only clear recognition errors:
         - FIX: a word or name was misheard (a similar-sounding wrong word, a broken proper noun, a word that makes no sense in context). \
         Write only the wrong words as they appear in the line and the correct words, like "[3] FIX whirled => world". \
@@ -311,7 +314,8 @@ public enum Auditor {
                                        cost: { generator.tokenCount(lines[$0]) + 4 },
                                        maxLines: options.maxLinesPerChunk,
                                        maxCost: options.maxTokensPerChunk)
-        let system = systemPrompt(language: language)
+        let spoken = Transcript(sourceName: "", segments: segments).spokenLanguages
+        let system = systemPrompt(language: language, mixed: spoken.count >= 2 ? spoken : nil)
         var changes: [AuditChange] = []
         onProgress(0, chunks.count)
         for (done, chunk) in chunks.enumerated() {
@@ -351,11 +355,12 @@ public enum Auditor {
                 case .fix(let wrong, let right):
                     // 指摘された語が行に無い・何も変わらない直しは使わない
                     guard let fixed = applyFix(to: segment.text, wrong: wrong, right: right) else { continue }
-                    let assessment = fixAssessment(original: segment.text, replacement: fixed, language: language)
+                    let lineLanguage = segment.language ?? language
+                    let assessment = fixAssessment(original: segment.text, replacement: fixed, language: lineLanguage)
                     guard assessment.keep else { continue }
                     // 評価役: 直す前と後のどちらが正しいかを、もう一度たずねる。どちらの並びでも直す前を選んだら捨てる
                     let votes = try judgeVotes(original: segment.text, proposed: fixed,
-                                               context: Array(lines[max(0, index - 2)..<index]), language: language,
+                                               context: Array(lines[max(0, index - 2)..<index]), language: lineLanguage,
                                                generator: generator, shouldCancel: shouldCancel)
                     guard votes > 0 else { continue }
                     // 行の大部分を差し替える直しは、聞き取りミスではなく書き換えの疑い

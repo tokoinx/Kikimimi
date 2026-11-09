@@ -84,7 +84,7 @@ struct ModelBar: View {
             }
             .labelsHidden()
             .frame(width: 120)
-            .help("話されている言語。分かっているなら指定すると精度が上がります")
+            .help("話されている言語。分かっているなら指定すると精度が上がります。日本語と英語が入れ替わる録音は「日本語＋英語」")
 
             Picker("モデル", selection: $model.modelID) {
                 ForEach(ModelCatalog.all) { spec in

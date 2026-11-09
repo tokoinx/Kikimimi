@@ -44,7 +44,7 @@ public enum Translator {
         }
         return segments.indices.filter {
             segments[$0].translation == nil && !covered.contains(segments[$0].id)
-                && Script.needsTranslation(segments[$0].text, transcriptLanguage: language)
+                && Script.needsTranslation(segments[$0].text, transcriptLanguage: segments[$0].language ?? language)
         }
     }
 
@@ -159,11 +159,13 @@ public enum Translator {
                                  generator: any TextGenerating, shouldCancel: () -> Bool,
                                  onChunk: (_ results: [TranslationResult], _ done: Int, _ total: Int) -> Void) throws -> Int {
         let pending = pendingIndices(segments, language: language)
+        // 「日本語＋英語」では、訳す区間に付いた言語 (いちばん多いもの) を原文の言語としてプロンプトに書く
+        let source = sourceLanguage(of: pending.map { segments[$0] }) ?? language
         let units = sentenceUnits(pending, in: segments)
         let sources = units.map { unit in Transcript.join(unit.map { segments[$0].text }) }
         let chunks = LLMChunker.chunks(Array(units.indices), cost: { generator.tokenCount(sources[$0]) + 4 },
                                        maxLines: options.maxLinesPerChunk, maxCost: options.maxTokensPerChunk)
-        let system = systemPrompt(language: language)
+        let system = systemPrompt(language: source)
         // 文脈用に、訳しながら訳を覚えておく (最初から訳がある区間も使う)
         var known: [(position: Int, source: String, translation: String)] = segments.indices.compactMap { i in
             guard let t = segments[i].translation else { return nil }
@@ -181,14 +183,14 @@ public enum Translator {
             let first = units[chunk[0]][0]
             let context = known.filter { $0.position < first }.suffix(options.contextLines)
                 .map { (source: $0.source, translation: $0.translation) }
-            var results = try translateLines(chunk.map { sources[$0] }, context: Array(context), language: language,
+            var results = try translateLines(chunk.map { sources[$0] }, context: Array(context), language: source,
                                              system: system, options: options, generator: generator,
                                              shouldCancel: shouldCancel)
             // 読めなかった行は 1 行ずつ訳し直す
             if chunk.count > 1 {
                 for k in chunk.indices where results[k] == nil {
                     if shouldCancel() { throw LLMError.cancelled }
-                    results[k] = try translateLines([sources[chunk[k]]], context: Array(context), language: language,
+                    results[k] = try translateLines([sources[chunk[k]]], context: Array(context), language: source,
                                                     system: system, options: options, generator: generator,
                                                     shouldCancel: shouldCancel)[0]
                 }
@@ -208,6 +210,20 @@ public enum Translator {
             onChunk(batch, done, pending.count)
         }
         return failed
+    }
+
+    /// 区間に付いた言語のうち、いちばん多いもの (区間に言語が無ければ nil。同じ数なら先に出てきたもの)
+    static func sourceLanguage(of segments: [TranscriptSegment]) -> String? {
+        var counts: [String: Int] = [:]
+        var order: [String] = []
+        for s in segments {
+            guard let l = s.language else { continue }
+            if counts[l] == nil { order.append(l) }
+            counts[l, default: 0] += 1
+        }
+        var best: String? = nil
+        for l in order where best.map({ (counts[l] ?? 0) > (counts[$0] ?? 0) }) ?? true { best = l }
+        return best
     }
 
     /// 数行をまとめて訳す。読めなかった行は nil

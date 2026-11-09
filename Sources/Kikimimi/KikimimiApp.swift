@@ -3,7 +3,8 @@ import Foundation
 import KikimimiCore
 import SwiftUI
 
-/// 起動の入り口。`--selftest-llm <GGUF>` のときは画面を出さずに LLM の動作確認だけをして終わる (診断・CI 用)
+/// 起動の入り口。`--selftest-llm <GGUF>` / `--selftest-whisper <音声>` のときは画面を出さずに、
+/// LLM / 文字起こしの動作確認だけをして終わる (診断・CI 用)
 @main
 enum KikimimiMain {
     static func main() {
@@ -11,6 +12,9 @@ enum KikimimiMain {
         if let i = args.firstIndex(of: "--selftest-llm") {
             let path = i + 1 < args.count ? args[i + 1] : ""
             exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu"), strict: args.contains("--strict")))
+        }
+        if args.contains("--selftest-whisper") {
+            exit(WhisperSelfTest.run(arguments: args))
         }
         KikimimiApp.main()
     }
