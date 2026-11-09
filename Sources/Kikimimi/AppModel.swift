@@ -110,8 +110,10 @@ final class AppModel {
     var installedLLMIDs: Set<String> = []
     var customLLMFiles: [String] = []
     var llmDownloads: [String: Double] = [:]
-    /// LLM の取得の案内を閉じた (この起動のあいだだけ)
+    /// 結果の画面の、LLM の取得の案内を閉じた (この起動のあいだだけ。始めの画面の案内も出さなくなる)
     var llmBannerDismissed = false
+    /// 始めの画面の、LLM の取得の案内を閉じた (この起動のあいだだけ。結果の画面の案内は、これとは別に出す)
+    var llmSetupCardDismissed = false
     /// 手元の GGUF を取り込んでいる
     var importingLLM = false
 
@@ -393,7 +395,7 @@ final class AppModel {
             } catch is CancellationError {
             } catch let error as URLError where error.code == .cancelled {
             } catch {
-                errorMessage = "\(spec.displayName) を取得できませんでした: \(error.localizedDescription)\n\nHugging Face (huggingface.co) に接続できない場合は、設定の「手元の GGUF を追加」から取り込めます。"
+                errorMessage = "\(spec.displayName) を取得できませんでした: \(error.localizedDescription)\n\nHugging Face (huggingface.co) に接続できない場合は、設定の「監査・翻訳」タブの「手元の GGUF を追加…」から取り込めます。"
             }
         }
     }

@@ -155,7 +155,12 @@ struct LLMModelRow: View {
                     .labelStyle(.titleAndIcon)
                 Button("削除") { model.deleteLLM(spec) }
             case .notInstalled:
-                Button("ダウンロード") { model.downloadLLM(spec) }
+                Button("ダウンロード") {
+                    // 使える LLM をまだ選んでいなければ、取得するものを選ぶ
+                    // (始めの画面・結果の画面の案内がこの取得を示し、取得後の監査・翻訳もこれを使う)
+                    if !model.isLLMInstalled { model.llmModelID = spec.id }
+                    model.downloadLLM(spec)
+                }
             case .downloading(let fraction):
                 ProgressView(value: fraction)
                     .frame(width: 90)

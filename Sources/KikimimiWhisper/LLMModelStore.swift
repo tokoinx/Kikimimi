@@ -111,7 +111,7 @@ public enum HuggingFaceResolver {
         public var errorDescription: String? {
             switch self {
             case .notFound(let name):
-                return "\(name) のファイルが配布元で見つかりませんでした。設定の「手元の GGUF を追加」から取り込むこともできます。"
+                return "\(name) のファイルが配布元で見つかりませんでした。設定の「監査・翻訳」タブの「手元の GGUF を追加…」から取り込むこともできます。"
             }
         }
     }

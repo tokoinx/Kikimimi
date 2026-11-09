@@ -232,65 +232,73 @@ struct EmptyStateView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "waveform.and.mic")
-                .font(.system(size: 60, weight: .light))
-                .foregroundStyle(Color.accentColor)
-            Text("ききみみ")
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-            Text("音声や動画をここに落とすと、Mac の中だけで文字に起こします。\nマイクで録音して起こすこともできます。")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-
-            if model.availability(of: model.currentModel) == .notInstalled {
-                VStack(spacing: 8) {
-                    Text("最初に音声認識モデル「\(model.currentModel.displayName)」(約 \(model.currentModel.approxMB) MB) を一度だけダウンロードします。")
-                        .font(.callout)
-                    Button {
-                        model.download(model.currentModel)
-                    } label: {
-                        Label("モデルをダウンロード", systemImage: "arrow.down.circle")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding(14)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-            } else if case .downloading(let fraction) = model.availability(of: model.currentModel) {
-                VStack(spacing: 6) {
-                    ProgressView(value: fraction)
-                        .frame(width: 280)
-                    Text("モデルをダウンロード中 \(Int(fraction * 100))%")
-                        .font(.callout)
+        // 狭いウインドウでは、文を切らずにスクロールできるようにする (収まるときは、これまでどおり真ん中に置く)
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 18) {
+                    Image(systemName: "waveform.and.mic")
+                        .font(.system(size: 60, weight: .light))
+                        .foregroundStyle(Color.accentColor)
+                    Text("ききみみ")
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    Text("音声や動画をここに落とすと、Mac の中だけで文字に起こします。\nマイクで録音して起こすこともできます。")
+                        .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
-                }
-            }
 
-            // 監査・翻訳の LLM (任意)。結果の画面を待たずに、ここでも取得できるようにする
-            if !model.isLLMInstalled && (model.autoAudit || model.autoTranslate) && !model.llmBannerDismissed {
-                LLMSetupCard()
-            } else if model.isLLMInstalled {
-                Label("監査・翻訳: \(model.currentLLM.name)", systemImage: "checkmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                    if model.availability(of: model.currentModel) == .notInstalled {
+                        VStack(spacing: 8) {
+                            Text("最初に音声認識モデル「\(model.currentModel.displayName)」(約 \(model.currentModel.approxMB) MB) を一度だけダウンロードします。")
+                                .font(.callout)
+                            Button {
+                                model.download(model.currentModel)
+                            } label: {
+                                Label("モデルをダウンロード", systemImage: "arrow.down.circle")
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .padding(14)
+                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                    } else if case .downloading(let fraction) = model.availability(of: model.currentModel) {
+                        VStack(spacing: 6) {
+                            ProgressView(value: fraction)
+                                .frame(width: 280)
+                            Text("モデルをダウンロード中 \(Int(fraction * 100))%")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
-            HStack(spacing: 12) {
-                Button {
-                    model.presentOpenPanel()
-                } label: {
-                    Label("ファイルを開く", systemImage: "folder")
+                    HStack(spacing: 12) {
+                        Button {
+                            model.presentOpenPanel()
+                        } label: {
+                            Label("ファイルを開く", systemImage: "folder")
+                        }
+                        Button {
+                            Task { await model.toggleRecording() }
+                        } label: {
+                            Label("マイクで録音", systemImage: "mic")
+                        }
+                    }
+                    .controlSize(.large)
+                    .padding(.top, 4)
+
+                    // 監査・翻訳の LLM (任意)。結果の画面を待たずに、ここでも取得できるようにする。
+                    // 任意なので、文字起こしの操作より後に置く (収まらないときにスクロールの先に回るのは、こちら)
+                    if !model.isLLMInstalled && (model.autoAudit || model.autoTranslate)
+                        && !model.llmSetupCardDismissed && !model.llmBannerDismissed {
+                        LLMSetupCard()
+                    } else if model.isLLMInstalled {
+                        Label("監査・翻訳: \(model.currentLLM.name)", systemImage: "checkmark.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                Button {
-                    Task { await model.toggleRecording() }
-                } label: {
-                    Label("マイクで録音", systemImage: "mic")
-                }
+                .padding(40)
+                .frame(maxWidth: .infinity, minHeight: geo.size.height)
             }
-            .controlSize(.large)
-            .padding(.top, 4)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -319,7 +327,8 @@ struct LLMSetupCard: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             Button {
-                model.llmBannerDismissed = true
+                // 閉じるのは始めの画面の案内だけ (「あとから」の案内として、結果の画面の案内は出す)
+                model.llmSetupCardDismissed = true
             } label: {
                 Image(systemName: "xmark")
             }

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import KikimimiCore
 import SwiftUI
@@ -30,6 +31,11 @@ struct KikimimiApp: App {
                 }
                 // 開くたびに新しいウインドウを作らず、今のウインドウで受け取る
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
+                // アプリに戻ったら LLM のフォルダを見直す (Finder で GGUF を置いた・消したときに、
+                // 置いた LLM に「ダウンロード」を出して数 GB を取り直させたり、消えた LLM を取得済みと出したりしない)
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    model.refreshLLMInstalled()
+                }
         }
         .defaultSize(width: 1120, height: 740)
         .commands {
@@ -72,6 +78,10 @@ struct KikimimiApp: App {
         Settings {
             SettingsView()
                 .environment(model)
+                // メインのウインドウを閉じて設定だけを開いているときも、アプリに戻ったら見直す
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    model.refreshLLMInstalled()
+                }
         }
     }
 }
