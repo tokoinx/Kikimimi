@@ -34,6 +34,11 @@ jobs:
           xcodebuild -version
           swift --version
 
+      # SwiftPM の共有キャッシュに前の実行の残りがあると、XCFramework の取得が
+      # 「already exists in file system」で止まる (2026-11-09 に両方の Xcode で起きた)。毎回空にしてから取得する
+      - name: Clear the SwiftPM artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts
+
       - name: Unit tests (KikimimiCore)
         run: swift test
 
