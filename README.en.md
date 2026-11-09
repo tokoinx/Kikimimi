@@ -145,6 +145,10 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | Intel Macs | Not verified |
 | Fix for the same sentence repeating through long recordings (1.0.1) | Verified in a reproduction (tiny model, 5 minutes of audio with music in between). Awaiting a re-check on the real lecture recording |
 | Audit and translation logic (rules, guardrails, line alignment, apply/undo, exports) | Unit tests (with a fake LLM) |
+| 日本語＋英語: chunking, detection, switch search, checks and repairs | Unit tests (with a scripted fake whisper) |
+| 日本語＋英語 with the real whisper (208 s of English and Japanese read in turns, Large v3 Turbo q5_0) | Verified on a Linux CPU: error rate 25.2% (Japanese setting) → 5.4%, all 8 language stretches in the right language, and both sides of the 3 switches with no pause came out in the right language. A Japanese-only talk (3.5 min) never switched to English and gave the same text as the Japanese setting |
+| 日本語＋英語 in the built app | GitHub Actions transcribes a 47 s English/Japanese recording with tiny and checks each line's language on every push |
+| 日本語＋英語 speed on a Mac (Metal), and a 2-hour lecture | Not verified yet (awaiting a run on real hardware; on a Linux CPU it takes 2.0–2.2× the Japanese setting) |
 | llama.cpp b12211 usage (grammar-constrained generation, cut-offs, cancellation, neutralized control tokens, Japanese UTF-8) | Checked against the real llama.cpp (Linux build) with a tiny random-weight GGUF |
 | whisper.framework and llama.framework in one app | GitHub Actions runs the built app's `--selftest-llm` on every push |
 | Audit and translation with the real Qwen3.5 2B / 4B (English and Japanese samples, sentences cut across segments, mishearings, repeats) | Verified on a Linux CPU (4B: 7 lines translated in 26 s, audit in 18 s). Found and fixed drift into Chinese and wrong auto-fixes along the way |
