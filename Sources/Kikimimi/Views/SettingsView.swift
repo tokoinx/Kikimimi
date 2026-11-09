@@ -128,6 +128,8 @@ struct LLMSettingsForm: View {
                     .foregroundStyle(.secondary)
             }
 
+            LearnedCorrectionsSection()
+
             Section {
                 Text("監査と翻訳には、無料・オープンソースの llama.cpp と Qwen3.5 を使い、Mac の GPU (Metal) で動きます。文字起こしの内容は Mac の外に送られません。インターネットを使うのは、LLM を初めて取得するときだけです。")
                     .font(.callout)
@@ -210,5 +212,64 @@ struct ModelRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// 設定の「学習した直し」: 監査の一覧で利用者が決めた直しの台帳。一覧・削除・自分で追加
+struct LearnedCorrectionsSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var newWrong = ""
+    @State private var newRight = ""
+
+    var body: some View {
+        @Bindable var model = model
+        Section("学習した直し") {
+            Toggle("監査の一覧で決めた直しを覚えて、次から使う", isOn: $model.useLedger)
+            let corrections = model.ledger.corrections.sorted { $0.updated > $1.updated }
+            if corrections.isEmpty {
+                Text("まだありません。監査の一覧で直しのチェックを入れたり外したりすると、ここに覚えます。")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(corrections) { correction in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(correction.wrong) → \(correction.right)")
+                            .textSelection(.enabled)
+                        Text(Self.status(of: correction))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("削除") { model.removeCorrection(correction.id) }
+                }
+            }
+            HStack {
+                TextField("聞き間違えた語", text: $newWrong, prompt: Text("聞き間違えた語 (例: Roblocks)"))
+                    .labelsHidden()
+                Image(systemName: "arrow.right")
+                    .foregroundStyle(.secondary)
+                TextField("正しい語", text: $newRight, prompt: Text("正しい語 (例: Roblox)"))
+                    .labelsHidden()
+                Button("追加") {
+                    if model.teachCorrection(wrong: newWrong, right: newRight) {
+                        newWrong = ""
+                        newRight = ""
+                    }
+                }
+                .disabled(newWrong.trimmingCharacters(in: .whitespaces).isEmpty
+                          || newRight.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            Text("反映した直しは、次の監査から LLM に聞く前に当てます (一覧に「学習した直し」と出るので、いつでも元に戻せます)。元に戻した直しは、LLM がまた出してきても使いません。正しい語は、語彙のヒントにも足します。ここで追加した直しは、いつも当てます。保存先はこの Mac の中だけです。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    static func status(of correction: LearnedCorrection) -> String {
+        if correction.taught { return "いつも直す (自分で追加)" }
+        if correction.isActive { return "次から自動で直す (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回)" }
+        if correction.isBlocked { return "もう提案しない (元に戻す \(correction.rejected) 回・反映 \(correction.accepted) 回)" }
+        return "保留 (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回)"
     }
 }

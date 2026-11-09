@@ -111,6 +111,10 @@ final class AppModel {
     var autoTranslate: Bool { didSet { save(autoTranslate, "autoTranslate") } }
     /// 原文と日本語訳を左右に並べて表示する
     var showBilingual: Bool { didSet { save(showBilingual, "showBilingual") } }
+    /// 学習した直し (監査の一覧で利用者が決めた直し・設定で自分で書いた直し)。Mac の中だけに保存する
+    var ledger = CorrectionLedger()
+    /// 学習した直しを使う (監査の前に当てる・断った直しを出さない・正しい語を語彙のヒントに足す)
+    var useLedger: Bool { didSet { save(useLedger, "useLedger") } }
     var installedLLMIDs: Set<String> = []
     var customLLMFiles: [String] = []
     var llmDownloads: [String: Double] = [:]
@@ -147,7 +151,9 @@ final class AppModel {
         autoAudit = d.object(forKey: "autoAudit") as? Bool ?? true
         autoTranslate = d.object(forKey: "autoTranslate") as? Bool ?? true
         showBilingual = d.object(forKey: "showBilingual") as? Bool ?? true
+        useLedger = d.object(forKey: "useLedger") as? Bool ?? true
         llmStore = LLMModelStore(models: store)
+        ledger = CorrectionLedger.load(from: ledgerURL)
         if !Languages.isKnown(languageCode) { languageCode = "ja" }
         refreshInstalled()
         refreshLLMInstalled()
@@ -159,6 +165,39 @@ final class AppModel {
 
     var selectedJob: Job? {
         jobs.first { $0.id == selectedJobID }
+    }
+
+    // MARK: 学習した直し
+
+    /// 保存先 (モデルのフォルダのとなり: ~/Library/Application Support/Kikimimi/learned-corrections.json)
+    var ledgerURL: URL {
+        store.directory.deletingLastPathComponent().appendingPathComponent("learned-corrections.json")
+    }
+
+    private func saveLedger() {
+        do {
+            try ledger.save(to: ledgerURL)
+        } catch {
+            errorMessage = "学習した直しを保存できませんでした: " + error.localizedDescription
+        }
+    }
+
+    /// 設定の画面で、利用者が自分で書いた直し (いつも当てる)
+    @discardableResult
+    func teachCorrection(wrong: String, right: String) -> Bool {
+        guard ledger.teach(wrong: wrong, right: right) else { return false }
+        saveLedger()
+        return true
+    }
+
+    func removeCorrection(_ id: UUID) {
+        ledger.remove(id)
+        saveLedger()
+    }
+
+    /// 語彙のヒント: 設定で書いたものに、学習した正しい語を足したもの (文字起こし・監査・翻訳で使う)
+    var effectiveHint: String {
+        useLedger ? (ledger.glossary(adding: initialPrompt) ?? "") : initialPrompt
     }
 
     /// 作業中か (文字起こし・録音・監査・翻訳・モデルの取得や取り込み)。作業中は、ウインドウを閉じてもアプリを終了しない
@@ -628,7 +667,7 @@ final class AppModel {
                 languageCandidates: candidates,
                 useBeamSearch: preferAccuracy,
                 vadModelPath: vadPath,
-                initialPrompt: initialPrompt,
+                initialPrompt: effectiveHint,
                 filterHallucinations: filterHallucinations
             )
             let flag = job.cancelFlag
@@ -716,8 +755,17 @@ final class AppModel {
     /// 監査の 1 か所を反映する / 元に戻す
     func setAuditChange(_ change: AuditChange, applied: Bool, in job: Job) {
         guard var transcript = job.transcript else { return }
+        let before = transcript.audit?.changes.first { $0.id == change.id }
         transcript.setChange(change.id, applied: applied)
         job.transcript = transcript
+        // 利用者が自分で決めた直しを覚える (次からは、反映した直しは先に当て、元に戻した直しは出さない)
+        let after = transcript.audit?.changes.first { $0.id == change.id }
+        if useLedger, let before, let after, before.kind == .fix, before.isApplied != after.isApplied,
+           let wrong = before.wrong, let right = before.right {
+            ledger.record(wrong: wrong, right: right, language: transcript.language(of: before.original),
+                          example: before.original.text, accepted: after.isApplied)
+            saveLedger()
+        }
     }
 
     func revertAudit(of job: Job) {
@@ -732,7 +780,8 @@ final class AppModel {
         job.postCancel = flag
         let selection = currentLLM
         let useLLM = isLLMInstalled
-        let glossary = initialPrompt
+        let glossary = effectiveHint
+        let learned = useLedger ? ledger : nil
         let language = transcript.language
         defer { job.postState = .idle }
         defer {
@@ -751,7 +800,7 @@ final class AppModel {
             case .audit:
                 job.postState = .running(.audit, message: "監査中…", progress: nil)
                 let segments = transcript.segmentsBeforeAudit
-                let options = AuditOptions(glossary: glossary)
+                let options = AuditOptions(glossary: glossary, ledger: learned)
                 // 前に LLM で監査してあれば、やり直しの結果は最後にまとめて反映する
                 // (途中で規則だけの結果を反映すると、前の LLM の直しといっしょに訳まで外れてしまう。中止したら前の結果のまま)
                 let hadLLMAudit = transcript.audit?.model != nil

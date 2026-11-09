@@ -14,6 +14,8 @@ public struct AuditChange: Codable, Hashable, Identifiable, Sendable {
         case rule
         /// ローカル LLM が見つけた
         case llm
+        /// 学習した直し (利用者が前に決めた直し) を当てた
+        case ledger
     }
 
     public var id: UUID
@@ -29,9 +31,13 @@ public struct AuditChange: Codable, Hashable, Identifiable, Sendable {
     public var isConfident: Bool
     /// いま本文に反映されているか
     public var isApplied: Bool
+    /// 聞き間違えた語と正しい語 (fix のとき。利用者の決定を「学習した直し」として覚えるのに使う)
+    public var wrong: String?
+    public var right: String?
 
     public init(id: UUID = UUID(), kind: Kind, origin: Origin, original: TranscriptSegment,
-                replacement: String? = nil, reason: String, isConfident: Bool, isApplied: Bool = false) {
+                replacement: String? = nil, reason: String, isConfident: Bool, isApplied: Bool = false,
+                wrong: String? = nil, right: String? = nil) {
         self.id = id
         self.kind = kind
         self.origin = origin
@@ -40,6 +46,8 @@ public struct AuditChange: Codable, Hashable, Identifiable, Sendable {
         self.reason = reason
         self.isConfident = isConfident
         self.isApplied = isApplied
+        self.wrong = wrong
+        self.right = right
     }
 }
 

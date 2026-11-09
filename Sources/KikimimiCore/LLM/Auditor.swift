@@ -7,11 +7,15 @@ public struct AuditOptions: Sendable {
     /// LLM に 1 度に見せる区間の数と、その長さの上限 (トークン数)
     public var maxLinesPerChunk: Int
     public var maxTokensPerChunk: Int
+    /// 学習した直し (利用者が前に決めた直し)。LLM に聞く前に当て、利用者が断った直しは LLM が出しても捨てる
+    public var ledger: CorrectionLedger?
 
-    public init(glossary: String? = nil, maxLinesPerChunk: Int = 20, maxTokensPerChunk: Int = 900) {
+    public init(glossary: String? = nil, maxLinesPerChunk: Int = 20, maxTokensPerChunk: Int = 900,
+                ledger: CorrectionLedger? = nil) {
         self.glossary = glossary
         self.maxLinesPerChunk = maxLinesPerChunk
         self.maxTokensPerChunk = maxTokensPerChunk
+        self.ledger = ledger
     }
 }
 
@@ -355,6 +359,8 @@ public enum Auditor {
                 case .fix(let wrong, let right):
                     // 指摘された語が行に無い・何も変わらない直しは使わない
                     guard let fixed = applyFix(to: segment.text, wrong: wrong, right: right) else { continue }
+                    // 利用者が前に元に戻した直しは、また出してきても使わない (評価役にも聞かない)
+                    if options.ledger?.blocks(wrong: wrong, right: right) == true { continue }
                     // 「日本語＋英語」: 行の言語 (日・英) が文字の上で変わる直しは、聞き取りミスの直しではなく訳なので使わない
                     // (「Ruth先生」→「Ruth-san」のように、かなの無い日本語の行は、文字だけの判定では言語の変化に気づけない)
                     if let own = segment.language,
@@ -385,7 +391,7 @@ public enum Auditor {
                     }
                     found.append(AuditChange(kind: .fix, origin: .llm, original: segment, replacement: fixed,
                                              reason: "聞き取りミス: 「\(wrong)」→「\(right)」" + note,
-                                             isConfident: confident))
+                                             isConfident: confident, wrong: wrong, right: right))
                 }
             }
             // 半分近くの行を直したがる答えは、聞き取りミスの指摘ではなく書き換え。すべて提案どまりにする
@@ -458,17 +464,44 @@ public enum Auditor {
         let ruled = Set(ruleChanges.map(\.original.id))
         let removed = Set(ruleChanges.filter(\.isConfident).map(\.original.id))
         let order = Dictionary(segments.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        let rest = segments.filter { !removed.contains($0.id) }
+        // 学習した直し: LLM に聞く前に、規則として当てる (規則が消す区間と、規則の指摘がある区間には当てない)
+        let ledgerChanges = (options.ledger?.fixes(for: rest, language: language) ?? []).filter { !ruled.contains($0.original.id) }
+        let learned = Dictionary(ledgerChanges.map { ($0.original.id, $0) }, uniquingKeysWith: { first, _ in first })
         func report(_ llmChanges: [AuditChange], model: String?, partial: Bool) -> AuditReport {
             // 規則の指摘がある区間は規則を優先する (理由がはっきりしているため)
-            var all = ruleChanges + llmChanges.filter { !ruled.contains($0.original.id) }
+            var all = ruleChanges
+            var kept = learned
+            for change in llmChanges where !ruled.contains(change.original.id) {
+                guard let own = learned[change.original.id] else {
+                    all.append(change)
+                    continue
+                }
+                // 学習した直しを当てた行を、LLM がさらに直した: 自信のある直しなら 1 件にまとめる (元の区間は、学習した直しの前のもの)。
+                // 自信の無い提案は捨てて、学習した直しだけを残す (1 区間 1 件)
+                if change.kind == .fix, change.isConfident {
+                    var merged = change
+                    merged.original = own.original
+                    merged.reason = own.reason + " / " + change.reason
+                    all.append(merged)
+                    kept[change.original.id] = nil
+                }
+            }
+            all += kept.values
             all.sort { (order[$0.original.id] ?? 0) < (order[$1.original.id] ?? 0) }
             return AuditReport(changes: all, model: model, reviewedCount: segments.count, isPartial: partial ? true : nil)
         }
         onPartial(report([], model: nil, partial: generator != nil))
         guard let generator else { return report([], model: nil, partial: false) }
-        let rest = segments.filter { !removed.contains($0.id) }
+        // LLM には、学習した直しを当てた後の文を見せる (正しい固有名詞が文脈に入る)
+        let reviewed = rest.map { segment -> TranscriptSegment in
+            guard let text = learned[segment.id]?.replacement else { return segment }
+            var fixed = segment
+            fixed.text = text
+            return fixed
+        }
         var soFar: [AuditChange] = []
-        let llmChanges = try review(rest, language: language, options: options, generator: generator,
+        let llmChanges = try review(reviewed, language: language, options: options, generator: generator,
                                     shouldCancel: shouldCancel, onProgress: onProgress) { chunk in
             soFar += chunk
             onPartial(report(soFar, model: modelName, partial: true))

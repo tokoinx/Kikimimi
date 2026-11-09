@@ -482,7 +482,8 @@ struct AuditChangeDetail: View {
                 }
             }
             HStack {
-                Text(change.origin == .llm ? "見つけた: ローカル LLM" : "見つけた: 繰り返しの規則")
+                Text(change.origin == .llm ? "見つけた: ローカル LLM"
+                     : (change.origin == .ledger ? "見つけた: 学習した直し" : "見つけた: 繰り返しの規則"))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 Spacer()
