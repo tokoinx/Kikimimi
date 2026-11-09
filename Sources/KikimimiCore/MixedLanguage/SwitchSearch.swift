@@ -59,7 +59,11 @@ public enum SwitchSearch {
     }
 
     /// 区切りを分けて判定し直す。detect は範囲の言語を判定する (判定できなければ nil)
+    /// islandThreshold: その言語の部分で島を探す、別の言語の確率のしきい値 (探さない言語は nil)。
+    /// 確からしい部分 (0.97 以上) でも、別の言語の確率がしきい値以上なら、中ほどの島を探す
+    /// (11 秒の区切りの最後の 1.1 秒の相づちが、5.4 秒の部分の 0.974 に埋もれていた)
     public static func refine(_ chunk: SpeechChunk, guess: LanguageGuess?, map: SpeechMap,
+                              islandThreshold: (String) -> Double? = { _ in nil },
                               detect: (Range<Int>) throws -> LanguageGuess?) rethrows -> Outcome {
         let pieces = SpeechChunker.pieces(of: chunk)
         var detections = 0
@@ -77,6 +81,12 @@ public enum SwitchSearch {
         for (piece, g) in zip(pieces, guesses) {
             if piece.seconds >= R.bisectMinSeconds, (g?.confidence ?? 0) < R.bisectBelow {
                 let found = try locate(piece, guess: g, map: map, detect: detect)
+                detections += found.detections
+                parts += found.parts
+                switches += found.switches
+            } else if let g, let threshold = islandThreshold(g.language), 1 - g.confidence >= threshold,
+                      piece.speechSeconds >= 2 * R.minDetectSpeechSeconds {
+                let found = try islands(piece, host: g, map: map, floor: threshold, detect: detect)
                 detections += found.detections
                 parts += found.parts
                 switches += found.switches

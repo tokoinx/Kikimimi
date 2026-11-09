@@ -208,7 +208,9 @@ public enum MixedPipeline {
             if SwitchSearch.needsRefinement(guess, speechSeconds: chunk.speechSeconds) {
                 let budget = R.refineBudgetPerChunk * Double(index + 1) + R.refineBudgetBase
                 if Double(extraDetections) < budget || (guess?.confidence ?? 0) < R.overBudgetRefineBelow {
-                    let outcome = try SwitchSearch.refine(chunk, guess: guess, map: map, detect: detect)
+                    let outcome = try SwitchSearch.refine(chunk, guess: guess, map: map,
+                                                          islandThreshold: { R.islandHosts.contains($0) ? islandThreshold($0) : nil },
+                                                          detect: detect)
                     extraDetections += outcome.detections
                     report.refinementDetections += outcome.detections
                     report.switches += outcome.switches
