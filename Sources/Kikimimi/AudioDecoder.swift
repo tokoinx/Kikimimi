@@ -18,7 +18,8 @@ enum AudioDecoder {
         }
     }
 
-    static func decode(url: URL, cancelFlag: CancelFlag? = nil) async throws -> [Float] {
+    /// from / to (秒) を渡すと、その範囲だけを読む (長い録音の一部だけを確かめるとき。2 時間の録音の全体は 0.5 GB になる)
+    static func decode(url: URL, from: Double = 0, to: Double? = nil, cancelFlag: CancelFlag? = nil) async throws -> [Float] {
         let name = url.lastPathComponent
         let asset = AVURLAsset(url: url)
         let tracks: [AVAssetTrack]
@@ -32,7 +33,8 @@ enum AudioDecoder {
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[Float], Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    cont.resume(returning: try readPCM(asset: asset, tracks: tracks, name: name, cancelFlag: cancelFlag))
+                    cont.resume(returning: try readPCM(asset: asset, tracks: tracks, name: name, from: from, to: to,
+                                                       cancelFlag: cancelFlag))
                 } catch {
                     cont.resume(throwing: error)
                 }
@@ -40,7 +42,8 @@ enum AudioDecoder {
         }
     }
 
-    private static func readPCM(asset: AVAsset, tracks: [AVAssetTrack], name: String, cancelFlag: CancelFlag?) throws -> [Float] {
+    private static func readPCM(asset: AVAsset, tracks: [AVAssetTrack], name: String, from: Double, to: Double?,
+                                cancelFlag: CancelFlag?) throws -> [Float] {
         let reader: AVAssetReader
         do {
             reader = try AVAssetReader(asset: asset)
@@ -60,6 +63,11 @@ enum AudioDecoder {
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { throw DecodeError.cannotRead(name) }
         reader.add(output)
+        if from > 0 || to != nil {
+            let start = CMTime(seconds: max(0, from), preferredTimescale: 16_000)
+            let duration = to.map { CMTime(seconds: max(0, $0 - max(0, from)), preferredTimescale: 16_000) } ?? .positiveInfinity
+            reader.timeRange = CMTimeRange(start: start, duration: duration)
+        }
         guard reader.startReading() else { throw DecodeError.cannotRead(name) }
 
         var samples: [Float] = []

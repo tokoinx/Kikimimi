@@ -18,9 +18,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS 14 Sonoma + Xcode 16.2 (Swift 6.0): 利用者の環境と同じ組み合わせ。ここで実際に起動させる
-          - { os: macos-14, xcode: "16.2" }
-          # 16.2: macOS 14 で動く最後の Xcode。26.3: 最新の Xcode / Swift
+          # 16.2: Swift 6.0。macOS 14 Sonoma で動く最後の Xcode (利用者の環境に合わせる)。26.3: 最新の Xcode / Swift。
+          # macOS 14 の実行環境 (macos-14) は GitHub が 2026 年に提供をやめたので、macOS 14 そのものでは確かめられない
           - { os: macos-15, xcode: "16.2" }
           - { os: macos-15, xcode: "26.3" }
     steps:
@@ -78,6 +77,25 @@ jobs:
           open -n -W build/Kikimimi.app --args --selftest-launch 5 --report "$PWD/build/launch-open.txt"
           cat build/launch-open.txt
           grep -q "LAUNCH SELFTEST OK" build/launch-open.txt
+
+      # ウインドウを全部閉じたまま動いているアプリが、呼ばれたとき (Dock・open) にウインドウを出し直すこと
+      - name: Launch self-test (the window comes back on a reopen request)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --reopen --report build/launch-reopen.txt
+
+      - name: Launch self-test (plain open while a copy without windows is running)
+        run: |
+          rm -f build/launch-external.txt
+          open -n build/Kikimimi.app --args --selftest-launch 5 --reopen-external --report "$PWD/build/launch-external.txt"
+          sleep 9
+          open build/Kikimimi.app
+          for i in $(seq 1 40); do [ -f build/launch-external.txt ] && break; sleep 1; done
+          cat build/launch-external.txt
+          grep -q "LAUNCH SELFTEST OK" build/launch-external.txt
+
+      - name: Version line
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --version
+          otool -l build/Kikimimi.app/Contents/MacOS/Kikimimi | grep -A4 LC_BUILD_VERSION
 
       - name: Doctor script
         run: Scripts/doctor.sh
@@ -143,6 +161,23 @@ jobs:
           build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper Tests/Fixtures/mixed-en-ja.wav
           --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin
           --languages ja --cpu --to 16
+
+      # 確認用の実行 (--selftest-whisper) が動いているあいだに、ふつうに open しても起動できるか (参考)
+      - name: Launch while a self-test is running
+        continue-on-error: true
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper Tests/Fixtures/mixed-en-ja.wav \
+            --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin \
+            --languages ja,en --cpu > build/selftest-background.log 2>&1 &
+          sleep 3
+          pgrep -fl Kikimimi || true
+          lsappinfo list | grep -i -A6 kikimimi || echo "(the self-test is not registered as an application)"
+          rm -f build/launch-busy.txt
+          open build/Kikimimi.app --args --selftest-launch 5 --report "$PWD/build/launch-busy.txt"
+          for i in $(seq 1 30); do [ -f build/launch-busy.txt ] && break; sleep 1; done
+          cat build/launch-busy.txt
+          grep -q "LAUNCH SELFTEST OK" build/launch-busy.txt
+          wait
 
       - name: Zip the app
         run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-${{ matrix.os }}-xcode${{ matrix.xcode }}.zip"

@@ -89,15 +89,17 @@ enum WhisperSelfTest {
 
         do {
             var clock = Date()
-            var samples = try decode(URL(fileURLWithPath: audioPath))
+            // 範囲が決まっていれば、そこだけを読む (2 時間の録音の全体を読むと、8 GB の Mac では数分と 0.5 GB かかる)
+            let fromSeconds = max(0, cut["--from"] ?? 0)
+            let toSeconds = cut["--to"].map { max($0, fromSeconds) }
+            log("reading \((audioPath as NSString).lastPathComponent) …")
+            let samples = try decode(URL(fileURLWithPath: audioPath), from: fromSeconds, to: toSeconds)
+            guard !samples.isEmpty else {
+                log("SELFTEST FAILED: no audio in that range (check --from / --to against the length of the recording)")
+                return 2
+            }
             let rate = Double(MixedLanguageRules.sampleRate)
-            let length = Double(samples.count) / rate
-            let fromSeconds = min(cut["--from"] ?? 0, length)
-            let toSeconds = min(max(cut["--to"] ?? length, fromSeconds), length)
-            let from = min(samples.count, Int(fromSeconds * rate))
-            let to = max(from, min(samples.count, Int(toSeconds * rate)))
-            if from > 0 || to < samples.count { samples = Array(samples[from..<to]) }
-            let offset = Double(from) / rate
+            let offset = fromSeconds
             let audioSeconds = Double(samples.count) / rate
             log(String(format: "audio: %@, %.1f s from %.1f s (decoded in %.1f s)", (audioPath as NSString).lastPathComponent,
                        audioSeconds, offset, Date().timeIntervalSince(clock)))
@@ -293,7 +295,7 @@ enum WhisperSelfTest {
     }
 
     /// 音声ファイルを 16 kHz モノラルにする (アプリと同じ AVFoundation の読み込み)
-    private static func decode(_ url: URL) throws -> [Float] {
+    private static func decode(_ url: URL, from: Double, to: Double?) throws -> [Float] {
         final class Result: @unchecked Sendable {
             var samples: [Float] = []
             var error: Error?
@@ -301,7 +303,7 @@ enum WhisperSelfTest {
         let result = Result()
         let done = DispatchSemaphore(value: 0)
         Task.detached {
-            do { result.samples = try await AudioDecoder.decode(url: url) } catch { result.error = error }
+            do { result.samples = try await AudioDecoder.decode(url: url, from: from, to: to) } catch { result.error = error }
             done.signal()
         }
         // 読み込みが返ってこないとき (CI で何十分も待たないように)

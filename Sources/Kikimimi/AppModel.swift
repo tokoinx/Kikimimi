@@ -161,6 +161,12 @@ final class AppModel {
         jobs.first { $0.id == selectedJobID }
     }
 
+    /// 作業中か (文字起こし・録音・監査・翻訳・モデルの取得や取り込み)。作業中は、ウインドウを閉じてもアプリを終了しない
+    var isBusy: Bool {
+        isRecording || importingLLM || !downloads.isEmpty || !llmDownloads.isEmpty
+            || jobs.contains { $0.isActive || $0.isPostActive }
+    }
+
     var currentModel: WhisperModelSpec {
         ModelCatalog.spec(id: modelID) ?? ModelCatalog.all[0]
     }
@@ -350,6 +356,10 @@ final class AppModel {
         customLLMFiles = llmStore.customFiles()
         // 選んでいた取り込みのモデルが消えていたら、一覧のおすすめに戻す
         if llmModelID.hasPrefix("file:"), !customLLMFiles.contains(String(llmModelID.dropFirst(5))) {
+            llmModelID = LLMCatalog.defaultModelID
+        }
+        // 一覧に無い ID (前の版の設定など) も、おすすめに戻す (設定の選択肢に当てはまるものが無くなる)
+        if !llmModelID.hasPrefix("file:"), LLMCatalog.spec(id: llmModelID) == nil {
             llmModelID = LLMCatalog.defaultModelID
         }
     }
