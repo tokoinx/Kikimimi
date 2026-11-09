@@ -3,14 +3,15 @@ import KikimimiCore
 import KikimimiLLM
 import KikimimiWhisper
 
-/// `Kikimimi --selftest-llm <GGUF> [--cpu]`
+/// `Kikimimi --selftest-llm <GGUF> [--cpu] [--strict]`
 ///
 /// 画面を出さずに、LLM の読み込み・翻訳・監査をひと通り試して結果を表示する (動作確認・CI 用)。
 /// whisper.framework と llama.framework を同じプロセスで使えることの確認も兼ねる。
+/// 乱数の重みのモデル (CI) でも成り立つことだけを必ず確かめ、`--strict` では本物のモデルの答えの中身まで確かめる。
 enum LLMSelfTest {
-    static func run(modelPath: String, useGPU: Bool) -> Int32 {
+    static func run(modelPath: String, useGPU: Bool, strict: Bool) -> Int32 {
         guard !modelPath.isEmpty, FileManager.default.fileExists(atPath: modelPath) else {
-            log("usage: Kikimimi --selftest-llm <model.gguf> [--cpu]")
+            log("usage: Kikimimi --selftest-llm <model.gguf> [--cpu] [--strict]")
             return 2
         }
         log("whisper.cpp: " + WhisperContext.systemInfo.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -30,6 +31,28 @@ enum LLMSelfTest {
             log("generate: \(shaped.debugDescription), \(seconds(since: clock))")
             guard shapeOK else {
                 log("SELFTEST FAILED: the grammar-shaped answer came back malformed")
+                return 1
+            }
+            // 翻訳と同じ組み立て (手本のやりとり・日本語だけ) で答えが返る。かなを外してしまうと、ここで答えられない
+            let japanese = try engine.generate(
+                LLMPrompt(system: "Translate into Japanese.", user: "[1] we",
+                          grammar: "root ::= \"[1] \" [ぁ-ん] [ぁ-ん]? \"\\n\"", maxTokens: 8,
+                          maxLineBytes: 64, examples: Translator.examples, japaneseOnly: true),
+                shouldCancel: { false })
+            log("japanese only: \(japanese.debugDescription)")
+            guard japanese.range(of: #"^\[1\] [ぁ-ん]{1,2}\n$"#, options: .regularExpression) != nil else {
+                log("SELFTEST FAILED: the Japanese-only answer came back malformed: \(japanese.debugDescription)")
+                return 1
+            }
+            // 日本語に出てこない字 (簡体字) は外し、かな・ふつうの漢字は外さない
+            let bans = ["们", "这", "欢", "あ", "日", "本"].map { ($0, engine.isExcludedFromJapanese($0)) }
+            log("excluded for Japanese: " + bans.map { "\($0.0)=\($0.1.map(String.init) ?? "-")" }.joined(separator: " "))
+            let wrongBans = bans.filter { text, excluded in
+                guard let excluded else { return false }
+                return excluded != Script.containsNonJapaneseHan(text)
+            }
+            guard wrongBans.isEmpty else {
+                log("SELFTEST FAILED: the Japanese-only token filter is wrong for \(wrongBans.map(\.0))")
                 return 1
             }
 
@@ -67,7 +90,20 @@ enum LLMSelfTest {
                 log("SELFTEST FAILED: duplicate removed=\(duplicateRemoved), japanese kept=\(japaneseKept)")
                 return 1
             }
-            log("SELFTEST OK")
+            if strict {
+                // 本物のモデル向け: 訳せていて、どれも日本語で、聞き間違い (Roblocks → Roblox) を直せている
+                let allJapanese = translations.values.allSatisfy {
+                    Script.isJapanese($0) && !Script.containsNonJapaneseHan($0)
+                }
+                let fixedName = report.changes.contains {
+                    $0.original.id == segments[0].id && $0.kind == .fix && ($0.replacement ?? "").contains("Roblox")
+                }
+                guard translations.count >= 3, allJapanese, fixedName else {
+                    log("SELFTEST FAILED (strict): translated=\(translations.count)/4, all Japanese=\(allJapanese), fixed Roblocks=\(fixedName)")
+                    return 1
+                }
+            }
+            log("SELFTEST OK" + (strict ? " (strict)" : ""))
             return 0
         } catch {
             log("SELFTEST FAILED: \(error.localizedDescription)")

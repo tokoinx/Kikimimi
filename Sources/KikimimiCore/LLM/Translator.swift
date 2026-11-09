@@ -101,7 +101,7 @@ public enum Translator {
 
     /// 手本のやりとり。小さなモデル (Qwen3.5 4B など) は指示だけだと訳文が中国語に流れることがあり、
     /// 日本語の手本を 1 回見せると日本語で答える (あいさつの行は特に流れやすいので、手本にも入れておく)
-    static let examples = [
+    public static let examples = [
         LLMExample(
             user: """
             Lines to translate:

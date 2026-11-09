@@ -9,7 +9,7 @@ enum KikimimiMain {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--selftest-llm") {
             let path = i + 1 < args.count ? args[i + 1] : ""
-            exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu")))
+            exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu"), strict: args.contains("--strict")))
         }
         KikimimiApp.main()
     }

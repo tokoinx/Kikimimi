@@ -512,7 +512,7 @@ struct AuditPanel: View {
                 Text("監査の結果").font(.headline)
                 Spacer()
                 if let audit {
-                    Text(audit.model.map { "LLM: \($0)" } ?? "規則のみ")
+                    Text((audit.model.map { "LLM: \($0)" } ?? "規則のみ") + (audit.isPartial == true ? " (途中まで)" : ""))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

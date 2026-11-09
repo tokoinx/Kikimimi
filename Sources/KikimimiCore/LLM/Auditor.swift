@@ -441,22 +441,22 @@ public enum Auditor {
         let ruled = Set(ruleChanges.map(\.original.id))
         let removed = Set(ruleChanges.filter(\.isConfident).map(\.original.id))
         let order = Dictionary(segments.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
-        func report(_ llmChanges: [AuditChange], model: String?) -> AuditReport {
+        func report(_ llmChanges: [AuditChange], model: String?, partial: Bool) -> AuditReport {
             // 規則の指摘がある区間は規則を優先する (理由がはっきりしているため)
             var all = ruleChanges + llmChanges.filter { !ruled.contains($0.original.id) }
             all.sort { (order[$0.original.id] ?? 0) < (order[$1.original.id] ?? 0) }
-            return AuditReport(changes: all, model: model, reviewedCount: segments.count)
+            return AuditReport(changes: all, model: model, reviewedCount: segments.count, isPartial: partial ? true : nil)
         }
-        onPartial(report([], model: nil))
-        guard let generator else { return report([], model: nil) }
+        onPartial(report([], model: nil, partial: generator != nil))
+        guard let generator else { return report([], model: nil, partial: false) }
         let rest = segments.filter { !removed.contains($0.id) }
         var soFar: [AuditChange] = []
         let llmChanges = try review(rest, language: language, options: options, generator: generator,
                                     shouldCancel: shouldCancel, onProgress: onProgress) { chunk in
             soFar += chunk
-            onPartial(report(soFar, model: modelName))
+            onPartial(report(soFar, model: modelName, partial: true))
         }
-        return report(llmChanges, model: modelName)
+        return report(llmChanges, model: modelName, partial: false)
     }
 }
 

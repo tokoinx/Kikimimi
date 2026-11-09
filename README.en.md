@@ -156,10 +156,10 @@ The parts that do not depend on the UI (export, model catalog, WAV, hallucinatio
 swift test
 ```
 
-There is also a diagnostic that exercises the LLM inside the built app (no window opens; add `--cpu` to stay off the GPU):
+There is also a diagnostic that exercises the LLM inside the built app (no window opens). It translates and audits sample lines with the downloaded LLM and prints the timings. With `--strict` it also checks that every translation is Japanese and that the mishearing (Roblocks → Roblox) gets fixed; add `--cpu` to stay off the GPU.
 
 ```bash
-build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf
+build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf --strict
 ```
 
 ## Layout

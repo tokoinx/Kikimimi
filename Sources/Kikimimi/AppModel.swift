@@ -33,6 +33,8 @@ final class Job: Identifiable {
     /// 監査・翻訳のお知らせ (失敗・一部だけ訳せなかった など)
     var postNote: String?
     @ObservationIgnored var postCancel = CancelFlag()
+    /// 録音のために一時停止した (メモリの少ない Mac)。録音を止めると続ける
+    @ObservationIgnored var pausedForRecording = false
 
     init(name: String, url: URL?, isRecording: Bool = false, samples: [Float]? = nil) {
         self.name = name
@@ -682,6 +684,12 @@ final class AppModel {
         let glossary = initialPrompt
         let language = transcript.language
         defer { job.postState = .idle }
+        defer {
+            if job.pausedForRecording {
+                job.pausedForRecording = false
+                job.postNote = "録音のあいだ一時停止しています。録音を止めると続けます。"
+            }
+        }
 
         // メモリの少ない Mac では、LLM を読み込む前に Whisper を手放す
         if useLLM && MemoryBudget.isTight { service.unload() }
@@ -710,6 +718,8 @@ final class AppModel {
                     job.postNote = "LLM が未取得のため、繰り返しの見直しだけを行いました。聞き取りミスも見直すには、設定の「監査・翻訳」から LLM を取得してください。"
                     return
                 }
+                // 規則の見直しのあいだに、メモリの少ない Mac で録音が始まった: LLM は録音のあとで
+                if pauseIfRecording(.audit, job: job) { return }
                 job.postState = .running(.audit, message: "監査中…" + preparing, progress: nil)
                 let partial = LockedBox<AuditReport>()
                 do {
@@ -736,15 +746,26 @@ final class AppModel {
                         return
                     }
                     // はじめての監査: LLM が見終えたまとまりまでの結果を反映する (規則の結果は反映済み)
-                    if let done = partial.value, done.model != nil { adopt(done, in: job) }
-                    job.postNote = cancelled
-                        ? "監査を中止しました。見終えた所までの結果を反映しています。"
-                        : "LLM で見直せなかったため、繰り返しの見直しだけを反映しました: " + error.localizedDescription
+                    let adoptedPartial: Bool
+                    if let done = partial.value, done.model != nil {
+                        adopt(done, in: job)
+                        adoptedPartial = true
+                    } else {
+                        adoptedPartial = false
+                    }
+                    if cancelled {
+                        job.postNote = "監査を中止しました。見終えた所までの結果を反映しています。"
+                    } else if adoptedPartial {
+                        job.postNote = "LLM の見直しが途中で止まりました。見終えた所までの結果を反映しています: " + error.localizedDescription
+                    } else {
+                        job.postNote = "LLM で見直せなかったため、繰り返しの見直しだけを反映しました: " + error.localizedDescription
+                    }
                     return
                 }
 
             case .translate:
                 guard useLLM else { return }
+                if pauseIfRecording(.translate, job: job) { return }
                 job.postState = .running(.translate, message: "翻訳中…" + preparing, progress: nil)
                 let segments = transcript.segments
                 let sources = Dictionary(segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
@@ -781,6 +802,26 @@ final class AppModel {
             } else {
                 job.postNote = (task == .audit ? "監査" : "翻訳") + "できませんでした: " + error.localizedDescription
             }
+        }
+    }
+
+    /// メモリの少ない Mac で録音中なら、この仕事を順番待ちの先頭に戻して true を返す (録音を止めると続ける)
+    private func pauseIfRecording(_ task: PostTask, job: Job) -> Bool {
+        guard isRecording, MemoryBudget.isTight else { return false }
+        if !job.postQueue.contains(task) { job.postQueue.insert(task, at: 0) }
+        job.pausedForRecording = true
+        return true
+    }
+
+    /// メモリの少ない Mac で録音を始めるとき: 動いている監査・翻訳を止めて順番待ちの先頭に戻す
+    /// (LLM を手放してから Whisper を読み込む。訳せた所・監査で見終えた所までは残り、録音を止めると続きから)
+    private func pausePostTasksForRecording() {
+        guard MemoryBudget.isTight else { return }
+        for job in jobs {
+            guard let task = job.postState.task else { continue }
+            if !job.postQueue.contains(task) { job.postQueue.insert(task, at: 0) }
+            job.pausedForRecording = true
+            job.postCancel.set()
         }
     }
 
@@ -831,7 +872,10 @@ final class AppModel {
 
         // プレビューのために、取得済みならモデルを先に読み込んでおく (メモリの少ない Mac では LLM を先に手放す)
         let spec = currentModel
-        if MemoryBudget.isTight { llm.unload() }
+        if MemoryBudget.isTight {
+            pausePostTasksForRecording()
+            llm.unload()
+        }
         if store.isInstalled(spec) {
             let path = store.url(for: spec).path
             Task { try? await service.preload(modelPath: path) }

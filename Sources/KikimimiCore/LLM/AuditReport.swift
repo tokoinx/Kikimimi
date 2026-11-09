@@ -53,14 +53,17 @@ public struct AuditReport: Codable, Hashable, Sendable {
     public var date: Date
     /// 利用者が自分で決めたこと (反映する / しない)。監査をやり直しても、同じ直しには同じ決定を当てる
     public var userDecisions: [String: Bool]?
+    /// LLM が全部を見終える前の結果 (中止・失敗したときに、見終えた所までを反映したもの)
+    public var isPartial: Bool?
 
     public init(changes: [AuditChange], model: String?, reviewedCount: Int, date: Date = Date(),
-                userDecisions: [String: Bool]? = nil) {
+                userDecisions: [String: Bool]? = nil, isPartial: Bool? = nil) {
         self.changes = changes
         self.model = model
         self.reviewedCount = reviewedCount
         self.date = date
         self.userDecisions = userDecisions
+        self.isPartial = isPartial
     }
 
     public var appliedFixes: Int { changes.filter { $0.isApplied && $0.kind == .fix }.count }

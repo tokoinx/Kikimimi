@@ -145,6 +145,15 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         }
     }
 
+    /// 診断用: この文字が 1 トークンで表せるとき、日本語だけの出力で外すトークンに入っているか (1 トークンでなければ nil)
+    public func isExcludedFromJapanese(_ text: String) -> Bool? {
+        lock.lock()
+        defer { lock.unlock() }
+        let tokens = tokenize(text, addSpecial: false, parseSpecial: false)
+        guard tokens.count == 1 else { return nil }
+        return japaneseBanList()[Int(tokens[0])]
+    }
+
     /// 会話の組み立て方 (診断用)
     public var chatFormatDescription: String {
         switch format {

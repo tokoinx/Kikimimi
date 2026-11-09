@@ -156,10 +156,10 @@ make install
 swift test
 ```
 
-組み立てたアプリで LLM をひと通り動かす診断もあります (画面は出ません。`--cpu` で GPU を使わずに動かします)。
+組み立てたアプリで LLM をひと通り動かす診断もあります (画面は出ません)。取得した LLM で例文を訳し、監査し、かかった時間を表示します。`--strict` を付けると、訳がすべて日本語か・聞き間違い (Roblocks → Roblox) を直せたかまで確かめます。`--cpu` で GPU を使わずに動かします。
 
 ```bash
-build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf
+build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf --strict
 ```
 
 ## 構成
