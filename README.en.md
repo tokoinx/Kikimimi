@@ -40,7 +40,9 @@ make run
 1. `swift build -c release` (the first build downloads the prebuilt whisper.cpp and llama.cpp frameworks, about 54 MB + 65 MB, from GitHub)
 2. Assembles `build/Kikimimi.app` and embeds whisper.framework and llama.framework
 3. Ad-hoc signs the app
-4. Launches it (if Kikimimi is already running, it quits that copy first)
+4. Launches it (if Kikimimi is already running, it quits that copy first, then checks a few seconds later that the new one is running; if it is not, it collects the cause into `build/doctor.txt`)
+
+Start the app with `make run`. A bare `open build/Kikimimi.app` does not start the new build while an older copy is still running.
 
 To install into `/Applications`:
 
@@ -117,6 +119,13 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 - **The LLM download fails**: like the speech models, it needs Hugging Face. If it is blocked, get a Qwen3.5 GGUF elsewhere (for example `Qwen3.5-4B-Q4_K_M.gguf` from huggingface.co/unsloth/Qwen3.5-4B-GGUF) and add it with "手元の GGUF を追加…" in Settings.
 - **Translation is slow or the Mac gets sluggish**: switch the LLM to "Qwen3.5 2B" in Settings. You can stop a translation at any time; what was translated is kept, and "残りを翻訳" (Translate the rest) continues from there.
 - **You disagree with a correction**: uncheck it in the "監査: …" list to undo it, or use "すべて元に戻す" (Undo all).
+- **The app does not start, or no window appears**: run the following. It collects the environment, the assembled app, a launch check and recent crash reports into `build/doctor.txt` (a window appears and closes by itself after a few seconds). Report that file as is.
+
+  ```bash
+  make doctor
+  ```
+
+  While the app keeps running with its window closed (during a transcription or translation), click the Dock icon or choose File > メインウインドウを表示 (⌘0) to bring the window back. When nothing is in progress, closing the window quits the app.
 - **`make run` says whisper.framework or llama.framework is missing**: run the following, then `make run` again.
 
   ```bash

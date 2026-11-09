@@ -32,7 +32,18 @@ enum KikimimiMain {
         // macOS が復元しようとして、ウインドウが 1 つも無いまま動いていることがあった (CI で、3 回目の起動で再現)。
         // 復元するものは無い (文字起こしの結果は保存していない) ので、いつも新しいウインドウで始める
         if !args.contains("--restore-windows") {
-            UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true, "NSQuitAlwaysKeepsWindows": false])
+            UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
+            UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+            // 前の版が残した状態も消す (残っていると、無視する設定にしても、最初の起動でウインドウが出ないことがあった)
+            if let id = Bundle.main.bundleIdentifier,
+               let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
+                try? FileManager.default.removeItem(
+                    at: library.appendingPathComponent("Saved Application State/\(id).savedState"))
+            }
+        } else {
+            // 確認用: これまでの動き (復元する) に戻す
+            UserDefaults.standard.removeObject(forKey: "ApplePersistenceIgnoreState")
+            UserDefaults.standard.removeObject(forKey: "NSQuitAlwaysKeepsWindows")
         }
         KikimimiApp.main()
     }
