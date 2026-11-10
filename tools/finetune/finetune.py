@@ -74,7 +74,7 @@ def split_data(data, work, seed):
     (out / "valid.jsonl").write_text("\n".join(rows[:n_valid]) + "\n", encoding="utf-8")
     (out / "train.jsonl").write_text("\n".join(rows[n_valid:]) + "\n", encoding="utf-8")
     print(f"▸ 学習データ {len(rows) - n_valid} 件、確認用 {n_valid} 件")
-    return out, json.loads(rows[0])["messages"]
+    return out, json.loads(rows[0])["messages"], len(rows) - n_valid
 
 
 def check_template(mlx_model, sample):
@@ -170,10 +170,11 @@ def main():
     parser.add_argument("--mlx-model", help="学習に使う MLX 形式のモデル (既定は --model に合うもの)")
     parser.add_argument("--gguf", help="ききみみの LLM のファイル (既定は、ききみみの保存先の <model>.gguf)")
     parser.add_argument("--out", default="build/finetune", help="作業用のフォルダ")
-    parser.add_argument("--iters", type=int, default=150, help="学習の回数")
-    parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument("--iters", type=int, default=0,
+                        help="学習の回数 (既定は、学習データを 3 周する回数。150〜600 の範囲)")
+    parser.add_argument("--learning-rate", type=float, default=2e-4)
     parser.add_argument("--rank", type=int, default=8)
-    parser.add_argument("--scale", type=float, default=4.0)
+    parser.add_argument("--scale", type=float, default=10.0, help="差分の強さ (大きいほど強く効く)")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--cpu", action="store_true", help="GPU を使わない (遅い。GPU でうまく動かないとき)")
     parser.add_argument("--app", default=str(REPO / "build/Kikimimi.app"), help="評価に使う、組み立てたききみみ")
@@ -218,7 +219,10 @@ def main():
     work.mkdir(parents=True, exist_ok=True)
     mlx_model = args.mlx_model or MLX_MODELS[args.model]
 
-    data_dir, sample = split_data(args.data, work, args.seed)
+    data_dir, sample, n_train = split_data(args.data, work, args.seed)
+    if args.iters <= 0:
+        # 1 回に 1 件ずつ学習する。3 周が目安 (GitHub の Mac での通しの確認では、1 周 (100 回) では覚えきれなかった)
+        args.iters = max(150, min(600, 3 * n_train))
     check_template(mlx_model, sample)
     print(f"▸ 学習: {mlx_model}、{args.iters} 回 (rank {args.rank}, scale {args.scale})")
     train(mlx_model, data_dir, adapters, args)

@@ -27,7 +27,7 @@ jobs:
   lora:
     name: LoRA end to end (macos-15, Qwen3.5 0.8B)
     runs-on: macos-15
-    timeout-minutes: 75
+    timeout-minutes: 110
     steps:
       - uses: actions/checkout@v7
 
@@ -87,11 +87,11 @@ jobs:
 
       # 学習と変換 (評価は後の手順で)
       - name: Train with MLX and convert to GGUF
-        timeout-minutes: 40
+        timeout-minutes: 70
         run: |
           set -o pipefail
           .venv-finetune/bin/python tools/finetune/finetune.py --data build/training.jsonl --model qwen3.5-0.8b \
-            --gguf build/models/qwen3.5-0.8b.gguf --out build/finetune --iters 100 --learning-rate 2e-4 --no-eval 2>&1 | tee build/train.log
+            --gguf build/models/qwen3.5-0.8b.gguf --out build/finetune --iters 200 --learning-rate 3e-4 --no-eval 2>&1 | tee build/train.log
           ls -la build/finetune build/finetune/adapters
 
       # 変換だけの確認: 中身が 0 の差分は、出力を変えない (MLX なしで作った差分。向きや名前の取り違えは、ここで読み込めずに止まる)
