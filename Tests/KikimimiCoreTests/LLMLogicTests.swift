@@ -726,4 +726,57 @@ final class LLMCatalogTests: XCTestCase {
         try (Data([0x6c, 0x6d, 0x67, 0x67]) + Data(count: 2_000_000)).write(to: ggml)
         XCTAssertFalse(GGUFFile.isGGUF(at: ggml))
     }
+
+    /// GGUF の先頭の項目を、小さい順のバイトで組み立てる
+    private func ggufHeader(_ items: [(String, [UInt8])]) -> [UInt8] {
+        var bytes: [UInt8] = Array("GGUF".utf8)
+        bytes += Self.le(3, 4) + Self.le(0, 8) + Self.le(UInt64(items.count), 8)
+        for (key, value) in items { bytes += Self.string(key) + value }
+        return bytes
+    }
+
+    private static func le(_ value: UInt64, _ size: Int) -> [UInt8] {
+        (0..<size).map { UInt8((value >> UInt64(8 * $0)) & 0xff) }
+    }
+
+    private static func string(_ s: String) -> [UInt8] { le(UInt64(s.utf8.count), 8) + Array(s.utf8) }
+    private static func stringValue(_ s: String) -> [UInt8] { le(8, 4) + string(s) }
+
+    func testGGUFStringMetadata() {
+        // 文字列のほかに、数値・数値の配列がはさまっていても読める
+        let header = ggufHeader([
+            ("general.architecture", Self.stringValue("qwen35")),
+            ("general.type", Self.stringValue("adapter")),
+            ("adapter.lora.alpha", Self.le(6, 4) + Self.le(0x4200_0000, 4)),
+            ("some.flags", Self.le(9, 4) + Self.le(4, 4) + Self.le(3, 8) + Self.le(1, 4) + Self.le(2, 4) + Self.le(3, 4)),
+            ("general.quantized", Self.le(7, 4) + [1]),
+            ("adapter.type", Self.stringValue("lora")),
+            ("general.name", Self.stringValue("ききみみ")),
+        ])
+        let meta = GGUFFile.stringMetadata(in: header)
+        XCTAssertEqual(meta["general.architecture"], "qwen35")
+        XCTAssertEqual(meta["general.type"], "adapter")
+        XCTAssertEqual(meta["adapter.type"], "lora")
+        XCTAssertEqual(meta["general.name"], "ききみみ")
+        XCTAssertEqual(meta.count, 4)
+
+        // 文字列の配列 (語彙の一覧) に行き当たったら、そこまでに読めたものを返す
+        let model = ggufHeader([
+            ("general.architecture", Self.stringValue("qwen35")),
+            ("tokenizer.ggml.tokens", Self.le(9, 4) + Self.le(8, 4) + Self.le(2, 8) + Self.string("a") + Self.string("b")),
+            ("general.type", Self.stringValue("model")),
+        ])
+        XCTAssertEqual(GGUFFile.stringMetadata(in: model), ["general.architecture": "qwen35"])
+
+        // GGUF でないもの・途中で切れたもの・長さが壊れたものでも落ちない
+        XCTAssertEqual(GGUFFile.stringMetadata(in: Array("GGML".utf8) + [UInt8](repeating: 0, count: 64)), [:])
+        XCTAssertEqual(GGUFFile.stringMetadata(in: Array(header.prefix(40))), [:])
+        for cut in stride(from: 24, to: header.count, by: 7) {
+            _ = GGUFFile.stringMetadata(in: Array(header.prefix(cut)))
+        }
+        let broken = ggufHeader([("general.type", Self.le(8, 4) + Self.le(UInt64.max, 8) + Array("adapter".utf8))])
+        XCTAssertEqual(GGUFFile.stringMetadata(in: broken), [:])
+        let hugeArray = ggufHeader([("x", Self.le(9, 4) + Self.le(4, 4) + Self.le(UInt64.max / 2, 8))])
+        XCTAssertEqual(GGUFFile.stringMetadata(in: hugeArray), [:])
+    }
 }

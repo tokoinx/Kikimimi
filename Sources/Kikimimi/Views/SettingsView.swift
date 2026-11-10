@@ -130,6 +130,8 @@ struct LLMSettingsForm: View {
 
             LearnedCorrectionsSection()
 
+            AdapterSection()
+
             Section {
                 Text("監査と翻訳には、無料・オープンソースの llama.cpp と Qwen3.5 を使い、Mac の GPU (Metal) で動きます。文字起こしの内容は Mac の外に送られません。インターネットを使うのは、LLM を初めて取得するときだけです。")
                     .font(.callout)
@@ -211,6 +213,45 @@ struct ModelRow: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+/// 設定の「追加学習 (LoRA)」: 学習用のデータの書き出しと、学習した差分を入れる・外す・使う
+struct AdapterSection: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Section("追加学習 (LoRA)") {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(model.currentLLM.name) 用の差分")
+                    Text(model.hasAdapter ? "入っています" : "入っていません")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if model.importingAdapter {
+                    ProgressView().controlSize(.small)
+                }
+                if model.hasAdapter {
+                    Button("外す") { model.removeAdapter() }
+                }
+                Button(model.hasAdapter ? "入れ替える…" : "差分を追加…") { model.importAdapter() }
+                    .disabled(model.importingAdapter)
+            }
+            Toggle("監査・翻訳で、この差分を使う", isOn: $model.useAdapter)
+                .disabled(!model.hasAdapter)
+            HStack {
+                Button("学習用のデータを書き出す…") { model.exportTrainingData() }
+                Text("学習した直し \(model.ledger.corrections.count) 件")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text("学習した直しがたまったら、LLM そのものに覚えさせることができます (追加学習)。学習用のデータを書き出し、ターミナルで tools/finetune/finetune.py を動かすと、この Mac の中で学習して「差分」(….lora.gguf) を作ります。差分は、元の LLM を書き換えずに重ねて使う小さなファイルで、いつでも外せます。学習の前後は同じ場面で比べ、悪くなった差分は入れません。手順は README の「追加学習」にあります。数件の直しなら、追加学習をしなくても上の「学習した直し」がそのまま当てます。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

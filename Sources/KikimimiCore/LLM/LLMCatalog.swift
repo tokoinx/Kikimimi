@@ -148,4 +148,53 @@ public enum GGUFFile {
         guard let head = try? handle.read(upToCount: 4) else { return false }
         return [UInt8](head) == ModelFile.ggufMagic
     }
+
+    /// GGUF の先頭にある項目のうち、文字列のもの (general.type・general.architecture・general.name など) を読む。
+    /// ファイルの先頭 limit バイトだけを見る (語彙の一覧のような大きな配列に行き当たったら、そこでやめる)
+    public static func stringMetadata(at url: URL, limit: Int = 262_144) -> [String: String] {
+        guard let handle = try? FileHandle(forReadingFrom: url.resolvingSymlinksInPath()) else { return [:] }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: limit) else { return [:] }
+        return stringMetadata(in: [UInt8](data))
+    }
+
+    static func stringMetadata(in bytes: [UInt8]) -> [String: String] {
+        var offset = 0
+        func integer(_ size: Int) -> UInt64? {
+            guard offset + size <= bytes.count else { return nil }
+            var value: UInt64 = 0
+            for k in 0..<size { value |= UInt64(bytes[offset + k]) << UInt64(8 * k) }
+            offset += size
+            return value
+        }
+        func string() -> String? {
+            guard let length = integer(8), length <= 1_000_000, offset + Int(length) <= bytes.count else { return nil }
+            defer { offset += Int(length) }
+            return String(decoding: bytes[offset..<(offset + Int(length))], as: UTF8.self)
+        }
+        // 値の型ごとの大きさ (GGUF v2 / v3): 0 u8, 1 i8, 2 u16, 3 i16, 4 u32, 5 i32, 6 f32, 7 bool, 8 string, 9 array, 10 u64, 11 i64, 12 f64
+        let sizes: [UInt64: Int] = [0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8]
+        guard bytes.count >= 24, Array(bytes[0..<4]) == ModelFile.ggufMagic else { return [:] }
+        offset = 4
+        guard let version = integer(4), version >= 2, integer(8) != nil, let count = integer(8) else { return [:] }
+        var out: [String: String] = [:]
+        for _ in 0..<min(count, 4096) {
+            guard let key = string(), let type = integer(4) else { break }
+            if type == 8 {
+                guard let value = string() else { break }
+                out[key] = value
+            } else if let size = sizes[type] {
+                guard offset + size <= bytes.count else { break }
+                offset += size
+            } else if type == 9 {
+                // 配列: 数値の配列は読み飛ばす。文字列の配列 (語彙など) は大きいので、そこでやめる
+                guard let element = integer(4), let length = integer(8), let size = sizes[element],
+                      length <= UInt64(bytes.count), offset + Int(length) * size <= bytes.count else { break }
+                offset += Int(length) * size
+            } else {
+                break
+            }
+        }
+        return out
+    }
 }

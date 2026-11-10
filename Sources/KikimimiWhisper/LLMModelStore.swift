@@ -59,6 +59,9 @@ public struct LLMModelStore: Sendable {
     public enum ImportError: LocalizedError {
         case notGGUF
         case multimodalProjector
+        case notAdapter
+        case adapterForAnotherModel(adapter: String, model: String)
+        case adapterInsteadOfModel
 
         public var errorDescription: String? {
             switch self {
@@ -66,7 +69,67 @@ public struct LLMModelStore: Sendable {
                 return "GGUF 形式の LLM ではありません。llama.cpp で動く .gguf ファイルを選んでください。"
             case .multimodalProjector:
                 return "これは画像を読むための補助ファイル (mmproj) です。本体の .gguf を選んでください。"
+            case .notAdapter:
+                return "追加学習の差分 (LoRA アダプタ) の GGUF ではありません。tools/finetune/finetune.py が作る「….lora.gguf」を選んでください。"
+            case .adapterForAnotherModel(let adapter, let model):
+                return "この差分は別の種類のモデル用です (差分: \(adapter)、選んでいる LLM: \(model))。選んでいる LLM から作った差分を選んでください。"
+            case .adapterInsteadOfModel:
+                return "これは追加学習の差分 (LoRA アダプタ) です。LLM の本体ではないので、「差分を追加…」から選んでください。"
             }
+        }
+    }
+
+    // MARK: 追加学習の差分 (LoRA アダプタ)
+
+    /// 差分の置き場所 (`LLM/Adapters`)。LLM の本体と同じフォルダに置くと、取り込んだ LLM として一覧に出てしまう
+    public var adaptersDirectory: URL {
+        directory.appendingPathComponent("Adapters", isDirectory: true)
+    }
+
+    /// モデルごとの差分のファイル。key は、一覧のモデルの ID (`qwen3.5-2b`) か、取り込んだ GGUF の名前 (拡張子なし)
+    public func adapterURL(forModelKey key: String) -> URL {
+        let safe = key.map { $0 == "/" || $0 == ":" ? "-" : $0 }
+        return adaptersDirectory.appendingPathComponent(String(safe) + ".lora.gguf")
+    }
+
+    public func hasAdapter(forModelKey key: String) -> Bool {
+        GGUFFile.isGGUF(at: adapterURL(forModelKey: key), minimumBytes: 1_000)
+    }
+
+    /// 差分を取り込む。差分の GGUF であること、モデルの種類 (architecture) が modelURL と同じことを確かめる
+    public func importAdapter(from source: URL, forModelKey key: String, modelURL: URL) throws {
+        guard GGUFFile.isGGUF(at: source, minimumBytes: 1_000) else { throw ImportError.notGGUF }
+        let adapter = GGUFFile.stringMetadata(at: source)
+        guard adapter["general.type"] == "adapter" else { throw ImportError.notAdapter }
+        let model = GGUFFile.stringMetadata(at: modelURL)
+        if let a = adapter["general.architecture"], let m = model["general.architecture"], a != m {
+            throw ImportError.adapterForAnotherModel(adapter: a, model: m)
+        }
+        // 同じ種類でも、大きさ (2B / 4B …) が違うと使えない。tools/finetune が、元のモデルの大きさを差分に書いている
+        if let a = adapter["kikimimi.base.size_label"], let m = model["general.size_label"], a != m {
+            throw ImportError.adapterForAnotherModel(adapter: a, model: m)
+        }
+        let fm = FileManager.default
+        try fm.createDirectory(at: adaptersDirectory, withIntermediateDirectories: true)
+        let dest = adapterURL(forModelKey: key)
+        if source.resolvingSymlinksInPath().standardizedFileURL.path == dest.resolvingSymlinksInPath().standardizedFileURL.path {
+            return
+        }
+        let tmp = adaptersDirectory.appendingPathComponent(".import-\(UUID().uuidString).part")
+        do {
+            try fm.copyItem(at: source, to: tmp)
+            if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
+            try fm.moveItem(at: tmp, to: dest)
+        } catch {
+            try? fm.removeItem(at: tmp)
+            throw error
+        }
+    }
+
+    public func deleteAdapter(forModelKey key: String) throws {
+        let url = adapterURL(forModelKey: key)
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
         }
     }
 
@@ -76,6 +139,7 @@ public struct LLMModelStore: Sendable {
         guard GGUFFile.isGGUF(at: source) else { throw ImportError.notGGUF }
         let name = source.lastPathComponent
         guard !name.lowercased().contains("mmproj") else { throw ImportError.multimodalProjector }
+        guard GGUFFile.stringMetadata(at: source)["general.type"] != "adapter" else { throw ImportError.adapterInsteadOfModel }
         try ensureDirectory()
         let dest = url(forFile: name)
         let fm = FileManager.default

@@ -82,6 +82,10 @@ def convert(adapter_dir, base_gguf, output):
     writer.add_string("general.type", "adapter")
     writer.add_string("adapter.type", "lora")
     writer.add_string("general.name", f"kikimimi LoRA for {Path(base_gguf).name}")
+    # 元のモデルの大きさ (2B など)。ききみみは、差分を入れるときに、選んでいる LLM と同じかを確かめる
+    size = base.fields.get("general.size_label")
+    if size is not None:
+        writer.add_string("kikimimi.base.size_label", bytes(size.parts[size.data[0]]).decode())
     rank = None
     for target in sorted(pairs, key=lambda k: (int(k.split(".")[1]), k)):
         sides = pairs[target]
