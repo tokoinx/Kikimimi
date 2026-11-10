@@ -30,7 +30,9 @@ public struct LlamaOptions: Sendable {
     }
 
     public static var recommendedThreads: Int {
-        max(1, min(8, ProcessInfo.processInfo.activeProcessorCount - 2))
+        // コアの少ない機械 (4 つ以下) では 1 つだけ空け、ほかでは 2 つ空ける (3 コアで 1 スレッドにならないように)
+        let cores = ProcessInfo.processInfo.activeProcessorCount
+        return max(1, min(8, cores <= 4 ? cores - 1 : cores - 2))
     }
 }
 
@@ -112,6 +114,12 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         cparams.n_threads = Int32(max(1, options.threads))
         cparams.n_threads_batch = Int32(max(1, options.threads))
         cparams.no_perf = true
+        if options.gpuLayers == 0 {
+            // CPU だけで動かす (--cpu) ときは、計算の一部を GPU に回すこともしない
+            // (既定では、層を GPU に置かなくても、大きな演算と KV キャッシュを GPU に回す。GPU が遅い・使えない環境での確認用)
+            cparams.offload_kqv = false
+            cparams.op_offload = false
+        }
         guard let context = llama_init_from_model(model, cparams) else {
             llama_model_free(model)
             throw LLMError.contextFailed

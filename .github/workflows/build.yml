@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# 新しい push が来たら、同じブランチの古い実行は止める (続けて push したときに、Mac の実行枠が古い実行で埋まらないように)
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   macos:
     name: ${{ matrix.os }} / Xcode ${{ matrix.xcode }}
