@@ -107,7 +107,7 @@ learning_rate: {args.learning_rate}
 max_seq_length: 1024
 mask_prompt: true
 grad_checkpoint: true
-steps_per_report: 10
+steps_per_report: 5
 steps_per_eval: {max(10, args.iters // 4)}
 val_batches: -1
 save_every: {max(10, args.iters // 2)}

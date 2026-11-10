@@ -82,15 +82,25 @@ jobs:
           wc -l build/training.jsonl
           head -c 600 build/training.jsonl
 
+      # この Mac での速さ (GPU と CPU)。GitHub の Mac は仮想 GPU・3 コアで、CPU だけだと 0.8B の評価 1 回に 9 分かかった
+      # (Linux の CPU では 41 秒)。以下の評価と学習は GPU (Metal) で動かす
+      - name: Speed check (Metal, then CPU)
+        continue-on-error: true
+        timeout-minutes: 12
+        run: |
+          APP=build/Kikimimi.app/Contents/MacOS/Kikimimi
+          time $APP --selftest-llm build/models/qwen3.5-0.8b.gguf 2>&1 | grep -v -E "^(ggml_|llama_|load_|print_info)" | tail -25
+          time $APP --selftest-llm build/models/qwen3.5-0.8b.gguf --cpu 2>&1 | grep -v -E "^(ggml_|llama_|load_|print_info)" | grep -E "loaded|generate|translate:|audit:"
+
       # 変換だけの確認: 中身が 0 の差分は、出力を変えない (MLX なしで作った差分。向きや名前の取り違えは、ここで読み込めずに止まる)
       - name: Converter check (a zero adapter changes nothing)
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: |
           .venv-finetune/bin/python tools/finetune/selftest/make_zero_adapter.py build/zero-adapter
           .venv-finetune/bin/python tools/finetune/mlx_lora_to_gguf.py build/zero-adapter build/models/qwen3.5-0.8b.gguf build/zero.lora.gguf
           APP=build/Kikimimi.app/Contents/MacOS/Kikimimi
-          $APP --eval-llm build/models/qwen3.5-0.8b.gguf --set tools/finetune/selftest/eval.json --cpu --report build/eval-plain.json
-          $APP --eval-llm build/models/qwen3.5-0.8b.gguf --adapter build/zero.lora.gguf --set tools/finetune/selftest/eval.json --cpu \
+          $APP --eval-llm build/models/qwen3.5-0.8b.gguf --set tools/finetune/selftest/eval.json --report build/eval-plain.json
+          $APP --eval-llm build/models/qwen3.5-0.8b.gguf --adapter build/zero.lora.gguf --set tools/finetune/selftest/eval.json \
             --report build/eval-zero.json --baseline build/eval-plain.json
           .venv-finetune/bin/python - <<'PY'
           import json
@@ -104,7 +114,7 @@ jobs:
         timeout-minutes: 45
         run: |
           .venv-finetune/bin/python tools/finetune/finetune.py --data build/training.jsonl --model qwen3.5-0.8b \
-            --gguf build/models/qwen3.5-0.8b.gguf --out build/finetune --iters 200 --cpu \
+            --gguf build/models/qwen3.5-0.8b.gguf --out build/finetune --iters 200 \
             --eval-set tools/finetune/selftest/eval.json --base-report build/eval-plain.json
 
       # 学習した語を、モデルそのもの (台帳なし) が直せるようになったか
