@@ -247,6 +247,98 @@ final class CorrectionLedgerTests: XCTestCase {
         }
     }
 
+    /// いくつかの語をまとめた直しを「反映 → 元に戻す」としても、回数が増えていかない (元に戻したのに自動になったりしない)
+    func testRetractTakesBackAnAcceptance() {
+        var ledger = CorrectionLedger()
+        ledger.record(wrong: "聞き耳", right: "ききみみ", language: "ja", example: nil, accepted: true)
+        // まとめた直しを反映: もう 1 回の「反映」
+        ledger.record(wrong: "聞き耳", right: "ききみみ", language: "ja", example: nil, accepted: true)
+        XCTAssertTrue(ledger.corrections[0].isAutomatic)
+        // それを元に戻した: 反映を 1 つ取り消す (「元に戻す」とは数えない)
+        ledger.retract(wrong: "聞き耳", right: "ききみみ")
+        XCTAssertEqual(ledger.corrections[0].accepted, 1)
+        XCTAssertEqual(ledger.corrections[0].rejected, 0)
+        XCTAssertFalse(ledger.corrections[0].isAutomatic)
+        XCTAssertTrue(ledger.corrections[0].isActive)
+        // 0 より下には行かない。無い組は何もしない
+        ledger.retract(wrong: "聞き耳", right: "ききみみ")
+        ledger.retract(wrong: "聞き耳", right: "ききみみ")
+        XCTAssertEqual(ledger.corrections[0].accepted, 0)
+        ledger.retract(wrong: "x", right: "y")
+        XCTAssertEqual(ledger.corrections.count, 1)
+    }
+
+    /// 大文字小文字だけが違う組は、別々の組として覚える。正しい語に大文字が入っていれば、書かれたとおりに直す
+    func testCaseOnlyPairsAreSeparateAndSpellingIsKept() {
+        var ledger = CorrectionLedger()
+        XCTAssertTrue(ledger.teach(wrong: "roblox", right: "ROBLOX"))
+        XCTAssertTrue(ledger.teach(wrong: "ROBLOX", right: "Roblox"))
+        XCTAssertEqual(ledger.corrections.map { "\($0.wrong)->\($0.right)" }, ["roblox->ROBLOX", "ROBLOX->Roblox"])
+        // 大文字小文字を区別しない組は、今までどおり同じ組
+        ledger.record(wrong: "Roblocks", right: "Roblox", language: "en", example: nil, accepted: true)
+        ledger.record(wrong: "roblocks", right: "roblox", language: "en", example: nil, accepted: true)
+        XCTAssertEqual(ledger.corrections.count, 3)
+
+        var names = CorrectionLedger()
+        _ = names.teach(wrong: "eye phone", right: "iPhone")
+        _ = names.teach(wrong: "iphone", right: "iPhone")
+        _ = names.teach(wrong: "teh", right: "the")
+        let lines = [segment("Eye phone sales went up again."), segment("IPHONE sales went up.", at: 3),
+                     segment("Teh cat sat down.", at: 6)]
+        XCTAssertEqual(names.fixes(for: lines, language: "en").map(\.replacement),
+                       ["iPhone sales went up again.", "iPhone sales went up.", "The cat sat down."])
+    }
+
+    /// 大文字小文字だけの学習した直しを、LLM の直しとまとめたものとして元に戻したら、やり直しで片方だけ戻ってこない
+    func testRevertedCaseOnlyFixDoesNotComeBackAlone() throws {
+        var ledger = CorrectionLedger()
+        _ = ledger.teach(wrong: "roblox", right: "Roblox")
+        let segments = [segment("We play roblox in a whirled of games every day.")]
+        var answer = "[1] FIX whirled => world\nEND"
+        let generator = FakeGenerator { prompt in
+            if prompt.user.contains("Lines to check") { return answer }
+            for line in prompt.user.split(separator: "\n") where line.hasPrefix("1: ") || line.hasPrefix("2: ") {
+                if line.contains("world") { return String(line.prefix(1)) }
+            }
+            return "1"
+        }
+        func audit(_ transcript: Transcript) throws -> AuditReport {
+            try Auditor.audit(transcript.segmentsBeforeAudit, language: "en",
+                              options: AuditOptions(ledger: ledger, decisions: transcript.audit?.userDecisions ?? [:]),
+                              generator: generator, modelName: "fake", shouldCancel: { false })
+        }
+        var transcript = Transcript(sourceName: "x", segments: segments, language: "en")
+        transcript.adopt(try audit(transcript))
+        XCTAssertEqual(transcript.segments[0].text, "We play Roblox in a world of games every day.")
+        transcript.setChange(try XCTUnwrap(transcript.audit?.changes.first).id, applied: false)
+        // やり直しでは、LLM は何も言わない: 学習した直しだけが、自動で戻ってきてはいけない
+        answer = "END"
+        transcript.adopt(try audit(transcript))
+        XCTAssertEqual(transcript.segments[0].text, segments[0].text)
+        XCTAssertEqual(transcript.audit?.changes.first?.isConfident, false)
+    }
+
+    /// 学習した直しの提案がある行に、LLM も自信の無い指摘をした: 学習した直しの提案を残す (一覧から消えない)
+    func testALearnedSuggestionIsKeptWhenTheLLMOnlySuggests() throws {
+        var ledger = CorrectionLedger()
+        ledger.record(wrong: "Roblocks", right: "Roblox", language: "en", example: nil, accepted: true)
+        let segments = [segment("Open Roblocks Studio and sell fifteen items.")]
+        // LLM: 数字が変わる直し (提案どまり)
+        let generator = FakeGenerator { prompt in
+            if prompt.user.contains("Lines to check") { return "[1] FIX fifteen => fifty\nEND" }
+            for line in prompt.user.split(separator: "\n") where line.hasPrefix("1: ") || line.hasPrefix("2: ") {
+                if line.contains("fifty") { return String(line.prefix(1)) }
+            }
+            return "1"
+        }
+        let report = try Auditor.audit(segments, language: "en", options: AuditOptions(ledger: ledger), generator: generator,
+                                       modelName: "fake", shouldCancel: { false })
+        XCTAssertEqual(report.changes.count, 1)
+        XCTAssertEqual(report.changes[0].origin, .ledger)
+        XCTAssertEqual(report.changes[0].replacement, "Open Roblox Studio and sell fifteen items.")
+        XCTAssertFalse(report.changes[0].isConfident)
+    }
+
     /// いくつかの語をまとめた直しは、どの組にも利用者の決定を覚えられるよう、すべての組を持つ
     func testCombinedChangesCarryEveryPair() throws {
         var ledger = CorrectionLedger()

@@ -114,9 +114,11 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
         return (w, r)
     }
 
-    /// 同じ組とみなす印 (英字の大文字小文字は区別しない)
+    /// 同じ組とみなす印 (英字の大文字小文字は区別しない)。大文字小文字だけが違う組 (「roblox」→「Roblox」) は、
+    /// 区別しないと「roblox → ROBLOX」と「ROBLOX → Roblox」が同じ組になってしまうので、そのまま比べる
     static func key(_ wrong: String, _ right: String) -> String {
-        wrong.lowercased() + "\u{1}" + right.lowercased()
+        if wrong.lowercased() == right.lowercased() { return wrong + "\u{1}" + right }
+        return wrong.lowercased() + "\u{1}" + right.lowercased()
     }
 
     func index(wrong: String, right: String) -> Int? {
@@ -152,6 +154,15 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
                                                  taught: true, updated: date))
         }
         return true
+    }
+
+    /// 利用者が自分で反映した直しを、元に戻した (どの語がいけなかったのかわからない、いくつかの語をまとめた直しで使う):
+    /// 「反映する」の回数を 1 つ戻す。「元に戻す」とは数えない
+    public mutating func retract(wrong: String, right: String, date: Date = Date()) {
+        guard let pair = Self.normalized(wrong, right), let i = index(wrong: pair.wrong, right: pair.right),
+              corrections[i].accepted > 0 else { return }
+        corrections[i].accepted -= 1
+        corrections[i].updated = date
     }
 
     public mutating func remove(_ id: UUID) {

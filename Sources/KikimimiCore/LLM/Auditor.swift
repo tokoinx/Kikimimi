@@ -298,9 +298,10 @@ public enum Auditor {
             let ns = NSString(string: text)
             guard let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)) else { continue }
             var replacement = right
-            // 大文字小文字を無視して見つけた語が大文字で始まっていれば (文の頭など)、直した語もそろえる
+            // 大文字小文字を無視して見つけた語が大文字で始まっていれば (文の頭など)、直した語もそろえる。
+            // 正しい語に大文字が入っているとき (iPhone・eBay・macOS) は、書かれたとおりの表記を使う
             if !options.isEmpty, let first = ns.substring(with: match.range).first, first.isUppercase,
-               let r = replacement.first, r.isLowercase {
+               let r = replacement.first, r.isLowercase, !replacement.contains(where: \.isUppercase) {
                 replacement = r.uppercased() + replacement.dropFirst()
             }
             return ns.replacingCharacters(in: match.range, with: replacement)
@@ -523,9 +524,14 @@ public enum Auditor {
         func revertedBefore(_ change: AuditChange) -> Bool {
             guard options.decisions[change.signature] == nil,
                   let texts = revertedTexts[change.original.id.uuidString] else { return false }
-            let rights = change.decisionPairs.map(\.right)
             return texts.contains { text in
-                rights.contains { containsTerm(text, $0) && !containsTerm(change.original.text, $0) }
+                change.decisionPairs.contains { pair in
+                    // 大文字小文字・記号だけが違う組は、表記まで同じかで見る (区別しないと、元の行にも「ある」ことになる)
+                    if TextSimilarity.key(pair.wrong) == TextSimilarity.key(pair.right) {
+                        return text.contains(pair.right) && !change.original.text.contains(pair.right)
+                    }
+                    return containsTerm(text, pair.right) && !containsTerm(change.original.text, pair.right)
+                }
             }
         }
         func isOn(_ change: AuditChange) -> Bool {
@@ -548,7 +554,11 @@ public enum Auditor {
             var suggested = pending
             for change in llmChanges where !ruled.contains(change.original.id) {
                 guard let own = learned[change.original.id] else {
-                    // 反映されない学習した直しがある行を、LLM が直した: LLM の直しを使う (1 区間 1 件)
+                    // 反映されない学習した直し (提案) がある行に、LLM も指摘した (1 区間 1 件):
+                    // LLM の自信のある直しなら、それを使う。提案どうしなら、利用者が前に決めた、学習した直しの提案を残す
+                    if suggested[change.original.id] != nil, !(change.kind == .fix && change.isConfident && !revertedBefore(change)) {
+                        continue
+                    }
                     suggested[change.original.id] = nil
                     var change = change
                     // 利用者が前に直しを元に戻した行は、別の直しでも、確かめてもらってから反映する

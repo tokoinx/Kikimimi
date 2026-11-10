@@ -18,7 +18,10 @@ final class Job: Identifiable {
     var status: Status = .queued
     var progress: Double = 0
     var message: String = "順番待ち"
-    var transcript: Transcript?
+    /// 文字起こしの結果。中身が変わったら (続きが出た・監査や翻訳が入った・直しを反映した)、まだ書き出していないものとして扱う
+    var transcript: Transcript? {
+        didSet { if transcript != oldValue { exported = false } }
+    }
     var error: String?
     let isRecording: Bool
     let cancelFlag = CancelFlag()
@@ -836,6 +839,7 @@ final class AppModel {
         } catch let error as WhisperError where error == .cancelled {
             job.status = .cancelled
             job.message = "中止しました"
+            if job.url != nil { job.samples = nil }
             cleanPartialTranscript(of: job)
         } catch {
             if job.cancelFlag.isSet {
@@ -889,19 +893,25 @@ final class AppModel {
     func setAuditChange(_ change: AuditChange, applied: Bool, in job: Job) {
         guard var transcript = job.transcript else { return }
         let before = transcript.audit?.changes.first { $0.id == change.id }
+        // この直しを、利用者が前に自分で「反映する」と決めていたか (自動で反映されたものではなく)
+        let wasAcceptedByUser = before.map { transcript.audit?.userDecisions?[$0.signature] == true } ?? false
         transcript.setChange(change.id, applied: applied)
         job.transcript = transcript
         // 利用者が自分で決めた直しを覚える (次からは、反映した直しは先に当て、元に戻した直しは出さない)
         let after = transcript.audit?.changes.first { $0.id == change.id }
         // いくつかの語をまとめた直し (学習した直しが 2 つ当たった行・学習した直しと LLM の直しをまとめた行) を反映したら、
-        // どの組にも「反映」を覚える。元に戻したときは、どの語がいけなかったのかわからないので、台帳には覚えない
-        // (この行での決定は、文字起こしの側に残る。監査をやり直しても、この行には当てない)
-        if useLedger, let before, let after, before.kind == .fix, before.isApplied != after.isApplied,
-           after.isApplied || before.decisionPairs.count == 1 {
+        // どの組にも「反映」を覚える。元に戻したときは、どの語がいけなかったのかわからないので「元に戻す」とは覚えず、
+        // 利用者が自分で反映していたものなら、その「反映」を取り消すだけにする (反映 → 元に戻す、で回数が増えていかないように。
+        // この行での決定は、文字起こしの側に残る。監査をやり直しても、この行には当てない)
+        if useLedger, let before, let after, before.kind == .fix, before.isApplied != after.isApplied {
             let pairs = before.decisionPairs
             for pair in pairs {
-                ledger.record(wrong: pair.wrong, right: pair.right, language: transcript.language(of: before.original),
-                              example: pairs.count == 1 ? before.original.text : nil, accepted: after.isApplied)
+                if after.isApplied || pairs.count == 1 {
+                    ledger.record(wrong: pair.wrong, right: pair.right, language: transcript.language(of: before.original),
+                                  example: pairs.count == 1 ? before.original.text : nil, accepted: after.isApplied)
+                } else if wasAcceptedByUser {
+                    ledger.retract(wrong: pair.wrong, right: pair.right)
+                }
             }
             if !pairs.isEmpty { saveLedger() }
         }

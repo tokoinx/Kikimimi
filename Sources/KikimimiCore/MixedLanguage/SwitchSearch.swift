@@ -285,7 +285,8 @@ public enum SwitchSearch {
         let minSpeech = R.samples(R.minDetectSpeechSeconds)
         let trimEdge = R.samples(R.islandTrimEdgeSeconds)
         var detections = 0
-        var leaves: [(range: Range<Int>, island: LanguageGuess?)] = []
+        // weak: 別の言語と出たが、信じられるほどではなかった判定 (信じられる島のとなりなら、島に含める)
+        var leaves: [(range: Range<Int>, island: LanguageGuess?, weak: LanguageGuess?)] = []
         func other(_ g: LanguageGuess) -> Double { g.language == host.language ? 1 - g.confidence : g.confidence }
 
         // (範囲, その範囲の判定, 4 秒以下になってから、もう一度だけ分けたものか, 雑音かどうかを確かめる途中か)。深さは高々 4〜5 段
@@ -299,7 +300,7 @@ public enum SwitchSearch {
             if range.count <= maxIsland || speech < 2 * minSpeech {
                 if let g = node.guess, g.language != host.language,
                    LanguagePlanner.isTrusted(g, speechSeconds: R.seconds(speech)) {
-                    leaves.append((range, g))
+                    leaves.append((range, g, nil))
                 } else if !node.trimmed, let g = node.guess, other(g) >= R.islandTrimOther, speech >= 2 * minSpeech,
                           range.count > 2 * trimEdge {
                     // 別の言語がかなり混ざっているが、信じられるほどではない (島が半分に割れた・端に寄っている):
@@ -308,15 +309,15 @@ public enum SwitchSearch {
                     let cut = map.quietestSample(in: (range.lowerBound + trimEdge)..<(range.upperBound - trimEdge), near: mid) ?? mid
                     for half in [range.lowerBound..<cut, cut..<range.upperBound] {
                         guard map.speechSamples(in: half) >= minSpeech else {
-                            leaves.append((half, nil))
+                            leaves.append((half, nil, nil))
                             continue
                         }
                         let h = try detect(half)
                         detections += 1
-                        if let h { stack.append((half, h, true, false)) } else { leaves.append((half, nil)) }
+                        if let h { stack.append((half, h, true, false)) } else { leaves.append((half, nil, nil)) }
                     }
                 } else {
-                    leaves.append((range, nil))
+                    leaves.append((range, nil, node.guess.flatMap { $0.language != host.language ? $0 : nil }))
                 }
                 continue
             }
@@ -326,7 +327,7 @@ public enum SwitchSearch {
             var explore: [(range: Range<Int>, guess: LanguageGuess)] = []
             for half in [range.lowerBound..<cut, cut..<range.upperBound] {
                 guard map.speechSamples(in: half) >= minSpeech else {
-                    leaves.append((half, nil))
+                    leaves.append((half, nil, nil))
                     continue
                 }
                 let g = try detect(half)
@@ -334,7 +335,7 @@ public enum SwitchSearch {
                 if let g, other(g) >= max(R.islandFloor, floor) {
                     explore.append((half, g))
                 } else {
-                    leaves.append((half, nil))
+                    leaves.append((half, nil, nil))
                 }
             }
             // 半分にした 2 つが、どちらも同じくらい別の言語らしい: 雑音で全体に広がった揺れか、両方に島があるか。
@@ -344,7 +345,7 @@ public enum SwitchSearch {
                 let a = other(explore[0].guess), b = other(explore[1].guess)
                 if min(a, b) > R.islandContrast * max(a, b) {
                     if node.suspect {
-                        leaves += explore.map { ($0.range, nil) }
+                        leaves += explore.map { ($0.range, nil, nil) }
                         continue
                     }
                     suspect = true
@@ -353,9 +354,25 @@ public enum SwitchSearch {
             for e in explore { stack.append((e.range, e.guess, false, suspect)) }
         }
 
-        // 並べ直し、つながった同じ言語の部分をまとめる
+        // 並べ直す。別の言語と出たが信じきれなかった部分は、同じ言語の信じられる島のとなりなら、その島に含める
+        // (6 秒の英語の引用が「英語 / 信じきれない英語 / 英語」に割れると、真ん中だけ元の言語で文字にして失う)
+        leaves.sort { $0.range.lowerBound < $1.range.lowerBound }
+        var joined = true
+        while joined {
+            joined = false
+            for k in leaves.indices {
+                guard leaves[k].island == nil, let weak = leaves[k].weak else { continue }
+                let before = k > 0 ? leaves[k - 1].island : nil
+                let after = k + 1 < leaves.count ? leaves[k + 1].island : nil
+                if before?.language == weak.language || after?.language == weak.language {
+                    leaves[k].island = weak
+                    joined = true
+                }
+            }
+        }
+        // つながった同じ言語の部分をまとめる
         var groups: [(range: Range<Int>, island: LanguageGuess?)] = []
-        for leaf in leaves.sorted(by: { $0.range.lowerBound < $1.range.lowerBound }) {
+        for leaf in leaves.map({ (range: $0.range, island: $0.island) }) {
             if let last = groups.last, last.island?.language == leaf.island?.language {
                 let island: LanguageGuess? = {
                     guard let a = last.island, let b = leaf.island else { return nil }

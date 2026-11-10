@@ -146,7 +146,9 @@ def evaluate(app, gguf, adapter, eval_sets, work, cpu, base_report=None):
     new_report = Path(work) / "eval-adapter.json"
     if base_report:
         print(f"▸ 評価 (差分なし): {base_report} を使います")
-        shutil.copyfile(base_report, Path(work) / "eval-base.json")
+        # 前の実行が作業用のフォルダに書いたものを、そのまま指定したときは写さない
+        if Path(base_report).resolve() != (Path(work) / "eval-base.json").resolve():
+            shutil.copyfile(base_report, Path(work) / "eval-base.json")
     else:
         print("▸ 評価 (差分なし)")
         first = subprocess.run([str(binary), "--eval-llm", str(gguf), *sets, "--report", str(Path(work) / "eval-base.json"), *extra])
@@ -201,6 +203,14 @@ def main():
         fail(f"この Mac のメモリは {have} GB で、{args.model} の追加学習の目安 ({need} GB) に足りません。"
              "軽いモデル (--model qwen3.5-2b など) を使うか、ほかのアプリを閉じて --force を付けてください。")
 
+    # 評価に使うファイルは、学習の前に確かめる (学習が終わってから「ありません」で止まらないように)
+    base = Path(args.base_report).expanduser() if args.base_report else None
+    if base and not base.exists():
+        fail(f"{base} がありません (--base-report)。")
+    for path in args.eval_set or []:
+        if not Path(path).expanduser().exists():
+            fail(f"{path} がありません (--eval-set)。")
+
     work = Path(args.out).expanduser()
     adapters = work / "adapters"
     if adapters.exists():
@@ -222,9 +232,6 @@ def main():
     better = None
     if not args.no_eval:
         sets = args.eval_set or [REPO / "Tests/Fixtures/llm-eval/seed.json"]
-        base = Path(args.base_report).expanduser() if args.base_report else None
-        if base and not base.exists():
-            fail(f"{base} がありません。")
         better = evaluate(args.app, gguf_path, adapter, sets, work, args.cpu, base)
     if better is False:
         print(f"✗ 差分を使うと、評価が悪くなりました。入れません (差分は {adapter} に残しています)。")

@@ -95,6 +95,8 @@ final class LLMService: @unchecked Sendable {
         lock.lock()
         engine = loaded
         loadedAdapter = applied
+        // 前に読み込めなかった差分が、作り直されて読み込めた: 「読み込めなかった」の記録を消す
+        if let applied, rejectedAdapter?.path == applied.path { rejectedAdapter = nil }
         lock.unlock()
         return loaded
     }

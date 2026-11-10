@@ -504,6 +504,19 @@ final class MixedLanguagePropertyTests: XCTestCase {
         XCTAssertGreaterThan(covered(engine, out, single), 1.5, describe(out))
     }
 
+    // MARK: - 4. 島が割れる
+
+    /// 日本語の話の途中の、6 秒の英語の引用。判定の揺れが大きいと、引用の一部 (1.5 秒ほど) が「英語らしいが信じきれない」と出る。
+    /// 信じられる英語のとなりなら、いっしょに英語として文字にする (割れたままだと、真ん中だけ日本語で文字にして失う)
+    func testAnUntrustedPieceNextToATrustedIslandJoinsIt() throws {
+        let scenario = Scenario.random(seed: 4437)
+        let engine = scenario.engine
+        let quote = try XCTUnwrap(engine.utterances.firstIndex { $0.language == "en" && abs(Double($0.range.lowerBound) / 16_000 - 27.72) < 0.05 })
+        let out = try MixedPipeline.run(samples: [Float](repeating: 0, count: scenario.total), engine: engine,
+                                        options: MixedPipeline.Options(candidates: ["ja", "en"]))
+        XCTAssertGreaterThan(covered(engine, out, quote), 5.0, describe(out))
+    }
+
     // MARK: - 乱数で作った録音
 
     /// 乱数で作った 150 通りの録音 (20〜400 秒。言語の入れ替わり・短い差し込み・VAD の有無・判定の揺れ・区間の切れ方を変える) で、
