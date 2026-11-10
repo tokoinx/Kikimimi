@@ -268,9 +268,11 @@ public enum Auditor {
     }
 
     /// 行の中の「聞き間違えた語」を「正しい語」に置き換える (最初の 1 か所だけ)。行に見つからなければ nil。
-    /// 語や数は切れ目で合わせる (「can」を直すつもりで「scan」の中を、「15」を直すつもりで「115」の中を変えない)
-    static func applyFix(to text: String, wrong: String, right: String) -> String? {
-        guard TextSimilarity.key(wrong) != TextSimilarity.key(right) else { return nil }
+    /// 語や数は切れ目で合わせる (「can」を直すつもりで「scan」の中を、「15」を直すつもりで「115」の中を変えない)。
+    /// 大文字小文字・記号だけが違う組は、LLM の直しとしては使わない (句読点や表記の好みを直したがるため)。
+    /// 利用者が自分で決めた直し (学習した直し) は、surfaceOnly: true でそれも当てる (「T-pie」→「TPIE」)
+    static func applyFix(to text: String, wrong: String, right: String, surfaceOnly: Bool = false) -> String? {
+        guard surfaceOnly ? wrong != right : TextSimilarity.key(wrong) != TextSimilarity.key(right) else { return nil }
         let (leading, trailing) = boundaries(for: wrong)
         let pattern = leading + NSRegularExpression.escapedPattern(for: wrong) + trailing
         for options: NSRegularExpression.Options in [[], [.caseInsensitive]] {

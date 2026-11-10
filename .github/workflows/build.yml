@@ -156,6 +156,26 @@ jobs:
         continue-on-error: true
         run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm build/tiny.gguf
 
+      # 評価ハーネス (LLM なしで動く所): 練習用の場面を、規則だけ → 学習した直しの台帳つき、で採点して比べる。
+      # 台帳は、覚えた語をすべて直し、正しい行を 1 つも壊さない。学習データの書き出しも、ここで動かす
+      - name: Evaluation harness (rules only, then with learned corrections) and training-data export
+        run: |
+          APP=build/Kikimimi.app/Contents/MacOS/Kikimimi
+          SET=tools/finetune/selftest
+          $APP --eval-llm none --rules-only --set $SET/eval.json --report build/eval-rules.json
+          $APP --eval-llm none --rules-only --ledger $SET/ledger.json --set $SET/eval.json \
+            --report build/eval-ledger.json --baseline build/eval-rules.json
+          python3 - <<'PY'
+          import json
+          rules, ledger = (json.load(open(f"build/eval-{n}.json"))["audit"] for n in ("rules", "ledger"))
+          assert rules["harmed"] == 0 and rules["fixedAutomatically"] == 0, rules
+          assert ledger["fixedAutomatically"] == ledger["errorLines"] == 10, ledger
+          assert ledger["harmed"] == 0 and ledger["wrongFixes"] == 0 and ledger["falseSuggestions"] == 0, ledger
+          print("learned corrections: fixed", ledger["fixedAutomatically"], "of", ledger["errorLines"], "- harmed 0")
+          PY
+          $APP --export-training build/training.jsonl --ledger $SET/ledger.json --clean $SET/clean.txt
+          test "$(wc -l < build/training.jsonl)" -ge 40
+
       # 「日本語＋英語」: 英語と日本語が入れ替わる 47 秒の録音 (FLEURS の朗読) を、いちばん小さな whisper のモデル (tiny) で
       # 文字にし、区間ごとの言語が合っているか (間を空けずに入れ替わるところも) を確かめる。1 つの言語の設定でも動かす
       - name: Fetch the whisper test models

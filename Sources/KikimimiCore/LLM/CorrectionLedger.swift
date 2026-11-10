@@ -137,10 +137,14 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
             var applied: [LearnedCorrection] = []
             for rule in rules {
                 if let own = rule.language, let lineLanguage, own != lineLanguage { continue }
-                // 正しい語がもう入っている行は、そのまま (「AI」→「AI model」のように、正しい語が誤りの語を含む組を重ねて当てない)
-                if text.range(of: rule.right, options: .caseInsensitive) != nil { continue }
+                // 正しい語がもう入っている行は、そのまま (「AI」→「AI model」のように、正しい語が誤りの語を含む組を重ねて当てない。
+                // 正しい語と誤りの語の両方がある行は、言い分けているのかもしれない)。
+                // 大文字小文字・記号だけが違う組 (「T-pie」→「TPIE」「roblox」→「Roblox」) は、表記まで同じものがあるときだけ
+                let surface = TextSimilarity.key(rule.wrong) == TextSimilarity.key(rule.right)
+                if surface ? text.contains(rule.right) : text.range(of: rule.right, options: .caseInsensitive) != nil { continue }
                 var count = 0
-                while count < 8, let fixed = Auditor.applyFix(to: text, wrong: rule.wrong, right: rule.right), fixed != text {
+                while count < 8, let fixed = Auditor.applyFix(to: text, wrong: rule.wrong, right: rule.right, surfaceOnly: true),
+                      fixed != text {
                     text = fixed
                     count += 1
                     if rule.right.range(of: rule.wrong, options: .caseInsensitive) != nil { break }

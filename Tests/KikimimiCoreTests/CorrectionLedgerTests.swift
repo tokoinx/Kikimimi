@@ -163,9 +163,31 @@ final class CorrectionLedgerTests: XCTestCase {
         XCTAssertEqual(change.replacement, "Welcome to Roblox Studio, where we build games.")
         XCTAssertTrue(change.reason.contains("学習した直し") && change.reason.contains("build"))
     }
+    /// 大文字小文字・記号だけが違う直しも、利用者が決めたものは当てる (LLM の直しとしては使わない組)
+    func testSurfaceOnlyCorrectionsApply() {
+        var ledger = CorrectionLedger()
+        XCTAssertTrue(ledger.teach(wrong: "T-pie", right: "TPIE"))
+        XCTAssertTrue(ledger.teach(wrong: "roblox", right: "Roblox"))
+        XCTAssertTrue(ledger.teach(wrong: "ルータイス", right: "ルー・タイス"))
+        let segments = [
+            TranscriptSegment(start: 0, end: 2, text: "We finished the first unit of T-pie today."),
+            TranscriptSegment(start: 2, end: 4, text: "I like roblox and t-pie."),
+            TranscriptSegment(start: 4, end: 6, text: "Roblox is already right, and TPIE too."),
+            TranscriptSegment(start: 6, end: 8, text: "ルータイス氏の言葉です。"),
+            TranscriptSegment(start: 8, end: 10, text: "The magpie flew away."),
+        ]
+        let fixes = ledger.fixes(for: segments, language: nil)
+        XCTAssertEqual(fixes.map(\.replacement), [
+            "We finished the first unit of TPIE today.",
+            "I like Roblox and TPIE.",
+            "ルー・タイス氏の言葉です。",
+        ])
+        // LLM の直しとしては、今までどおり使わない
+        XCTAssertNil(Auditor.applyFix(to: "the T-pie course", wrong: "T-pie", right: "TPIE"))
+        XCTAssertEqual(Auditor.applyFix(to: "the T-pie course", wrong: "T-pie", right: "TPIE", surfaceOnly: true), "the TPIE course")
+    }
 }
 
-/// 評価ハーネス (決まった場面で監査役・翻訳役を動かして採点する)
 final class LLMEvalTests: XCTestCase {
     private let roblox = AuditEvalCase(
         id: "en-roblox", language: "en", glossary: "Roblox Studio",
