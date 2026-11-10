@@ -86,7 +86,8 @@ jobs:
       # Linux の CPU では 41 秒。MLX の学習は 1 回に 15 秒ほど)。評価は小さな場面 (3 場面 + 確認用の例から作る場面) を CPU で。
       # 学習は MLX の GPU (CPU では 30 分たっても進まなかった)
 
-      # 学習 → 変換 → 評価 (差分なし / 差分あり)。評価が悪い・効き目が無いときの終了コード (3 / 4) では止めず、次の手順で中身を確かめる
+      # 学習 (途中の差分を候補として残す) → 変換 → 評価 (差分なしと、候補を同じ場面で比べて、いちばん良いものを選ぶ)。
+      # 良い候補が無いときの終了コード (3 / 4) では止めず、次の手順で中身を確かめる
       - name: Train with MLX, convert to GGUF, evaluate with the app
         timeout-minutes: 240
         run: |
@@ -103,7 +104,9 @@ jobs:
       - name: Did the adapter learn the corrections?
         run: |
           .venv-finetune/bin/python - <<'PY'
-          import json
+          import json, os, sys
+          if not os.path.exists("build/finetune/eval-adapter.json"):
+              sys.exit("no candidate was better than the plain model (see the table in the training step)")
           base, new = json.load(open("build/finetune/eval-base.json")), json.load(open("build/finetune/eval-adapter.json"))
           def found(r): return r["audit"]["fixedAutomatically"] + r["audit"]["fixedBySuggestion"]
           print("base   :", json.dumps(base["audit"]))

@@ -147,7 +147,7 @@ Once you have collected enough learned corrections, you can teach them to the LL
    .venv-finetune/bin/pip install "mlx-lm[train]" gguf numpy
    ```
 
-3. Train. This trains, converts the result to GGUF, compares "without / with the adapter" with the evaluation harness, and installs the adapter only **if it is better** (more lines fixed, and no more wrong fixes or harmed lines than before). The evaluation uses the scenes shipped with Kikimimi plus scenes built from held-out examples of your own corrections. An adapter that shows no gain, or makes things worse, is not installed.
+3. Train. This trains, converts the results to GGUF, compares the plain model with five intermediate adapters using the evaluation harness, and installs the best one only **if it is better than no adapter** (more lines fixed, and no more wrong fixes or harmed lines than before). The evaluation uses the scenes shipped with Kikimimi plus scenes built from held-out examples of your own corrections. An adapter that shows no gain, or makes things worse, is not installed.
 
    ```bash
    .venv-finetune/bin/python tools/finetune/finetune.py --data ~/Desktop/kikimimi-training.jsonl --model qwen3.5-2b --install
@@ -159,7 +159,17 @@ Things to know:
 
 - **Memory needed**: about 8 GB to train 2B, 16 GB for 4B, 32 GB for 9B. On an 8 GB Mac, use 2B (the script stops and says so when memory is short). The first run downloads the training copy of the model (MLX format, e.g. `mlx-community/Qwen3.5-2B-4bit`) from Hugging Face.
 - **At least 12 training examples** are required. For a handful of corrections, learned corrections already do the job without training. Fine-tuning pays off once you have dozens of corrections and want them to carry over to similar cases.
-- **How much training**: by default the data is seen three and a half times (200–800 steps). Checked with Qwen3.5 0.8B and 12 corrections (90 training examples): after one pass (100 steps) the model still answered "nothing to fix" even on its training examples; after three passes (300 steps) it fixed 7 of 10 lines automatically in sentences it had never seen (0 without the adapter, no correct line harmed). One line got a wrong fix ("Roblocks → Robo"), and the evaluation harness ruled "do not use this adapter". A fine-tuned small model can overreach like this, so always run the evaluation before using an adapter (the script does).
+- **How much training, and which adapter**: by default the data is seen five times (300–1000 steps). No fixed number of steps is right, so five intermediate adapters are kept and the evaluation harness picks the best one. An example with Qwen3.5 0.8B and 12 corrections (90 training examples), on 24 lines with an error in sentences the training never saw:
+
+  | | Lines fixed (automatically) | Wrong fixes | Correct lines harmed | Needless suggestions |
+  |---|---|---|---|---|
+  | No adapter | 3 (2) | 0 | 0 | 5 |
+  | 200 steps | 13 (2) | 0 | 0 | 1 |
+  | 300 steps | 12 (5) | 0 | 0 | 1 |
+  | 400 steps | 11 (11) | 0 | 0 | 1 |
+  | 500 and 600 steps | 2 (2) | 0 | 0 | 1 |
+
+  After one or two passes most fixes come out as suggestions, after four they are automatic, and beyond five the model fixes almost nothing again (here the 400-step adapter is chosen). A run with another seed fixed 7 of 10 lines automatically at 300 steps but produced one wrong fix ("Roblocks → Robo"), and the harness ruled "do not use". Fine-tuning a small model is unstable like this, so always run the evaluation before using an adapter (the script does). These numbers come from running the same training in PyTorch and evaluating the converted adapters with llama.cpp.
 - The script corrects three things that make training ineffective when mlx-lm is used as is (each was reproduced by running the same training in PyTorch):
   - **What is trained**: mlx-lm also trains on the marker that closes the "thinking" block before the answer. With Qwen3.5 nearly all of the training goes there, so the loss is restricted to the answer.
   - **The loss**: mlx-lm counts one padding position after the end of each example. With answer-only training (3–12 tokens) that one position dominates the loss (4.634 against 0.012 for one example), so it is excluded.

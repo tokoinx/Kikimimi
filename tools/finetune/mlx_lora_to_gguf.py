@@ -49,14 +49,15 @@ def read_safetensors(path):
     return out
 
 
-def convert(adapter_dir, base_gguf, output):
+def convert(adapter_dir, base_gguf, output, weights=None):
+    """weights: 差分の重みのファイル (既定は adapter_dir の adapters.safetensors。学習の途中で保存されたものを指定できる)"""
     import gguf
 
     adapter_dir = Path(adapter_dir)
     config = json.loads((adapter_dir / "adapter_config.json").read_text())
     params = config.get("lora_parameters", {})
     scale = float(params.get("scale", 20.0))
-    tensors = read_safetensors(adapter_dir / "adapters.safetensors")
+    tensors = read_safetensors(Path(weights) if weights else adapter_dir / "adapters.safetensors")
 
     base = gguf.GGUFReader(str(base_gguf))
     field = base.fields["general.architecture"]

@@ -207,6 +207,11 @@ def use_answer_only_loss():
     return replaced
 
 
+def save_every(args):
+    """学習の途中の差分を保存する間隔 (--checkpoints 個の候補ができる)"""
+    return max(10, args.iters // max(1, args.checkpoints))
+
+
 def train(mlx_model, data_dir, adapters, args):
     """mlx-lm の LoRA の学習を、このプロセスの中で動かす。
 
@@ -229,8 +234,11 @@ grad_checkpoint: true
 steps_per_report: 5
 steps_per_eval: {max(10, args.iters // 4)}
 val_batches: -1
-save_every: {max(10, args.iters // 2)}
+save_every: {save_every(args)}
 seed: {args.seed}
+lr_schedule:
+  name: cosine_decay
+  arguments: [{args.learning_rate}, {args.iters}]
 optimizer: adam
 optimizer_config:
   adam:
@@ -261,38 +269,72 @@ def found(report):
     return report["audit"]["fixedAutomatically"] + report["audit"]["fixedBySuggestion"]
 
 
-def evaluate(app, gguf, adapter, eval_sets, work, cpu, base_report=None):
-    """評価ハーネスで、差分なし / 差分ありを比べる。
-    返すのは (悪くなっていないか, 直せた行が増えたか)。評価できなければ None。
+def run_eval(binary, gguf, sets, cpu, report, adapter=None, baseline=None):
+    """評価ハーネスを 1 回動かして、結果 (report の中身) と終了コードを返す"""
+    command = [str(binary), "--eval-llm", str(gguf), *[x for s in sets for x in ("--set", str(s))], "--report", str(report)]
+    if adapter:
+        command += ["--adapter", str(adapter)]
+    if baseline:
+        command += ["--baseline", str(baseline)]
+    if cpu:
+        command.append("--cpu")
+    done = subprocess.run(command, capture_output=True, text=True)
+    if done.returncode not in ((0, 3) if baseline else (0,)):
+        print(done.stdout[-2000:] + done.stderr[-2000:])
+        fail("評価が失敗しました。")
+    return json.loads(Path(report).read_text(encoding="utf-8")), done.returncode
+
+
+def choose(base, candidates):
+    """候補 (名前, 結果, 悪くなっていないか) から、いちばん良いものを選ぶ。
+    悪くなっていない (誤った直し・正しい行を壊す・直せた行が減る、が無い) ものの中で、点がいちばん高いもの。
+    点は、自動で直せた行を 2、提案どまりで見つけた行を 1 と数える (確かめずに済む直しのほうが役に立つ)。
+    同じなら、不要な提案が少ないもの、それも同じなら学習の回数が少ないもの (候補は回数の順に並んでいる)。
+    差分なしより直せた行が増えたものが無ければ None"""
+    best = None
+    for index, (name, report, not_worse) in enumerate(candidates):
+        if not not_worse or found(report) <= found(base):
+            continue
+        key = (found(report) + report["audit"]["fixedAutomatically"], -report["audit"]["falseSuggestions"], -index)
+        if best is None or key > best[0]:
+            best = (key, name)
+    return best[1] if best else None
+
+
+def evaluate(app, gguf, candidates, eval_sets, work, cpu, base_report=None):
+    """評価ハーネスで、差分なしと、候補 (名前 → GGUF の差分) を同じ場面で比べる。
+    返すのは (選んだ候補の名前か None, 悪くなっていない候補があったか)。評価できなければ None。
     base_report があれば、差分なしの評価はそれを使う (同じ LLM・同じ場面で前に測ったもの)"""
     binary = Path(app) / "Contents/MacOS/Kikimimi"
     if not binary.exists():
         print(f"⚠ {app} が無いので、評価は飛ばします (先に make app で組み立ててください)")
         return None
-    sets = [x for s in eval_sets for x in ("--set", str(s))]
-    extra = ["--cpu"] if cpu else []
-    base_path, new_path = Path(work) / "eval-base.json", Path(work) / "eval-adapter.json"
+    base_path = Path(work) / "eval-base.json"
     if base_report:
         print(f"▸ 評価 (差分なし): {base_report} を使います")
         # 前の実行が作業用のフォルダに書いたものを、そのまま指定したときは写さない
         if Path(base_report).resolve() != base_path.resolve():
             shutil.copyfile(base_report, base_path)
+        base = json.loads(base_path.read_text(encoding="utf-8"))
     else:
         print("▸ 評価 (差分なし)")
-        first = subprocess.run([str(binary), "--eval-llm", str(gguf), *sets, "--report", str(base_path), *extra])
-        if first.returncode != 0:
-            fail("差分なしの評価が失敗しました。")
-    print("▸ 評価 (差分あり)")
-    second = subprocess.run([str(binary), "--eval-llm", str(gguf), "--adapter", str(adapter), *sets,
-                             "--report", str(new_path), "--baseline", str(base_path), *extra])
-    if second.returncode not in (0, 3):
-        fail("差分ありの評価が失敗しました。")
-    base, new = json.loads(base_path.read_text(encoding="utf-8")), json.loads(new_path.read_text(encoding="utf-8"))
-    lines = new["audit"]["errorLines"]
-    print(f"▸ 直せた行 (提案を含む): {found(base)} → {found(new)} / {lines}、"
-          f"正しい行を壊した数: {base['audit']['harmed']} → {new['audit']['harmed']}、"
-          f"誤った直し: {base['audit']['wrongFixes']} → {new['audit']['wrongFixes']}")
-    return second.returncode == 0, found(new) > found(base)
+        base, _ = run_eval(binary, gguf, eval_sets, cpu, base_path)
+
+    def line(name, r, note=""):
+        a = r["audit"]
+        print(f"  {name:>10}: 直せた行 {found(r)}/{a['errorLines']} (うち自動 {a['fixedAutomatically']})、"
+              f"誤った直し {a['wrongFixes']}、正しい行を壊した数 {a['harmed']}、不要な提案 {a['falseSuggestions']}{note}")
+
+    line("差分なし", base)
+    results = []
+    for name, adapter in candidates:
+        report, code = run_eval(binary, gguf, eval_sets, cpu, Path(work) / f"eval-{name}.json", adapter=adapter, baseline=base_path)
+        results.append((name, report, code == 0))
+        line(name, report, "" if code == 0 else "  ← 悪くなっている")
+    chosen = choose(base, results)
+    if chosen:
+        shutil.copyfile(Path(work) / f"eval-{chosen}.json", Path(work) / "eval-adapter.json")
+    return chosen, any(ok for _, _, ok in results)
 
 
 def main():
@@ -303,7 +345,9 @@ def main():
     parser.add_argument("--gguf", help="ききみみの LLM のファイル (既定は、ききみみの保存先の <model>.gguf)")
     parser.add_argument("--out", default="build/finetune", help="作業用のフォルダ")
     parser.add_argument("--iters", type=int, default=0,
-                        help="学習の回数 (既定は、学習データを 7 周する回数。300〜1200 の範囲)")
+                        help="学習の回数 (既定は、学習データを 5 周する回数。300〜1000 の範囲)")
+    parser.add_argument("--checkpoints", type=int, default=5,
+                        help="学習の途中の差分を、いくつ候補として残すか (評価して、いちばん良いものを選ぶ)")
     parser.add_argument("--learning-rate", type=float, default=2e-4)
     parser.add_argument("--rank", type=int, default=8)
     parser.add_argument("--scale", type=float, default=4.0, help="差分の強さ")
@@ -356,10 +400,10 @@ def main():
 
     data_dir, sample, n_train, own_eval = split_data(args.data, work, args.seed)
     if args.iters <= 0:
-        # 1 回に 1 件ずつ学習する。7 周が目安。直しを答え始めるのは、ある回数を超えてから急に起きる: 同じ学習 (0.8B、90 件) を
-        # PyTorch で確かめたとき、1〜2 周 (100〜200 回) では学習した例にも「直しなし」と答え、3 周 (300 回) で、学習に
-        # 使っていない文の 10 行のうち 7 行を直せるようになった。MLX (4 bit のモデル) では、3 周半 (298 回) でもまだ届かなかった
-        args.iters = max(300, min(1200, 7 * n_train))
+        # 1 回に 1 件ずつ学習する。5 周が目安。何回がよいかは、決め打ちできない: 同じ学習 (0.8B、90 件) を PyTorch で
+        # 確かめたとき、1〜2 周では学習した例にも「直しなし」と答え、3〜4 周で直せるようになり (10 行中 7 行)、5 周を
+        # 超えると、種によっては逆にほとんど直さなくなった。そこで、途中の差分を残して、評価でいちばん良いものを選ぶ
+        args.iters = max(300, min(1000, 5 * n_train))
     check_template(mlx_model, sample)
     print(f"▸ 学習: {mlx_model}、{args.iters} 回 (rank {args.rank}, scale {args.scale})")
     train(mlx_model, data_dir, adapters, args)
@@ -367,23 +411,41 @@ def main():
     sys.path.insert(0, str(HERE))
     from mlx_lora_to_gguf import convert
 
-    adapter = work / f"{args.model}.lora.gguf"
-    convert(adapters, gguf_path, adapter)
+    # 候補: 学習の途中で保存された差分と、最後の差分 (回数の順)
+    candidates = []
+    for saved in sorted(adapters.glob("*_adapters.safetensors")):
+        step = int(saved.name.split("_")[0])
+        if step < args.iters:
+            candidates.append((f"{step}回", saved))
+    candidates.append((f"{args.iters}回", adapters / "adapters.safetensors"))
+    converted = []
+    for name, weights in candidates:
+        out = work / f"candidate-{name}.lora.gguf"
+        convert(adapters, gguf_path, out, weights=weights)
+        converted.append((name, out))
 
+    adapter = work / f"{args.model}.lora.gguf"
     result = None
     if not args.no_eval:
         sets = list(args.eval_set or [REPO / "Tests/Fixtures/llm-eval/seed.json"])
         if own_eval:
             sets.append(own_eval)
-        result = evaluate(args.app, gguf_path, adapter, sets, work, args.cpu, base)
-    if result is not None and not result[0]:
-        print(f"✗ 差分を使うと、評価が悪くなりました (誤った直し・正しい行を壊す・直せた行が減る)。入れません。\n"
-              f"  差分は {adapter} に残しています。直しをもっとためるか、--iters を変えて、もう一度試してください。")
-        raise SystemExit(3)
-    if result is not None and not result[1]:
-        print(f"△ 悪くはなっていませんが、直せた行は増えていません (効き目を確かめられませんでした)。入れません。\n"
-              f"  差分は {adapter} に残しています。直しをもっとためるか、--iters を増やして、もう一度試してください。")
-        raise SystemExit(4)
+        print(f"▸ 評価: 候補 {len(converted)} 個を、同じ場面で比べます")
+        result = evaluate(args.app, gguf_path, converted, sets, work, args.cpu, base)
+    if result is None:
+        # 評価していない: 最後の差分をそのまま使う
+        shutil.copyfile(converted[-1][1], adapter)
+    else:
+        chosen, any_not_worse = result
+        if chosen is None:
+            if any_not_worse:
+                print("△ 悪くはなっていない候補はありますが、直せた行が増えた候補がありません (効き目を確かめられませんでした)。入れません。")
+            else:
+                print("✗ どの候補も、差分なしより悪くなりました (誤った直し・正しい行を壊す・直せた行が減る)。入れません。")
+            print(f"  候補は {work} に残しています (candidate-….lora.gguf)。直しをもっとためるか、--iters や --seed を変えて、もう一度試してください。")
+            raise SystemExit(4 if any_not_worse else 3)
+        shutil.copyfile(dict(converted)[chosen], adapter)
+        print(f"▸ いちばん良かった候補: {chosen}")
     if args.install:
         target = LLM_DIR / "Adapters" / f"{args.model}.lora.gguf"
         target.parent.mkdir(parents=True, exist_ok=True)
