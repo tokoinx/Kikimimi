@@ -92,6 +92,74 @@ A small LLM running on your Mac reads the transcript once more.
 - On Macs with less than 12 GB of memory, the speech model and the LLM are loaded in turn so they never use memory at the same time.
 - A small LLM is not as smart as a large cloud model. That is why the auditor applies only confident changes automatically and leaves the rest as suggestions; check the suggestions before you rely on an important transcript.
 
+## Learned corrections, the evaluation harness, and fine-tuning
+
+A small LLM is not dependable on its own. Kikimimi surrounds it with a harness that remembers, checks and measures. Fine-tuning is an optional layer on top of that.
+
+### Learned corrections (memory)
+
+- When you **apply** or **undo** a fix in the audit list, Kikimimi remembers that decision as "misheard term → right term". The "学習した直し" (Learned corrections) section of the "監査・翻訳" tab in Settings lists them, and lets you delete them or add your own.
+- Fixes you applied are made before the LLM is asked, from the next audit on (they are listed as "学習した直し", so you can still undo them). Fixes you undid are not used again, even when the LLM proposes them. The right terms are also added to the vocabulary hint for transcription and translation.
+- They are saved in `~/Library/Application Support/Kikimimi/learned-corrections.json` and never leave the Mac. This works without an LLM.
+
+### Gates (machine checks)
+
+The LLM's answers are checked by code before they are applied (the judge's second opinion and the guardrails are described above). Two more gates were added after measuring with the evaluation harness:
+
+- A fix that writes a comment instead of words ("no error", "note: …", bracketed text, or text more than three times as long as the original term) is dropped.
+- A suggested deletion is dropped unless the same sentence is nearby or the line is a stock hallucination (small models often call ordinary sentences "not spoken").
+
+### Evaluation harness
+
+This measures whether a change made things better. The LLM audits scenes with planted mishearings (which line is wrong, and what the right text is), and the harness counts the lines fixed, the lines missed, the **correct lines harmed** and the needless suggestions. The scenes are in `Tests/Fixtures/llm-eval/seed.json` (6 English and 6 Japanese scenes: 14 lines with an error, 36 correct lines), and you can add your own.
+
+```bash
+build/Kikimimi.app/Contents/MacOS/Kikimimi --eval-llm ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-2b.gguf --set Tests/Fixtures/llm-eval/seed.json --report build/eval-2b.json
+```
+
+With `--baseline <earlier report.json>` the result is compared with an earlier one, and the command exits with code 3 if it is worse (more correct lines harmed, or fewer lines fixed). `--adapter <file.lora.gguf>` adds a fine-tuned adapter, `--ledger <ledger.json>` uses learned corrections, and `--rules-only` measures the rules without an LLM.
+
+Measured with the real Qwen3.5 (Q4_K_M) on a Linux CPU (14 lines with an error):
+
+| LLM | Fixed automatically | Found as a suggestion | Missed | Correct lines harmed | Needless suggestions |
+|---|---|---|---|---|---|
+| 2B (before the gates) | 3 | 4 | 7 | 0 | 13 |
+| 2B (with the gates) | 4 | 3 | 7 | 0 | 1 |
+| 4B | 5 | 2 | 7 | 0 | 3 |
+
+- The gates cut the 2B model's needless suggestions from 13 to 1. No model harmed a correct line.
+- The 7 missed lines are confusions between two real words, where only the context tells them apart (機会 / 機械, 公園 / 講演, 以上 / 異常, 保障 / 保証, break / brake, Their / They're). That is the limit of a small LLM; learned corrections and fine-tuning are there to cover it.
+
+### Fine-tuning (LoRA)
+
+Once you have collected enough learned corrections, you can teach them to the LLM itself. The LLM file is not changed: training makes a small adapter (a LoRA, tens of MB) that is applied on top of it. Training also runs entirely on the Mac.
+
+1. "学習用のデータを書き出す…" (Export training data) on the "監査・翻訳" tab in Settings writes `kikimimi-training.jsonl`. It holds prompts in the same form the auditor and the judge really receive, with answers that follow your decisions (a fix you applied is "fix", a fix you undid is "leave it", a line nothing was said about is "unchanged").
+2. Install the training tools (Apple silicon Mac; this uses Apple's MLX).
+
+   ```bash
+   python3 -m venv .venv-finetune
+   ```
+
+   ```bash
+   .venv-finetune/bin/pip install "mlx-lm[train]" gguf numpy
+   ```
+
+3. Train. This trains, converts the result to GGUF, compares "without / with the adapter" with the evaluation harness, and installs the adapter only if it is not worse.
+
+   ```bash
+   .venv-finetune/bin/python tools/finetune/finetune.py --data ~/Desktop/kikimimi-training.jsonl --model qwen3.5-2b --install
+   ```
+
+4. The "追加学習 (LoRA)" (Fine-tuning) section of the "監査・翻訳" tab turns the adapter on or off; "外す" (Remove) goes back to the plain LLM. An adapter made elsewhere can be added with "差分を追加…" (Add adapter) (one that does not match the selected LLM's family or size is refused; if an adapter cannot be loaded, the app runs without it and says so).
+
+Things to know:
+
+- **Memory needed**: about 8 GB to train 2B, 16 GB for 4B, 32 GB for 9B. On an 8 GB Mac, use 2B (the script stops and says so when memory is short). The first run downloads the training copy of the model (MLX format, e.g. `mlx-community/Qwen3.5-2B-4bit`) from Hugging Face.
+- **At least 12 training examples** are required. For a handful of corrections, learned corrections already do the job without training. Fine-tuning pays off once you have dozens of corrections and want them to carry over to similar cases.
+- **An adapter belongs to the LLM it was trained on** (a 2B adapter does not work with 4B). Train again after switching LLMs.
+- Only the MLP of each layer is trained (Qwen3.5 mixes attention with state-space blocks, and only the MLP weights map one to one between MLX and GGUF). `tools/finetune/mlx_lora_to_gguf.py` does the conversion.
+
 ## Choosing a model
 
 | Model | Best for | Size |
@@ -110,6 +178,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 - **Remove common hallucinations and runaway repetition**: drops stock phrases Whisper tends to produce on silence or music, such as "ご視聴ありがとうございました" (Thanks for watching), but only when the segment is likely not speech. When the same line repeats back to back 4 or more times (or a group of 2–3 lines cycles 3 or more times), only the first occurrence is kept, and a phrase repeated 6 or more times within one line is collapsed to one. The same words spoken minutes apart, emphasis such as "No, no, no, no, no.", and amounts or numbers are kept.
 - **Vocabulary hint**: list proper nouns or jargon (for example: Roblox Studio) so they come out spelled that way. The auditor and the translator use it too.
 - **Audit & translation (local LLM)**: on the "監査・翻訳" tab, choose whether to audit automatically after each transcription, whether to translate non-Japanese segments automatically, and which LLM to use. Download, delete and import LLMs here as well.
+- **Learned corrections / fine-tuning (LoRA)**: on the same tab, list, delete and add learned corrections, export training data, and add, remove or switch a fine-tuned adapter.
 
 ## Troubleshooting
 
@@ -198,6 +267,9 @@ Sources/
     LLM/                 Auditor and translator (the LLM-independent parts)
       Auditor.swift      Repetition rules, reading the LLM's findings, guardrails
       AuditReport.swift  Audit results, apply and undo
+      CorrectionLedger.swift  Learned corrections (remember, apply, block)
+      LLMEval.swift      Evaluation harness (scenes and scoring)
+      FineTuneData.swift Builds fine-tuning data from the ledger
       Translator.swift   Translation a few lines at a time, retries
       Grammar.swift      GBNF grammars that constrain the output
       LLMCatalog.swift   LLM list and how to pick the file to download
@@ -213,23 +285,32 @@ Sources/
     MixedTranscription.swift  Connects whisper to the 日本語＋英語 flow
     ModelStore.swift     Model location, import, delete
     ModelDownloader.swift Download with progress (validated before it is moved into place)
-    LLMModelStore.swift  LLM location and import, reading the Hugging Face file list, SHA-256 check
+    LLMModelStore.swift  LLM and adapter location and import, reading the Hugging Face file list, SHA-256 check
   KikimimiLLM/           Thin layer over the llama.cpp C API
-    LlamaEngine.swift    Loading, chat templates, grammar-constrained greedy generation, cancellation
+    LlamaEngine.swift    Loading, LoRA adapters, chat templates, grammar-constrained greedy generation, cancellation
   Kikimimi/              The macOS app (SwiftUI + AVFoundation)
     AppModel.swift       State, job queue, settings
     TranscriptionService.swift  Dedicated inference thread, model reuse
     LLMService.swift     Dedicated LLM thread, model reuse
     LLMSelfTest.swift    --selftest-llm (diagnostics and CI)
+    LLMEvalRunner.swift  --eval-llm (evaluation harness)
+    TrainingExport.swift --export-training (fine-tuning data export)
     WhisperSelfTest.swift  --selftest-whisper (diagnostics and CI)
+    LaunchSelfTest.swift --selftest-launch (launch and window check, for make doctor and CI)
     AudioDecoder.swift   Audio/video to 16 kHz mono
     LiveRecorder.swift   Microphone recording
     PlayerController.swift  Playback and seeking
     Views/               UI
 Resources/               Info.plist, icon
 Scripts/build-app.sh     Assembles the .app
+Scripts/run-app.sh       Launch (make run): quits a running copy, opens the new one, checks it is alive
+Scripts/doctor.sh        Diagnostics when the app does not launch (make doctor)
 Scripts/make-tiny-gguf.py  Makes a tiny GGUF for smoke tests (CI)
-Tests/Fixtures/          A short English/Japanese recording (for --selftest-whisper in CI)
+tools/finetune/          Fine-tuning (LoRA)
+  finetune.py            Train, convert, evaluate and install in one go (Mac, MLX)
+  mlx_lora_to_gguf.py    Converts an MLX adapter to a GGUF that llama.cpp reads
+  selftest/              Practice data for the end-to-end check (CI)
+Tests/Fixtures/          A short English/Japanese recording (for --selftest-whisper in CI), evaluation scenes (llm-eval/)
 ```
 
 ## Design notes
@@ -240,6 +321,7 @@ Tests/Fixtures/          A short English/Japanese recording (for --selftest-whis
 - **Why a local LLM for auditing and translation**: it is free, keeps the transcript on your Mac and works offline. llama.cpp is fast on Metal and ships an official prebuilt XCFramework. To keep a small model's output well-formed, it is constrained with a GBNF grammar down to the line numbers and the line count, and a line that grows too long is cut off (a guard against runaway repetition). Tokens are chosen greedily, so the same input always gives the same answer.
 - **whisper.cpp and llama.cpp side by side**: the two frameworks each embed a different version of ggml.h. Putting both C modules into one Swift compilation makes their type definitions clash, so each C module is used only inside its wrapper (`internal import`), and the wrappers and KikimimiCore are built with library evolution so the app target never imports them. The overlapping symbols were checked as well; the two libraries never call into each other.
 - **日本語＋英語 (Japanese + English)**: whisper transcribes 30 seconds at a time under one language token (`<|ja|>` and so on). VAD squeezes pauses to 0.1 s, so in a recording that switches between English and Japanese one 30-second window holds both. Hearing English under the Japanese token loops into 「彼は、彼は、…」, and the clean-up pass shortens that to the single broken Japanese line left inside the English (reproduced on English and Japanese read in turns, with a 25% error rate). Automatic detection does not help either: it decides once, on the first 30 seconds. With 日本語＋英語 the speech found by VAD is packed into chunks of 28 s or less, and whisper's language detection compares Japanese and English only for each chunk (without that restriction, short clips come out as Chinese or Korean). A chunk with an unsure result is split at its long pauses and detected again, and a switch with no pause is found by bisecting with 4 s and 2 s windows (a window with less than 1 s of speech is widened until it holds 1 s, since detection on near-silence is unreliable). Even a confident chunk is halved step by step to look for a short stretch of the other language in its middle (an island) when its other-language probability is above what is usual for the file (5× the median of the English chunks): transcribed as English, a Japanese remark is skipped untranslated and leaves nothing for the checks to find. Noise that spreads over a whole chunk is told apart by comparing the end windows, or the first two halves, and is not searched. Neighbouring chunks of the same language are joined (up to 10 minutes) and transcribed in that language with the same settings as the Japanese setting. The result gets cheap checks: repetition, low confidence, an amount of text that does not fit the speaking time, and speech with no text. A flagged region is detected again (when the result is unsure, switches and islands are searched first); the other-language parts, widened to cover every line they overlap, are transcribed in that language, and the result replaces the old text only when it is better (if it is the same language, the text stays; if a re-transcribed part comes back empty, the old line stays: the checks never delete text). The thresholds were measured on English and Japanese read speech (FLEURS) and on a Japanese talk.
+- **Harness before fine-tuning**: most weaknesses of a small LLM (wanting to fix everything, writing comments, repeating the same mistake) can be stopped without changing its weights. So the ledger that remembers your decisions and applies them mechanically, the gates before an answer is applied, and the evaluation harness that compares before and after on the same scenes came first. The ledger works from the first correction and needs no training time or memory. Fine-tuning (LoRA) is for when dozens of corrections have built up, and only when the harness shows the adapter is not worse.
 - **Signing**: ad-hoc. To distribute the app, sign it with a Developer ID and notarize it.
 
 ## Known limitations

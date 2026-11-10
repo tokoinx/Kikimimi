@@ -21,6 +21,7 @@ final class LLMService: @unchecked Sendable {
         queue.async {
             self.lock.lock()
             self.engine = nil
+            self.loadedAdapter = nil
             self.lock.unlock()
         }
     }
@@ -29,11 +30,26 @@ final class LLMService: @unchecked Sendable {
     func failedAdapter() -> String? {
         lock.lock()
         defer { lock.unlock() }
-        return rejectedAdapter
+        return rejectedAdapter?.path
+    }
+
+    /// 差分のファイル。場所が同じでも、作り直されていれば (更新日時が違えば) 別のものとして読み込み直す
+    /// (アプリを開いたまま `finetune.py --install` で入れ替えたとき)
+    private struct AdapterID: Equatable {
+        let path: String
+        let modified: Date?
+
+        init?(_ path: String?) {
+            guard let path else { return nil }
+            self.path = path
+            modified = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
+        }
     }
 
     /// `lock` で保護する
-    private var rejectedAdapter: String?
+    private var rejectedAdapter: AdapterID?
+    /// いまのモデルに重ねてある差分。`lock` で保護する
+    private var loadedAdapter: AdapterID?
 
     /// モデルを (必要なら読み込んで) 使う。body は LLM のスレッドで動く。
     /// adapterPath は追加学習の差分 (LoRA)。読み込めなければ、差分なしで動かす (`failedAdapter()` でわかる)
@@ -53,27 +69,32 @@ final class LLMService: @unchecked Sendable {
     }
 
     private func loadedEngine(_ path: String, adapterPath: String?, shouldCancel: @escaping () -> Bool) throws -> LlamaEngine {
+        let wanted = AdapterID(adapterPath)
         lock.lock()
         // 前に読み込めなかった差分は、もう試さない (毎回、数秒の読み込みをやり直さない)
-        let adapter = adapterPath == rejectedAdapter ? nil : adapterPath
-        if let engine, engine.modelPath == path, engine.adapterPath == adapter {
+        let adapter = wanted == rejectedAdapter ? nil : wanted
+        if let engine, engine.modelPath == path, loadedAdapter == adapter {
             lock.unlock()
             return engine
         }
         engine = nil // 先に古いモデルを手放す
+        loadedAdapter = nil
         lock.unlock()
 
         let loaded: LlamaEngine
+        var applied = adapter
         do {
-            loaded = try LlamaEngine(modelPath: path, options: LlamaOptions(adapterPath: adapter), shouldCancel: shouldCancel)
-        } catch LLMError.adapterLoadFailed(let failed) {
+            loaded = try LlamaEngine(modelPath: path, options: LlamaOptions(adapterPath: adapter?.path), shouldCancel: shouldCancel)
+        } catch LLMError.adapterLoadFailed {
             lock.lock()
-            rejectedAdapter = failed
+            rejectedAdapter = adapter
             lock.unlock()
+            applied = nil
             loaded = try LlamaEngine(modelPath: path, options: LlamaOptions(), shouldCancel: shouldCancel)
         }
         lock.lock()
         engine = loaded
+        loadedAdapter = applied
         lock.unlock()
         return loaded
     }
@@ -83,6 +104,7 @@ final class LLMService: @unchecked Sendable {
         queue.async {
             self.lock.lock()
             self.rejectedAdapter = nil
+            self.loadedAdapter = nil
             self.engine = nil
             self.lock.unlock()
         }
