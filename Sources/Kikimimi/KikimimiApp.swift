@@ -21,6 +21,9 @@ enum KikimimiMain {
         if args.contains("--eval-llm") {
             exit(LLMEvalRunner.run(arguments: args))
         }
+        if args.contains("--export-training") {
+            exit(TrainingExport.run(arguments: args))
+        }
         // 版と、同梱した whisper.cpp / llama.cpp を読み込めるかだけを表示して終わる (組み立ての最後に、この Mac で動くかを確かめる)
         if args.contains("--version") {
             print(LaunchLog.versionLine)

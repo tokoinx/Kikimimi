@@ -1,0 +1,137 @@
+{
+ "version": 1,
+ "corrections": [
+  {
+   "id": "26141BFE-3C8B-516D-A8DD-2FA1A69B4D6E",
+   "wrong": "Kikimimy",
+   "right": "Kikimimi",
+   "language": "en",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "Today we will transcribe this talk with Kikimimy.",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "8582F1FE-0D43-5688-9001-25E8F99791BC",
+   "wrong": "Roblocks",
+   "right": "Roblox",
+   "language": "en",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "Welcome to our session about Roblocks Studio.",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "9150FCAD-5A8D-5095-932B-FD72D516C517",
+   "wrong": "Lou Tyce",
+   "right": "Lou Tice",
+   "language": "en",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "This program was created by Lou Tyce many years ago.",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "A930FB8F-06C2-51BB-9B9C-6C8C2B44C66E",
+   "wrong": "T-pie",
+   "right": "TPIE",
+   "language": "en",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "The T-pie course has twenty-one units.",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "2368748B-E789-5552-AAE9-F2BAB9379CB0",
+   "wrong": "scotomer",
+   "right": "scotoma",
+   "language": "en",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "A scotomer is a blind spot in what we notice.",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "71DEBE0F-79B9-5D74-AC17-2EF61D3EF06C",
+   "wrong": "a formation",
+   "right": "affirmation",
+   "language": "en",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "Write one a formation for each goal.",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "319FAE2F-2884-5688-9A1B-3083DB837AC0",
+   "wrong": "Lua you",
+   "right": "Luau",
+   "language": "en",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "Scripts in the studio are written in Lua you.",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "0D740C2C-974C-57D5-945A-E57E88DDE17D",
+   "wrong": "whirled",
+   "right": "world",
+   "language": "en",
+   "accepted": 0,
+   "rejected": 1,
+   "taught": false,
+   "example": "The leaves whirled around the yard.",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "FDD8A2AE-C2DF-54F8-B35C-5DCE509DE158",
+   "wrong": "ききみに",
+   "right": "ききみみ",
+   "language": "ja",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "この録音は、ききみにで文字にしました。",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "A7C58882-8C0E-5D4E-B72D-D8E62AD583D9",
+   "wrong": "スコトーム",
+   "right": "スコトーマ",
+   "language": "ja",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "スコトームとは、心の盲点のことです。",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "8B4EA04C-7E09-588F-B8DC-359840345D71",
+   "wrong": "アファメーソン",
+   "right": "アファメーション",
+   "language": "ja",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "毎朝、アファメーソンを声に出して読みます。",
+   "updated": "2026-11-10T00:00:00Z"
+  },
+  {
+   "id": "3DE0C7D8-DB15-5DB5-B6DC-995659DD0223",
+   "wrong": "ルータイズ",
+   "right": "ルー・タイス",
+   "language": "ja",
+   "accepted": 1,
+   "rejected": 0,
+   "taught": false,
+   "example": "このプログラムは、ルータイズ氏が作りました。",
+   "updated": "2026-11-10T00:00:00Z"
+  }
+ ]
+}

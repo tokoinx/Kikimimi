@@ -261,3 +261,61 @@ final class LLMEvalTests: XCTestCase {
         XCTAssertGreaterThan(rules.score.fixedAutomatically, 0)
     }
 }
+
+/// 追加学習用のデータ (台帳 → 監査役・評価役の問いと答え)
+final class FineTuneDataTests: XCTestCase {
+    private let clean = [
+        "Welcome to today's session.", "First, we open Roblox Studio and add a part.", "Then we press the play button.",
+        "Please save your work often.", "This is the main menu.", "We will come back to it later.",
+    ].map { FineTuneData.CleanLine(text: $0, language: "en") }
+
+    func testRecordsTeachAcceptedFixesRejectedFixesAndCleanLines() throws {
+        var ledger = CorrectionLedger()
+        ledger.record(wrong: "Roblocks", right: "Roblox", language: "en", example: "Welcome to Roblocks Studio.", accepted: true)
+        ledger.record(wrong: "whirled", right: "world", language: "en", example: "The leaves whirled around the yard.", accepted: false)
+        ledger.record(wrong: "undecided", right: "decided", language: "en", example: "It is undecided.", accepted: true)
+        ledger.record(wrong: "undecided", right: "decided", language: "en", example: nil, accepted: false)
+        let records = FineTuneData.records(ledger: ledger, cleanLines: clean)
+        XCTAssertEqual(records, FineTuneData.records(ledger: ledger, cleanLines: clean), "the same ledger gives the same data")
+        let audits = records.filter { $0.messages[1].content.contains("Lines to check") }
+        let judges = records.filter { $0.messages[1].content.contains("Which version") }
+        XCTAssertEqual(audits.count + judges.count, records.count)
+
+        // 反映した直し: 誤りの語のある行の番号で FIX を答える。答えは、監査役が読める形
+        let fixes = audits.filter { $0.messages[2].content.contains("FIX Roblocks => Roblox") }
+        XCTAssertEqual(fixes.count, 3)
+        for record in fixes {
+            let user = record.messages[1].content
+            let lines = user.components(separatedBy: "\n").filter { $0.hasPrefix("[") }
+            let actions = Auditor.parse(record.messages[2].content, count: lines.count)
+            XCTAssertEqual(actions.count, 1)
+            let number = try XCTUnwrap(actions.keys.first)
+            XCTAssertTrue(lines[number - 1].contains("Roblocks"), user)
+            XCTAssertEqual(record.messages[0].content, Auditor.systemPrompt(language: "en"))
+            XCTAssertTrue(record.messages[2].content.hasSuffix("END\n"))
+        }
+        // 正しい語を含む行を誤りの語に戻した行も、例に使う
+        XCTAssertTrue(fixes.contains { $0.messages[1].content.contains("we open Roblocks Studio and add a part") })
+        // 断った直し: その行があっても END だけ。本物の誤り (world → whirled に戻した行) は作らない
+        let refused = audits.filter { $0.messages[1].content.contains("whirled") }
+        XCTAssertEqual(refused.count, 3)
+        XCTAssertTrue(refused.allSatisfy { $0.messages[2].content == "END\n" })
+        // 決まっていない直し (反映 1・元に戻す 1) は使わない
+        XCTAssertFalse(records.contains { $0.messages[1].content.contains("undecided") })
+        // 直す必要のないまとまり
+        XCTAssertGreaterThanOrEqual(audits.filter { $0.messages[2].content == "END\n" && !$0.messages[1].content.contains("whirled") }.count, 2)
+        // 評価役: 反映した直しは直した後、断った直しは直す前
+        XCTAssertTrue(judges.contains { $0.messages[1].content.hasSuffix("1: Welcome to Roblocks Studio.\n2: Welcome to Roblox Studio.") && $0.messages[2].content == "2" })
+        XCTAssertTrue(judges.contains { $0.messages[1].content.hasSuffix("1: Welcome to Roblox Studio.\n2: Welcome to Roblocks Studio.") && $0.messages[2].content == "1" })
+        XCTAssertTrue(judges.contains { $0.messages[1].content.contains("1: The leaves whirled") && $0.messages[2].content == "1" })
+
+        // 1 行に 1 つの JSON
+        let text = FineTuneData.jsonl(records)
+        let rows = text.split(separator: "\n")
+        XCTAssertEqual(rows.count, records.count)
+        let decoded = try JSONDecoder().decode(FineTuneData.Record.self, from: Data(rows[0].utf8))
+        XCTAssertEqual(decoded, records[0])
+        XCTAssertEqual(decoded.messages.map(\.role), ["system", "user", "assistant"])
+        XCTAssertTrue(FineTuneData.records(ledger: CorrectionLedger(), cleanLines: []).isEmpty)
+    }
+}

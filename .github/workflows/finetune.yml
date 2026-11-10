@@ -1,0 +1,128 @@
+name: finetune
+
+# 追加学習 (LoRA) の通しの確認: 練習用の台帳から学習データを書き出し、MLX で小さなモデル (Qwen3.5 0.8B) を学習し、
+# GGUF の差分に変え、組み立てたアプリの評価ハーネスで「差分なし / 差分あり」を比べる。
+# MLX は Apple シリコンでしか動かないので、ここ (GitHub の Mac) でだけ確かめられる。時間がかかるので、関係するファイルが変わったときだけ動かす
+on:
+  push:
+    paths:
+      - "tools/finetune/**"
+      - ".github/workflows/finetune.yml"
+      - "Sources/KikimimiCore/LLM/FineTuneData.swift"
+      - "Sources/KikimimiCore/LLM/LLMEval.swift"
+      - "Sources/Kikimimi/TrainingExport.swift"
+      - "Sources/Kikimimi/LLMEvalRunner.swift"
+      - "Sources/KikimimiLLM/LlamaEngine.swift"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lora:
+    name: LoRA end to end (macos-15, Qwen3.5 0.8B)
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode 16.2
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app || true
+          swift --version
+          sysctl -n hw.memsize hw.ncpu
+
+      - name: Fetch the XCFrameworks
+        run: |
+          for attempt in 1 2 3 4; do
+            if swift package resolve; then exit 0; fi
+            rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts .build/artifacts
+            sleep $((attempt * 30))
+          done
+          exit 1
+
+      - name: Build Kikimimi.app
+        run: Scripts/build-app.sh
+
+      - name: Python environment (mlx-lm, gguf)
+        run: |
+          python3 -m venv .venv-finetune
+          .venv-finetune/bin/pip install --quiet "mlx-lm[train]" gguf numpy
+          .venv-finetune/bin/pip list 2>/dev/null | grep -i -E "^(mlx|mlx-lm|gguf|numpy|transformers) "
+
+      - name: Is MLX usable here (GPU / CPU)?
+        continue-on-error: true
+        run: |
+          .venv-finetune/bin/python - <<'PY'
+          import mlx.core as mx
+          print("default device:", mx.default_device(), "metal available:", mx.metal.is_available())
+          a = mx.ones((64, 64)); print("gpu matmul:", (a @ a).sum().item())
+          PY
+
+      - name: Fetch Qwen3.5 0.8B (GGUF, the file the app would use)
+        run: |
+          mkdir -p build/models
+          for attempt in 1 2 3 4; do
+            if curl -fsSL -o build/models/qwen3.5-0.8b.gguf \
+                 https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf; then break; fi
+            sleep $((attempt * 20))
+          done
+          echo "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517  build/models/qwen3.5-0.8b.gguf" | shasum -a 256 -c
+
+      # アプリが書き出すのと同じ学習データ (練習用の台帳: 12 件の直しと、直す必要のない 36 行)
+      - name: Export the training data with the app
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --export-training build/training.jsonl \
+            --ledger tools/finetune/selftest/ledger.json --clean tools/finetune/selftest/clean.txt
+          wc -l build/training.jsonl
+          head -c 600 build/training.jsonl
+
+      # 変換だけの確認: 中身が 0 の差分は、出力を変えない (MLX なしで作った差分。向きや名前の取り違えは、ここで読み込めずに止まる)
+      - name: Converter check (a zero adapter changes nothing)
+        run: |
+          .venv-finetune/bin/python tools/finetune/selftest/make_zero_adapter.py build/zero-adapter
+          .venv-finetune/bin/python tools/finetune/mlx_lora_to_gguf.py build/zero-adapter build/models/qwen3.5-0.8b.gguf build/zero.lora.gguf
+          APP=build/Kikimimi.app/Contents/MacOS/Kikimimi
+          $APP --eval-llm build/models/qwen3.5-0.8b.gguf --set tools/finetune/selftest/eval.json --cpu --report build/eval-plain.json
+          $APP --eval-llm build/models/qwen3.5-0.8b.gguf --adapter build/zero.lora.gguf --set tools/finetune/selftest/eval.json --cpu \
+            --report build/eval-zero.json --baseline build/eval-plain.json
+          .venv-finetune/bin/python - <<'PY'
+          import json
+          a, b = json.load(open("build/eval-plain.json")), json.load(open("build/eval-zero.json"))
+          for r in (a, b): r["audit"]["seconds"] = 0; r.pop("adapter", None)
+          assert a["audit"] == b["audit"] and a["details"] == b["details"], "a zero adapter changed the result"
+          print("zero adapter: same result as no adapter")
+          PY
+
+      - name: Train, convert, evaluate
+        run: |
+          .venv-finetune/bin/python tools/finetune/finetune.py --data build/training.jsonl --model qwen3.5-0.8b \
+            --gguf build/models/qwen3.5-0.8b.gguf --out build/finetune --iters 200 --cpu \
+            --eval-set tools/finetune/selftest/eval.json
+
+      # 学習した語を、モデルそのもの (台帳なし) が直せるようになったか
+      - name: Did the adapter learn the corrections?
+        run: |
+          .venv-finetune/bin/python - <<'PY'
+          import json
+          base, new = json.load(open("build/finetune/eval-base.json")), json.load(open("build/finetune/eval-adapter.json"))
+          def found(r): return r["audit"]["fixedAutomatically"] + r["audit"]["fixedBySuggestion"]
+          print("base   :", json.dumps(base["audit"]))
+          print("adapter:", json.dumps(new["audit"]))
+          print("\n".join(new["details"]))
+          assert found(new) > found(base), f"the adapter did not fix more lines ({found(base)} -> {found(new)})"
+          assert new["audit"]["harmed"] <= base["audit"]["harmed"], "the adapter harmed correct lines"
+          print(f"fixed (incl. suggestions): {found(base)} -> {found(new)} of {new['audit']['errorLines']}")
+          PY
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: finetune-selftest
+          path: |
+            build/finetune/*.json
+            build/finetune/*.yaml
+            build/finetune/adapters/adapter_config.json
+            build/eval-*.json
+            build/training.jsonl
+          retention-days: 14

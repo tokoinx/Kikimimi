@@ -1,0 +1,182 @@
+{
+ "name": "finetune-selftest",
+ "audit": [
+  {
+   "id": "en-1",
+   "language": "en",
+   "lines": [
+    "Please save your work often.",
+    "I installed Kikimimy on my laptop last night.",
+    "That is all for this part.",
+    "Now we look at the next step."
+   ],
+   "expected": [
+    "Please save your work often.",
+    "I installed Kikimimi on my laptop last night.",
+    "That is all for this part.",
+    "Now we look at the next step."
+   ]
+  },
+  {
+   "id": "en-2",
+   "language": "en",
+   "lines": [
+    "This is the main menu.",
+    "My children build games in Roblocks every weekend.",
+    "Now we look at the next step.",
+    "Please save your work often."
+   ],
+   "expected": [
+    "This is the main menu.",
+    "My children build games in Roblox every weekend.",
+    "Now we look at the next step.",
+    "Please save your work often."
+   ]
+  },
+  {
+   "id": "en-3",
+   "language": "en",
+   "lines": [
+    "We will come back to it later.",
+    "Lou Tyce started teaching in Seattle.",
+    "Please save your work often.",
+    "This is the main menu."
+   ],
+   "expected": [
+    "We will come back to it later.",
+    "Lou Tice started teaching in Seattle.",
+    "Please save your work often.",
+    "This is the main menu."
+   ]
+  },
+  {
+   "id": "en-4",
+   "language": "en",
+   "lines": [
+    "That is all for this part.",
+    "We finished the first unit of T-pie today.",
+    "This is the main menu.",
+    "We will come back to it later."
+   ],
+   "expected": [
+    "That is all for this part.",
+    "We finished the first unit of TPIE today.",
+    "This is the main menu.",
+    "We will come back to it later."
+   ]
+  },
+  {
+   "id": "en-5",
+   "language": "en",
+   "lines": [
+    "Now we look at the next step.",
+    "Everyone has a scotomer about something.",
+    "We will come back to it later.",
+    "That is all for this part."
+   ],
+   "expected": [
+    "Now we look at the next step.",
+    "Everyone has a scotoma about something.",
+    "We will come back to it later.",
+    "That is all for this part."
+   ]
+  },
+  {
+   "id": "en-6",
+   "language": "en",
+   "lines": [
+    "Please save your work often.",
+    "Read your a formation twice a day.",
+    "That is all for this part.",
+    "Now we look at the next step."
+   ],
+   "expected": [
+    "Please save your work often.",
+    "Read your affirmation twice a day.",
+    "That is all for this part.",
+    "Now we look at the next step."
+   ]
+  },
+  {
+   "id": "en-7",
+   "language": "en",
+   "lines": [
+    "This is the main menu.",
+    "The dust whirled in the wind.",
+    "Now we look at the next step.",
+    "Please save your work often."
+   ],
+   "expected": [
+    "This is the main menu.",
+    "The dust whirled in the wind.",
+    "Now we look at the next step.",
+    "Please save your work often."
+   ]
+  },
+  {
+   "id": "ja-1",
+   "language": "ja",
+   "lines": [
+    "ここまでで質問はありますか。",
+    "昨日、ききみにを入れてみました。",
+    "続きは午後に行います。",
+    "では、次に進みます。"
+   ],
+   "expected": [
+    "ここまでで質問はありますか。",
+    "昨日、ききみみを入れてみました。",
+    "続きは午後に行います。",
+    "では、次に進みます。"
+   ]
+  },
+  {
+   "id": "ja-2",
+   "language": "ja",
+   "lines": [
+    "大事な点をもう一度言います。",
+    "誰にでもスコトームがあります。",
+    "では、次に進みます。",
+    "ここまでで質問はありますか。"
+   ],
+   "expected": [
+    "大事な点をもう一度言います。",
+    "誰にでもスコトーマがあります。",
+    "では、次に進みます。",
+    "ここまでで質問はありますか。"
+   ]
+  },
+  {
+   "id": "ja-3",
+   "language": "ja",
+   "lines": [
+    "少し休憩を取りましょう。",
+    "アファメーソンは一人称で書きます。",
+    "ここまでで質問はありますか。",
+    "大事な点をもう一度言います。"
+   ],
+   "expected": [
+    "少し休憩を取りましょう。",
+    "アファメーションは一人称で書きます。",
+    "ここまでで質問はありますか。",
+    "大事な点をもう一度言います。"
+   ]
+  },
+  {
+   "id": "ja-4",
+   "language": "ja",
+   "lines": [
+    "続きは午後に行います。",
+    "ルータイズ氏の言葉を紹介します。",
+    "大事な点をもう一度言います。",
+    "少し休憩を取りましょう。"
+   ],
+   "expected": [
+    "続きは午後に行います。",
+    "ルー・タイス氏の言葉を紹介します。",
+    "大事な点をもう一度言います。",
+    "少し休憩を取りましょう。"
+   ]
+  }
+ ],
+ "translation": []
+}
