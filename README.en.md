@@ -234,6 +234,10 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | whisper.framework and llama.framework in one app | GitHub Actions runs the built app's `--selftest-llm` on every push |
 | Audit and translation with the real Qwen3.5 2B / 4B (English and Japanese samples, sentences cut across segments, mishearings, repeats) | Verified on a Linux CPU (4B: 7 lines translated in 26 s, audit in 18 s). Found and fixed drift into Chinese and wrong auto-fixes along the way |
 | Qwen3.5 speed on a Mac (Metal), and auditing/translating a long (1-hour) recording | Not verified yet (awaiting a run on real hardware) |
+| Learned corrections, gates, evaluation harness | Unit tests. Measured with the real Qwen3.5 2B / 4B (Linux CPU, table above). In the built app, GitHub Actions runs the rules-only and with-ledger evaluations (all 10 learned lines fixed, no correct line harmed) and the training-data export on every push |
+| Loading a LoRA adapter | Checked with the real llama.cpp (Linux) and Qwen3.5 0.8B: an all-zero adapter leaves the output unchanged, a random one changes it, a broken file or an adapter for another model is not loaded and the plain LLM is used. On GitHub's Mac, a zero adapter converted from the MLX layout also leaves the evaluation result unchanged |
+| Fine-tuning (the MLX training itself) | Loading the training config, fetching the training copy of the model and attaching the LoRA layers (0.35% of the weights are trained) are confirmed on GitHub's Mac (macOS 15) with Qwen3.5 0.8B. Training to the end and evaluating the trained adapter are still being checked (GitHub's Mac has a virtual GPU and 3 cores, the LLM is extremely slow there, and the runs keep timing out). Not verified on real hardware (an 8 GB M1) or with 2B and larger |
+| Results kept when the window is closed, the confirmation before quitting, the fine-tuning settings screen | Not verified (implemented and built only; the UI cannot be exercised on Linux or on GitHub's Mac) |
 
 ## Tests
 
@@ -332,6 +336,8 @@ Tests/Fixtures/          A short English/Japanese recording (for --selftest-whis
 - Even with 日本語＋英語, about 1.5 s around a switch with no pause can be lost. Insertions shorter than about 1.5 s (backchannels), and insertions in noisy recordings, may be missed and come out in the surrounding language or be dropped.
 - Automatic detection decides the language once, from the first 30 seconds, so use 日本語＋英語 for recordings that switch languages.
 - Translation goes one way only: into Japanese.
+- Use 日本語＋英語 with "無音を飛ばす (VAD)" turned on (the default). Without it, language detection on silent stretches is unreliable and can invent a switch, so a few seconds may be transcribed in the wrong language.
+- A learned correction is a word replacement. A fix that is right on one line and wrong on another (two real words that sound alike) comes back only as a suggestion after one acceptance, but becomes automatic after two. If it stops fitting, delete it under "学習した直し" in Settings.
 - The recording preview covers only the last 12 seconds (the whole recording is transcribed again when you stop).
 
 ## License
