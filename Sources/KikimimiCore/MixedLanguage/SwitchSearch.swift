@@ -36,6 +36,8 @@ public enum SwitchSearch {
         /// 使った判定の回数
         public var detections: Int
         public var switches: [Found]
+        /// そのうち、島を探すのに使った回数 (分けて判定し直す回数の上限とは別に数える)
+        public var islandDetections = 0
     }
 
     /// 二分探索の結果
@@ -80,23 +82,26 @@ public enum SwitchSearch {
         }
         var parts: [Part] = []
         var switches: [Found] = []
+        var islandDetections = 0
         for (piece, g) in zip(pieces, guesses) {
             if piece.seconds >= R.bisectMinSeconds, (g?.confidence ?? 0) < R.bisectBelow {
                 let found = try locate(piece, guess: g, map: map, detect: detect)
                 detections += found.detections
+                islandDetections += found.islandDetections
                 parts += found.parts
                 switches += found.switches
             } else if let g, let threshold = islandThreshold(g.language), 1 - g.confidence >= threshold,
                       piece.speechSeconds >= 2 * R.minDetectSpeechSeconds {
                 let found = try islands(piece, host: g, map: map, floor: threshold, detect: detect)
                 detections += found.detections
+                islandDetections += found.islandDetections
                 parts += found.parts
                 switches += found.switches
             } else {
                 parts.append(Part(chunk: piece, guess: g))
             }
         }
-        return Outcome(parts: parts, detections: detections, switches: switches)
+        return Outcome(parts: parts, detections: detections, switches: switches, islandDetections: islandDetections)
     }
 
     /// 言語の混ざっていそうな部分の中で、切り替わり (二分探索) を探し、無ければ、中ほどに挟まった別の言語 (島) を探す。
@@ -105,6 +110,7 @@ public enum SwitchSearch {
                               detect: (Range<Int>) throws -> LanguageGuess?) rethrows -> Outcome {
         let b = try bisect(piece.range, map: map, detect: detect)
         var detections = b.detections
+        var islandDetections = 0
         if let cut = b.cut, let halves = SpeechChunker.split(piece, at: cut) {
             var switches: [Found] = []
             if let head = b.head, let tail = b.tail, let bracket = b.bracket {
@@ -126,21 +132,24 @@ public enum SwitchSearch {
         if piece.range.count > R.samples(R.islandMaxSeconds), shouldSearchIslands(guess, head: h, tail: t) {
             let found = try islands(piece, host: host, map: map, detect: detect)
             detections += found.detections
+            islandDetections += found.detections
             if found.parts.contains(where: { $0.guess?.language != h.language }) {
-                return Outcome(parts: found.parts, detections: detections, switches: found.switches)
+                return Outcome(parts: found.parts, detections: detections, switches: found.switches,
+                               islandDetections: islandDetections)
             }
         }
         // 切り替わりも島も無い: 部分全体の (確からしさの低い) 判定より、そろった両端の言語を信じる
-        return Outcome(parts: [Part(chunk: piece, guess: host)], detections: detections, switches: [])
+        return Outcome(parts: [Part(chunk: piece, guess: host)], detections: detections, switches: [],
+                       islandDetections: islandDetections)
     }
 
     /// 二分探索で両端が同じ言語だったとき、中ほどの島を探すか。
-    /// 探すのは、両端の言語が島を探す言語 (`islandHosts`) か、部分全体が別の言語と判定されたときで、しかも、
-    /// どちらかの端の別の言語の確率が、部分全体の `islandContrast` 倍未満のとき (別の言語が一部に集まっている)。
-    /// 雑音で全体に広がった揺れなら、両端も全体と同じくらい揺れているので探さない
+    /// 探すのは、どちらかの端の別の言語の確率が、部分全体の `islandContrast` 倍未満のとき (別の言語が一部に集まっている)。
+    /// 雑音で全体に広がった揺れなら、両端も全体と同じくらい揺れているので探さない。
+    /// 両端の言語は問わない: ここに来るのは、全体の判定が揺れている部分だけ (日本語の講演の途中の英語の引用も探す。
+    /// `islandHosts` は、確からしい区切りを念のために調べるときの絞り込みで、ここでは使わない)
     static func shouldSearchIslands(_ guess: LanguageGuess?, head h: LanguageGuess, tail t: LanguageGuess) -> Bool {
         guard let guess else { return false }
-        guard R.islandHosts.contains(h.language) || guess.language != h.language else { return false }
         let pieceOther = guess.language == h.language ? 1 - guess.confidence : guess.confidence
         return min(1 - h.confidence, 1 - t.confidence) < R.islandContrast * pieceOther
     }
@@ -236,8 +245,9 @@ public enum SwitchSearch {
             let mid = (lo + hi) / 2
             let probe = probeWindow(max(range.lowerBound, mid - half)..<min(range.upperBound, mid + half), in: range, map: map,
                                     anchor: .center)
-            guard let g = try detect(probe) else { break }
-            detections += 1
+            let probed = try detect(probe)
+            detections += 1 // 判定できなかったときも、1 回は使っている
+            guard let g = probed else { break }
             steps += 1
             if g.confidence < R.uncertainProbe {
                 lo = max(lo, probe.lowerBound)
@@ -265,8 +275,9 @@ public enum SwitchSearch {
     /// 別の言語だと信じられる部分だけを分け出す。英日の朗読の試作では、1〜3 秒の日本語の差し込みを取り戻し、
     /// 英語だけの部分を日本語と取り違えることはなかった (英語の 4 秒以下の部分は、どれも英語 0.993 以上)
     /// floor: 半分を詳しく見る、別の言語の確率の下限。
-    /// contrast: 最初に半分にした 2 つが、どちらも同じくらい別の言語らしければ (`islandContrast`)、雑音とみなしてやめる
-    /// (分けて判定し直す回数の上限を超えた、確からしさ 0.90〜0.97 の区切りで使う。雑音の多い英語を延々と調べない)
+    /// contrast: 最初に半分にした 2 つが、どちらも同じくらい別の言語らしく (`islandContrast`)、それぞれをもう一度半分に
+    /// しても同じくらいなら、雑音とみなしてやめる (分けて判定し直す回数の上限を超えた、確からしさ 0.90〜0.97 の区切りで使う。
+    /// 雑音の多い英語を延々と調べない。前半と後半に 1 つずつ島があるときは、2 段目で片寄るので探し続ける)
     public static func islands(_ chunk: SpeechChunk, host: LanguageGuess, map: SpeechMap, floor: Double = MixedLanguageRules.islandFloor,
                                contrast: Bool = false,
                                detect: (Range<Int>) throws -> LanguageGuess?) rethrows -> Outcome {
@@ -277,8 +288,8 @@ public enum SwitchSearch {
         var leaves: [(range: Range<Int>, island: LanguageGuess?)] = []
         func other(_ g: LanguageGuess) -> Double { g.language == host.language ? 1 - g.confidence : g.confidence }
 
-        // (範囲, その範囲の判定, 4 秒以下になってから、もう一度だけ分けたものか)。深さは高々 4〜5 段
-        var stack: [(range: Range<Int>, guess: LanguageGuess?, trimmed: Bool)] = [(chunk.range, host, false)]
+        // (範囲, その範囲の判定, 4 秒以下になってから、もう一度だけ分けたものか, 雑音かどうかを確かめる途中か)。深さは高々 4〜5 段
+        var stack: [(range: Range<Int>, guess: LanguageGuess?, trimmed: Bool, suspect: Bool)] = [(chunk.range, host, false, false)]
         var atRoot = true
         while let node = stack.popLast() {
             let root = atRoot
@@ -302,7 +313,7 @@ public enum SwitchSearch {
                         }
                         let h = try detect(half)
                         detections += 1
-                        if let h { stack.append((half, h, true)) } else { leaves.append((half, nil)) }
+                        if let h { stack.append((half, h, true, false)) } else { leaves.append((half, nil)) }
                     }
                 } else {
                     leaves.append((range, nil))
@@ -326,14 +337,20 @@ public enum SwitchSearch {
                     leaves.append((half, nil))
                 }
             }
-            if contrast, root, explore.count == 2 {
+            // 半分にした 2 つが、どちらも同じくらい別の言語らしい: 雑音で全体に広がった揺れか、両方に島があるか。
+            // もう 1 段だけ分けて確かめる: 雑音なら、その半分どうしもまた同じくらい。島なら、どちらかに片寄る
+            var suspect = false
+            if contrast, root || node.suspect, explore.count == 2 {
                 let a = other(explore[0].guess), b = other(explore[1].guess)
                 if min(a, b) > R.islandContrast * max(a, b) {
-                    leaves += explore.map { ($0.range, nil) }
-                    continue
+                    if node.suspect {
+                        leaves += explore.map { ($0.range, nil) }
+                        continue
+                    }
+                    suspect = true
                 }
             }
-            for e in explore { stack.append((e.range, e.guess, false)) }
+            for e in explore { stack.append((e.range, e.guess, false, suspect)) }
         }
 
         // 並べ直し、つながった同じ言語の部分をまとめる
@@ -367,6 +384,6 @@ public enum SwitchSearch {
             }
         }
         if parts.isEmpty { parts = [Part(chunk: chunk, guess: host)] }
-        return Outcome(parts: parts, detections: detections, switches: found)
+        return Outcome(parts: parts, detections: detections, switches: found, islandDetections: detections)
     }
 }

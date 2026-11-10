@@ -213,8 +213,12 @@ public enum MixedPipeline {
                     let outcome = try SwitchSearch.refine(chunk, guess: guess, map: map,
                                                           islandThreshold: { R.islandHosts.contains($0) ? islandThreshold($0) : nil },
                                                           detect: detect)
-                    extraDetections += outcome.detections
-                    report.refinementDetections += outcome.detections
+                    // 島を探すのに使った回数は、島の上限のほうで数える (両端のそろった部分の中ほどを調べるのは、雑音では
+                    // 起きない。ここで分けて判定し直す回数を使い切ると、後の区切りの切り替わりを探せなくなる)
+                    extraDetections += outcome.detections - outcome.islandDetections
+                    islandDetections += outcome.islandDetections
+                    report.refinementDetections += outcome.detections - outcome.islandDetections
+                    report.islandDetections += outcome.islandDetections
                     report.switches += outcome.switches
                     parts = outcome.parts
                     refined = true
@@ -240,8 +244,9 @@ public enum MixedPipeline {
                     refined = true
                     foundIsland = outcome.parts.contains { $0.guess?.language != g.language }
                 }
-                // 島が見つかった区切りは数えない (相づちの多い録音で中央値が上がり、後の島を探さなくなる)
-                if !foundIsland { cleanOther[g.language, default: []].append(1 - g.confidence) }
+                // 島が見つかった区切りは数えない (相づちの多い録音で中央値が上がり、後の島を探さなくなる)。
+                // 分けて判定し直すべきだった区切り (上限を超えたもの) も、混ざっていない区切りではないので数えない
+                if !foundIsland, !overBudget { cleanOther[g.language, default: []].append(1 - g.confidence) }
             }
             detectedSpeech += chunk.speechSamples
             reportWork()
@@ -457,6 +462,8 @@ public enum MixedPipeline {
         let keptOld = kept(old)
         let keepOverlap = R.samples(R.repairKeepOverlapSeconds)
         var fresh: [DecodedSegment] = []
+        // 何も残らなかった部分
+        var silentParts: [(range: Range<Int>, language: String)] = []
         for part in parts {
             let got = try engine.decode(samples, range: part.range, language: part.language,
                                         hint: GlossaryHint.hint(options.glossary, for: part.language), useVAD: useVAD,
@@ -464,18 +471,34 @@ public enum MixedPipeline {
             fresh += got
             report.repairDecodes += 1
             entry.decodedAs.append(part.language)
-            // 部分ごとにも: 何も残らない部分が、そこに重なっていた元の文を消さない
-            let erased = kept(got).isEmpty && keptOld.contains { s in
-                let a = max(part.range.lowerBound, R.samples(s.start)), b = min(part.range.upperBound, R.samples(s.end))
-                return a < b && map.speechSamples(in: a..<b) >= keepOverlap
-            }
-            if erased {
-                entry.after = Transcript.join(fresh.map(\.text))
-                return nil
-            }
+            if kept(got).isEmpty { silentParts.append(part) }
         }
         entry.after = Transcript.join(fresh.map(\.text))
         guard !kept(fresh).isEmpty || keptOld.isEmpty else { return nil }
+        // 元の文を消さない (点検は文を消さない)。次のどれかに当たる元の文があれば、入れ替えない:
+        // (a) 別の言語で文字にし直して何も残らなかった部分に重なる文 (その言語では何も聞き取れなかった。元の文のほうがまし)
+        // (b) 元の言語のまま文字にし直して何も残らなかった部分 (広げた分の切れ端など) に重なる文と、点検に引っかかって
+        //     いなかった文のうち、文字にし直した結果のどれにも覆われないもの (となりの部分の結果が覆っていれば、消えていない。
+        //     間だけの切れ端から何も出ないのは当たり前で、それで直し全体を取りやめない)
+        let keptFresh = kept(fresh)
+        let erased = keptOld.contains { s in
+            let line = R.samples(s.start)..<max(R.samples(s.start) + 1, R.samples(s.end))
+            guard map.speechSamples(in: line) >= keepOverlap else { return false }
+            func overlapsSilent(_ sameLanguage: Bool) -> Bool {
+                silentParts.contains { part in
+                    guard (part.language == run.language) == sameLanguage else { return false }
+                    let a = max(part.range.lowerBound, line.lowerBound), b = min(part.range.upperBound, line.upperBound)
+                    return a < b && map.speechSamples(in: a..<b) >= keepOverlap
+                }
+            }
+            if overlapsSilent(false) { return true }
+            guard overlapsSilent(true) || check.flags(s).isEmpty else { return false }
+            let covered = keptFresh.reduce(0) { sum, f in
+                sum + max(0, min(line.upperBound, R.samples(f.end)) - max(line.lowerBound, R.samples(f.start)))
+            }
+            return covered < min(keepOverlap, line.count / 2)
+        }
+        guard !erased else { return nil }
         guard check.isBetter(fresh, than: old, in: spans) else { return nil }
         entry.accepted = true
         return current.filter { !inSpans($0) } + fresh
