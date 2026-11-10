@@ -39,6 +39,12 @@ public enum HallucinationFilter {
         return normalize(trimmed).isEmpty
     }
 
+    /// 無音や BGM のところで Whisper が出しがちな、定番の文か (発話の有無は見ない)
+    public static func isStockPhrase(_ text: String) -> Bool {
+        let n = normalize(text)
+        return !n.isEmpty && phrases.contains { normalize($0) == n }
+    }
+
     public static func shouldDrop(text: String, noSpeechProbability: Float) -> Bool {
         if isOnlyNoise(text) { return true }
         let n = normalize(text)

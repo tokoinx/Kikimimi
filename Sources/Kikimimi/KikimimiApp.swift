@@ -5,7 +5,8 @@ import SwiftUI
 
 /// 起動の入り口。`--selftest-llm <GGUF>` / `--selftest-whisper <音声>` のときは画面を出さずに、
 /// LLM / 文字起こしの動作確認だけをして終わる (診断・CI 用)。
-/// `--selftest-launch` は、ふつうに起動して、数秒後にウインドウができたかを確かめて終わる (起動しないときの診断用)
+/// `--selftest-launch` は、ふつうに起動して、数秒後にウインドウができたかを確かめて終わる (起動しないときの診断用)。
+/// `--eval-llm` は、決まった場面で監査役・翻訳役を動かして成績を数える (評価ハーネス)
 @main
 enum KikimimiMain {
     static func main() {
@@ -16,6 +17,9 @@ enum KikimimiMain {
         }
         if args.contains("--selftest-whisper") {
             exit(WhisperSelfTest.run(arguments: args))
+        }
+        if args.contains("--eval-llm") {
+            exit(LLMEvalRunner.run(arguments: args))
         }
         // 版と、同梱した whisper.cpp / llama.cpp を読み込めるかだけを表示して終わる (組み立ての最後に、この Mac で動くかを確かめる)
         if args.contains("--version") {

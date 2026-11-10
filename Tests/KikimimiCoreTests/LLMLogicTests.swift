@@ -282,12 +282,37 @@ final class AuditorTests: XCTestCase {
                 + "[6] FIX zebra => horse\n[7] FIX talk => talk\nEND\n"
         }
         let report = try Auditor.audit(segments, language: "en", generator: fake, modelName: "fake", shouldCancel: { false })
-        XCTAssertEqual(report.changes.count, 5, "行に無い語・何も変わらない直しは捨てる")
+        XCTAssertEqual(report.changes.count, 4, "行に無い語・何も変わらない直し・裏付けの無い削除は捨てる")
+        XCTAssertFalse(report.changes.contains { $0.kind == .delete }, "近くに同じ文も無く、定番の誤認識でもない行は消す提案にしない")
         XCTAssertTrue(report.changes.allSatisfy { !$0.isConfident }, "半分の行を直したがる答えは提案どまり")
         var t = Transcript(sourceName: "x", segments: segments)
         t.adopt(report)
         XCTAssertEqual(t.segments.map(\.text), segments.map(\.text), "提案は本文を変えない")
-        XCTAssertEqual(t.audit?.pendingSuggestions, 5)
+        XCTAssertEqual(t.audit?.pendingSuggestions, 4)
+        // 定番の誤認識 (無音のところの決まり文句) を消す提案は、裏付けが無くても出す
+        let stock = [seg(0, "So that is how the gears fit together."), seg(3, "ご視聴ありがとうございました")]
+        let closing = FakeGenerator { _ in "[2] DEL hallucination\nEND\n" }
+        let stockReport = try Auditor.audit(stock, language: "en", generator: closing, modelName: "fake", shouldCancel: { false })
+        XCTAssertEqual(stockReport.changes.map(\.kind), [.delete])
+        XCTAssertEqual(stockReport.changes.first?.isConfident, false)
+    }
+
+    func testFixesThatWriteCommentsInsteadOfWordsAreDropped() throws {
+        // 小さなモデルは、直しの形で感想を書くことがある (本物の Qwen3.5 2B で出た形)
+        XCTAssertTrue(Auditor.isCommentary(wrong: "place", right: "place (Note: \"place\" is a valid term in"))
+        XCTAssertTrue(Auditor.isCommentary(wrong: "ました", right: "ました (No error)"))
+        XCTAssertTrue(Auditor.isCommentary(wrong: "bild", right: "build, which is the right word for making things in this sentence"))
+        XCTAssertFalse(Auditor.isCommentary(wrong: "Roblocks", right: "Roblox"))
+        XCTAssertFalse(Auditor.isCommentary(wrong: "機会", right: "機械"))
+        XCTAssertFalse(Auditor.isCommentary(wrong: "get status", right: "git status"))
+        XCTAssertFalse(Auditor.isCommentary(wrong: "(sic)", right: "(thus)"))
+        let segments = [seg(0, "First, we will open a new place and add a part.")]
+        let fake = FakeGenerator { prompt in
+            prompt.grammar == GBNF.choice ? "2" : "[1] FIX place => place (Note: \"place\" is a valid term in\nEND\n"
+        }
+        let report = try Auditor.audit(segments, language: "en", generator: fake, modelName: "fake", shouldCancel: { false })
+        XCTAssertTrue(report.changes.isEmpty)
+        XCTAssertFalse(fake.prompts.contains { $0.grammar == GBNF.choice }, "評価役にも聞かない")
     }
 
     func testJudgeVotes() throws {

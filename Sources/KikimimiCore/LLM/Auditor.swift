@@ -197,6 +197,19 @@ public enum Auditor {
 
     // MARK: LLM
 
+    /// 「正しい語」のところに、語ではなく説明を書いている直しか (小さなモデルは「place (Note: "place" is a valid term …」
+    /// 「… (No error)」のように、直しの形で感想を書くことがある。本物の Qwen3.5 2B の評価で、不要な提案の 4 分の 1 がこれだった)
+    static func isCommentary(wrong: String, right: String) -> Bool {
+        let brackets: [Character] = ["(", "（", "[", "［", "「", "\""]
+        if brackets.contains(where: { right.contains($0) && !wrong.contains($0) }) { return true }
+        let lower = right.lowercased()
+        if ["no error", "note:", "correct", "誤りなし", "問題なし", "正しい"].contains(where: { lower.contains($0) && !wrong.lowercased().contains($0) }) {
+            return true
+        }
+        // 聞き間違いの直しは、元の語と同じくらいの長さ。何倍にもなるのは書き足し
+        return right.count > max(wrong.count * 3, wrong.count + 24)
+    }
+
     enum Action: Equatable {
         case delete(String)
         /// 聞き間違えた語 → 正しい語 (行ぜんたいは書き直させない)
@@ -352,12 +365,19 @@ public enum Auditor {
                     // 理由に別の行の文を書いている: 番号の取り違え (4B で実際にあった)。使わない
                     if noteQuotesAnotherLine(note, target: index, chunk: chunk, lines: lines) { continue }
                     let backed = deletionIsBacked(index, in: segments, keep: { !deleting.contains($0) })
+                    // 近くに同じ文も無く、定番の誤認識でもない行を「消す」提案は、裏付けの無い当て推量。出さない
+                    // (本物の Qwen3.5 2B の評価では、正しい 36 行のうち 9 行にこの提案が付いた。4B は定番の文の 2 行だけ)
+                    // (ここでの裏付けは「近くに同じ文があるか」だけ。その文も消す提案に入っていても、提案としては出す)
+                    guard backed || deletionIsBacked(index, in: segments, keep: { _ in true })
+                            || HallucinationFilter.isStockPhrase(segment.text) else { continue }
                     // LLM の削除は提案どまり: 自動で消してよい「すき間なく同じ文が 2 度」は規則が先に消している。
                     // 規則が残したもの (聞き返し・間をあけたくり返し) を、LLM の判断で消さない
                     found.append(AuditChange(kind: .delete, origin: .llm, original: segment,
                                              reason: deletionReason(note, backed: backed), isConfident: false))
                 case .fix(let wrong, let right):
                     // 指摘された語が行に無い・何も変わらない直しは使わない
+                    // 「正しい語」に説明を書いている直しは使わない
+                    if isCommentary(wrong: wrong, right: right) { continue }
                     guard let fixed = applyFix(to: segment.text, wrong: wrong, right: right) else { continue }
                     // 利用者が前に元に戻した直しは、また出してきても使わない (評価役にも聞かない)
                     if options.ledger?.blocks(wrong: wrong, right: right) == true { continue }

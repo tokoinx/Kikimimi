@@ -68,6 +68,8 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
     case decodeFailed(Int32)
     case invalidGrammar
     case cancelled
+    /// 追加学習の差分 (LoRA アダプタ) を読み込めない: ファイルが無い・壊れている・別のモデル用
+    case adapterLoadFailed(String)
 
     public var errorDescription: String? {
         switch self {
@@ -83,6 +85,8 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
             return "LLM の出力の形式 (文法) を準備できませんでした。"
         case .cancelled:
             return "中止しました。"
+        case .adapterLoadFailed(let path):
+            return "追加学習の差分 (LoRA) を読み込めませんでした: \((path as NSString).lastPathComponent)。選んでいる LLM と同じモデルから作った差分かを確かめてください。設定で差分を外すと、元のモデルで動きます。"
         }
     }
 }

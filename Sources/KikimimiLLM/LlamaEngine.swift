@@ -14,13 +14,19 @@ public struct LlamaOptions: Sendable {
     /// GPU (Metal) に載せる層の数。-1 ですべて、0 で CPU だけ
     public var gpuLayers: Int
     public var threads: Int
+    /// 追加学習の差分 (GGUF 形式の LoRA アダプタ)。元のモデルの重みは変えずに、読み込むときに重ねる
+    public var adapterPath: String?
+    /// 差分を効かせる強さ (1 = 学習したとおり)
+    public var adapterScale: Float
 
     public init(contextLength: Int = 8192, batchSize: Int = 512, gpuLayers: Int = -1,
-                threads: Int = LlamaOptions.recommendedThreads) {
+                threads: Int = LlamaOptions.recommendedThreads, adapterPath: String? = nil, adapterScale: Float = 1) {
         self.contextLength = contextLength
         self.batchSize = batchSize
         self.gpuLayers = gpuLayers
         self.threads = threads
+        self.adapterPath = adapterPath
+        self.adapterScale = adapterScale
     }
 
     public static var recommendedThreads: Int {
@@ -34,6 +40,8 @@ public struct LlamaOptions: Sendable {
 /// 出力は貪欲法 (毎回いちばん確からしいトークン) で決めるので、同じ入力には同じ答えを返す。
 public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     public let modelPath: String
+    /// 重ねている追加学習の差分 (無ければ nil)
+    public let adapterPath: String?
     public let contextLength: Int
     /// 例: "qwen35 4B Q4_K - Medium"
     public let modelDescription: String
@@ -108,6 +116,18 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             llama_model_free(model)
             throw LLMError.contextFailed
         }
+
+        // 追加学習の差分 (LoRA) を重ねる。読み込んだ差分は、モデルを手放すときにいっしょに解放される
+        if let adapterPath = options.adapterPath {
+            var adapters: [OpaquePointer?] = [llama_adapter_lora_init(model, adapterPath)]
+            var scales: [Float] = [options.adapterScale]
+            guard adapters[0] != nil, llama_set_adapters_lora(context, &adapters, 1, &scales) == 0 else {
+                llama_free(context)
+                llama_model_free(model)
+                throw LLMError.adapterLoadFailed(adapterPath)
+            }
+        }
+        self.adapterPath = options.adapterPath
 
         self.modelPath = modelPath
         self.model = model
