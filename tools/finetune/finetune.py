@@ -165,6 +165,48 @@ def mask_only_the_answer():
     datasets.ChatDataset.process = process
 
 
+def answer_only_loss(model, batch, lengths):
+    """mlx-lm の損失と同じ。ただし、学習例の終わりの次 (詰め物) は数えない。
+
+    mlx-lm は「答えの始まり ≦ 位置 ≦ 例の長さ」を対象にするので、例の終わりの次の 1 つ (詰め物のトークン 0) を
+    当てることまで学習する。数千トークンを学習するふつうの使い方では誤差だが、答えだけ (3〜12 トークン) を学習する
+    ここでは、その 1 つが損失の大半になる (学習前の検証の損失が、PyTorch の 0.36 に対して 3.9 だった)"""
+    import mlx.core as mx
+    import mlx.nn as nn
+
+    inputs = batch[:, :-1]
+    targets = batch[:, 1:]
+    logits = model(inputs)
+    steps = mx.arange(1, targets.shape[1] + 1)
+    mask = mx.logical_and(steps >= lengths[:, 0:1], steps < lengths[:, 1:])
+    ce = nn.losses.cross_entropy(logits, targets) * mask
+    ntoks = mask.sum()
+    ce = ce.astype(mx.float32).sum() / ntoks
+    return ce, ntoks
+
+
+def use_answer_only_loss():
+    """mlx-lm の学習と検証が使う損失を、answer_only_loss に差し替える。差し替えた数を返す"""
+    import mlx_lm.tuner.trainer as trainer
+
+    original = trainer.default_loss
+    if original is answer_only_loss:
+        return 1
+    replaced = 0
+    for function in (trainer.train, trainer.evaluate):
+        defaults = function.__defaults__ or ()
+        if any(d is original for d in defaults):
+            function.__defaults__ = tuple(answer_only_loss if d is original else d for d in defaults)
+            replaced += 1
+        keywords = function.__kwdefaults__ or {}
+        for name, value in list(keywords.items()):
+            if value is original:
+                keywords[name] = answer_only_loss
+                replaced += 1
+    trainer.default_loss = answer_only_loss
+    return replaced
+
+
 def train(mlx_model, data_dir, adapters, args):
     """mlx-lm の LoRA の学習を、このプロセスの中で動かす"""
     config = Path(adapters).parent / "lora-config.yaml"
@@ -194,6 +236,9 @@ lora_parameters:
     from mlx_lm import lora as mlx_lora
 
     mask_only_the_answer()
+    if use_answer_only_loss() < 2:
+        print("⚠ mlx-lm の損失の計算を差し替えられませんでした (mlx-lm の版が変わった可能性)。"
+              "学習はできますが、効き目が弱くなることがあります。")
     saved = sys.argv
     sys.argv = ["mlx_lm.lora", "--config", str(config)]
     try:
