@@ -100,6 +100,8 @@ A small LLM is not dependable on its own. Kikimimi surrounds it with a harness t
 
 - When you **apply** or **undo** a fix in the audit list, Kikimimi remembers that decision as "misheard term → right term". The "学習した直し" (Learned corrections) section of the "監査・翻訳" tab in Settings lists them, and lets you delete them or add your own.
 - Fixes you applied are made before the LLM is asked, from the next audit on (they are listed as "学習した直し", so you can still undo them). Fixes you undid are not used again, even when the LLM proposes them. The right terms are also added to the vocabulary hint for transcription and translation.
+- A fix you applied only once comes back as a **suggestion**. After you apply it twice it is made **automatically** (so that a fix that was right for one line only, such as "break → brake" or "機関 → 期間", does not become a rule for every recording after a single click). Fixes that change a number or a negation, or turn kana into kanji, always stay suggestions and are confirmed line by line. Corrections you add yourself in Settings are always applied automatically (including case- or punctuation-only ones such as "T-pie → TPIE").
+- A decision to undo a learned fix on one line is kept when that transcript is audited again.
 - They are saved in `~/Library/Application Support/Kikimimi/learned-corrections.json` and never leave the Mac. This works without an LLM.
 
 ### Gates (machine checks)
@@ -194,7 +196,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
   make doctor
   ```
 
-  While the app keeps running with its window closed (during a transcription or translation), click the Dock icon or choose File > メインウインドウを表示 (⌘0) to bring the window back. When nothing is in progress, closing the window quits the app.
+  While the app keeps running with its window closed (during a transcription or translation, or while a transcript has not been exported yet), click the Dock icon or choose File > メインウインドウを表示 (⌘0) to bring the window back. When nothing is in progress and every result has been exported (or copied), closing the window quits the app. Kikimimi does not save transcripts to disk, so quitting (⌘Q) with results that were never exported asks for confirmation first.
 - **`make run` says whisper.framework or llama.framework is missing**: run the following, then `make run` again.
 
   ```bash

@@ -11,21 +11,22 @@ if [ ! -x "$APP/Contents/MacOS/Kikimimi" ]; then
   exit 1
 fi
 
-# 画面のある Kikimimi のプロセス番号 (確認用の --selftest-… の実行は除く)
+# 画面のある Kikimimi のプロセス番号 (端末から動かす --selftest-… / --eval-llm / --export-training / --version は除く。
+# 何分もかかる評価を、make run が途中で止めてしまわないように)
 gui_pids() {
   local pid args
   for pid in $(pgrep -x Kikimimi 2>/dev/null); do
     args="$(ps -o args= -p "$pid" 2>/dev/null || true)"
     case "$args" in
-      ""|*--selftest-*) ;;
+      ""|*--selftest-*|*--eval-llm*|*--export-training*|*--version*) ;;
       *) echo "$pid" ;;
     esac
   done
 }
 
-SELFTESTS="$(ps -axo pid=,args= | grep '[K]ikimimi.*--selftest-' || true)"
+SELFTESTS="$(ps -axo pid=,args= | grep -E '[K]ikimimi.*--(selftest-|eval-llm)' || true)"
 if [ -n "$SELFTESTS" ]; then
-  echo "▸ 確認用の実行が動いています (終わるまで Mac が重くなります。止めるときは、その端末で Ctrl-C):"
+  echo "▸ 確認用・評価用の実行が動いています (終わるまで Mac が重くなります。止めるときは、その端末で Ctrl-C):"
   echo "$SELFTESTS" | sed 's/^/    /'
 fi
 

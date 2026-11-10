@@ -306,6 +306,13 @@ final class AuditorTests: XCTestCase {
         XCTAssertFalse(Auditor.isCommentary(wrong: "機会", right: "機械"))
         XCTAssertFalse(Auditor.isCommentary(wrong: "get status", right: "git status"))
         XCTAssertFalse(Auditor.isCommentary(wrong: "(sic)", right: "(thus)"))
+        // 「correct」「正しい」は、聞き間違いの正しい語でもある。感想として書く形だけを落とす
+        XCTAssertFalse(Auditor.isCommentary(wrong: "collect", right: "correct"))
+        XCTAssertFalse(Auditor.isCommentary(wrong: "collectly", right: "correctly"))
+        XCTAssertFalse(Auditor.isCommentary(wrong: "忠しい", right: "正しい"))
+        XCTAssertTrue(Auditor.isCommentary(wrong: "place", right: "place is correct"))
+        XCTAssertTrue(Auditor.isCommentary(wrong: "ました", right: "ましたのままで正しいです"))
+        XCTAssertTrue(Auditor.isCommentary(wrong: "there", right: "no change needed"))
         let segments = [seg(0, "First, we will open a new place and add a part.")]
         let fake = FakeGenerator { prompt in
             prompt.grammar == GBNF.choice ? "2" : "[1] FIX place => place (Note: \"place\" is a valid term in\nEND\n"
@@ -313,6 +320,37 @@ final class AuditorTests: XCTestCase {
         let report = try Auditor.audit(segments, language: "en", generator: fake, modelName: "fake", shouldCancel: { false })
         XCTAssertTrue(report.changes.isEmpty)
         XCTAssertFalse(fake.prompts.contains { $0.grammar == GBNF.choice }, "評価役にも聞かない")
+    }
+
+    /// 問いが長すぎて答えの余地が無いまとまりを、見ていないのに「見終えた」ことにしない
+    func testAPromptThatLeavesNoRoomIsAnErrorNotASilentSkip() {
+        let fake = FakeGenerator { _ in "END\n" }
+        fake.contextLength = 256
+        let segments = [seg(0, "First, we will open a new place and add a part.")]
+        let options = AuditOptions(glossary: String(repeating: "Roblox Studio, ", count: 200))
+        XCTAssertThrowsError(try Auditor.audit(segments, language: "en", options: options, generator: fake, modelName: "fake",
+                                               shouldCancel: { false })) { error in
+            guard case LLMError.promptTooLong = error else { return XCTFail("\(error)") }
+        }
+        XCTAssertTrue(fake.prompts.isEmpty)
+    }
+
+    /// 同じ時刻の区間が並んでいても、消した区間は元の順に戻る
+    func testRevertingADeleteKeepsTheOrderOfSegmentsWithTheSameTime() throws {
+        let a = TranscriptSegment(start: 0, end: 3, text: "それでは、今日の講義を始めていきます。")
+        let b = TranscriptSegment(start: 3, end: 3, text: "それでは、今日の講義を始めていきます。")
+        let c = TranscriptSegment(start: 3, end: 3, text: "最初に、前回の内容を振り返ります。")
+        let report = try Auditor.audit([a, b, c], language: "ja", generator: nil, modelName: nil, shouldCancel: { false })
+        let delete = try XCTUnwrap(report.changes.first { $0.kind == .delete })
+        XCTAssertEqual(delete.original.id, b.id)
+        XCTAssertEqual(delete.nextID, c.id)
+        var transcript = Transcript(sourceName: "x", segments: [a, b, c], language: "ja")
+        transcript.adopt(report)
+        transcript.setChange(delete.id, applied: true)
+        XCTAssertEqual(transcript.segments.map(\.id), [a.id, c.id])
+        XCTAssertEqual(transcript.segmentsBeforeAudit.map(\.id), [a.id, b.id, c.id])
+        transcript.revertAllChanges()
+        XCTAssertEqual(transcript.segments.map(\.id), [a.id, b.id, c.id])
     }
 
     func testJudgeVotes() throws {

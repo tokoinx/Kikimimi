@@ -9,13 +9,17 @@ public struct AuditOptions: Sendable {
     public var maxTokensPerChunk: Int
     /// 学習した直し (利用者が前に決めた直し)。LLM に聞く前に当て、利用者が断った直しは LLM が出しても捨てる
     public var ledger: CorrectionLedger?
+    /// 前の監査で、利用者がこの文字起こしについて決めたこと (`AuditReport.userDecisions`)。
+    /// 利用者がこの行では元に戻した「学習した直し」を、LLM の直しとまとめて反映し直さないために使う
+    public var decisions: [String: Bool]
 
     public init(glossary: String? = nil, maxLinesPerChunk: Int = 20, maxTokensPerChunk: Int = 900,
-                ledger: CorrectionLedger? = nil) {
+                ledger: CorrectionLedger? = nil, decisions: [String: Bool] = [:]) {
         self.glossary = glossary
         self.maxLinesPerChunk = maxLinesPerChunk
         self.maxTokensPerChunk = maxTokensPerChunk
         self.ledger = ledger
+        self.decisions = decisions
     }
 }
 
@@ -202,8 +206,12 @@ public enum Auditor {
     static func isCommentary(wrong: String, right: String) -> Bool {
         let brackets: [Character] = ["(", "（", "[", "［", "「", "\""]
         if brackets.contains(where: { right.contains($0) && !wrong.contains($0) }) { return true }
+        // 感想の言い回し。「correct」「正しい」という語そのものは、聞き間違いの正しい語でもある (collect → correct) ので、
+        // 「is correct」「正しいです」のように、感想として書く形だけを見る
         let lower = right.lowercased()
-        if ["no error", "note:", "correct", "誤りなし", "問題なし", "正しい"].contains(where: { lower.contains($0) && !wrong.lowercased().contains($0) }) {
+        let phrases = ["no error", "no change", "note:", "is correct", "are correct", "correct as", "already correct",
+                       "誤りなし", "問題なし", "正しいです", "は正しい", "が正しい", "のままで", "修正不要", "変更なし"]
+        if phrases.contains(where: { lower.contains($0) && !wrong.lowercased().contains($0) }) {
             return true
         }
         // 聞き間違いの直しは、元の語と同じくらいの長さ。何倍にもなるのは書き足し
@@ -265,6 +273,16 @@ public enum Auditor {
             }
         }
         return (leading, trailing)
+    }
+
+    /// 行に、その語があるか (語や数は切れ目で合わせる。「evaluate」の中の「lua」は数えない。大文字小文字は区別しない)
+    static func containsTerm(_ text: String, _ term: String) -> Bool {
+        let (leading, trailing) = boundaries(for: term)
+        guard let regex = try? NSRegularExpression(pattern: leading + NSRegularExpression.escapedPattern(for: term) + trailing,
+                                                   options: [.caseInsensitive]) else {
+            return text.range(of: term, options: .caseInsensitive) != nil
+        }
+        return regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: NSString(string: text).length)) != nil
     }
 
     /// 行の中の「聞き間違えた語」を「正しい語」に置き換える (最初の 1 か所だけ)。行に見つからなければ nil。
@@ -345,7 +363,10 @@ public enum Auditor {
             let promptTokens = generator.tokenCount(system) + generator.tokenCount(user) + 32
             // 答えは問題のある行だけの短い指摘 (1 行あたり十数トークン)
             let budget = min(generator.contextLength - promptTokens - 8, 48 + chunk.count * 32)
-            guard budget > 16 else { continue }
+            // 問いが長すぎて答えの余地が無い (語彙のヒントが何千トークンもあるときなど): 見ていないのに「見終えた」ことにしない
+            guard budget > 16 else {
+                throw LLMError.promptTooLong(tokens: promptTokens, limit: generator.contextLength)
+            }
             let longest = chunk.map { lines[$0].utf8.count }.max() ?? 0
             let output = try generator.generate(
                 LLMPrompt(system: system, user: user, grammar: GBNF.auditActions(count: chunk.count), maxTokens: budget,
@@ -489,13 +510,20 @@ public enum Auditor {
         let rest = segments.filter { !removed.contains($0.id) }
         // 学習した直し: LLM に聞く前に、規則として当てる (規則が消す区間と、規則の指摘がある区間には当てない)
         let ledgerChanges = (options.ledger?.fixes(for: rest, language: language) ?? []).filter { !ruled.contains($0.original.id) }
-        let learned = Dictionary(ledgerChanges.map { ($0.original.id, $0) }, uniquingKeysWith: { first, _ in first })
+        // 反映される学習した直し (自信があるもの。利用者がこの行で決めていれば、その決定)。LLM には、これを当てた後の文を見せる。
+        // 反映されないもの (利用者がこの行では元に戻した・確かめてもらう提案) は、LLM に見せず、LLM の直しともまとめない
+        func isOn(_ change: AuditChange) -> Bool { options.decisions[change.signature] ?? change.isConfident }
+        let learned = Dictionary(ledgerChanges.filter(isOn).map { ($0.original.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let pending = Dictionary(ledgerChanges.filter { !isOn($0) }.map { ($0.original.id, $0) }, uniquingKeysWith: { first, _ in first })
         func report(_ llmChanges: [AuditChange], model: String?, partial: Bool) -> AuditReport {
             // 規則の指摘がある区間は規則を優先する (理由がはっきりしているため)
             var all = ruleChanges
             var kept = learned
+            var suggested = pending
             for change in llmChanges where !ruled.contains(change.original.id) {
                 guard let own = learned[change.original.id] else {
+                    // 反映されない学習した直しがある行を、LLM が直した: LLM の直しを使う (1 区間 1 件)
+                    suggested[change.original.id] = nil
                     all.append(change)
                     continue
                 }
@@ -505,12 +533,18 @@ public enum Auditor {
                     var merged = change
                     merged.original = own.original
                     merged.reason = own.reason + " / " + change.reason
+                    merged.learned = own.learned
                     all.append(merged)
                     kept[change.original.id] = nil
                 }
             }
             all += kept.values
+            all += suggested.values
             all.sort { (order[$0.original.id] ?? 0) < (order[$1.original.id] ?? 0) }
+            // 消す区間には、すぐ後ろの区間を覚えさせる (元に戻すときの場所)
+            for i in all.indices where all[i].kind == .delete {
+                if let at = order[all[i].original.id], at + 1 < segments.count { all[i].nextID = segments[at + 1].id }
+            }
             return AuditReport(changes: all, model: model, reviewedCount: segments.count, isPartial: partial ? true : nil)
         }
         onPartial(report([], model: nil, partial: generator != nil))

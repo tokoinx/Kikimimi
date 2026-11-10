@@ -83,7 +83,11 @@ final class CorrectionLedgerTests: XCTestCase {
         ledger.record(wrong: "Roblocks", right: "Roblox", language: "en", example: nil, accepted: true)
         ledger.record(wrong: "whirled", right: "world", language: "en", example: nil, accepted: false)
         XCTAssertEqual(ledger.glossaryTerms(), ["Roblox"], "rejected pairs are not hints")
-        XCTAssertEqual(ledger.glossary(adding: "ききみみ"), "ききみみ, Roblox")
+        // 学習した語は前に置く (whisper は長すぎるヒントの終わりだけを使うので、利用者が書いたヒントを終わりに残す)
+        XCTAssertEqual(ledger.glossary(adding: "ききみみ"), "Roblox, ききみみ")
+        _ = ledger.teach(wrong: "Lewa", right: "Luau", date: Date().addingTimeInterval(10))
+        XCTAssertEqual(ledger.glossary(adding: "ききみみ"), "Roblox, Luau, ききみみ", "newest learned term next to the user's hint")
+        ledger.remove(ledger.corrections[2].id)
         XCTAssertEqual(ledger.glossary(adding: "roblox studio"), "roblox studio", "already in the hint")
         XCTAssertEqual(ledger.glossary(adding: nil), "Roblox")
         // 上限
@@ -105,6 +109,186 @@ final class CorrectionLedgerTests: XCTestCase {
         XCTAssertTrue(CorrectionLedger.load(from: url.appendingPathExtension("missing")).isEmpty)
         try Data("{ broken".utf8).write(to: url)
         XCTAssertTrue(CorrectionLedger.load(from: url).isEmpty)
+    }
+
+    /// 読めないファイルを、空の台帳で上書きしない。欠けた項目のある直しは補って読み、読めない 1 件は飛ばす
+    func testUnreadableLedgerIsKeptAsideAndPartialEntriesAreRead() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kikimimi-ledger-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("learned-corrections.json")
+        // 無いファイル: 空の台帳。何も動かさない
+        var loaded = CorrectionLedger.loadKeepingUnreadable(from: url)
+        XCTAssertTrue(loaded.ledger.isEmpty)
+        XCTAssertNil(loaded.setAside)
+        // 利用者が手で書き足した「wrong」「right」だけの直し (自分で書いた直しとして読む)、回数だけの直し、読めない 1 件
+        let text = """
+        {"version": 1, "corrections": [
+          {"wrong": "Roblocks", "right": "Roblox"},
+          {"wrong": "whirled", "right": "world", "rejected": 2},
+          {"wrong": 5},
+          {"wrong": "same", "right": "same"},
+          {"wrong": "Lewa", "right": "Luau", "accepted": 2, "updated": "2027-01-15T00:00:00Z", "id": "not a uuid"}
+        ]}
+        """
+        try Data(text.utf8).write(to: url)
+        loaded = CorrectionLedger.loadKeepingUnreadable(from: url)
+        XCTAssertNil(loaded.setAside)
+        XCTAssertEqual(loaded.ledger.corrections.map(\.wrong), ["Roblocks", "whirled", "Lewa"])
+        XCTAssertTrue(loaded.ledger.corrections[0].taught)
+        XCTAssertTrue(loaded.ledger.corrections[1].isBlocked)
+        XCTAssertTrue(loaded.ledger.corrections[2].isAutomatic)
+        XCTAssertFalse(loaded.ledger.corrections[2].taught)
+        // 保存し直しても読める
+        try loaded.ledger.save(to: url)
+        let again = CorrectionLedger.load(from: url)
+        XCTAssertEqual(again.corrections.map(\.id), loaded.ledger.corrections.map(\.id))
+        XCTAssertEqual(again.corrections.map(\.taught), [true, false, false])
+        XCTAssertEqual(again.corrections.map(\.accepted), [0, 0, 2])
+        // 壊れたファイル: 別の名前でとっておき、空の台帳で始める
+        try Data("{ \"corrections\": [ broken".utf8).write(to: url)
+        loaded = CorrectionLedger.loadKeepingUnreadable(from: url, date: Date(timeIntervalSince1970: 1_800_000_000))
+        XCTAssertTrue(loaded.ledger.isEmpty)
+        let aside = try XCTUnwrap(loaded.setAside)
+        XCTAssertTrue(aside.lastPathComponent.hasPrefix("learned-corrections.unreadable-"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertEqual(try String(contentsOf: aside, encoding: .utf8), "{ \"corrections\": [ broken")
+    }
+
+    /// 1 回反映しただけの直しは、次は提案。2 回で自動。数字・否定・漢字の当て推量は、覚えていても提案どまり
+    func testOneAcceptanceIsASuggestionAndRiskyFixesStaySuggestions() {
+        var ledger = CorrectionLedger()
+        ledger.record(wrong: "Lou Tyce", right: "Lou Tice", language: "en", example: nil, accepted: true)
+        let line = [segment("This program was created by Lou Tyce.")]
+        var changes = ledger.fixes(for: line, language: "en")
+        XCTAssertEqual(changes.map(\.replacement), ["This program was created by Lou Tice."])
+        XCTAssertFalse(changes[0].isConfident, "one acceptance: a suggestion")
+        XCTAssertTrue(changes[0].reason.contains("もう一度反映すると"))
+        XCTAssertEqual(changes[0].learned, [AuditChange.Pair(wrong: "Lou Tyce", right: "Lou Tice")])
+        ledger.record(wrong: "Lou Tyce", right: "Lou Tice", language: "en", example: nil, accepted: true)
+        XCTAssertTrue(ledger.corrections[0].isAutomatic)
+        changes = ledger.fixes(for: line, language: "en")
+        XCTAssertTrue(changes[0].isConfident, "two acceptances: automatic")
+        // 元に戻すと、また提案に下がる
+        ledger.record(wrong: "Lou Tyce", right: "Lou Tice", language: "en", example: nil, accepted: false)
+        XCTAssertFalse(ledger.fixes(for: line, language: "en")[0].isConfident)
+
+        // 監査役が「要確認」にとどめる種類の直しは、何回反映していても行ごとに確かめる
+        var risky = CorrectionLedger()
+        for _ in 0..<3 {
+            risky.record(wrong: "fifteen", right: "fifty", language: "en", example: nil, accepted: true)
+            risky.record(wrong: "can", right: "can't", language: "en", example: nil, accepted: true)
+            risky.record(wrong: "こうせい", right: "構成", language: "ja", example: nil, accepted: true)
+        }
+        let lines = [
+            segment("We sold fifteen units in March.", language: "en"),
+            segment("Yes, we can ship it on Friday.", at: 3, language: "en"),
+            segment("こうせい労働省の発表です。", at: 6, language: "ja"),
+        ]
+        let suggestions = risky.fixes(for: lines, language: "en")
+        XCTAssertEqual(suggestions.count, 3)
+        XCTAssertTrue(suggestions.allSatisfy { !$0.isConfident }, "\(suggestions.map(\.reason))")
+        XCTAssertTrue(suggestions[0].reason.contains("数字"))
+        XCTAssertTrue(suggestions[1].reason.contains("否定"))
+        XCTAssertTrue(suggestions[2].reason.contains("漢字"))
+        // 反映はされない (提案として一覧に出る)
+        var transcript = Transcript(sourceName: "x", segments: lines, language: "en")
+        transcript.adopt(AuditReport(changes: suggestions, model: nil, reviewedCount: 3))
+        XCTAssertEqual(transcript.segments.map(\.text), lines.map(\.text))
+        // 設定で利用者が自分で書いた直しは、そのまま当てる
+        XCTAssertTrue(risky.teach(wrong: "fifteen", right: "fifty"))
+        XCTAssertTrue(risky.fixes(for: [lines[0]], language: "en")[0].isConfident)
+    }
+
+    /// 正しい語がもう入っているかは、語の切れ目で見る (「evaluate」の中の「lua」は数えない)
+    func testRightTermCheckUsesWordBoundaries() {
+        var ledger = CorrectionLedger()
+        _ = ledger.teach(wrong: "Lewa", right: "Lua")
+        _ = ledger.teach(wrong: "eye", right: "AI")
+        let segments = [
+            segment("Let's evaluate the Lewa script."),
+            segment("He said the eye model is trained again.", at: 3),
+            segment("Lua and Lewa are different here.", at: 6),
+        ]
+        XCTAssertEqual(ledger.fixes(for: segments, language: "en").map(\.replacement),
+                       ["Let's evaluate the Lua script.", "He said the AI model is trained again."])
+        XCTAssertTrue(Auditor.containsTerm("We use Lua here.", "lua"))
+        XCTAssertFalse(Auditor.containsTerm("We evaluate it.", "Lua"))
+        XCTAssertTrue(Auditor.containsTerm("機械を使います。", "機械"))
+    }
+
+    /// いくつかの語をまとめた直しは、どの組にも利用者の決定を覚えられるよう、すべての組を持つ
+    func testCombinedChangesCarryEveryPair() throws {
+        var ledger = CorrectionLedger()
+        _ = ledger.teach(wrong: "Roblocks", right: "Roblox")
+        _ = ledger.teach(wrong: "Lewa", right: "Luau")
+        let segments = [segment("In Roblocks Studio we write Lewa, and we bild games.")]
+        let both = ledger.fixes(for: segments, language: "en")
+        XCTAssertEqual(both.count, 1)
+        XCTAssertEqual(Set(both[0].decisionPairs), [AuditChange.Pair(wrong: "Roblocks", right: "Roblox"),
+                                                    AuditChange.Pair(wrong: "Lewa", right: "Luau")])
+        // LLM の直しとまとめたもの: 学習した 2 組と、LLM の 1 組
+        let generator = FakeGenerator { prompt in
+            if prompt.user.contains("Lines to check") { return "[1] FIX bild => build\nEND" }
+            for line in prompt.user.split(separator: "\n") where line.hasPrefix("1: ") || line.hasPrefix("2: ") {
+                if line.contains("build") { return String(line.prefix(1)) }
+            }
+            return "1"
+        }
+        let report = try Auditor.audit(segments, language: "en", options: AuditOptions(ledger: ledger), generator: generator,
+                                       modelName: "fake", shouldCancel: { false })
+        XCTAssertEqual(report.changes.count, 1)
+        XCTAssertEqual(report.changes[0].replacement, "In Roblox Studio we write Luau, and we build games.")
+        XCTAssertEqual(report.changes[0].original.text, segments[0].text)
+        XCTAssertEqual(Set(report.changes[0].decisionPairs.map(\.wrong)), ["Roblocks", "Lewa", "bild"])
+        // 古い保存 (learned が無い) も読める
+        let old = try JSONDecoder().decode(AuditChange.self, from: Data("""
+        {"id":"\(UUID().uuidString)","kind":"fix","origin":"llm","original":{"id":"\(UUID().uuidString)","start":0,"end":1,"text":"a"},
+         "reason":"r","isConfident":true,"isApplied":false,"wrong":"a","right":"b","replacement":"b"}
+        """.utf8))
+        XCTAssertEqual(old.decisionPairs, [AuditChange.Pair(wrong: "a", right: "b")])
+    }
+
+    /// 利用者がこの行では元に戻した「学習した直し」を、監査のやり直しで LLM の直しとまとめて戻さない
+    func testReAuditDoesNotBringBackALearnedFixTheUserReverted() throws {
+        var ledger = CorrectionLedger()
+        _ = ledger.teach(wrong: "Roblocks", right: "Roblox")
+        let segments = [segment("Our studio is called Roblocks Labs, and we bild small games."),
+                        segment("Open Roblocks Studio first.", at: 3)]
+        var seen: [String] = []
+        let generator = FakeGenerator { prompt in
+            if prompt.user.contains("Lines to check") {
+                seen.append(prompt.user)
+                return "[1] FIX bild => build\nEND"
+            }
+            for line in prompt.user.split(separator: "\n") where line.hasPrefix("1: ") || line.hasPrefix("2: ") {
+                if line.contains("build") { return String(line.prefix(1)) }
+            }
+            return "1"
+        }
+        func audit(_ transcript: Transcript) throws -> AuditReport {
+            try Auditor.audit(transcript.segmentsBeforeAudit, language: "en",
+                              options: AuditOptions(ledger: ledger, decisions: transcript.audit?.userDecisions ?? [:]),
+                              generator: generator, modelName: "fake", shouldCancel: { false })
+        }
+        var transcript = Transcript(sourceName: "x", segments: segments, language: "en")
+        // 1 回目 (規則と台帳だけの結果を先に反映した形): 学習した直しが 2 行に当たる
+        transcript.adopt(try Auditor.audit(segments, language: "en", options: AuditOptions(ledger: ledger), generator: nil,
+                                           modelName: nil, shouldCancel: { false }))
+        XCTAssertEqual(transcript.segments[0].text, "Our studio is called Roblox Labs, and we bild small games.")
+        // 利用者: 1 行目の名前は、本当に Roblocks
+        transcript.setChange(try XCTUnwrap(transcript.audit?.change(forSegment: segments[0].id)).id, applied: false)
+        XCTAssertEqual(transcript.segments[0].text, segments[0].text)
+        // 監査のやり直し (LLM つき) を 2 回: どちらも、1 行目の Roblocks はそのまま。LLM の直しだけが入る
+        for round in 1...2 {
+            transcript.adopt(try audit(transcript))
+            XCTAssertEqual(transcript.segments[0].text, "Our studio is called Roblocks Labs, and we build small games.", "round \(round)")
+            XCTAssertEqual(transcript.segments[1].text, "Open Roblox Studio first.")
+            XCTAssertTrue(try XCTUnwrap(seen.last).contains("[1] Our studio is called Roblocks Labs"), "the LLM sees the line as the user left it")
+            let change = try XCTUnwrap(transcript.audit?.change(forSegment: segments[0].id))
+            XCTAssertEqual(change.origin, .llm)
+            XCTAssertNil(change.learned)
+        }
     }
 
     func testAuditAppliesLearnedFixesBeforeTheLLMAndDropsRejectedOnes() throws {

@@ -323,6 +323,12 @@ public enum LLMEval {
             }
             var result = score(c, translations: translations.map { $0 == "" ? nil : $0 })
             result.score.translated = translations.filter { $0 != nil }.count
+            // まとめて訳した後ろの区間は、先頭の訳が日本語なら日本語として数える (「訳した数」と同じ数え方にそろえる)
+            for (head, unit) in byHead {
+                guard let index = position[head], let text = translations[index], !text.isEmpty,
+                      Script.isJapanese(text), !Script.containsNonJapaneseHan(text) else { continue }
+                result.score.japanese += unit.covers.filter { $0 != head && position[$0] != nil }.count
+            }
             result.score.seconds = Date().timeIntervalSince(started)
             total.add(result.score)
             details += result.details

@@ -37,8 +37,10 @@ final class Job: Identifiable {
     /// 監査・翻訳のお知らせ (失敗・一部だけ訳せなかった など)
     var postNote: String?
     @ObservationIgnored var postCancel = CancelFlag()
-    /// 録音のために一時停止した (メモリの少ない Mac)。録音を止めると続ける
+    /// 録音のために一時停止した (メモリの少ない Mac)。録音を止めると再開する
     @ObservationIgnored var pausedForRecording = false
+    /// 結果を書き出した・コピーした (まだなら、ウインドウを閉じてもアプリを終了せず、終了の前に確かめる)
+    @ObservationIgnored var exported = false
 
     init(name: String, url: URL?, isRecording: Bool = false, samples: [Float]? = nil) {
         self.name = name
@@ -165,7 +167,11 @@ final class AppModel {
         useLedger = d.object(forKey: "useLedger") as? Bool ?? true
         useAdapter = d.object(forKey: "useAdapter") as? Bool ?? true
         llmStore = LLMModelStore(models: store)
-        ledger = CorrectionLedger.load(from: ledgerURL)
+        let loaded = CorrectionLedger.loadKeepingUnreadable(from: ledgerURL)
+        ledger = loaded.ledger
+        if let aside = loaded.setAside {
+            errorMessage = "学習した直しのファイルを読めなかったので、空の状態から始めます。元のファイルは「\(aside.lastPathComponent)」という名前で、同じフォルダにとってあります。"
+        }
         if !Languages.isKnown(languageCode) { languageCode = "ja" }
         refreshInstalled()
         refreshLLMInstalled()
@@ -216,6 +222,12 @@ final class AppModel {
     var isBusy: Bool {
         isRecording || importingLLM || importingAdapter || !downloads.isEmpty || !llmDownloads.isEmpty
             || jobs.contains { $0.isActive || $0.isPostActive }
+    }
+
+    /// 書き出しもコピーもしていない文字起こしの数。結果はファイルに保存していないので、アプリを終了すると消える。
+    /// 1 つでもあれば、ウインドウを閉じてもアプリを終了せず (Dock から開き直せる)、終了の前に確かめる
+    var unsavedResultCount: Int {
+        jobs.filter { !($0.transcript?.segments.isEmpty ?? true) && !$0.exported }.count
     }
 
     var currentModel: WhisperModelSpec {
@@ -666,6 +678,8 @@ final class AppModel {
         case .queued:
             job.status = .cancelled
             job.message = "中止しました"
+            // 録音の音声は WAV に保存してある。やり直しはそのファイルから読むので、メモリの分は手放す (1 時間で約 230 MB)
+            if job.url != nil { job.samples = nil }
         case .running:
             job.cancelFlag.set()
             job.message = "中止しています…"
@@ -678,10 +692,12 @@ final class AppModel {
     func cancelPost(_ job: Job) {
         let hadQueue = !job.postQueue.isEmpty
         job.postQueue.removeAll()
+        // 録音のための一時停止を取りやめる (止まったあとに「録音を止めると再開します」と出さない)
+        job.pausedForRecording = false
         if job.postState != .idle {
             job.postCancel.set()
         } else if hadQueue {
-            // 録音のあいだ一時停止していた作業を取りやめた: 「録音を止めると続けます」を残さない
+            // 録音のあいだ一時停止していた作業を取りやめた: 「録音を止めると再開します」を残さない
             job.postNote = "監査・翻訳を中止しました。反映済みの結果は残しています。"
         }
     }
@@ -795,6 +811,15 @@ final class AppModel {
                         job.transcript?.segments.append(segment)
                     }
                 },
+                onRestart: {
+                    // whisper が途中で失敗して、始めからやり直す: そこまでに出した区間を消す (同じ文が 2 度並ばないように)
+                    Task { @MainActor in
+                        guard job.status == .running else { return }
+                        job.transcript?.segments.removeAll()
+                        job.progress = 0
+                        job.message = "認識をやり直しています…"
+                    }
+                },
                 shouldCancel: { flag.isSet }
             )
             job.transcript = Transcript(
@@ -821,6 +846,8 @@ final class AppModel {
                 job.error = error.localizedDescription
                 job.message = "エラー"
             }
+            // 音声を読む前に止まった録音: WAV に保存してあれば、メモリの分は手放す
+            if job.url != nil { job.samples = nil }
             cleanPartialTranscript(of: job)
         }
     }
@@ -866,11 +893,14 @@ final class AppModel {
         job.transcript = transcript
         // 利用者が自分で決めた直しを覚える (次からは、反映した直しは先に当て、元に戻した直しは出さない)
         let after = transcript.audit?.changes.first { $0.id == change.id }
-        if useLedger, let before, let after, before.kind == .fix, before.isApplied != after.isApplied,
-           let wrong = before.wrong, let right = before.right {
-            ledger.record(wrong: wrong, right: right, language: transcript.language(of: before.original),
-                          example: before.original.text, accepted: after.isApplied)
-            saveLedger()
+        // いくつかの語をまとめた直し (学習した直しが 2 つ当たった行・学習した直しと LLM の直しをまとめた行) は、どの組にも同じ決定を覚える
+        if useLedger, let before, let after, before.kind == .fix, before.isApplied != after.isApplied {
+            let pairs = before.decisionPairs
+            for pair in pairs {
+                ledger.record(wrong: pair.wrong, right: pair.right, language: transcript.language(of: before.original),
+                              example: pairs.count == 1 ? before.original.text : nil, accepted: after.isApplied)
+            }
+            if !pairs.isEmpty { saveLedger() }
         }
     }
 
@@ -894,9 +924,11 @@ final class AppModel {
         defer {
             if job.pausedForRecording {
                 job.pausedForRecording = false
-                job.postNote = "録音のあいだ一時停止しています。録音を止めると続けます。"
+                job.postNote = Self.pausedNote
             }
         }
+        // 一時停止から再開した: 「一時停止しています」を消す
+        if job.postNote == Self.pausedNote { job.postNote = nil }
 
         // メモリの少ない Mac では、LLM を読み込む前に Whisper を手放す
         if useLLM && MemoryBudget.isTight { service.unload() }
@@ -913,7 +945,8 @@ final class AppModel {
             case .audit:
                 job.postState = .running(.audit, message: "監査中…", progress: nil)
                 let segments = transcript.segmentsBeforeAudit
-                let options = AuditOptions(glossary: glossary, ledger: learned)
+                let options = AuditOptions(glossary: glossary, ledger: learned,
+                                           decisions: transcript.audit?.userDecisions ?? [:])
                 // 前に LLM で監査してあれば、やり直しの結果は最後にまとめて反映する
                 // (途中で規則だけの結果を反映すると、前の LLM の直しといっしょに訳まで外れてしまう。中止したら前の結果のまま)
                 let hadLLMAudit = transcript.audit?.model != nil
@@ -1028,7 +1061,10 @@ final class AppModel {
         }
     }
 
-    /// メモリの少ない Mac で録音中なら、この仕事を順番待ちの先頭に戻して true を返す (録音を止めると続ける)
+    /// 録音のあいだ一時停止しているときのお知らせ
+    static let pausedNote = "録音のあいだ一時停止しています。録音を止めると再開します。"
+
+    /// メモリの少ない Mac で録音中なら、この仕事を順番待ちの先頭に戻して true を返す (録音を止めると再開する)
     private func pauseIfRecording(_ task: PostTask, job: Job) -> Bool {
         guard isRecording, MemoryBudget.isTight else { return false }
         if !job.postQueue.contains(task) { job.postQueue.insert(task, at: 0) }
@@ -1037,7 +1073,8 @@ final class AppModel {
     }
 
     /// メモリの少ない Mac で録音を始めるとき: 動いている監査・翻訳を止めて順番待ちの先頭に戻す
-    /// (LLM を手放してから Whisper を読み込む。訳せた所・監査で見終えた所までは残り、録音を止めると続きから)
+    /// (LLM を手放してから Whisper を読み込む。訳せた所・監査で見終えた所までの結果は残る。録音を止めると再開する:
+    /// 翻訳は残りだけを訳し、監査は始めから見直す)
     private func pausePostTasksForRecording() {
         guard MemoryBudget.isTight else { return }
         for job in jobs {
@@ -1190,6 +1227,7 @@ final class AppModel {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try Exporter.render(transcript, as: format, content: content).write(to: url, atomically: true, encoding: .utf8)
+            job.exported = true
         } catch {
             errorMessage = "保存できませんでした: \(error.localizedDescription)"
         }
@@ -1203,6 +1241,7 @@ final class AppModel {
     /// 本文をコピーする。対訳表示のときは原文と日本語訳を並べたもの
     func copySelectedText() {
         guard let transcript = selectedJob?.transcript else { return }
+        selectedJob?.exported = true
         let text: String
         let stats = transcript.translationStats
         if isBilingual(stats) && stats.hasTranslation {

@@ -71,12 +71,13 @@ final class TranscriptionService: @unchecked Sendable {
                     options: WhisperOptions,
                     onProgress: @escaping @Sendable (Double) -> Void,
                     onSegment: @escaping @Sendable (TranscriptSegment) -> Void,
+                    onRestart: @escaping @Sendable () -> Void = {},
                     shouldCancel: @escaping @Sendable () -> Bool) async throws -> WhisperOutput {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<WhisperOutput, Error>) in
             queue.async {
                 do {
                     let output = try self.run(samples: samples, modelPath: modelPath, options: options,
-                                              onProgress: onProgress, onSegment: onSegment,
+                                              onProgress: onProgress, onSegment: onSegment, onRestart: onRestart,
                                               shouldCancel: shouldCancel)
                     cont.resume(returning: output)
                 } catch {
@@ -91,6 +92,7 @@ final class TranscriptionService: @unchecked Sendable {
                      options: WhisperOptions,
                      onProgress: @escaping @Sendable (Double) -> Void,
                      onSegment: @escaping @Sendable (TranscriptSegment) -> Void,
+                     onRestart: @escaping @Sendable () -> Void,
                      shouldCancel: @escaping @Sendable () -> Bool) throws -> WhisperOutput {
         // WhisperContext と同じ条件 (パスがあり、ファイルが存在する) で VAD を使う
         let usesVAD = options.vadModelPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
@@ -103,6 +105,7 @@ final class TranscriptionService: @unchecked Sendable {
             // whisper.cpp が内部の状態を解放した (メモリ不足で KV キャッシュを作り直せなかった)。VAD とは関係ないので、
             // 読み込み直して同じ設定で 1 回だけやり直す (使えなくなったコンテキストは loadedContext が読み込み直す)
             let fresh = try loadedContext(modelPath, vad: usesVAD)
+            onRestart() // そこまでに出した区間は、やり直しでもう一度出る
             return try fresh.transcribe(samples: samples, options: options,
                                         onProgress: onProgress, onSegment: onSegment,
                                         shouldCancel: shouldCancel)
@@ -111,6 +114,7 @@ final class TranscriptionService: @unchecked Sendable {
             var plainOptions = options
             plainOptions.vadModelPath = nil
             let plain = try loadedContext(modelPath, vad: false)
+            onRestart()
             return try plain.transcribe(samples: samples, options: plainOptions,
                                         onProgress: onProgress, onSegment: onSegment,
                                         shouldCancel: shouldCancel)

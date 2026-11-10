@@ -98,7 +98,7 @@ jobs:
         run: |
           .venv-finetune/bin/python tools/finetune/finetune.py --data build/training.jsonl --model qwen3.5-0.8b \
             --gguf build/models/qwen3.5-0.8b.gguf --out build/finetune --iters 200 --cpu \
-            --eval-set tools/finetune/selftest/eval.json
+            --eval-set tools/finetune/selftest/eval.json --base-report build/eval-plain.json
 
       # 学習した語を、モデルそのもの (台帳なし) が直せるようになったか
       - name: Did the adapter learn the corrections?

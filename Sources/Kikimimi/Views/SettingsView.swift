@@ -301,7 +301,7 @@ struct LearnedCorrectionsSection: View {
                 .disabled(newWrong.trimmingCharacters(in: .whitespaces).isEmpty
                           || newRight.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            Text("反映した直しは、次の監査から LLM に聞く前に当てます (一覧に「学習した直し」と出るので、いつでも元に戻せます)。元に戻した直しは、LLM がまた出してきても使いません。正しい語は、語彙のヒントにも足します。ここで追加した直しは、いつも当てます。保存先はこの Mac の中だけです。")
+            Text("反映した直しは、次の監査から LLM に聞く前に当てます。1 回反映しただけの直しは提案として出し、2 回反映すると自動で直します (数字や否定が変わる直し・かなを漢字にする直しは、いつも提案です)。一覧に「学習した直し」と出るので、いつでも元に戻せます。元に戻した直しは、LLM がまた出してきても使いません。正しい語は、語彙のヒントにも足します。ここで追加した直しは、いつも自動で当てます。保存先はこの Mac の中だけです。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -309,7 +309,8 @@ struct LearnedCorrectionsSection: View {
 
     static func status(of correction: LearnedCorrection) -> String {
         if correction.taught { return "いつも直す (自分で追加)" }
-        if correction.isActive { return "次から自動で直す (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回)" }
+        if correction.isAutomatic { return "次から自動で直す (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回)" }
+        if correction.isActive { return "次は提案として出す (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回。もう一度反映すると、自動で直す)" }
         if correction.isBlocked { return "もう提案しない (元に戻す \(correction.rejected) 回・反映 \(correction.accepted) 回)" }
         return "保留 (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回)"
     }

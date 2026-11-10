@@ -34,8 +34,33 @@ public struct LearnedCorrection: Codable, Hashable, Identifiable, Sendable {
         self.updated = updated
     }
 
-    /// 次からは自動で当てる: 利用者が自分で書いたもの、または「反映する」が「元に戻す」より多いもの
+    enum CodingKeys: String, CodingKey {
+        case id, wrong, right, language, accepted, rejected, taught, example, updated
+    }
+
+    /// 欠けている項目は補って読む (利用者がファイルに手で書き足した「wrong」「right」だけの直しも読める。
+    /// 回数も「自分で書いた」の印も無いものは、自分で書いた直しとして扱う)
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        wrong = try c.decode(String.self, forKey: .wrong)
+        right = try c.decode(String.self, forKey: .right)
+        id = (try? c.decodeIfPresent(UUID.self, forKey: .id)) ?? UUID()
+        language = try? c.decodeIfPresent(String.self, forKey: .language)
+        let counted = c.contains(.accepted) || c.contains(.rejected) || c.contains(.taught)
+        accepted = (try? c.decodeIfPresent(Int.self, forKey: .accepted)) ?? 0
+        rejected = (try? c.decodeIfPresent(Int.self, forKey: .rejected)) ?? 0
+        taught = (try? c.decodeIfPresent(Bool.self, forKey: .taught)) ?? !counted
+        example = try? c.decodeIfPresent(String.self, forKey: .example)
+        updated = (try? c.decodeIfPresent(Date.self, forKey: .updated)) ?? Date()
+    }
+
+    /// 次から使う: 利用者が自分で書いたもの、または「反映する」が「元に戻す」より多いもの
     public var isActive: Bool { taught || accepted > rejected }
+    /// 次からは確かめずに自動で当てる: 利用者が自分で書いたもの、または「反映する」が「元に戻す」より 2 回以上多いもの。
+    /// 1 回反映しただけの直しは、次は提案として出す (監査役が「要確認」にとどめた直しを 1 回反映しただけで、
+    /// どの録音にも自動で当たる規則にしない。「break → brake」「機関 → 期間」のように、その行でだけ正しい直しもある)
+    public var isAutomatic: Bool { taught || accepted - rejected >= Self.automaticAfter }
+    public static let automaticAfter = 2
     /// この直しは、もう提案しない: 「元に戻す」のほうが多いもの
     public var isBlocked: Bool { !taught && rejected > accepted }
 }
@@ -55,6 +80,24 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
     public init(corrections: [LearnedCorrection] = []) {
         self.version = 1
         self.corrections = corrections
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case version, corrections
+    }
+
+    /// 読めない直しが 1 件あっても、ほかの直しは読む (その 1 件だけを飛ばす)
+    public init(from decoder: any Decoder) throws {
+        struct Entry: Decodable {
+            var value: LearnedCorrection?
+            init(from decoder: any Decoder) throws {
+                value = try? LearnedCorrection(from: decoder)
+            }
+        }
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = (try? c.decodeIfPresent(Int.self, forKey: .version)) ?? 1
+        corrections = (try c.decodeIfPresent([Entry].self, forKey: .corrections) ?? []).compactMap(\.value)
+            .filter { Self.normalized($0.wrong, $0.right) != nil }
     }
 
     public var isEmpty: Bool { corrections.isEmpty }
@@ -135,13 +178,15 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
             let lineLanguage = segment.language ?? language
             var text = segment.text
             var applied: [LearnedCorrection] = []
+            var risk: String?
             for rule in rules {
                 if let own = rule.language, let lineLanguage, own != lineLanguage { continue }
                 // 正しい語がもう入っている行は、そのまま (「AI」→「AI model」のように、正しい語が誤りの語を含む組を重ねて当てない。
                 // 正しい語と誤りの語の両方がある行は、言い分けているのかもしれない)。
                 // 大文字小文字・記号だけが違う組 (「T-pie」→「TPIE」「roblox」→「Roblox」) は、表記まで同じものがあるときだけ
                 let surface = TextSimilarity.key(rule.wrong) == TextSimilarity.key(rule.right)
-                if surface ? text.contains(rule.right) : text.range(of: rule.right, options: .caseInsensitive) != nil { continue }
+                if surface ? text.contains(rule.right) : Auditor.containsTerm(text, rule.right) { continue }
+                let before = text
                 var count = 0
                 while count < 8, let fixed = Auditor.applyFix(to: text, wrong: rule.wrong, right: rule.right, surfaceOnly: true),
                       fixed != text {
@@ -149,15 +194,28 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
                     count += 1
                     if rule.right.range(of: rule.wrong, options: .caseInsensitive) != nil { break }
                 }
-                if count > 0 { applied.append(rule) }
+                guard count > 0 else { continue }
+                applied.append(rule)
+                // 数字・否定が変わる直し、かなを漢字にする直しなどは、覚えていても行ごとに確かめてもらう
+                // (設定で利用者が自分で書いた直しは、そのまま当てる。大文字小文字・記号だけの直しは、意味が変わらない)
+                if !rule.taught, !surface, risk == nil {
+                    risk = Auditor.meaningRisk(original: before, fixed: text, wrong: rule.wrong, right: rule.right)
+                }
             }
             guard !applied.isEmpty, text != segment.text else { continue }
             // 「日本語＋英語」: 行の言語が文字の上で変わる直しは当てない
             if let own = segment.language, Script.spokenLanguage(of: text, among: ["ja", "en"], fallback: own) != own { continue }
             let pairs = applied.map { "「\($0.wrong)」→「\($0.right)」" }.joined(separator: "、")
+            var reason = "学習した直し: \(pairs)"
+            if let risk {
+                reason += " (\(risk)。要確認)"
+            } else if applied.contains(where: { !$0.isAutomatic }) {
+                reason += " (前に 1 回反映した直し。もう一度反映すると、次から自動で直します)"
+            }
             changes.append(AuditChange(kind: .fix, origin: .ledger, original: segment, replacement: text,
-                                       reason: "学習した直し: \(pairs)", isConfident: true,
-                                       wrong: applied[0].wrong, right: applied[0].right))
+                                       reason: reason, isConfident: risk == nil && applied.allSatisfy(\.isAutomatic),
+                                       wrong: applied[0].wrong, right: applied[0].right,
+                                       learned: applied.map { AuditChange.Pair(wrong: $0.wrong, right: $0.right) }))
         }
         return changes
     }
@@ -177,13 +235,16 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
         return terms
     }
 
-    /// 語彙のヒント (設定で利用者が書いたもの) に、学習した語を足す。もう入っている語は足さない
+    /// 語彙のヒント (設定で利用者が書いたもの) に、学習した語を足す。もう入っている語は足さない。
+    /// 学習した語を前に置く: whisper は、長すぎるヒントの終わりの 223 トークンだけを使うので、
+    /// あふれたときに切れるのが、利用者が自分で書いたヒントではなく、学習した語 (古いものから) になるようにする
     public func glossary(adding hint: String?) -> String? {
         let base = hint?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let lower = base.lowercased()
-        let extra = glossaryTerms().filter { !lower.contains($0.lowercased()) }
+        // 新しい語ほど後ろ (利用者のヒントの近く) に置く
+        let extra = Array(glossaryTerms().filter { !lower.contains($0.lowercased()) }.reversed())
         if extra.isEmpty { return base.isEmpty ? nil : base }
-        return base.isEmpty ? extra.joined(separator: ", ") : base + ", " + extra.joined(separator: ", ")
+        return base.isEmpty ? extra.joined(separator: ", ") : extra.joined(separator: ", ") + ", " + base
     }
 
     // MARK: 保存
@@ -196,19 +257,32 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
         return ledger
     }
 
+    /// アプリが起動のときに読む。ファイルがあるのに読めないとき (壊れた・手で書き換えて形が崩れた) は、
+    /// 空の台帳で上書きしてしまわないよう、そのファイルを別の名前でとっておき、その場所を返す
+    public static func loadKeepingUnreadable(from url: URL, date: Date = Date()) -> (ledger: CorrectionLedger, setAside: URL?) {
+        guard let data = try? Data(contentsOf: url), !data.isEmpty else { return (CorrectionLedger(), nil) }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let ledger = try? decoder.decode(CorrectionLedger.self, from: data) { return (ledger, nil) }
+        let stamp = DateFormatter()
+        stamp.locale = Locale(identifier: "en_US_POSIX")
+        stamp.dateFormat = "yyyyMMdd-HHmmss"
+        let aside = url.deletingLastPathComponent()
+            .appendingPathComponent("learned-corrections.unreadable-\(stamp.string(from: date)).json")
+        do {
+            try FileManager.default.moveItem(at: url, to: aside)
+            return (CorrectionLedger(), aside)
+        } catch {
+            // 動かせなければ、そのまま (次に保存するときに上書きされる。読めない中身なので、失うものは同じ)
+            return (CorrectionLedger(), nil)
+        }
+    }
+
     public func save(to url: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try encoder.encode(self).write(to: url, options: .atomic)
-    }
-
-    private enum CodingKeys: String, CodingKey { case version, corrections }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        corrections = try container.decodeIfPresent([LearnedCorrection].self, forKey: .corrections) ?? []
     }
 }

@@ -134,19 +134,25 @@ lora_parameters:
         fail("学習が終わりましたが、差分 (adapters.safetensors) ができていません。上の出力を確かめてください。")
 
 
-def evaluate(app, gguf, adapter, eval_sets, work, cpu):
-    """評価ハーネスで、差分なし / 差分ありを比べる。悪くなっていなければ True"""
+def evaluate(app, gguf, adapter, eval_sets, work, cpu, base_report=None):
+    """評価ハーネスで、差分なし / 差分ありを比べる。悪くなっていなければ True。
+    base_report があれば、差分なしの評価はそれを使う (同じ LLM・同じ場面で前に測ったもの)"""
     binary = Path(app) / "Contents/MacOS/Kikimimi"
     if not binary.exists():
         print(f"⚠ {app} が無いので、評価は飛ばします (先に make app で組み立ててください)")
         return None
     sets = [x for s in eval_sets for x in ("--set", str(s))]
     extra = ["--cpu"] if cpu else []
-    base_report, new_report = Path(work) / "eval-base.json", Path(work) / "eval-adapter.json"
-    print("▸ 評価 (差分なし)")
-    first = subprocess.run([str(binary), "--eval-llm", str(gguf), *sets, "--report", str(base_report), *extra])
-    if first.returncode != 0:
-        fail("差分なしの評価が失敗しました。")
+    new_report = Path(work) / "eval-adapter.json"
+    if base_report:
+        print(f"▸ 評価 (差分なし): {base_report} を使います")
+        shutil.copyfile(base_report, Path(work) / "eval-base.json")
+    else:
+        print("▸ 評価 (差分なし)")
+        first = subprocess.run([str(binary), "--eval-llm", str(gguf), *sets, "--report", str(Path(work) / "eval-base.json"), *extra])
+        if first.returncode != 0:
+            fail("差分なしの評価が失敗しました。")
+    base_report = Path(work) / "eval-base.json"
     print("▸ 評価 (差分あり)")
     second = subprocess.run([str(binary), "--eval-llm", str(gguf), "--adapter", str(adapter), *sets,
                              "--report", str(new_report), "--baseline", str(base_report), *extra])
@@ -171,6 +177,7 @@ def main():
     parser.add_argument("--app", default=str(REPO / "build/Kikimimi.app"), help="評価に使う、組み立てたききみみ")
     parser.add_argument("--eval-set", action="append", default=None, help="評価の場面 (.json)。何度でも指定できる")
     parser.add_argument("--no-eval", action="store_true", help="評価を飛ばす")
+    parser.add_argument("--base-report", help="差分なしの評価の結果 (--eval-llm --report で作った .json)。あれば、測り直さずに使う")
     parser.add_argument("--install", action="store_true", help="悪くなっていなければ、ききみみの差分の置き場所に入れる")
     parser.add_argument("--force", action="store_true", help="メモリの目安に足りなくても学習する")
     args = parser.parse_args()
@@ -215,7 +222,10 @@ def main():
     better = None
     if not args.no_eval:
         sets = args.eval_set or [REPO / "Tests/Fixtures/llm-eval/seed.json"]
-        better = evaluate(args.app, gguf_path, adapter, sets, work, args.cpu)
+        base = Path(args.base_report).expanduser() if args.base_report else None
+        if base and not base.exists():
+            fail(f"{base} がありません。")
+        better = evaluate(args.app, gguf_path, adapter, sets, work, args.cpu, base)
     if better is False:
         print(f"✗ 差分を使うと、評価が悪くなりました。入れません (差分は {adapter} に残しています)。")
         raise SystemExit(3)

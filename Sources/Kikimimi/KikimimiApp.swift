@@ -64,6 +64,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) static weak var shared: AppDelegate?
     /// 作業中か (文字起こし・録音・監査・翻訳・モデルの取得)。作業中は、ウインドウを閉じても終了しない
     var isBusy: @MainActor () -> Bool = { false }
+    /// 書き出しもコピーもしていない文字起こしの数。あるあいだは、ウインドウを閉じても終了せず、終了の前に確かめる
+    /// (結果はファイルに保存していないので、終了すると消える)
+    var unsavedResultCount: @MainActor () -> Int = { 0 }
     /// メインのウインドウを新しく開く (SwiftUI の openWindow)
     var openMainWindow: (@MainActor () -> Void)?
     /// 起動の確認 (`--selftest-launch --reopen`) のあいだは、ウインドウを閉じても終了しない
@@ -91,7 +94,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        !keepRunningWithoutWindows && !isBusy()
+        !keepRunningWithoutWindows && !isBusy() && unsavedResultCount() == 0
+    }
+
+    /// 終了の前に: 書き出していない文字起こしや、途中の作業があれば確かめる
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !keepRunningWithoutWindows else { return .terminateNow }
+        let unsaved = unsavedResultCount()
+        let busy = isBusy()
+        guard unsaved > 0 || busy else { return .terminateNow }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = unsaved > 0 ? "書き出していない文字起こしが \(unsaved) 件あります" : "作業の途中です"
+        var text = "ききみみは、文字起こし・監査・翻訳の結果をファイルに保存しません。終了すると消えます。"
+        if busy { text += "途中の作業 (文字起こし・監査・翻訳・ダウンロード) も止まります。" }
+        alert.informativeText = text
+        alert.addButton(withTitle: "終了する")
+        alert.addButton(withTitle: "キャンセル")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -171,6 +192,7 @@ private struct AppLifecycleHook: View {
                 let model = model
                 let openWindow = openWindow
                 delegate.isBusy = { model.isBusy }
+                delegate.unsavedResultCount = { model.unsavedResultCount }
                 delegate.openMainWindow = { openWindow(id: MainWindow.id) }
                 LaunchLog.note("window appeared")
             }

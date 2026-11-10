@@ -34,10 +34,25 @@ public struct AuditChange: Codable, Hashable, Identifiable, Sendable {
     /// 聞き間違えた語と正しい語 (fix のとき。利用者の決定を「学習した直し」として覚えるのに使う)
     public var wrong: String?
     public var right: String?
+    /// この直しに入っている、学習した直しの組 (いくつかの語が 1 行に当たれば、すべて。LLM の直しとまとめたものにも入る)。
+    /// 利用者が反映 / 元に戻すと決めたら、どの組にも同じ決定を覚える
+    public var learned: [Pair]?
+    /// 消した区間 (delete) のすぐ後ろにあった区間。元に戻すときに、同じ時刻の区間が並んでいても元の順に戻す
+    public var nextID: UUID?
+
+    public struct Pair: Codable, Hashable, Sendable {
+        public var wrong: String
+        public var right: String
+
+        public init(wrong: String, right: String) {
+            self.wrong = wrong
+            self.right = right
+        }
+    }
 
     public init(id: UUID = UUID(), kind: Kind, origin: Origin, original: TranscriptSegment,
                 replacement: String? = nil, reason: String, isConfident: Bool, isApplied: Bool = false,
-                wrong: String? = nil, right: String? = nil) {
+                wrong: String? = nil, right: String? = nil, learned: [Pair]? = nil) {
         self.id = id
         self.kind = kind
         self.origin = origin
@@ -48,6 +63,16 @@ public struct AuditChange: Codable, Hashable, Identifiable, Sendable {
         self.isApplied = isApplied
         self.wrong = wrong
         self.right = right
+        self.learned = learned
+    }
+
+    /// 利用者の決定を覚える組: 学習した直しの組と、LLM が出した組 (重なりは 1 つに)
+    public var decisionPairs: [Pair] {
+        var pairs = learned ?? []
+        if let wrong, let right, !pairs.contains(Pair(wrong: wrong, right: right)) {
+            pairs.append(Pair(wrong: wrong, right: right))
+        }
+        return pairs
     }
 }
 
@@ -87,7 +112,7 @@ public struct AuditReport: Codable, Hashable, Sendable {
 
 extension AuditChange {
     /// 監査をやり直したときに「同じ直し」とみなすための印 (区間・種類・直した文)
-    var signature: String {
+    public var signature: String {
         "\(original.id.uuidString)|\(kind.rawValue)|\(replacement ?? "")"
     }
 }
@@ -191,7 +216,10 @@ extension Transcript {
         switch change.kind {
         case .delete:
             guard !segments.contains(where: { $0.id == change.original.id }) else { return }
-            let position = segments.firstIndex { ($0.start, $0.end) > (change.original.start, change.original.end) }
+            // すぐ後ろにあった区間が残っていれば、その前に戻す (同じ時刻の区間が並んでいても、元の順になる)。
+            // 無ければ、時刻で場所を決める
+            let position = change.nextID.flatMap { next in segments.firstIndex { $0.id == next } }
+                ?? segments.firstIndex { ($0.start, $0.end) > (change.original.start, change.original.end) }
                 ?? segments.endIndex
             segments.insert(change.original, at: position)
         case .fix:
