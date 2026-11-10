@@ -147,7 +147,7 @@ Once you have collected enough learned corrections, you can teach them to the LL
    .venv-finetune/bin/pip install "mlx-lm[train]" gguf numpy
    ```
 
-3. Train. This trains, converts the result to GGUF, compares "without / with the adapter" with the evaluation harness, and installs the adapter only if it is not worse.
+3. Train. This trains, converts the result to GGUF, compares "without / with the adapter" with the evaluation harness, and installs the adapter only **if it is better** (more lines fixed, and no more wrong fixes or harmed lines than before). The evaluation uses the scenes shipped with Kikimimi plus scenes built from held-out examples of your own corrections. An adapter that shows no gain, or makes things worse, is not installed.
 
    ```bash
    .venv-finetune/bin/python tools/finetune/finetune.py --data ~/Desktop/kikimimi-training.jsonl --model qwen3.5-2b --install
@@ -159,6 +159,8 @@ Things to know:
 
 - **Memory needed**: about 8 GB to train 2B, 16 GB for 4B, 32 GB for 9B. On an 8 GB Mac, use 2B (the script stops and says so when memory is short). The first run downloads the training copy of the model (MLX format, e.g. `mlx-community/Qwen3.5-2B-4bit`) from Hugging Face.
 - **At least 12 training examples** are required. For a handful of corrections, learned corrections already do the job without training. Fine-tuning pays off once you have dozens of corrections and want them to carry over to similar cases.
+- **How much training**: by default the data is seen three and a half times (200–800 steps). Checked with Qwen3.5 0.8B and 12 corrections (90 training examples): after one pass (100 steps) the model still answered "nothing to fix" even on its training examples; after three passes (300 steps) it fixed 7 of 10 lines automatically in sentences it had never seen (0 without the adapter, no correct line harmed). One line got a wrong fix ("Roblocks → Robo"), and the evaluation harness ruled "do not use this adapter". A fine-tuned small model can overreach like this, so always run the evaluation before using an adapter (the script does).
+- Only the answer is trained. Left alone, mlx-lm also trains on the marker that closes the "thinking" block before the answer; with Qwen3.5 nearly all of the training goes there and the answers do not change. The script restricts the loss to the answer.
 - **An adapter belongs to the LLM it was trained on** (a 2B adapter does not work with 4B). Train again after switching LLMs.
 - Only the MLP of each layer is trained (Qwen3.5 mixes attention with state-space blocks, and only the MLP weights map one to one between MLX and GGUF). `tools/finetune/mlx_lora_to_gguf.py` does the conversion.
 
@@ -236,7 +238,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | Qwen3.5 speed on a Mac (Metal), and auditing/translating a long (1-hour) recording | Not verified yet (awaiting a run on real hardware) |
 | Learned corrections, gates, evaluation harness | Unit tests. Measured with the real Qwen3.5 2B / 4B (Linux CPU, table above). In the built app, GitHub Actions runs the rules-only and with-ledger evaluations (all 10 learned lines fixed, no correct line harmed) and the training-data export on every push |
 | Loading a LoRA adapter | Checked with the real llama.cpp (Linux) and Qwen3.5 0.8B: an all-zero adapter leaves the output unchanged, a random one changes it, a broken file or an adapter for another model is not loaded and the plain LLM is used. On GitHub's Mac, a zero adapter converted from the MLX layout also leaves the evaluation result unchanged |
-| Fine-tuning (the MLX training itself) | Loading the training config, fetching the training copy of the model and attaching the LoRA layers (0.35% of the weights are trained) are confirmed on GitHub's Mac (macOS 15) with Qwen3.5 0.8B. Training to the end and evaluating the trained adapter are still being checked (GitHub's Mac has a virtual GPU and 3 cores, the LLM is extremely slow there, and the runs keep timing out). Not verified on real hardware (an 8 GB M1) or with 2B and larger |
+| Fine-tuning (the MLX training itself) | The whole path (train, convert to GGUF, load and evaluate in the built app) runs on GitHub's Mac (macOS 15) with Qwen3.5 0.8B. What the training learns (answer-only loss; after three passes, 7 of 10 lines fixed in unseen sentences) was confirmed by running the same training in PyTorch and evaluating the converted adapter with the real llama.cpp (Linux). Whether an MLX-trained adapter gives the same result is being checked on GitHub's Mac (its GPU is virtual and training takes over an hour). Not verified on real hardware (an 8 GB M1) or with 2B and larger |
 | Results kept when the window is closed, the confirmation before quitting, the fine-tuning settings screen | Not verified (implemented and built only; the UI cannot be exercised on Linux or on GitHub's Mac) |
 
 ## Tests

@@ -4,11 +4,14 @@
     python3 tools/finetune/finetune.py --data ~/Desktop/kikimimi-training.jsonl --model qwen3.5-2b
 
 流れ:
-  1. 学習データ (ききみみの設定「学習用のデータを書き出す…」か `Kikimimi --export-training` で作った .jsonl) を、学習用と確認用に分ける
-  2. MLX (mlx-lm) で LoRA を学習する。対象は各層の MLP だけ (GGUF にそのまま変えられる重み)
+  1. 学習データ (ききみみの設定「学習用のデータを書き出す…」か `Kikimimi --export-training` で作った .jsonl) を、学習用と確認用に分ける。
+     確認用の例からは、評価の場面も作る (学習に使っていない並びの行)
+  2. MLX (mlx-lm) で LoRA を学習する。対象は各層の MLP だけ (GGUF にそのまま変えられる重み)。学習するのは「答え」のところだけ
   3. 学習した差分を、ききみみ (llama.cpp) が読める GGUF に変える
   4. 評価ハーネス (`Kikimimi --eval-llm`) で、差分なし / 差分ありを同じ場面で比べる
-  5. 悪くなっていなければ、ききみみの差分の置き場所に入れる (`--install`)
+     (ききみみに付いている場面と、1 で作った自分の直しの場面)
+  5. 直せた行が増え、悪くなったところが無ければ、ききみみの差分の置き場所に入れる (`--install`)。
+     誤った直しが出る・正しい行を壊す・直せた行が増えない差分は、入れない
 
 必要なもの (Apple シリコンの Mac):
     python3 -m venv .venv-finetune
@@ -23,6 +26,7 @@ import json
 import os
 import platform
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -55,8 +59,27 @@ def memory_gb():
         return 0
 
 
+def eval_case(messages, case_id):
+    """確認用の学習例 (監査役への問いと答え) を、評価ハーネスの場面 (行と、直した後の行) にする。評価役への問いは None"""
+    user, answer = messages[-2]["content"], messages[-1]["content"]
+    if "Lines to check:\n" not in user:
+        return None
+    lines = [re.sub(r"^\[\d+\] ", "", line) for line in user.split("Lines to check:\n", 1)[1].split("\n") if line.strip()]
+    expected = list(lines)
+    for match in re.finditer(r"^\[(\d+)\] FIX (.+?) => (.+)$", answer, flags=re.MULTILINE):
+        k = int(match.group(1)) - 1
+        if 0 <= k < len(expected):
+            expected[k] = expected[k].replace(match.group(2), match.group(3), 1)
+    system = messages[0]["content"] if messages[0]["role"] == "system" else ""
+    language = "ja" if "mostly in Japanese" in system else ("en" if "mostly in English" in system else None)
+    if language is None:
+        language = "ja" if re.search("[\u3040-\u30ff\u4e00-\u9fff]", "".join(lines)) else "en"
+    return {"id": case_id, "language": language, "lines": lines, "expected": expected}
+
+
 def split_data(data, work, seed):
-    """学習用と確認用に分ける (確認用は 1 割、最低 2 件)"""
+    """学習用と確認用に分ける (確認用は 15%、最低 4 件)。確認用の例からは、評価の場面も作る
+    (学習に使っていない並びの行で、自分の直しを覚えたか・直す必要のない行を直していないかを測る)"""
     rows = [line for line in Path(data).read_text(encoding="utf-8").splitlines() if line.strip()]
     for n, row in enumerate(rows, 1):
         try:
@@ -68,13 +91,17 @@ def split_data(data, work, seed):
         fail(f"学習データが {len(rows)} 件しかありません。少なすぎると丸暗記になるだけなので、12 件以上になってから試してください "
              "(数件の直しは、追加学習をしなくても「学習した直し」がそのまま当てます)。")
     random.Random(seed).shuffle(rows)
-    n_valid = max(2, len(rows) // 10)
+    n_valid = max(4, len(rows) * 15 // 100)
     out = Path(work) / "data"
     out.mkdir(parents=True, exist_ok=True)
     (out / "valid.jsonl").write_text("\n".join(rows[:n_valid]) + "\n", encoding="utf-8")
     (out / "train.jsonl").write_text("\n".join(rows[n_valid:]) + "\n", encoding="utf-8")
-    print(f"▸ 学習データ {len(rows) - n_valid} 件、確認用 {n_valid} 件")
-    return out, json.loads(rows[0])["messages"], len(rows) - n_valid
+    cases = [c for c in (eval_case(json.loads(row)["messages"], f"own-{n}") for n, row in enumerate(rows[:n_valid])) if c]
+    own = Path(work) / "eval-own.json"
+    own.write_text(json.dumps({"name": "own", "audit": cases, "translation": []}, ensure_ascii=False, indent=1), encoding="utf-8")
+    fixes = sum(1 for c in cases if c["lines"] != c["expected"])
+    print(f"▸ 学習データ {len(rows) - n_valid} 件、確認用 {n_valid} 件 (うち評価の場面 {len(cases)}: 直す行のある場面 {fixes})")
+    return out, json.loads(rows[0])["messages"], len(rows) - n_valid, (own if cases else None)
 
 
 def check_template(mlx_model, sample):
@@ -90,6 +117,52 @@ def check_template(mlx_model, sample):
         print("  組み立てた文の終わり: " + repr(text[-160:]))
     else:
         print("▸ 会話の型は、ききみみの渡し方と同じです")
+    # 学習の対象が、答えだけになっているか
+    from mlx_lm.tuner.datasets import ChatDataset
+
+    mask_only_the_answer()
+    tokens, offset = ChatDataset([{"messages": sample}], tokenizer, mask_prompt=True).process({"messages": sample})
+    trained = tokenizer.decode(list(tokens[offset:]))
+    if trained.startswith(answer.strip()):
+        print("▸ 学習の対象は、答えだけです: " + repr(trained))
+    else:
+        print("⚠ 学習の対象が、答えだけになっていません (効き目が弱くなります): " + repr(trained[:120]))
+
+
+def answer_offset(tokenizer, messages, tokens, fallback):
+    """学習の対象にする「答え」が、トークンの列の何番目から始まるか。
+
+    mlx-lm は「答えの前まで」を、答えの無い会話を組み立てて数える。Qwen3.5 の会話の型では、それが
+    「…assistant\n<think>\n」で終わる (考える前提) ので、答えのある会話の「<think>\n\n</think>\n\n答え」と食い違い、
+    「</think>」から後ろが学習の対象になる。ききみみは、空の <think>…</think> までを問いとして渡し、答えだけを
+    書かせるので、学習も答えだけにする (そうしないと、「考えずに閉じる」ことを覚えるのに学習を使い切る。
+    GitHub の Mac での確認では、検証の損失が 2.9 → 0.3 に下がっても、答えは何も変わらなかった)
+    """
+    answer = messages[-1]["content"].strip()  # 会話の型は、答えの前後の空白と改行を落とす
+    text = tokenizer.apply_chat_template(messages, tokenize=False)
+    cut = text.rfind(answer) if answer else -1
+    if cut <= 0:
+        return fallback
+    head = tokenizer.encode(text[:cut], add_special_tokens=False)
+    return len(head) if list(tokens[:len(head)]) == list(head) else fallback
+
+
+def mask_only_the_answer():
+    """mlx-lm の学習データの読み方を、答えだけを学習の対象にするものに差し替える"""
+    import mlx_lm.tuner.datasets as datasets
+
+    original = datasets.ChatDataset.process
+    if getattr(original, "kikimimi", False):
+        return
+
+    def process(self, d):
+        tokens, offset = original(self, d)
+        if self.mask_prompt:
+            offset = answer_offset(self.tokenizer, d[self.chat_key], tokens, offset)
+        return tokens, offset
+
+    process.kikimimi = True
+    datasets.ChatDataset.process = process
 
 
 def train(mlx_model, data_dir, adapters, args):
@@ -118,12 +191,9 @@ lora_parameters:
   scale: {args.scale}
   dropout: 0.0
 """, encoding="utf-8")
-    if args.cpu:
-        import mlx.core as mx
-        mx.set_default_device(mx.cpu)
-        print("▸ CPU で学習します (--cpu)")
     from mlx_lm import lora as mlx_lora
 
+    mask_only_the_answer()
     saved = sys.argv
     sys.argv = ["mlx_lm.lora", "--config", str(config)]
     try:
@@ -134,8 +204,13 @@ lora_parameters:
         fail("学習が終わりましたが、差分 (adapters.safetensors) ができていません。上の出力を確かめてください。")
 
 
+def found(report):
+    return report["audit"]["fixedAutomatically"] + report["audit"]["fixedBySuggestion"]
+
+
 def evaluate(app, gguf, adapter, eval_sets, work, cpu, base_report=None):
-    """評価ハーネスで、差分なし / 差分ありを比べる。悪くなっていなければ True。
+    """評価ハーネスで、差分なし / 差分ありを比べる。
+    返すのは (悪くなっていないか, 直せた行が増えたか)。評価できなければ None。
     base_report があれば、差分なしの評価はそれを使う (同じ LLM・同じ場面で前に測ったもの)"""
     binary = Path(app) / "Contents/MacOS/Kikimimi"
     if not binary.exists():
@@ -143,24 +218,28 @@ def evaluate(app, gguf, adapter, eval_sets, work, cpu, base_report=None):
         return None
     sets = [x for s in eval_sets for x in ("--set", str(s))]
     extra = ["--cpu"] if cpu else []
-    new_report = Path(work) / "eval-adapter.json"
+    base_path, new_path = Path(work) / "eval-base.json", Path(work) / "eval-adapter.json"
     if base_report:
         print(f"▸ 評価 (差分なし): {base_report} を使います")
         # 前の実行が作業用のフォルダに書いたものを、そのまま指定したときは写さない
-        if Path(base_report).resolve() != (Path(work) / "eval-base.json").resolve():
-            shutil.copyfile(base_report, Path(work) / "eval-base.json")
+        if Path(base_report).resolve() != base_path.resolve():
+            shutil.copyfile(base_report, base_path)
     else:
         print("▸ 評価 (差分なし)")
-        first = subprocess.run([str(binary), "--eval-llm", str(gguf), *sets, "--report", str(Path(work) / "eval-base.json"), *extra])
+        first = subprocess.run([str(binary), "--eval-llm", str(gguf), *sets, "--report", str(base_path), *extra])
         if first.returncode != 0:
             fail("差分なしの評価が失敗しました。")
-    base_report = Path(work) / "eval-base.json"
     print("▸ 評価 (差分あり)")
     second = subprocess.run([str(binary), "--eval-llm", str(gguf), "--adapter", str(adapter), *sets,
-                             "--report", str(new_report), "--baseline", str(base_report), *extra])
+                             "--report", str(new_path), "--baseline", str(base_path), *extra])
     if second.returncode not in (0, 3):
         fail("差分ありの評価が失敗しました。")
-    return second.returncode == 0
+    base, new = json.loads(base_path.read_text(encoding="utf-8")), json.loads(new_path.read_text(encoding="utf-8"))
+    lines = new["audit"]["errorLines"]
+    print(f"▸ 直せた行 (提案を含む): {found(base)} → {found(new)} / {lines}、"
+          f"正しい行を壊した数: {base['audit']['harmed']} → {new['audit']['harmed']}、"
+          f"誤った直し: {base['audit']['wrongFixes']} → {new['audit']['wrongFixes']}")
+    return second.returncode == 0, found(new) > found(base)
 
 
 def main():
@@ -171,17 +250,20 @@ def main():
     parser.add_argument("--gguf", help="ききみみの LLM のファイル (既定は、ききみみの保存先の <model>.gguf)")
     parser.add_argument("--out", default="build/finetune", help="作業用のフォルダ")
     parser.add_argument("--iters", type=int, default=0,
-                        help="学習の回数 (既定は、学習データを 3 周する回数。150〜600 の範囲)")
+                        help="学習の回数 (既定は、学習データを 3 周半する回数。200〜800 の範囲)")
     parser.add_argument("--learning-rate", type=float, default=2e-4)
     parser.add_argument("--rank", type=int, default=8)
-    parser.add_argument("--scale", type=float, default=10.0, help="差分の強さ (大きいほど強く効く)")
+    parser.add_argument("--scale", type=float, default=4.0, help="差分の強さ")
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--cpu", action="store_true", help="GPU を使わない (遅い。GPU でうまく動かないとき)")
+    parser.add_argument("--cpu", action="store_true", help="評価を CPU で動かす (学習は、いつも GPU)")
     parser.add_argument("--app", default=str(REPO / "build/Kikimimi.app"), help="評価に使う、組み立てたききみみ")
-    parser.add_argument("--eval-set", action="append", default=None, help="評価の場面 (.json)。何度でも指定できる")
+    parser.add_argument("--eval-set", action="append", default=None,
+                        help="評価の場面 (.json)。何度でも指定できる (既定は、ききみみに付いている場面。"
+                             "学習データの確認用の例から作った場面は、いつも足す)")
     parser.add_argument("--no-eval", action="store_true", help="評価を飛ばす")
     parser.add_argument("--base-report", help="差分なしの評価の結果 (--eval-llm --report で作った .json)。あれば、測り直さずに使う")
-    parser.add_argument("--install", action="store_true", help="悪くなっていなければ、ききみみの差分の置き場所に入れる")
+    parser.add_argument("--install", action="store_true",
+                        help="評価で良くなっていれば (直せた行が増え、悪くなっていなければ)、ききみみの差分の置き場所に入れる")
     parser.add_argument("--force", action="store_true", help="メモリの目安に足りなくても学習する")
     args = parser.parse_args()
 
@@ -219,10 +301,11 @@ def main():
     work.mkdir(parents=True, exist_ok=True)
     mlx_model = args.mlx_model or MLX_MODELS[args.model]
 
-    data_dir, sample, n_train = split_data(args.data, work, args.seed)
+    data_dir, sample, n_train, own_eval = split_data(args.data, work, args.seed)
     if args.iters <= 0:
-        # 1 回に 1 件ずつ学習する。3 周が目安 (GitHub の Mac での通しの確認では、1 周 (100 回) では覚えきれなかった)
-        args.iters = max(150, min(600, 3 * n_train))
+        # 1 回に 1 件ずつ学習する。3 周半が目安: 同じ学習 (0.8B、90 件) を確かめたとき、1 周 (100 回) では学習した例にも
+        # 「直しなし」と答え、3 周 (300 回) で、学習に使っていない文の 10 行のうち 7 行を直せるようになった
+        args.iters = max(200, min(800, round(3.5 * n_train)))
     check_template(mlx_model, sample)
     print(f"▸ 学習: {mlx_model}、{args.iters} 回 (rank {args.rank}, scale {args.scale})")
     train(mlx_model, data_dir, adapters, args)
@@ -233,21 +316,27 @@ def main():
     adapter = work / f"{args.model}.lora.gguf"
     convert(adapters, gguf_path, adapter)
 
-    better = None
+    result = None
     if not args.no_eval:
-        sets = args.eval_set or [REPO / "Tests/Fixtures/llm-eval/seed.json"]
-        better = evaluate(args.app, gguf_path, adapter, sets, work, args.cpu, base)
-    if better is False:
-        print(f"✗ 差分を使うと、評価が悪くなりました。入れません (差分は {adapter} に残しています)。")
+        sets = list(args.eval_set or [REPO / "Tests/Fixtures/llm-eval/seed.json"])
+        if own_eval:
+            sets.append(own_eval)
+        result = evaluate(args.app, gguf_path, adapter, sets, work, args.cpu, base)
+    if result is not None and not result[0]:
+        print(f"✗ 差分を使うと、評価が悪くなりました (誤った直し・正しい行を壊す・直せた行が減る)。入れません。\n"
+              f"  差分は {adapter} に残しています。直しをもっとためるか、--iters を変えて、もう一度試してください。")
         raise SystemExit(3)
+    if result is not None and not result[1]:
+        print(f"△ 悪くはなっていませんが、直せた行は増えていません (効き目を確かめられませんでした)。入れません。\n"
+              f"  差分は {adapter} に残しています。直しをもっとためるか、--iters を増やして、もう一度試してください。")
+        raise SystemExit(4)
     if args.install:
         target = LLM_DIR / "Adapters" / f"{args.model}.lora.gguf"
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(adapter, target)
-        print(f"✓ 入れました: {target}\n  ききみみの設定「監査・翻訳」の「追加学習の差分」で、使う / 使わないを選べます。")
+        print(f"✓ 入れました: {target}\n  ききみみの設定「監査・翻訳」の「追加学習 (LoRA)」で、使う / 使わないを選べます。")
     else:
         print(f"✓ できました: {adapter}\n  使うには --install を付けるか、ききみみの設定「監査・翻訳」の「差分を追加…」で選んでください。")
-
 
 if __name__ == "__main__":
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")

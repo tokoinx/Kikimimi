@@ -27,7 +27,7 @@ jobs:
   lora:
     name: LoRA end to end (macos-15, Qwen3.5 0.8B)
     runs-on: macos-15
-    timeout-minutes: 110
+    timeout-minutes: 170
     steps:
       - uses: actions/checkout@v7
 
@@ -83,16 +83,36 @@ jobs:
           head -c 600 build/training.jsonl
 
       # GitHub の Mac は仮想 GPU・3 コアで、LLM がとても遅い (0.8B で 11 場面の評価 1 回に、CPU で 9 分・Metal で 13 分。
-      # Linux の CPU では 41 秒)。そこで、ここでは小さな場面 (3 場面) で確かめる。学習は MLX の GPU (CPU では 30 分たっても進まなかった)
+      # Linux の CPU では 41 秒。MLX の学習は 1 回に 15 秒ほど)。評価は小さな場面 (3 場面 + 確認用の例から作る場面) を CPU で。
+      # 学習は MLX の GPU (CPU では 30 分たっても進まなかった)
 
-      # 学習と変換 (評価は後の手順で)
-      - name: Train with MLX and convert to GGUF
-        timeout-minutes: 70
+      # 学習 → 変換 → 評価 (差分なし / 差分あり)。評価が悪い・効き目が無いときの終了コード (3 / 4) では止めず、次の手順で中身を確かめる
+      - name: Train with MLX, convert to GGUF, evaluate with the app
+        timeout-minutes: 125
         run: |
           set -o pipefail
+          code=0
           .venv-finetune/bin/python tools/finetune/finetune.py --data build/training.jsonl --model qwen3.5-0.8b \
-            --gguf build/models/qwen3.5-0.8b.gguf --out build/finetune --iters 200 --learning-rate 3e-4 --no-eval 2>&1 | tee build/train.log
+            --gguf build/models/qwen3.5-0.8b.gguf --out build/finetune --cpu \
+            --eval-set tools/finetune/selftest/eval-mini.json 2>&1 | tee build/train.log || code=$?
+          echo "finetune.py exit code: $code"
           ls -la build/finetune build/finetune/adapters
+          test "$code" = 0 -o "$code" = 3 -o "$code" = 4
+
+      # 学習した語を、モデルそのもの (台帳なし) が直せるようになったか。正しい行は壊していないか
+      - name: Did the adapter learn the corrections?
+        run: |
+          .venv-finetune/bin/python - <<'PY'
+          import json
+          base, new = json.load(open("build/finetune/eval-base.json")), json.load(open("build/finetune/eval-adapter.json"))
+          def found(r): return r["audit"]["fixedAutomatically"] + r["audit"]["fixedBySuggestion"]
+          print("base   :", json.dumps(base["audit"]))
+          print("adapter:", json.dumps(new["audit"]))
+          print("\n".join(new["details"]))
+          assert new["audit"]["harmed"] <= base["audit"]["harmed"], "the adapter harmed correct lines"
+          assert found(new) > found(base), f"the adapter did not fix more lines ({found(base)} -> {found(new)})"
+          print(f"fixed (incl. suggestions): {found(base)} -> {found(new)} of {new['audit']['errorLines']}; wrong fixes {new['audit']['wrongFixes']}")
+          PY
 
       # 変換だけの確認: 中身が 0 の差分は、出力を変えない (MLX なしで作った差分。向きや名前の取り違えは、ここで読み込めずに止まる)
       - name: Converter check (a zero adapter changes nothing)
@@ -111,29 +131,6 @@ jobs:
           for r in (a, b): r["audit"]["seconds"] = 0; r.pop("adapter", None)
           assert a["audit"] == b["audit"] and a["details"] == b["details"], "a zero adapter changed the result"
           print("zero adapter: same result as no adapter")
-          PY
-
-      # 学習した差分を、組み立てたアプリが読み込んで評価できる。悪くなっていれば終了コード 3 で止まる
-      - name: Evaluate the trained adapter with the app
-        timeout-minutes: 15
-        run: |
-          build/Kikimimi.app/Contents/MacOS/Kikimimi --eval-llm build/models/qwen3.5-0.8b.gguf \
-            --adapter build/finetune/qwen3.5-0.8b.lora.gguf --set tools/finetune/selftest/eval-mini.json --cpu \
-            --report build/eval-adapter.json --baseline build/eval-plain.json
-
-      # 学習した語を、モデルそのもの (台帳なし) が直せるようになったか
-      - name: Did the adapter learn the corrections?
-        run: |
-          .venv-finetune/bin/python - <<'PY'
-          import json
-          base, new = json.load(open("build/eval-plain.json")), json.load(open("build/eval-adapter.json"))
-          def found(r): return r["audit"]["fixedAutomatically"] + r["audit"]["fixedBySuggestion"]
-          print("base   :", json.dumps(base["audit"]))
-          print("adapter:", json.dumps(new["audit"]))
-          print("\n".join(new["details"]))
-          assert new["audit"]["harmed"] <= base["audit"]["harmed"], "the adapter harmed correct lines"
-          assert found(new) > found(base), f"the adapter did not fix more lines ({found(base)} -> {found(new)})"
-          print(f"fixed (incl. suggestions): {found(base)} -> {found(new)} of {new['audit']['errorLines']}")
           PY
 
       - uses: actions/upload-artifact@v7
