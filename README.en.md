@@ -159,17 +159,17 @@ Things to know:
 
 - **Memory needed**: about 8 GB to train 2B, 16 GB for 4B, 32 GB for 9B. On an 8 GB Mac, use 2B (the script stops and says so when memory is short). The first run downloads the training copy of the model (MLX format, e.g. `mlx-community/Qwen3.5-2B-4bit`) from Hugging Face.
 - **At least 12 training examples** are required. For a handful of corrections, learned corrections already do the job without training. Fine-tuning pays off once you have dozens of corrections and want them to carry over to similar cases.
-- **How much training, and which adapter**: by default the data is seen five times (300–1000 steps). No fixed number of steps is right, so five intermediate adapters are kept and the evaluation harness picks the best one. An example with Qwen3.5 0.8B and 12 corrections (90 training examples), on 24 lines with an error in sentences the training never saw:
+- **How much training, and which adapter**: by default the data is seen five times (300–1000 steps, with a decaying learning rate). No fixed number of steps is right, so five intermediate adapters are kept and the evaluation harness picks the best one. An example with Qwen3.5 0.8B and 12 corrections (90 training examples), on 24 lines with an error and 3 translation scenes, none seen in training:
 
-  | | Lines fixed (automatically) | Wrong fixes | Correct lines harmed | Needless suggestions |
-  |---|---|---|---|---|
-  | No adapter | 3 (2) | 0 | 0 | 5 |
-  | 200 steps | 13 (2) | 0 | 0 | 1 |
-  | 300 steps | 12 (5) | 0 | 0 | 1 |
-  | 400 steps | 11 (11) | 0 | 0 | 1 |
-  | 500 and 600 steps | 2 (2) | 0 | 0 | 1 |
+  | | Lines fixed (automatically) | Wrong fixes | Correct lines harmed | Needless suggestions | Proper nouns kept in translation |
+  |---|---|---|---|---|---|
+  | No adapter | 3 (2) | 0 | 0 | 5 | 2/2 |
+  | 100 steps | 2 (2) | 0 | 0 | 1 | 1/2 |
+  | 200 steps | 12 (11) | 0 | 0 | 1 | 2/2 |
+  | 300 steps | 14 (14) | 0 | 0 | 1 | 1/2 |
+  | 400 steps | 14 (14) | 0 | 0 | 1 | 1/2 |
 
-  After one or two passes most fixes come out as suggestions, after four they are automatic, and beyond five the model fixes almost nothing again (here the 400-step adapter is chosen). A run with another seed fixed 7 of 10 lines automatically at 300 steps but produced one wrong fix ("Roblocks → Robo"), and the harness ruled "do not use". Fine-tuning a small model is unstable like this, so always run the evaluation before using an adapter (the script does). These numbers come from running the same training in PyTorch and evaluating the converted adapters with llama.cpp.
+  The 300- and 400-step adapters fix the most lines, but they also make the translation turn "Roblox Studio" into 「ロブス・スタジオ」, so the harness rules them "worse" and picks the 200-step adapter, which leaves translation intact. In another experiment that kept a constant learning rate up to 600 steps, the model fixed almost nothing again after 500 steps (2 lines), and a run with another seed produced a wrong fix ("Roblocks → Robo"). Fine-tuning a small model is unstable like this, so always run the evaluation before using an adapter (the script does). These numbers come from running the same training in PyTorch and evaluating the converted adapters with llama.cpp.
 - The script corrects three things that make training ineffective when mlx-lm is used as is (each was reproduced by running the same training in PyTorch):
   - **What is trained**: mlx-lm also trains on the marker that closes the "thinking" block before the answer. With Qwen3.5 nearly all of the training goes there, so the loss is restricted to the answer.
   - **The loss**: mlx-lm counts one padding position after the end of each example. With answer-only training (3–12 tokens) that one position dominates the loss (4.634 against 0.012 for one example), so it is excluded.

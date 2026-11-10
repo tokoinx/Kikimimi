@@ -321,9 +321,14 @@ def evaluate(app, gguf, candidates, eval_sets, work, cpu, base_report=None):
         base, _ = run_eval(binary, gguf, eval_sets, cpu, base_path)
 
     def line(name, r, note=""):
-        a = r["audit"]
-        print(f"  {name:>10}: 直せた行 {found(r)}/{a['errorLines']} (うち自動 {a['fixedAutomatically']})、"
-              f"誤った直し {a['wrongFixes']}、正しい行を壊した数 {a['harmed']}、不要な提案 {a['falseSuggestions']}{note}")
+        a, tr = r["audit"], r.get("translation", {})
+        text = (f"  {name:>10}: 直せた行 {found(r)}/{a['errorLines']} (うち自動 {a['fixedAutomatically']})、"
+                f"誤った直し {a['wrongFixes']}、正しい行を壊した数 {a['harmed']}、不要な提案 {a['falseSuggestions']}")
+        if tr.get("lines"):
+            # 監査の学習が、翻訳を変えてしまうことがある (固有名詞の訳が崩れるなど)。翻訳の場面も同じように比べる
+            text += (f"、訳: 日本語 {tr.get('japanese', 0)}/{tr.get('translated', 0)}・"
+                     f"数 {tr.get('numbersKept', 0)}/{tr.get('numbersChecked', 0)}・語 {tr.get('termsKept', 0)}/{tr.get('termsChecked', 0)}")
+        print(text + note)
 
     line("差分なし", base)
     results = []
