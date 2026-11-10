@@ -59,15 +59,15 @@ enum LLMEvalRunner {
                            adapter.map { " + adapter " + ($0 as NSString).lastPathComponent } ?? "", Date().timeIntervalSince(started)))
             }
             log("cases: \(audit.count) audit, \(translation.count) translation; learned corrections: \(report.ledgerEntries)")
-            let audited = try LLMEval.runAudit(audit, generator: engine, modelName: engine?.modelDescription, ledger: ledger) { done, total in
-                if done % 5 == 0 || done == total { log("  audit \(done)/\(total)") }
-            }
+            let audited = try LLMEval.runAudit(audit, generator: engine, modelName: engine?.modelDescription, ledger: ledger,
+                                               onCase: { done, total in
+                                                   if done % 5 == 0 || done == total { log("  audit \(done)/\(total)") }
+                                               })
             report.audit = audited.score
             report.details = audited.details
             if let engine {
-                let translated = try LLMEval.runTranslation(translation, generator: engine, ledger: ledger) { done, total in
-                    log("  translation \(done)/\(total)")
-                }
+                let translated = try LLMEval.runTranslation(translation, generator: engine, ledger: ledger,
+                                                            onCase: { done, total in log("  translation \(done)/\(total)") })
                 report.translation = translated.score
                 report.details += translated.details
             }
