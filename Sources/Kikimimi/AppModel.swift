@@ -893,8 +893,11 @@ final class AppModel {
         job.transcript = transcript
         // 利用者が自分で決めた直しを覚える (次からは、反映した直しは先に当て、元に戻した直しは出さない)
         let after = transcript.audit?.changes.first { $0.id == change.id }
-        // いくつかの語をまとめた直し (学習した直しが 2 つ当たった行・学習した直しと LLM の直しをまとめた行) は、どの組にも同じ決定を覚える
-        if useLedger, let before, let after, before.kind == .fix, before.isApplied != after.isApplied {
+        // いくつかの語をまとめた直し (学習した直しが 2 つ当たった行・学習した直しと LLM の直しをまとめた行) を反映したら、
+        // どの組にも「反映」を覚える。元に戻したときは、どの語がいけなかったのかわからないので、台帳には覚えない
+        // (この行での決定は、文字起こしの側に残る。監査をやり直しても、この行には当てない)
+        if useLedger, let before, let after, before.kind == .fix, before.isApplied != after.isApplied,
+           after.isApplied || before.decisionPairs.count == 1 {
             let pairs = before.decisionPairs
             for pair in pairs {
                 ledger.record(wrong: pair.wrong, right: pair.right, language: transcript.language(of: before.original),

@@ -217,6 +217,36 @@ final class CorrectionLedgerTests: XCTestCase {
         XCTAssertTrue(Auditor.containsTerm("機械を使います。", "機械"))
     }
 
+    /// 学習した直しと LLM の直しをまとめたものを元に戻したら、監査のやり直しで、学習した直しだけが戻ってくることもない
+    func testRevertingAMergedChangeKeepsTheLineAsTheUserLeftIt() throws {
+        var ledger = CorrectionLedger()
+        _ = ledger.teach(wrong: "Roblocks", right: "Roblox")
+        let segments = [segment("Our studio is called Roblocks Labs, and we bild small games.")]
+        let generator = FakeGenerator { prompt in
+            if prompt.user.contains("Lines to check") { return "[1] FIX bild => build\nEND" }
+            for line in prompt.user.split(separator: "\n") where line.hasPrefix("1: ") || line.hasPrefix("2: ") {
+                if line.contains("build") { return String(line.prefix(1)) }
+            }
+            return "1"
+        }
+        func audit(_ transcript: Transcript) throws -> AuditReport {
+            try Auditor.audit(transcript.segmentsBeforeAudit, language: "en",
+                              options: AuditOptions(ledger: ledger, decisions: transcript.audit?.userDecisions ?? [:]),
+                              generator: generator, modelName: "fake", shouldCancel: { false })
+        }
+        var transcript = Transcript(sourceName: "x", segments: segments, language: "en")
+        transcript.adopt(try audit(transcript))
+        XCTAssertEqual(transcript.segments[0].text, "Our studio is called Roblox Labs, and we build small games.")
+        transcript.setChange(try XCTUnwrap(transcript.audit?.changes.first).id, applied: false)
+        XCTAssertEqual(transcript.segments[0].text, segments[0].text)
+        for round in 1...2 {
+            transcript.adopt(try audit(transcript))
+            XCTAssertEqual(transcript.segments[0].text, segments[0].text, "round \(round)")
+            XCTAssertEqual(transcript.audit?.changes.count, 1)
+            XCTAssertEqual(transcript.audit?.changes.first?.isApplied, false)
+        }
+    }
+
     /// いくつかの語をまとめた直しは、どの組にも利用者の決定を覚えられるよう、すべての組を持つ
     func testCombinedChangesCarryEveryPair() throws {
         var ledger = CorrectionLedger()

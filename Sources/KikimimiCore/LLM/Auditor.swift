@@ -512,9 +512,35 @@ public enum Auditor {
         let ledgerChanges = (options.ledger?.fixes(for: rest, language: language) ?? []).filter { !ruled.contains($0.original.id) }
         // 反映される学習した直し (自信があるもの。利用者がこの行で決めていれば、その決定)。LLM には、これを当てた後の文を見せる。
         // 反映されないもの (利用者がこの行では元に戻した・確かめてもらう提案) は、LLM に見せず、LLM の直しともまとめない
-        func isOn(_ change: AuditChange) -> Bool { options.decisions[change.signature] ?? change.isConfident }
+        // 利用者がこの行で元に戻した直し (区間 → 直した文)。同じ語の直しを含む別の直し (LLM の直しとまとめ直したもの・
+        // まとめたものの片方だけ) は、自動では反映せず、提案にとどめる
+        var revertedTexts: [String: [String]] = [:]
+        for (key, applied) in options.decisions where !applied {
+            let parts = key.split(separator: "|", maxSplits: 2, omittingEmptySubsequences: false)
+            guard parts.count == 3, parts[1] == "fix" else { continue }
+            revertedTexts[String(parts[0]), default: []].append(String(parts[2]))
+        }
+        func revertedBefore(_ change: AuditChange) -> Bool {
+            guard options.decisions[change.signature] == nil,
+                  let texts = revertedTexts[change.original.id.uuidString] else { return false }
+            let rights = change.decisionPairs.map(\.right)
+            return texts.contains { text in
+                rights.contains { containsTerm(text, $0) && !containsTerm(change.original.text, $0) }
+            }
+        }
+        func isOn(_ change: AuditChange) -> Bool {
+            if let decided = options.decisions[change.signature] { return decided }
+            return change.isConfident && !revertedBefore(change)
+        }
         let learned = Dictionary(ledgerChanges.filter(isOn).map { ($0.original.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let pending = Dictionary(ledgerChanges.filter { !isOn($0) }.map { ($0.original.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let pending = Dictionary(ledgerChanges.filter { !isOn($0) }.map { change -> (UUID, AuditChange) in
+            var change = change
+            if change.isConfident, options.decisions[change.signature] == nil {
+                change.isConfident = false
+                change.reason += " (この行では、前に直しを元に戻しています。要確認)"
+            }
+            return (change.original.id, change)
+        }, uniquingKeysWith: { first, _ in first })
         func report(_ llmChanges: [AuditChange], model: String?, partial: Bool) -> AuditReport {
             // 規則の指摘がある区間は規則を優先する (理由がはっきりしているため)
             var all = ruleChanges
@@ -524,6 +550,12 @@ public enum Auditor {
                 guard let own = learned[change.original.id] else {
                     // 反映されない学習した直しがある行を、LLM が直した: LLM の直しを使う (1 区間 1 件)
                     suggested[change.original.id] = nil
+                    var change = change
+                    // 利用者が前に直しを元に戻した行は、別の直しでも、確かめてもらってから反映する
+                    if change.kind == .fix, change.isConfident, revertedBefore(change) {
+                        change.isConfident = false
+                        change.reason += " (この行では、前に直しを元に戻しています。要確認)"
+                    }
                     all.append(change)
                     continue
                 }
