@@ -208,7 +208,11 @@ def use_answer_only_loss():
 
 
 def train(mlx_model, data_dir, adapters, args):
-    """mlx-lm の LoRA の学習を、このプロセスの中で動かす"""
+    """mlx-lm の LoRA の学習を、このプロセスの中で動かす。
+
+    Adam は、偏りの補正 (bias_correction) を有効にする。MLX の既定は補正なしで、そのままだと最初の数百回は、
+    補正ありの約 3 倍の大きさで重みが動く (学習率 2e-4 では不安定になり、検証の損失が 0.80 → 2.80 と上がった)。
+    学習率の既定 (2e-4) は、補正ありで確かめた値"""
     config = Path(adapters).parent / "lora-config.yaml"
     config.write_text(f"""model: "{mlx_model}"
 train: true
@@ -227,6 +231,10 @@ steps_per_eval: {max(10, args.iters // 4)}
 val_batches: -1
 save_every: {max(10, args.iters // 2)}
 seed: {args.seed}
+optimizer: adam
+optimizer_config:
+  adam:
+    bias_correction: true
 lora_parameters:
   keys: ["mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"]
   rank: {args.rank}
