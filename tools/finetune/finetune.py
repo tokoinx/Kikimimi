@@ -303,7 +303,7 @@ def main():
     parser.add_argument("--gguf", help="ききみみの LLM のファイル (既定は、ききみみの保存先の <model>.gguf)")
     parser.add_argument("--out", default="build/finetune", help="作業用のフォルダ")
     parser.add_argument("--iters", type=int, default=0,
-                        help="学習の回数 (既定は、学習データを 3 周半する回数。200〜800 の範囲)")
+                        help="学習の回数 (既定は、学習データを 7 周する回数。300〜1200 の範囲)")
     parser.add_argument("--learning-rate", type=float, default=2e-4)
     parser.add_argument("--rank", type=int, default=8)
     parser.add_argument("--scale", type=float, default=4.0, help="差分の強さ")
@@ -356,9 +356,10 @@ def main():
 
     data_dir, sample, n_train, own_eval = split_data(args.data, work, args.seed)
     if args.iters <= 0:
-        # 1 回に 1 件ずつ学習する。3 周半が目安: 同じ学習 (0.8B、90 件) を確かめたとき、1 周 (100 回) では学習した例にも
-        # 「直しなし」と答え、3 周 (300 回) で、学習に使っていない文の 10 行のうち 7 行を直せるようになった
-        args.iters = max(200, min(800, round(3.5 * n_train)))
+        # 1 回に 1 件ずつ学習する。7 周が目安。直しを答え始めるのは、ある回数を超えてから急に起きる: 同じ学習 (0.8B、90 件) を
+        # PyTorch で確かめたとき、1〜2 周 (100〜200 回) では学習した例にも「直しなし」と答え、3 周 (300 回) で、学習に
+        # 使っていない文の 10 行のうち 7 行を直せるようになった。MLX (4 bit のモデル) では、3 周半 (298 回) でもまだ届かなかった
+        args.iters = max(300, min(1200, 7 * n_train))
     check_template(mlx_model, sample)
     print(f"▸ 学習: {mlx_model}、{args.iters} 回 (rank {args.rank}, scale {args.scale})")
     train(mlx_model, data_dir, adapters, args)
