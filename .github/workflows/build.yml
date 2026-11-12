@@ -130,7 +130,28 @@ jobs:
       - name: UI load self-test (3000 lines, one line played from a recording)
         timeout-minutes: 4
         run: |
-          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000.txt
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000.txt --screenshots build/ui-shots
+
+      # 同じ 3000 行を、一覧の入れ物を LazyVStack にして測る (List と比べるための参考。失敗にしない)。
+      # 一覧の作りのほかは、上の段と同じ引数にしている。ウインドウの絵は build/ui-shots-lazy に残す。
+      # 上の段が目安を超えて失敗しても、比べる数が残るように動かす
+      - name: UI load self-test (3000 lines, lazy list, for comparison, informational)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000-lazy.txt --list lazy --screenshots build/ui-shots-lazy
+
+      # 画面の重さの確認が残したウインドウの絵 (List と LazyVStack)。確認が失敗しても残す
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ui-shots-${{ matrix.os }}-xcode${{ matrix.xcode }}
+          path: |
+            build/ui-shots
+            build/ui-shots-lazy
+          if-no-files-found: warn
+          retention-days: 14
 
       # 8000 行は参考に測るだけ (失敗にしない)。2 時間の録音の本当の文字起こしは 2000〜4000 行ほどなので、
       # 目安は 3000 行で決めている。8000 行で目安を超えても、この段は止めずに先へ進む

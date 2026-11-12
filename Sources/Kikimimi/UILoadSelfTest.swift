@@ -3,7 +3,7 @@ import CoreFoundation
 import Foundation
 import KikimimiCore
 
-/// `Kikimimi --selftest-ui-load [行数] [--audio <音声>] [--report <ファイル>]`
+/// `Kikimimi --selftest-ui-load [行数] [--audio <音声>] [--report <ファイル>] [--list <list|lazy>] [--screenshots <フォルダ>]`
 ///
 /// ふつうに起動して (画面も出す)、行数 (既定 3000) の結果を出したまま、使っているときと同じ操作を起こし、
 /// 操作ごとに、メインスレッドがまた空くまでの時間を測る (長い録音を文字起こししている最中に画面が固まった不具合の確認)。
@@ -31,6 +31,11 @@ import KikimimiCore
 /// `--audio` を付けると、その音声で 1 行 (5〜7 秒あたり) を本当に再生し、行の終わりで自分で止まるかと、
 /// そのあと下の再生ボタンで行の終わりから続くかも確かめる。行は 0 秒から押すときと、ふつうの再生が後ろ (30 秒あたり)
 /// にいるときに押すときの 2 回。音を出せるかは先にふつうの再生で確かめ、出せない Mac では、その部分は飛ばす。
+///
+/// `--list` は、結果の一覧の作り (TranscriptListKind) を、この回だけ変える (設定の "transcriptListKind" より先)。
+///
+/// `--screenshots` を付けると、測り終えたあと (測る段階の外で) ウインドウを 1200 x 800 にして、決まった場面の
+/// ウインドウの絵を PNG で、そのフォルダに残す (無ければ作る)。絵を残せなくても、終了コードは変えない。
 ///
 /// 終了コード: 0 = 成功、1 = メインのウインドウが出ない、3 = 終わらない (メインスレッドが止まっている)、
 /// 5 = 重い (UI LOAD: SLOW)、6 = 1 行だけの再生が行の終わりで止まらない・続きから再生しない
@@ -144,6 +149,10 @@ enum UILoadSelfTest {
         let audio = value(after: "--audio", in: arguments).map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
         }
+        let listKind = value(after: "--list", in: arguments)
+        let screenshots = value(after: "--screenshots", in: arguments).map {
+            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
+        }
         let header = [
             LaunchLog.versionLine + " UI load self-test",
             LaunchLog.environmentLine,
@@ -157,7 +166,8 @@ enum UILoadSelfTest {
                              + " (the main thread may be stuck)"], code: 3, reportPath: reportPath)
         }
         Task { @MainActor in
-            await run(rows: rows, audio: audio, header: header, reportPath: reportPath)
+            await run(rows: rows, audio: audio, listKind: listKind, screenshots: screenshots, header: header,
+                      reportPath: reportPath)
         }
     }
 
@@ -167,8 +177,11 @@ enum UILoadSelfTest {
     }
 
     @MainActor
-    private static func run(rows: Int, audio: URL?, header: [String], reportPath: String?) async {
+    private static func run(rows: Int, audio: URL?, listKind: String?, screenshots: URL?, header: [String],
+                            reportPath: String?) async {
         var lines = header
+        // 一覧が、絵を残すときに動かす口を入れる (一覧が出る前に)
+        UILoadHooks.isActive = true
         // 1. メインのウインドウと、その中のモデルを待つ
         var found: AppModel?
         for _ in 0..<80 {
@@ -182,6 +195,15 @@ enum UILoadSelfTest {
             finish(lines + ["UI LOAD FAILED: no main window after 20 s"], code: 1, reportPath: reportPath)
         }
         AppDelegate.shared?.keepRunningWithoutWindows = true
+        // 一覧の作り: --list があれば、この回だけ変える (保存しない)
+        if let listKind {
+            if let kind = TranscriptListKind(rawValue: listKind) {
+                model.transcriptListKind = kind
+            } else {
+                lines.append("UI LOAD: unknown list kind \"\(listKind)\" (use list or lazy), keeping the setting")
+            }
+        }
+        lines.append("UI LOAD: list kind \(model.transcriptListKind.rawValue)")
 
         // 2. 終わったジョブ 2 つと、文字起こし中のジョブを入れる。
         // 音声が無いときは、無いファイルを開く (行の再生の印は出て、再生しても音は出ない)
@@ -202,6 +224,11 @@ enum UILoadSelfTest {
             lines.append("UI LOAD: SLOW (\(failure))")
         }
         let slow = !failures.isEmpty
+
+        // 測り終えたあとで、ウインドウの絵を残す (測る段階の外。見張りも止めてある)
+        if let screenshots {
+            lines += await load.takeScreenshots(into: screenshots)
+        }
 
         // 4. 音声があれば、1 行を本当に再生して、行の終わりで止まるかを見る
         var lineFailed = false
@@ -453,6 +480,26 @@ enum UILoadSelfTest {
         }
         exit(code)
     }
+}
+
+/// 画面の重さの確認から、結果の一覧を動かすための口。確認のあいだだけ、一覧 (TranscriptListView) が現れたときに入れる
+/// (ScrollViewProxy と ListFollow は一覧の中にしか無い)。ふだんの起動では、どれも nil のまま
+@MainActor
+enum UILoadHooks {
+    /// 行のどちらの端に合わせて動かすか
+    enum Edge {
+        case top
+        case bottom
+    }
+
+    /// 確認の最中か (一覧は、このときだけ下の口を入れる)
+    static var isActive = false
+    /// 一覧を、その行 (行の id) が上の端か下の端に来るように動かす
+    static var scrollList: (@MainActor (UUID, Edge) -> Void)?
+    /// 一覧の終わりを追いかけるか (ListFollow.isOn) を変える
+    static var setFollowing: (@MainActor (Bool) -> Void)?
+    /// 一覧の終わりを追いかけているか
+    static var isFollowing: (@MainActor () -> Bool)?
 }
 
 /// 画面の重さの確認の、ジョブと操作と測った値
@@ -851,6 +898,151 @@ private final class LoadRun {
                               ", the append path was used in \(used)"))
         }
         return lines
+    }
+
+    // MARK: ウインドウの絵 (--screenshots)
+
+    /// 決まった場面を順に出し、それぞれ、メインスレッドが空いて絵が落ち着いてから、ウインドウの絵を PNG で残す。
+    /// 測り終えたあとに呼ぶ (測る操作の中では撮らない)。出力の行を返す
+    func takeScreenshots(into directory: URL) async -> [String] {
+        var lines: [String] = []
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            return ["UI LOAD: screenshot failed (all): could not create \(directory.path): \(error.localizedDescription)"]
+        }
+        guard let window = MainWindow.all().first(where: { $0.isVisible }) else {
+            return ["UI LOAD: screenshot failed (all): no visible main window"]
+        }
+        // 絵の大きさ (左上の位置はそのまま)
+        var frame = window.frame
+        frame.origin.y += frame.height - 800
+        frame.size = CGSize(width: 1200, height: 800)
+        window.setFrame(frame, display: true)
+        lines.append("screenshots: into \(directory.path), window \(Int(window.frame.width))x\(Int(window.frame.height)) pt")
+        player.stopLine()
+        player.selfTestSetTime(0, playing: false)
+
+        // 1. 終わったジョブ (対訳)、一覧の始め
+        model.select(doneBilingual)
+        await settle()
+        lines += await scroll(to: doneBilingual.transcript?.segments.first?.id, .top, for: "01")
+        lines.append(shot("01-finished-bilingual", in: window, to: directory))
+
+        // 2. 同じジョブで、見えている 4 行目を 1 行だけ再生しているところ (再生の色と止める印)。
+        // 音声が無くても、playLine は行の印を付ける (音は出ない)
+        if let segments = doneBilingual.transcript?.segments, segments.count > 3 {
+            let segment = segments[3]
+            player.playLine(id: segment.id, start: segment.start, end: segment.end)
+            await settle()
+            let playing = player.playingLineID == segment.id
+            lines.append(shot("02-line-playing", in: window, to: directory))
+            if !playing || player.playingLineID != segment.id {
+                lines.append("UI LOAD: screenshot 02-line-playing.png: the row was not in one-line playback for the whole"
+                             + " picture (it may show no playing tint)")
+            }
+            player.stopLine()
+        } else {
+            lines.append("UI LOAD: screenshot failed 02-line-playing.png: the job has fewer than 4 rows")
+        }
+        player.selfTestSetTime(0, playing: false)
+
+        // 3. 終わったジョブ (日本語だけ)
+        model.select(donePlain)
+        await settle()
+        lines += await scroll(to: donePlain.transcript?.segments.first?.id, .top, for: "03")
+        lines.append(shot("03-finished-plain", in: window, to: directory))
+
+        // 4. 文字起こし中のジョブ、一覧の終わり (進み具合と、出てきた行)
+        model.select(running)
+        await settle()
+        UILoadHooks.setFollowing?(true)
+        lines += await scroll(to: running.transcript?.segments.last?.id, .bottom, for: "04")
+        lines.append(shot("04-running-job", in: window, to: directory))
+
+        // 5. 同じジョブで、追いかけるのをやめ、15 行ほど上へ動かしたところ (右下の「末尾へ」)
+        let segments = running.transcript?.segments ?? []
+        lines += await scroll(to: segments.isEmpty ? nil : segments[max(0, segments.count - 15)].id, .bottom, for: "05")
+        UILoadHooks.setFollowing?(false)
+        await settle()
+        if UILoadHooks.isFollowing?() ?? true {
+            lines.append("UI LOAD: screenshot 05-running-scrolled-up.png: the list was still following the end"
+                         + " (the 末尾へ button may be missing)")
+        }
+        lines.append(shot("05-running-scrolled-up", in: window, to: directory))
+        UILoadHooks.setFollowing?(true)
+
+        // 6. 日本語と英語が混ざっていたので、自動で「日本語＋英語」にした終わったジョブ (案内と「…だけでやり直す」)。
+        // AppModel.run が、言語を確かめて混ざっていたときに入れるものと同じものを入れる。訳の無い英語の行には「訳」が出る
+        let mixed = Job(name: "日本語と英語が混ざった録音 (確認用)", url: doneBilingual.url)
+        let mixedRows = 60
+        mixed.transcript = Transcript(sourceName: mixed.name, segments: UILoadSelfTest.makeSegments(0..<mixedRows),
+                                      language: "ja", duration: Double(mixedRows) * UILoadSelfTest.rowSpacing, elapsed: 1)
+        mixed.status = .done
+        mixed.progress = 1
+        mixed.message = "完了"
+        mixed.exported = true
+        mixed.autoMixedFrom = "ja"
+        mixed.languageCode = Languages.japaneseEnglish.code
+        model.jobs.insert(mixed, at: 0)
+        model.select(mixed)
+        await settle()
+        lines += await scroll(to: mixed.transcript?.segments.first?.id, .top, for: "06")
+        lines.append(shot("06-auto-mixed-notice", in: window, to: directory))
+        return lines
+    }
+
+    /// メインスレッドが空くのを待ち、0.4 秒おいて (絵が落ち着くまで)、また空くのを待つ
+    private func settle() async {
+        _ = await UILoadSelfTest.untilIdle(since: UILoadSelfTest.now())
+        await UILoadSelfTest.sleep(0.4)
+        _ = await UILoadSelfTest.untilIdle(since: UILoadSelfTest.now())
+    }
+
+    /// 一覧を、その行が端に来るように動かし、落ち着くまで待つ。動かせなければ、そのことを出力の行で返す
+    private func scroll(to id: UUID?, _ edge: UILoadHooks.Edge, for name: String) async -> [String] {
+        guard let id else { return ["UI LOAD: screenshot \(name): could not scroll the list (no rows)"] }
+        guard let scrollList = UILoadHooks.scrollList else {
+            return ["UI LOAD: screenshot \(name): could not scroll the list (the list did not register its scroll hook)"]
+        }
+        scrollList(id, edge)
+        await settle()
+        return []
+    }
+
+    /// ウインドウの絵を PNG で残し、出力の行を返す。タイトルバーとツールバーも入るよう、内容の外側 (枠の view) から撮り、
+    /// 撮れなければ内容の view から撮る
+    private func shot(_ name: String, in window: NSWindow, to directory: URL) -> String {
+        let file = name + ".png"
+        var picture: (data: Data, width: Int, height: Int)?
+        var what = ""
+        if let frameView = window.contentView?.superview, let p = Self.png(of: frameView) {
+            picture = p
+            what = "window frame"
+        } else if let content = window.contentView, let p = Self.png(of: content) {
+            picture = p
+            what = "content view"
+        }
+        guard let picture else {
+            return "UI LOAD: screenshot failed \(file): the view could not be drawn into a PNG"
+        }
+        do {
+            try picture.data.write(to: directory.appendingPathComponent(file))
+        } catch {
+            return "UI LOAD: screenshot failed \(file): \(error.localizedDescription)"
+        }
+        return "UI LOAD: screenshot \(file) \(picture.width)x\(picture.height) (\(what))"
+    }
+
+    /// view を描いた PNG と、その画素の幅と高さ (描けなければ nil)
+    private static func png(of view: NSView) -> (data: Data, width: Int, height: Int)? {
+        let bounds = view.bounds
+        guard bounds.width > 0, bounds.height > 0, let rep = view.bitmapImageRepForCachingDisplay(in: bounds) else {
+            return nil
+        }
+        view.cacheDisplay(in: bounds, to: rep)
+        guard let data = rep.representation(using: .png, properties: [:]) else { return nil }
+        return (data, rep.pixelsWide, rep.pixelsHigh)
     }
 
     // MARK: 結果

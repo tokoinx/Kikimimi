@@ -94,6 +94,14 @@ enum SettingsTab: Hashable {
     case llm
 }
 
+/// 結果の一覧の作り (UserDefaults の "transcriptListKind")。行・色・追いかける決まりは同じで、入れ物だけが違う
+enum TranscriptListKind: String {
+    /// SwiftUI の List (いまの既定)
+    case list
+    /// ScrollView の中の LazyVStack (数千行で軽いかを比べるため)
+    case lazy
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -137,6 +145,9 @@ final class AppModel {
     var autoTranslate: Bool { didSet { save(autoTranslate, "autoTranslate") } }
     /// 原文と日本語訳を左右に並べて表示する
     var showBilingual: Bool { didSet { save(showBilingual, "showBilingual") } }
+    /// 結果の一覧の作り。設定の画面には出さず、ここでは保存しない
+    /// (画面の重さの確認の `--list` は、その回だけ変える。ふだんは `defaults write` で変える)
+    var transcriptListKind: TranscriptListKind
     /// 学習した直し (監査の一覧で利用者が決めた直し・設定で自分で書いた直し)。Mac の中だけに保存する
     var ledger = CorrectionLedger()
     /// 学習した直しを使う (監査の前に当てる・断った直しを出さない・正しい語を語彙のヒントに足す)
@@ -184,6 +195,7 @@ final class AppModel {
         autoAudit = d.object(forKey: "autoAudit") as? Bool ?? true
         autoTranslate = d.object(forKey: "autoTranslate") as? Bool ?? true
         showBilingual = d.object(forKey: "showBilingual") as? Bool ?? true
+        transcriptListKind = d.string(forKey: "transcriptListKind").flatMap(TranscriptListKind.init(rawValue:)) ?? .list
         useLedger = d.object(forKey: "useLedger") as? Bool ?? true
         useAdapter = d.object(forKey: "useAdapter") as? Bool ?? true
         llmStore = LLMModelStore(models: store)

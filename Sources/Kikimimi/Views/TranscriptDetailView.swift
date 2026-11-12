@@ -228,6 +228,10 @@ struct LanguageTagLabel: View {
 /// - 一覧の終わり (見えない印の行) が見えたら、また追いかける。右下の「末尾へ」でも戻せる。
 /// - 再生しているあいだ (1 行だけでも、ふつうの再生でも) は、追いかけていても動かさない。
 /// macOS 14 の SwiftUI の List には、いまのスクロールの位置を知る手段が無いので、この決まりにしている
+///
+/// 入れ物は 2 通り (AppModel.transcriptListKind): SwiftUI の List (既定) と、ScrollView の中の LazyVStack (数千行で
+/// 軽いかを比べるため)。行 (rows)・行の色・見えない部品・「末尾へ」・scrollTo の id はどちらも同じで、違うのは入れ物だけ。
+/// LazyVStack では、List がしていた行の背景・区切りの線・行の余白・一覧の背景の色を、行の側 (PlayableRow) と rows で付ける
 struct TranscriptListView: View {
     @Environment(AppModel.self) private var model
     let job: Job
@@ -248,41 +252,12 @@ struct TranscriptListView: View {
         // 中を見ずに、入れ物そのものを渡す (行・見えない部品・ボタンが、それぞれ要るものだけを見る)
         let highlight = self.highlight
         let follow = self.follow
+        let kind = model.transcriptListKind
         ScrollViewReader { proxy in
-            // 行に .id() を付けない (付けると List がすべての行を一度に作るようになる。scrollTo は ForEach の id で動く)
-            List {
-                ForEach(items) { item in
-                    PlayableRow(item: item, job: job, canPlay: canPlay, highlight: highlight) {
-                        if bilingual {
-                            BilingualRow(item: item, isTranslating: translating, showTimestamp: showTimestamps,
-                                         highlight: highlightText, job: job)
-                        } else {
-                            SegmentRow(item: item, showTimestamp: showTimestamps,
-                                       highlight: highlightText, job: job)
-                        }
-                    }
-                }
-                if items.isEmpty {
-                    Text(emptyMessage)
-                        .foregroundStyle(.secondary)
-                }
-                if running {
-                    // 一覧の終わりの印 (見えない行)。これが見えたら、使う人は一覧の終わりにいる: また追いかける。
-                    // onAppear は、表 (NSTableView) が行を作っている最中に呼ばれる。ここで状態を変えると、表を更新している
-                    // 最中に SwiftUI がまた表を更新しようとして「reentrant operation」と警告されるので、次の回に変える。
-                    // 同じ値でも書くと見ている部品が描き直されるので、変わるときだけ書く
-                    Color.clear
-                        .frame(height: 1)
-                        .listRowBackground(Color.clear)
-                        .accessibilityHidden(true)
-                        .onAppear {
-                            Task { @MainActor in
-                                if !follow.isOn { follow.isOn = true }
-                            }
-                        }
-                }
+            container(kind) {
+                rows(kind, canPlay: canPlay, translating: translating, showTimestamps: showTimestamps,
+                     highlightText: highlightText, running: running, highlight: highlight, follow: follow)
             }
-            .listStyle(.inset)
             .background(CurrentLineTracker(job: job, items: items, highlight: highlight, follow: follow, proxy: proxy))
             .background(
                 GeometryReader { geometry in
@@ -295,8 +270,92 @@ struct TranscriptListView: View {
             .overlay(alignment: .bottomTrailing) {
                 FollowButton(follow: follow, running: running, lastID: items.last?.id, proxy: proxy)
             }
-            .onAppear { follow.install() }
+            .onAppear {
+                follow.install()
+                // 画面の重さの確認 (--selftest-ui-load --screenshots) が、絵を撮る前に一覧を動かす口
+                if UILoadHooks.isActive {
+                    UILoadHooks.scrollList = { id, edge in
+                        proxy.scrollTo(id, anchor: edge == .top ? .top : .bottom)
+                    }
+                    UILoadHooks.setFollowing = { on in
+                        if follow.isOn != on { follow.isOn = on }
+                    }
+                    UILoadHooks.isFollowing = { follow.isOn }
+                }
+            }
             .onDisappear { follow.remove() }
+        }
+    }
+
+    /// 入れ物: SwiftUI の List か、ScrollView の中の LazyVStack。中身 (rows) はどちらも同じ
+    @ViewBuilder
+    private func container<Rows: View>(_ kind: TranscriptListKind, @ViewBuilder rows: () -> Rows) -> some View {
+        switch kind {
+        case .list:
+            List {
+                rows()
+            }
+            .listStyle(.inset)
+        case .lazy:
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    rows()
+                }
+                .padding(.vertical, 6)
+            }
+            .background(Color(nsColor: .controlBackgroundColor))
+        }
+    }
+
+    /// 一覧の中身: 行、行が無いときの知らせ、一覧の終わりの印。
+    /// 行に .id() を付けない (付けると List がすべての行を一度に作るようになる。scrollTo は ForEach の id で動く)
+    @ViewBuilder
+    private func rows(_ kind: TranscriptListKind, canPlay: Bool, translating: Bool, showTimestamps: Bool,
+                      highlightText: String, running: Bool, highlight: RowHighlight, follow: ListFollow) -> some View {
+        let lastID = kind == .lazy ? items.last?.id : nil
+        ForEach(items) { item in
+            let row = PlayableRow(item: item, job: job, canPlay: canPlay, highlight: highlight, kind: kind) {
+                if bilingual {
+                    BilingualRow(item: item, isTranslating: translating, showTimestamp: showTimestamps,
+                                 highlight: highlightText, job: job)
+                } else {
+                    SegmentRow(item: item, showTimestamp: showTimestamps,
+                               highlight: highlightText, job: job)
+                }
+            }
+            if kind == .lazy {
+                // List の区切りの線の代わり (行の背景の外に、行の余白と同じだけ内側へ寄せて引く。最後の行の下には引かない)
+                VStack(alignment: .leading, spacing: 0) {
+                    row
+                    if item.id != lastID {
+                        Divider()
+                            .padding(.horizontal, LazyListMetrics.horizontal)
+                    }
+                }
+            } else {
+                row
+            }
+        }
+        if items.isEmpty {
+            Text(emptyMessage)
+                .foregroundStyle(.secondary)
+                .modifier(LazyRowLayout(kind: kind))
+        }
+        if running {
+            // 一覧の終わりの印 (見えない行)。これが見えたら、使う人は一覧の終わりにいる: また追いかける。
+            // onAppear は、表 (NSTableView) が行を作っている最中に呼ばれる。ここで状態を変えると、表を更新している
+            // 最中に SwiftUI がまた表を更新しようとして「reentrant operation」と警告されるので、次の回に変える。
+            // 同じ値でも書くと見ている部品が描き直されるので、変わるときだけ書く。
+            // LazyVStack では、見える少し前 (先に作る範囲に入ったとき) に呼ばれることがある
+            Color.clear
+                .frame(height: 1)
+                .listRowBackground(Color.clear)
+                .accessibilityHidden(true)
+                .onAppear {
+                    Task { @MainActor in
+                        if !follow.isOn { follow.isOn = true }
+                    }
+                }
         }
     }
 }
@@ -573,15 +632,18 @@ struct PlayableRow<Content: View>: View {
     let canPlay: Bool
     /// 行の色 (この行だけを再生している・ふつうの再生でいまの位置がこの行にある)。この行の Cell だけを見る
     let highlight: RowHighlight
+    /// 一覧の入れ物。LazyVStack では、List がしていた行の余白と背景を、ここで付ける
+    let kind: TranscriptListKind
     let content: Content
     @State private var hovering = false
 
-    init(item: TranscriptListItem, job: Job, canPlay: Bool, highlight: RowHighlight,
+    init(item: TranscriptListItem, job: Job, canPlay: Bool, highlight: RowHighlight, kind: TranscriptListKind = .list,
          @ViewBuilder content: () -> Content) {
         self.item = item
         self.job = job
         self.canPlay = canPlay
         self.highlight = highlight
+        self.kind = kind
         self.content = content()
     }
 
@@ -596,6 +658,7 @@ struct PlayableRow<Content: View>: View {
             }
             content
         }
+        .modifier(LazyRowLayout(kind: kind))
         .contentShape(Rectangle())
         .onTapGesture {
             if canPlay { toggle() }
@@ -631,7 +694,7 @@ struct PlayableRow<Content: View>: View {
         .accessibilityAction {
             if canPlay { toggle() }
         }
-        .listRowBackground(background(tint))
+        .modifier(RowBackground(kind: kind, color: background(tint)))
     }
 
     private func hint(_ isPlaying: Bool) -> String {
@@ -648,6 +711,48 @@ struct PlayableRow<Content: View>: View {
 
     private func toggle() {
         model.player.toggleLine(id: item.id, start: item.start, end: item.end)
+    }
+}
+
+/// LazyVStack の行の余白 (macOS の inset の List の行に合わせた値)
+private enum LazyListMetrics {
+    static let horizontal: CGFloat = 10
+    static let vertical: CGFloat = 4
+}
+
+/// LazyVStack の行: List の行と同じほどの余白を付け、幅いっぱいに広げる (押せる所・背景の色が行の幅いっぱいになる)。
+/// List の行には何もしない
+private struct LazyRowLayout: ViewModifier {
+    let kind: TranscriptListKind
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch kind {
+        case .list:
+            content
+        case .lazy:
+            content
+                .padding(.horizontal, LazyListMetrics.horizontal)
+                .padding(.vertical, LazyListMetrics.vertical)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// 行の背景の色 (マウスを載せた・いまの位置・再生している)。List では行の背景 (listRowBackground)、
+/// LazyVStack では行そのものの背景にする
+private struct RowBackground: ViewModifier {
+    let kind: TranscriptListKind
+    let color: Color
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch kind {
+        case .list:
+            content.listRowBackground(color)
+        case .lazy:
+            content.background(color)
+        }
     }
 }
 
