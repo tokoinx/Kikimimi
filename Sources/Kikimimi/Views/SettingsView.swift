@@ -48,6 +48,13 @@ struct TranscriptionSettingsForm: View {
                 Toggle("精度を優先する (ビームサーチ)", isOn: $model.preferAccuracy)
                 Toggle("無音を飛ばす (VAD)", isOn: $model.useVAD)
                 Toggle("定番の誤認識と、同じ文の繰り返しを取り除く", isOn: $model.filterHallucinations)
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("日本語と英語が混ざっている録音は、自動で「日本語＋英語」で文字にする", isOn: $model.autoMixedLanguage)
+                    Text("「日本語」「英語」「自動判定」のとき、文字にする前に録音のところどころの言語を確かめます (数秒〜数十秒)。混ざっていて切り替えたときは、「日本語」の 2〜4 倍ほどの時間がかかります。1 つの言語だけの録音は、確かめる時間のほかは変わりません。無音を飛ばす (VAD) が必要です。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Toggle("録音中にプレビューを出す", isOn: $model.livePreview)
                 VStack(alignment: .leading, spacing: 4) {
                     TextField("語彙のヒント", text: $model.initialPrompt, prompt: Text("例: ロブロックス, Roblox Studio, ききみみ"))

@@ -31,6 +31,12 @@ final class Job: Identifiable {
     var languageCode: String?
     /// 「日本語＋英語でやり直す」の案内を閉じた
     var mixedSuggestionDismissed = false
+    /// 日本語と英語が混ざっていたので、自動で「日本語＋英語」に切り替えた。切り替える前の言語 (設定の言語) が入る
+    var autoMixedFrom: String?
+    /// 「自動で日本語＋英語にしました」の案内を閉じた
+    var autoMixedNoticeDismissed = false
+    /// 自動で「日本語＋英語」に切り替えない (案内の「〜だけでやり直す」で作ったジョブ)
+    var allowsAutoMixed = true
 
     // 文字起こしのあとの監査・翻訳
     /// これから行う監査・翻訳
@@ -107,6 +113,8 @@ final class AppModel {
     var preferAccuracy: Bool { didSet { save(preferAccuracy, "preferAccuracy") } }
     var useVAD: Bool { didSet { save(useVAD, "useVAD") } }
     var filterHallucinations: Bool { didSet { save(filterHallucinations, "filterHallucinations") } }
+    /// 「日本語」「英語」「自動判定」のとき、日本語と英語が混ざった録音は自動で「日本語＋英語」で文字にする
+    var autoMixedLanguage: Bool { didSet { save(autoMixedLanguage, "autoMixedLanguage") } }
     var livePreview: Bool { didSet { save(livePreview, "livePreview") } }
     var initialPrompt: String { didSet { save(initialPrompt, "initialPrompt") } }
     // 監査・翻訳 (ローカル LLM)
@@ -161,6 +169,7 @@ final class AppModel {
         preferAccuracy = d.object(forKey: "preferAccuracy") as? Bool ?? true
         useVAD = d.object(forKey: "useVAD") as? Bool ?? true
         filterHallucinations = d.object(forKey: "filterHallucinations") as? Bool ?? true
+        autoMixedLanguage = d.object(forKey: "autoMixedLanguage") as? Bool ?? true
         livePreview = d.object(forKey: "livePreview") as? Bool ?? true
         initialPrompt = d.string(forKey: "initialPrompt") ?? ""
         llmModelID = d.string(forKey: "llmModelID") ?? LLMCatalog.defaultModelID
@@ -653,15 +662,18 @@ final class AppModel {
         ensureWorker()
     }
 
-    /// 同じファイルを、別の言語の設定でもう一度文字起こしする (新しいジョブ。設定の言語は変えない)
-    func retranscribe(_ job: Job, languageCode code: String) {
+    /// 同じファイルを、別の言語の設定でもう一度文字起こしする (新しいジョブ。設定の言語は変えない)。
+    /// autoMixed が false なら、日本語と英語が混ざっていても「日本語＋英語」に切り替えない
+    func retranscribe(_ job: Job, languageCode code: String, autoMixed: Bool = true) {
         guard let url = job.url else { return }
         // 置き換える文字起こしの監査・翻訳は止める (待っていると、やり直しがその後ろに回る。反映済みの結果は残す)
         cancelPost(job)
         let again = Job(name: job.name, url: url)
         again.languageCode = code
+        again.allowsAutoMixed = autoMixed
         jobs.insert(again, at: 0)
         job.mixedSuggestionDismissed = true
+        job.autoMixedNoticeDismissed = true
         select(again)
         ensureWorker()
     }
@@ -793,7 +805,8 @@ final class AppModel {
                 useBeamSearch: preferAccuracy,
                 vadModelPath: vadPath,
                 initialPrompt: effectiveHint,
-                filterHallucinations: filterHallucinations
+                filterHallucinations: filterHallucinations,
+                autoMixedLanguage: autoMixedLanguage && job.allowsAutoMixed
             )
             let flag = job.cancelFlag
             let started = Date()
@@ -823,8 +836,27 @@ final class AppModel {
                         job.message = "認識をやり直しています…"
                     }
                 },
+                onStage: { stage in
+                    Task { @MainActor in
+                        guard job.status == .running else { return }
+                        switch stage {
+                        case .checkingLanguages:
+                            job.message = "言語を確かめています…"
+                        case .checkedLanguages(let probe):
+                            if probe.isMixed {
+                                job.message = "日本語と英語が混ざっています。「日本語＋英語」で文字にします…"
+                            }
+                        }
+                    }
+                },
                 shouldCancel: { flag.isSet }
             )
+            // 日本語と英語が混ざっていたので「日本語＋英語」で文字にした: このジョブは「日本語＋英語」として扱う
+            // (英 / 日 の印・英語の行の翻訳など)
+            if output.probe?.isMixed == true {
+                job.autoMixedFrom = code
+                job.languageCode = Languages.japaneseEnglish.code
+            }
             job.transcript = Transcript(
                 sourceName: job.name,
                 segments: output.segments,

@@ -22,6 +22,9 @@ public struct WhisperOptions: Sendable {
     public var noTimestamps: Bool
     /// 定番の誤認識 (ご視聴ありがとうございました 等) を除去する
     public var filterHallucinations: Bool
+    /// 1 つの言語 ("ja" / "en" / "auto") で文字にする前に、日本語と英語が混ざっているかを確かめ、
+    /// 混ざっていれば「日本語＋英語」で文字にする (VAD を使うときだけ。`MixedProbe`)
+    public var autoMixedLanguage: Bool
 
     public init(language: String = "auto",
                 languageCandidates: [String] = [],
@@ -31,7 +34,8 @@ public struct WhisperOptions: Sendable {
                 threads: Int = WhisperOptions.recommendedThreads,
                 singleSegment: Bool = false,
                 noTimestamps: Bool = false,
-                filterHallucinations: Bool = true) {
+                filterHallucinations: Bool = true,
+                autoMixedLanguage: Bool = false) {
         self.language = language
         self.languageCandidates = languageCandidates
         self.useBeamSearch = useBeamSearch
@@ -41,6 +45,7 @@ public struct WhisperOptions: Sendable {
         self.singleSegment = singleSegment
         self.noTimestamps = noTimestamps
         self.filterHallucinations = filterHallucinations
+        self.autoMixedLanguage = autoMixedLanguage
     }
 
     public static var recommendedThreads: Int {
@@ -49,6 +54,21 @@ public struct WhisperOptions: Sendable {
 
     /// 区切りごとに言語を判定して文字にするか
     var isMixed: Bool { languageCandidates.count >= 2 }
+
+    /// 文字にする前に、日本語と英語が混ざっているかを確かめるか (VAD のモデルがあるときだけ)
+    var probesMixedLanguage: Bool {
+        guard autoMixedLanguage, !isMixed, ["ja", "en", "auto"].contains(language),
+              let path = vadModelPath, FileManager.default.fileExists(atPath: path) else { return false }
+        return true
+    }
+}
+
+/// 文字起こしの段階 (画面の表示用)
+public enum TranscriptionStage: Sendable {
+    /// 日本語と英語が混ざっているかを確かめている
+    case checkingLanguages
+    /// 確かめ終わった (混ざっていれば、このあと「日本語＋英語」で文字にする)
+    case checkedLanguages(MixedProbe.Result)
 }
 
 public struct WhisperOutput: Sendable {
@@ -56,11 +76,15 @@ public struct WhisperOutput: Sendable {
     public var language: String?
     /// 区切りごとに言語を判定したときの記録 (診断用)
     public var report: MixedReport?
+    /// 日本語と英語が混ざっているかを確かめた結果 (確かめなかったら nil)。混ざっていたら「日本語＋英語」で文字にしてある
+    public var probe: MixedProbe.Result?
 
-    public init(segments: [TranscriptSegment], language: String?, report: MixedReport? = nil) {
+    public init(segments: [TranscriptSegment], language: String?, report: MixedReport? = nil,
+                probe: MixedProbe.Result? = nil) {
         self.segments = segments
         self.language = language
         self.report = report
+        self.probe = probe
     }
 }
 
@@ -123,16 +147,57 @@ public final class WhisperContext: @unchecked Sendable {
                            options: WhisperOptions,
                            onProgress: @escaping (Double) -> Void = { _ in },
                            onSegment: @escaping (TranscriptSegment) -> Void = { _ in },
+                           onStage: @escaping (TranscriptionStage) -> Void = { _ in },
                            shouldCancel: @escaping () -> Bool = { false }) throws -> WhisperOutput {
         lock.lock()
         defer { lock.unlock() }
         guard !isBroken else { throw WhisperError.failed(-7) }
-        if options.isMixed, whisper_is_multilingual(ctx) != 0 {
+        let multilingual = whisper_is_multilingual(ctx) != 0
+        if options.isMixed, multilingual {
             return try runMixed(samples: samples, options: options, onProgress: onProgress,
                                 onSegment: onSegment, shouldCancel: shouldCancel)
         }
+        if options.probesMixedLanguage, multilingual, !samples.isEmpty {
+            return try runProbed(samples: samples, options: options, onProgress: onProgress, onSegment: onSegment,
+                                 onStage: onStage, shouldCancel: shouldCancel)
+        }
         return try run(samples: samples, options: options, onProgress: onProgress,
                        onSegment: onSegment, shouldCancel: shouldCancel)
+    }
+
+    /// 日本語と英語が混ざっているかを確かめてから文字にする。混ざっていれば「日本語＋英語」(候補は利用者の言語が先)、
+    /// 混ざっていなければ、確かめなかったときと同じく 1 つの言語で文字にする。
+    /// 確かめたときの VAD と判定は、「日本語＋英語」で使い回す (結果は、初めから「日本語＋英語」を選んだときと同じ)
+    private func runProbed(samples: [Float],
+                           options: WhisperOptions,
+                           onProgress: @escaping (Double) -> Void,
+                           onSegment: @escaping (TranscriptSegment) -> Void,
+                           onStage: @escaping (TranscriptionStage) -> Void,
+                           shouldCancel: @escaping () -> Bool) throws -> WhisperOutput {
+        let engine = ReusingMixedEngine(WhisperEngine(context: self, options: options, shouldCancel: shouldCancel))
+        onStage(.checkingLanguages)
+        let probe: MixedProbe.Result
+        do {
+            probe = try MixedProbe.run(samples: samples, engine: engine, preferred: options.language,
+                                       shouldCancel: shouldCancel)
+        } catch MixedPipelineError.cancelled {
+            throw WhisperError.cancelled
+        }
+        if shouldCancel() { throw WhisperError.cancelled }
+        onStage(.checkedLanguages(probe))
+        var output: WhisperOutput
+        if probe.isMixed {
+            var mixed = options
+            mixed.languageCandidates = probe.candidates
+            mixed.language = probe.candidates[0]
+            output = try runMixed(samples: samples, options: mixed, engine: engine, onProgress: onProgress,
+                                  onSegment: onSegment, shouldCancel: shouldCancel)
+        } else {
+            output = try run(samples: samples, options: options, onProgress: onProgress,
+                             onSegment: onSegment, shouldCancel: shouldCancel)
+        }
+        output.probe = probe
+        return output
     }
 
     /// 他の推論が走っていれば待たずに nil を返す (ライブプレビュー用)。
@@ -393,8 +458,18 @@ public final class WhisperContext: @unchecked Sendable {
                           onProgress: @escaping (Double) -> Void,
                           onSegment: @escaping (TranscriptSegment) -> Void,
                           shouldCancel: @escaping () -> Bool) throws -> WhisperOutput {
-        guard !samples.isEmpty else { throw WhisperError.emptyAudio }
         let engine = WhisperEngine(context: self, options: options, shouldCancel: shouldCancel)
+        return try runMixed(samples: samples, options: options, engine: engine, onProgress: onProgress,
+                            onSegment: onSegment, shouldCancel: shouldCancel)
+    }
+
+    private func runMixed<Engine: MixedEngine>(samples: [Float],
+                                               options: WhisperOptions,
+                                               engine: Engine,
+                                               onProgress: @escaping (Double) -> Void,
+                                               onSegment: @escaping (TranscriptSegment) -> Void,
+                                               shouldCancel: @escaping () -> Bool) throws -> WhisperOutput {
+        guard !samples.isEmpty else { throw WhisperError.emptyAudio }
         do {
             let out = try MixedPipeline.run(samples: samples, engine: engine,
                                             options: MixedPipeline.Options(candidates: options.languageCandidates,

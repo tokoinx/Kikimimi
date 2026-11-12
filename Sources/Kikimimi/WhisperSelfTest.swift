@@ -6,12 +6,14 @@ import Darwin
 #endif
 
 /// `Kikimimi --selftest-whisper <音声> [--model <bin>] [--vad <bin>] [--languages ja,en] [--from 秒] [--to 秒]
-///  [--cpu] [--greedy] [--hint 語彙] [--report <json>] [--expect <json>]`
+///  [--cpu] [--greedy] [--hint 語彙] [--auto-mixed] [--report <json>] [--expect <json>]`
 ///
 /// 画面を出さずに文字起こしをして、区切りごとの言語の判定・文字にした範囲・点検と直し・区間ごとの言語・時間・メモリを表示する
 /// (「日本語＋英語」の動作確認・CI 用)。モデルと VAD は、指定が無ければアプリが取得したもの。
 /// --expect の JSON (`{"intervals": [{"start": 0, "end": 10, "language": "en"}], "maxSegmentSeconds": 30}`) を
 /// 満たさなければ 1 で終わる。
+/// --auto-mixed は、1 つの言語 (--languages ja / en / auto) のときに、アプリの「自動で日本語＋英語にする」と同じく、
+/// 文字にする前に日本語と英語が混ざっているかを確かめる (結果と数を表示する)。
 enum WhisperSelfTest {
     struct Expectation: Decodable {
         struct Interval: Decodable {
@@ -46,6 +48,8 @@ enum WhisperSelfTest {
         var language: String?
         var segments: [Segment]
         var report: MixedReport?
+        /// --auto-mixed で確かめた結果
+        var probe: MixedProbe.Result?
     }
 
     static func run(arguments args: [String]) -> Int32 {
@@ -55,7 +59,7 @@ enum WhisperSelfTest {
         }
         guard let audioPath = value("--selftest-whisper"), FileManager.default.fileExists(atPath: audioPath) else {
             log("usage: Kikimimi --selftest-whisper <audio> [--model <ggml.bin>] [--vad <silero.bin>] [--languages ja,en]"
-                + " [--from s] [--to s] [--cpu] [--greedy] [--hint words] [--report out.json] [--expect expect.json]")
+                + " [--from s] [--to s] [--cpu] [--greedy] [--hint words] [--auto-mixed] [--report out.json] [--expect expect.json]")
             return 2
         }
         let store = ModelStore()
@@ -85,7 +89,9 @@ enum WhisperSelfTest {
         log("whisper.cpp: " + WhisperContext.systemInfo.trimmingCharacters(in: .whitespacesAndNewlines))
         log("model: \(modelPath) (\(useGPU ? "GPU" : "CPU"))")
         log("VAD: \(vadPath ?? "none")")
-        log("languages: \(candidates.isEmpty ? language : candidates.joined(separator: "+"))")
+        let autoMixed = args.contains("--auto-mixed")
+        log("languages: \(candidates.isEmpty ? language : candidates.joined(separator: "+"))"
+            + (autoMixed && candidates.isEmpty ? " (auto-mixed: check for Japanese + English first)" : ""))
 
         do {
             var clock = Date()
@@ -109,7 +115,7 @@ enum WhisperSelfTest {
             log(String(format: "loaded in %.1f s", Date().timeIntervalSince(clock)))
             let options = WhisperOptions(language: language, languageCandidates: candidates,
                                          useBeamSearch: !args.contains("--greedy"), vadModelPath: vadPath,
-                                         initialPrompt: value("--hint"))
+                                         initialPrompt: value("--hint"), autoMixedLanguage: autoMixed)
             var peak = footprintMB() ?? 0
             var nextReport = 0.05
             clock = Date()
@@ -121,6 +127,13 @@ enum WhisperSelfTest {
                 }
             }, onSegment: { s in
                 log(String(format: "  [%@] %@ %@", TimeFormat.short(s.start + offset), tag(s.language), s.text))
+            }, onStage: { stage in
+                switch stage {
+                case .checkingLanguages:
+                    log("checking whether Japanese and English are mixed …")
+                case .checkedLanguages(let probe):
+                    printProbe(probe, offset: offset)
+                }
             })
             let wall = Date().timeIntervalSince(clock)
             peak = max(peak, footprintMB() ?? 0)
@@ -143,7 +156,8 @@ enum WhisperSelfTest {
                                      Output.Segment(start: $0.start + offset, end: $0.end + offset, language: $0.language,
                                                     text: $0.text)
                                  },
-                                 report: output.report.map { shifted($0, by: offset) })
+                                 report: output.report.map { shifted($0, by: offset) },
+                                 probe: output.probe.map { shifted($0, by: offset) })
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
                 try encoder.encode(out).write(to: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
@@ -243,6 +257,28 @@ enum WhisperSelfTest {
             r.repairs[i].end += offset
         }
         return r
+    }
+
+    /// 確かめた結果の時刻に offset (--from) を足す
+    static func shifted(_ probe: MixedProbe.Result, by offset: Double) -> MixedProbe.Result {
+        guard offset != 0 else { return probe }
+        var p = probe
+        for i in p.probes.indices {
+            p.probes[i].start += offset
+            p.probes[i].end += offset
+        }
+        return p
+    }
+
+    private static func printProbe(_ p: MixedProbe.Result, offset: Double) {
+        for c in p.probes {
+            let detected = c.detected.map { d in String(format: "%@ %.3f", d, c.confidence ?? 0) } ?? "not detected"
+            log(String(format: "  probe %.2f-%.2f speech %.1f s: %@", c.start + offset, c.end + offset, c.speech, detected)
+                + (c.trusted ? "" : " (untrusted)"))
+        }
+        log("probe: \(p.decision.rawValue), \(p.probes.count) of \(p.probeableChunks) chunks checked,"
+            + " trusted ja \(p.trusted["ja"] ?? 0) en \(p.trusted["en"] ?? 0), untrusted \(p.untrustedCount)"
+            + (p.isMixed ? " -> \(p.candidates.joined(separator: "+"))" : ""))
     }
 
     private static func printReport(_ r: MixedReport, offset: Double) {

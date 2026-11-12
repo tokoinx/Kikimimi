@@ -59,8 +59,13 @@ struct TranscriptDetailView: View {
                 // 文字起こしの最中は区間が増えるたびに描き直すので数えない (終わってから使う)
                 let stats = job.status == .done ? transcript.translationStats : Transcript.TranslationStats()
                 let bilingual = model.isBilingual(stats)
+                if job.status == .done, let from = job.autoMixedFrom, !job.autoMixedNoticeDismissed {
+                    AutoMixedLanguageNotice(job: job, from: from)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                }
                 if job.status == .done, job.languageCode == "ja", job.url != nil, !job.mixedSuggestionDismissed,
-                   transcript.spokenLanguages.isEmpty, stats.isMainlyForeign {
+                   job.allowsAutoMixed, transcript.spokenLanguages.isEmpty, stats.isMainlyForeign {
                     MixedLanguageSuggestion(job: job)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
@@ -691,6 +696,49 @@ struct MixedLanguageSuggestion: View {
         }
         .padding(12)
         .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// 日本語と英語が混ざっていたので、自動で「日本語＋英語」で文字にしたことを知らせる。
+/// 設定の言語だけでやり直すこともできる (やり直しでは、自動で切り替えない)
+struct AutoMixedLanguageNotice: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    /// 切り替える前の言語 (設定の言語)
+    let from: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "globe")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("日本語と英語が混ざっていたので、「日本語＋英語」で文字にしました。")
+                    .font(.callout.weight(.semibold))
+                Text("区切りごとに日本語か英語かを判定し、その言語で文字にしています。自動で切り替えないようにするには、設定の「文字起こし」で変えられます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if job.url != nil {
+                Button(retryTitle) {
+                    model.retranscribe(job, languageCode: from, autoMixed: false)
+                }
+            }
+            Button {
+                job.autoMixedNoticeDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help("閉じる")
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var retryTitle: String {
+        from == Languages.auto.code ? "「日本語＋英語」を使わずにやり直す" : "「\(Languages.name(for: from))」だけでやり直す"
     }
 }
 
