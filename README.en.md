@@ -17,6 +17,8 @@ Neither your audio nor the transcript leaves your Mac. The only network access i
 - **Auditor**: after transcription, a reviewer looks for repeated sentences and misheard words. Only confident corrections are applied; the rest are kept as suggestions. Every change can be reviewed and undone
 - **English → Japanese translation**: the original on the left, the Japanese translation on the right (Chinese, Korean and others can be translated to Japanese too). Translate everything at once, or only the sentences you want, one at a time, with the "訳" button on a line
 - Export to txt / srt / vtt / Markdown / csv / json (original, Japanese, or both side by side)
+- **Library**: finished results (transcript, translation, audit decisions) are saved on the Mac automatically and are listed again at the next launch
+- **Notes and history**: write notes for each result (what you understood, phrases to remember). Right-click a row and choose "メモに引用" (Quote in notes) to paste that sentence with its time. Keep the current state as a "version" and go back to it later
 - Japanese, English, Chinese, Korean and more, with automatic language detection
 - **日本語＋英語 (Japanese + English)**: for recordings that switch between Japanese and English, such as an English lecturer with a Japanese interpreter. Each stretch of speech gets its own language and is transcribed in it; lines are tagged 英 or 日 and only the English lines are translated (it takes about 2–4× the time of the Japanese setting: longer the more often the language changes or short remarks cut in). Even with the language set to 日本語, 英語 or 自動判定, a recording found to mix Japanese and English is switched to this setting automatically (the result screen says so and lets you redo it in the original language only; it can be turned off in the settings)
 
@@ -54,11 +56,29 @@ make install
 
 1. Click "モデルをダウンロード" (Download model). The recommended **Large v3 Turbo (quantized)** is about 574 MB; after that, everything works offline.
 2. Drop an audio file on the window, or open one with ⌘O.
-3. Recognized text appears on the right as it is produced (rows are added in batches: up to 4 times a second while there are few rows, at most once a second once there are thousands; the list follows the newest row only while you are at the end, stops following when you scroll up or click a row to play it, and "末尾へ" (To the end) at the bottom right takes you back). Export it with "書き出す" (Export) when it is done.
+3. Recognized text appears on the right as it is produced (rows are added in batches: up to 4 times a second while there are few rows, at most once a second once there are thousands; the list follows the newest row only while you are at the end, stops following when you scroll up or click a row to play it, and "末尾へ" (To the end) at the bottom right takes you back). Finished results are saved automatically (see "Library, notes and history" below). To use one in another app, write it to a file with "書き出す" (Export).
 
 Recording (⌘R) asks for microphone permission the first time.
 
 To use the auditor and the translator, download the LLM once: click "ダウンロード" (Download) on the start screen or the result screen, or use the "監査・翻訳" (Audit & translation) tab in Settings (⌘,). After that, every finished transcript is audited automatically, and English (or other non-Japanese) segments are translated into Japanese.
+
+## Library, notes and history
+
+Transcripts are saved on the Mac without you doing anything, and they are listed on the left again at the next launch (nothing is lost if you do not export).
+
+- **Where**: `~/Library/Application Support/Kikimimi/Library` (next to the `Models` folder; the environment variable `KIKIMIMI_LIBRARY_DIR` changes it). Each result gets one folder holding `document.json` (transcript, translation, audit decisions, list of versions), `notes.md` (the notes, as plain text that other apps can read too) and `versions/` (the versions).
+- **When**: when a transcription finishes (with at least some text), and afterwards whenever it changes through an audit, a translation, applying a fix and so on (changes within about a second are written together). Notes are saved within about a second of typing, and the notes pane shows "保存しました" (Saved) at its top right. Cancelled or failed transcriptions are not saved. Writing happens in the background, in order, so the window does not stall even with thousands of lines. When you quit, pending saves are written first.
+- **Deleting**: right-click in the list on the left › "削除…" (Delete…). After you confirm, the folder (transcript, translation, notes, history) goes to the Trash. For a microphone recording, the recording in the app's `Recordings` folder goes to the Trash too. Results that were never saved (still transcribing, cancelled, failed) are removed from the list at once, as before.
+- **The audio file was moved or deleted**: the result stays. It cannot be played, and the result shows "音声ファイルが見つかりません: <path>" (Audio file not found) with a button "音声を選び直す…" (Choose the audio again…); pick the new location and playback works again.
+- **Unreadable results**: when a `document.json` is damaged, the file is renamed to `document.unreadable-<date>.json` in place, the result is left out of the list, and one message says how many were set aside.
+
+**Notes**: tick "メモ" (Notes) in the controls row to show a notes pane to the right of the list (drag the divider to change its width). Write anything: what you understood, phrases to remember. Right-click a row and choose "メモに引用" (Quote in notes) to add that sentence with its time at the end of the notes, like `> [02:22] Have you ever ...`. "書き出す" (Export) › "メモ (.md)" writes the notes to a file.
+
+**History (versions)**: "履歴" (History) in the controls row (or File › "版として保存…" (Save as a version…, ⌘S) / "履歴…" (History…)) opens the history sheet.
+- "いまの状態を版として残す" (Keep the current state as a version): give it a name (optional) and press "保存" (Save) to keep a copy of the transcript, translation and notes as they are now. "新しい版として保存" (Save as a new version) adds a version; "いちばん新しい版に上書き" (Overwrite the newest version) replaces the newest version you kept yourself with the current state (when you do not want more versions).
+- "この版に戻す…" (Go back to this version…): choose what to bring back ("文字起こしと訳" transcript and translation, "メモ" notes). The state before going back is kept automatically as a version ("自動 (戻す前)", automatic, before going back), so you can undo it.
+- The trash button deletes a version. Versions cannot be kept or restored while the result is being audited or translated.
+- The transcript, translation and notes are saved every time they change, even without versions. A version is a copy of one moment.
 
 ## Audit and translation (local LLM)
 
@@ -213,7 +233,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
   make doctor
   ```
 
-  While the app keeps running with its window closed (during a transcription or translation, or while a transcript has not been exported yet), click the Dock icon or choose File > メインウインドウを表示 (⌘0) to bring the window back. When nothing is in progress and every result has been exported (or copied), closing the window quits the app. Kikimimi does not save transcripts to disk, so quitting (⌘Q) with results that were never exported asks for confirmation first.
+  While the app keeps running with its window closed (during a transcription or translation), click the Dock icon or choose File > メインウインドウを表示 (⌘0) to bring the window back. When nothing is in progress, closing the window quits the app. Finished results and notes are saved and are listed again at the next launch. Quitting (⌘Q) while work is in progress asks first, because that work stops (a transcription in progress keeps no partial result).
 - **`make run` says whisper.framework or llama.framework is missing**: run the following, then `make run` again.
 
   ```bash
@@ -255,7 +275,8 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | Learned corrections, gates, evaluation harness | Unit tests. Measured with the real Qwen3.5 2B / 4B (Linux CPU, table above). In the built app, GitHub Actions runs the rules-only and with-ledger evaluations (all 10 learned lines fixed, no correct line harmed) and the training-data export on every push |
 | Loading a LoRA adapter | Checked with the real llama.cpp (Linux) and Qwen3.5 0.8B: an all-zero adapter leaves the output unchanged, a random one changes it, a broken file or an adapter for another model is not loaded and the plain LLM is used. On GitHub's Mac, a zero adapter converted from the MLX layout also leaves the evaluation result unchanged |
 | Fine-tuning (the MLX training itself) | Confirmed end to end on GitHub's Mac (macOS 15) with Qwen3.5 0.8B: train with MLX (425 steps, validation loss 0.80 → 0.11), convert five intermediate adapters to GGUF, compare them with the built app's evaluation harness and pick one. Of 5 lines never seen in training, the plain model found 0 and the chosen adapter found 4 (as suggestions; no wrong fix, no correct line harmed). The adapters from 85–255 steps found 0 and the one from 340 steps found 1. How the training must be done (answer-only loss, no padding position, Adam bias correction, number of steps and side effects) was worked out by running the same training in PyTorch and evaluating the converted adapters with the real llama.cpp (Linux). Not verified on real hardware (an 8 GB M1) or with 2B and larger (GitHub's Mac has a virtual GPU and needs 1 h 40 min for 425 steps on 0.8B; the speed on real hardware is unknown) |
-| Results kept when the window is closed, the confirmation before quitting, the fine-tuning settings screen | Not verified (implemented and built only; the UI cannot be exercised on Linux or on GitHub's Mac) |
+| The confirmation before quitting, quitting when the window is closed, the fine-tuning settings screen | Not verified (implemented and built only; the UI cannot be exercised on Linux or on GitHub's Mac) |
+| Library (automatic saving, reloading, deleting), notes, history (keeping, overwriting and restoring versions) | The storage (`LibraryStore`) is unit tested. In the app, GitHub's Mac runs the save check inside `--selftest-ui-load` (LIBRARY CHECK) on every push: in a temporary folder, using the same AppModel functions as the app, it saves the finished results (not the running one), writes notes, keeps versions A and B as new versions, overwrites with C (2 versions), restores the notes of A only (an automatic version is added, making 3; the transcript is unchanged), reloads the folder and compares the contents, and deletes a small result and checks that its folder is gone. It also prints how long writing the 3000-line result takes in the background. The look of the notes pane and the history sheet was checked only on the pictures from that run (07, 08). Not yet verified on real hardware |
 | A transcript with thousands of lines keeps the window responsive while lines play and a transcription runs, and a single line stops at its end | GitHub Actions runs the built app's `--selftest-ui-load` on every push (3000 lines decide pass or fail; 8000 lines are measured for information only and do not fail the build, since a real transcript of a 2-hour recording has about 2000-4000 lines). It adds finished jobs (bilingual and plain) and a running job that starts with the same number of lines and grows, and for each action measures how long until the main thread is idle again (count, median, 95th percentile, maximum). The actions are: selecting a job, a playback-position update (advancing 0.2 s like the real observer; updates that keep the current row and updates that move it to another row are counted separately), starting and stopping a single line, appending one segment to the selected and to a non-selected job, one batch applied while a running job receives 10 segments a second, delivering 300 segments at once (timed from the start of applying the batch), and a progress update. Segments are delivered from another thread into the same buffer the transcription uses (batches are applied every 0.25-1 s depending on the number of rows). A watchdog thread also measures the main thread's wait per phase and how long it could not respond (also as a share of the phase), and lists the five longest stalls with the action before each. Without a window it also times building the list rows (a full rebuild from all lines, and appending 10 segments to a running job; median and maximum of 20 runs each). It fails above its limits (`UILoadSelfTest.Limits`, set for GitHub's runner). With 3000 lines it also really plays one line of the 47 s recording and checks that it stops at the end of the line and that the play button then continues from there; that part is skipped on a Mac that cannot play audio. After measuring, it also saves pictures of the window (`--screenshots`; kept as a CI artifact). Result on GitHub's Mac with 3000 lines: while a transcription runs, the main thread is busy 1-12% of the time, one batch of new lines takes 0.1-0.3 s, and opening a result takes 0.1-1.0 s. A single line stopped exactly at its end. Not verified on real hardware (a 2-hour recording) |
 
 ## Tests
@@ -290,6 +311,10 @@ Sources/
     ModelCatalog.swift   Model list, download URLs, model file validation
     HallucinationFilter.swift  Removes common hallucinations
     WAV.swift            Saves recordings (16-bit PCM)
+    Library/             The library (saved results)
+      SavedDocument.swift  A saved result, version headers and contents
+      LibraryStore.swift   Reads and writes the result folders (keeps unreadable files aside)
+      NoteQuote.swift    The text "メモに引用" (Quote in notes) adds
     LLM/                 Auditor and translator (the LLM-independent parts)
       Auditor.swift      Repetition rules, reading the LLM's findings, guardrails
       AuditReport.swift  Audit results, apply and undo
@@ -323,11 +348,14 @@ Sources/
     TrainingExport.swift --export-training (fine-tuning data export)
     WhisperSelfTest.swift  --selftest-whisper (diagnostics and CI)
     LaunchSelfTest.swift --selftest-launch (launch and window check, for make doctor and CI)
-    UILoadSelfTest.swift --selftest-ui-load (checks that a transcript with thousands of lines does not freeze the window, for CI)
+    LibraryWriter.swift  Writes to the library in the background, one write after another
+    UILoadSelfTest.swift --selftest-ui-load (checks that a transcript with thousands of lines does not freeze the window, and the saving, for CI)
     AudioDecoder.swift   Audio/video to 16 kHz mono
     LiveRecorder.swift   Microphone recording
     PlayerController.swift  Playback and seeking
     Views/               UI
+      NotesPane.swift    The notes pane
+      HistorySheet.swift The history sheet (keep, restore and delete versions)
 Resources/               Info.plist, icon
 Scripts/build-app.sh     Assembles the .app
 Scripts/run-app.sh       Launch (make run): quits a running copy, opens the new one, checks it is alive

@@ -41,7 +41,8 @@ enum KikimimiMain {
         LaunchLog.note("launch: \(LaunchLog.versionLine); \(LaunchLog.environmentLine); other instances: \(LaunchLog.otherInstances())")
         // 前回のウインドウの状態を復元しない。強制終了の後 (make run は前のアプリを終了させてから起動する) の起動では、
         // macOS が復元しようとして、ウインドウが 1 つも無いまま動いていることがあった (CI で、3 回目の起動で再現)。
-        // 復元するものは無い (文字起こしの結果は保存していない) ので、いつも新しいウインドウで始める
+        // ウインドウの状態は復元しなくてよい (文字起こしの結果・メモ・履歴はライブラリに保存してあり、
+        // 次の起動で一覧に戻る) ので、いつも新しいウインドウで始める
         if !args.contains("--restore-windows") {
             UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
             UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
@@ -68,9 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) static weak var shared: AppDelegate?
     /// 作業中か (文字起こし・録音・監査・翻訳・モデルの取得)。作業中は、ウインドウを閉じても終了しない
     var isBusy: @MainActor () -> Bool = { false }
-    /// 書き出しもコピーもしていない文字起こしの数。あるあいだは、ウインドウを閉じても終了せず、終了の前に確かめる
-    /// (結果はファイルに保存していないので、終了すると消える)
-    var unsavedResultCount: @MainActor () -> Int = { 0 }
+    /// 待っている保存を書き終える (終了の前に)
+    var flushLibrary: @MainActor () -> Void = {}
     /// メインのウインドウを新しく開く (SwiftUI の openWindow)
     var openMainWindow: (@MainActor () -> Void)?
     /// 起動の確認 (`--selftest-launch --reopen`) のあいだは、ウインドウを閉じても終了しない
@@ -100,25 +100,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        !keepRunningWithoutWindows && !isBusy() && unsavedResultCount() == 0
+        !keepRunningWithoutWindows && !isBusy()
     }
 
-    /// 終了の前に: 書き出していない文字起こしや、途中の作業があれば確かめる
+    /// 終了の前に: 待っている保存を書き終え、途中の作業があれば確かめる
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard !keepRunningWithoutWindows else { return .terminateNow }
-        let unsaved = unsavedResultCount()
-        let busy = isBusy()
-        guard unsaved > 0 || busy else { return .terminateNow }
+        flushLibrary()
+        guard !keepRunningWithoutWindows, isBusy() else { return .terminateNow }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = unsaved > 0 ? "書き出していない文字起こしが \(unsaved) 件あります" : "作業の途中です"
-        var text = "ききみみは、文字起こし・監査・翻訳の結果をファイルに保存しません。終了すると消えます。"
-        if busy { text += "途中の作業 (文字起こし・監査・翻訳・ダウンロード) も止まります。" }
-        alert.informativeText = text
+        alert.messageText = "作業の途中です"
+        alert.informativeText = "終わった文字起こし・訳・メモは保存してあり、次に開いたときも一覧に出ます。"
+            + "途中の作業 (文字起こし・監査・翻訳・ダウンロード) は止まり、文字起こしの途中の結果は残りません。"
         alert.addButton(withTitle: "終了する")
         alert.addButton(withTitle: "キャンセル")
         NSApplication.shared.activate(ignoringOtherApps: true)
-        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+        guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+        // 確かめているあいだに監査・翻訳が進んで変わった分も、書き終えてから終わる
+        flushLibrary()
+        return .terminateNow
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -198,7 +198,7 @@ private struct AppLifecycleHook: View {
                 let model = model
                 let openWindow = openWindow
                 delegate.isBusy = { model.isBusy }
-                delegate.unsavedResultCount = { model.unsavedResultCount }
+                delegate.flushLibrary = { model.flushLibrary() }
                 delegate.openMainWindow = { openWindow(id: MainWindow.id) }
                 delegate.model = model
                 PlaybackKeys.install(model: model)
@@ -308,13 +308,24 @@ struct KikimimiApp: App {
                     // 文字起こしの最中は数えない (区間が増えるたびにメニューを作り直すので、区間を全部見ることになる)
                     ExportMenuItems(hasTranslation: model.selectedJob.map {
                         $0.status == .done && ($0.transcript?.hasTranslation ?? false)
-                    } ?? false)
+                    } ?? false, hasNotes: model.selectedJob?.hasNotes ?? false)
                         .environment(model)
                 }
                 .disabled(model.selectedJob?.status != .done)
                 Button("本文をコピー") { model.copySelectedText() }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                     .disabled(model.selectedJob?.transcript == nil)
+                Divider()
+                // どちらも、選んでいる結果の履歴の画面を開く (保存した、終わった結果のときだけ)
+                Button("版として保存…") {
+                    if let job = model.selectedJob { model.historyJobID = job.id }
+                }
+                .keyboardShortcut("s")
+                .disabled(!(model.selectedJob.map { $0.inLibrary && $0.status == .done } ?? false))
+                Button("履歴…") {
+                    if let job = model.selectedJob { model.historyJobID = job.id }
+                }
+                .disabled(!(model.selectedJob.map { $0.inLibrary && $0.status == .done } ?? false))
                 Divider()
                 Button("監査する (繰り返し・聞き取りミス)") {
                     if let job = model.selectedJob { model.audit(job) }

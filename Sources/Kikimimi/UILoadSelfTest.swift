@@ -36,8 +36,13 @@ import KikimimiCore
 /// `--screenshots` を付けると、測り終えたあと (測る段階の外で) ウインドウを 1200 x 800 にして、決まった場面の
 /// ウインドウの絵を PNG で、そのフォルダに残す (無ければ作る)。絵を残せなくても、終了コードは変えない。
 ///
+/// 測り終えたあと (絵も残すときは、その 06 のあと) に、保存の確認 (LIBRARY CHECK) も行う: 始めにモデルの保存先を
+/// 一時フォルダにしておき (終わりに消す)、ふだんと同じ AppModel の関数で、メモ・版の保存・上書き・戻す・消すを行い、
+/// フォルダを新しい LibraryStore で読み直して比べる。`--screenshots` なら、そのあとメモの欄 (07) と履歴の画面 (08) の絵も残す。
+///
 /// 終了コード: 0 = 成功、1 = メインのウインドウが出ない、3 = 終わらない (メインスレッドが止まっている)、
-/// 5 = 重い (UI LOAD: SLOW)、6 = 1 行だけの再生が行の終わりで止まらない・続きから再生しない
+/// 5 = 重い (UI LOAD: SLOW)、6 = 1 行だけの再生が行の終わりで止まらない・続きから再生しない、
+/// 7 = 保存の確認に失敗 (LIBRARY CHECK FAILED)
 enum UILoadSelfTest {
     /// 合格の目安 (秒)。GitHub の macOS の実行機 (3 コア、仮想の GPU。ふつうの Mac より遅い) のための値。
     /// p95 は 95 パーセンタイル、max は最大
@@ -159,7 +164,8 @@ enum UILoadSelfTest {
         // メインスレッドが止まったまま終わらないなら、別のスレッドから知らせて終わる
         // (8000 行では、段階と、行を作る手間を測るのとで 2 分近くかかることがある)
         // ウインドウの絵も残すときは、場面を出して落ち着くのを待つぶん、長くかかる
-        let hangLimit = screenshots == nil ? 170.0 : 260.0
+        // 保存の確認 (数千行の結果を何回か書く) のぶんも足す
+        let hangLimit = screenshots == nil ? 200.0 : 290.0
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
             finish(header + ["UI LOAD FAILED: the self-test did not finish in \(Int(hangLimit)) s"
                              + " (the main thread may be stuck)"], code: 3, reportPath: reportPath)
@@ -194,6 +200,10 @@ enum UILoadSelfTest {
             finish(lines + ["UI LOAD FAILED: no main window after 20 s"], code: 1, reportPath: reportPath)
         }
         AppDelegate.shared?.keepRunningWithoutWindows = true
+        // 保存先を、空の一時フォルダにする (ふだんのライブラリには書かない。終わりに消す)
+        let libraryRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kikimimi-ui-load-library-\(UUID().uuidString)", isDirectory: true)
+        model.useLibrary(at: libraryRoot)
 
         // 2. 終わったジョブ 2 つと、文字起こし中のジョブを入れる。
         // 音声が無いときは、無いファイルを開く (行の再生の印は出て、再生しても音は出ない)
@@ -220,6 +230,13 @@ enum UILoadSelfTest {
             lines += await load.takeScreenshots(into: screenshots)
         }
 
+        // 保存の確認 (ふだんと同じ AppModel の関数で)。絵を残すときは、そのあとメモの欄と履歴の画面も撮る
+        let library = await load.libraryCheck(root: libraryRoot)
+        lines += library.lines
+        if let screenshots {
+            lines += await load.takeLibraryScreenshots(into: screenshots)
+        }
+
         // 4. 音声があれば、1 行を本当に再生して、行の終わりで止まるかを見る
         var lineFailed = false
         if let audio {
@@ -227,8 +244,11 @@ enum UILoadSelfTest {
             lineFailed = await checkLinePlayback(player: model.player, segments: load.doneBilingual.transcript?.segments ?? [],
                                                  audio: audio, lines: &lines)
         }
-        let code: Int32 = slow ? 5 : (lineFailed ? 6 : 0)
+        let code: Int32 = slow ? 5 : (lineFailed ? 6 : (library.failed ? 7 : 0))
         if code == 0 { lines.append("UI LOAD OK") }
+        // 書きかけを待ってから、確認用のライブラリの一時フォルダを消す
+        model.flushLibrary()
+        try? FileManager.default.removeItem(at: libraryRoot)
         finish(lines, code: code, reportPath: reportPath)
     }
 
@@ -560,7 +580,6 @@ private final class LoadRun {
             job.status = .done
             job.progress = 1
             job.message = "完了"
-            job.exported = true
         }
         // 文字起こし中のジョブも、はじめから行数の行がある (長い録音の途中で、数千行が出ているところ)
         running.transcript = Transcript(sourceName: running.name, segments: UILoadSelfTest.makeSegments(0..<rows),
@@ -568,13 +587,13 @@ private final class LoadRun {
         running.status = .running
         running.progress = 0.5
         running.message = "認識中 50%"
-        running.exported = true
         feed = AppModel.liveFeed(for: running) { [weak self] count, started in
             self?.batchApplied(count: count, started: started)
         }
-        model.jobs.insert(running, at: 0)
-        model.jobs.insert(donePlain, at: 0)
-        model.jobs.insert(doneBilingual, at: 0)
+        // ふだんと同じ入れ方 (保存の受け口が付き、終わったジョブ 2 つは、確認用のライブラリに保存される)
+        model.adopt(running)
+        model.adopt(donePlain)
+        model.adopt(doneBilingual)
     }
 
     func isShownBilingual(_ job: Job) -> String {
@@ -979,11 +998,10 @@ private final class LoadRun {
         mixed.status = .done
         mixed.progress = 1
         mixed.message = "完了"
-        mixed.exported = true
         mixed.autoMixedFrom = "ja"
         mixed.languageCode = Languages.japaneseEnglish.code
         Self.live("scene 06: select the automatically switched job")
-        model.jobs.insert(mixed, at: 0)
+        model.adopt(mixed)
         model.select(mixed)
         await settle()
         lines += await scroll(to: mixed.transcript?.segments.first?.id, .top, for: "06")
@@ -1171,6 +1189,164 @@ private final class LoadRun {
                             + " (the append path was not used)")
         }
         return failures
+    }
+}
+
+// MARK: 保存の確認 (LIBRARY CHECK)
+
+extension LoadRun {
+    /// ふだんと同じ AppModel の関数で、保存・メモ・版 (新しく・上書き・戻す)・消すを行い、フォルダを読み直して比べる。
+    /// 出力の行と、失敗したかを返す
+    func libraryCheck(root: URL) async -> (lines: [String], failed: Bool) {
+        Self.live("library check")
+        var lines: [String] = ["library: a temporary folder for this run: \(root.path)"]
+        var failure: String?
+        func step(_ name: String, _ ok: Bool, _ detail: String) {
+            lines.append("LIBRARY: \(name): \(ok ? "ok" : "FAILED") (\(detail))")
+            if !ok, failure == nil { failure = name }
+        }
+        let fm = FileManager.default
+        let store = LibraryStore(root: root)
+        let job = doneBilingual
+
+        // 1. 終わったジョブ 2 つは、ふだんの道 (終わったジョブを一覧に入れたとき) で保存されている。文字起こし中のジョブは保存しない
+        model.flushLibrary()
+        let bilingualSaved = fm.fileExists(atPath: store.documentURL(for: doneBilingual.id).path)
+        let plainSaved = fm.fileExists(atPath: store.documentURL(for: donePlain.id).path)
+        let runningSaved = fm.fileExists(atPath: store.folder(for: running.id).path)
+        step("saved by the normal path", bilingualSaved && plainSaved && !runningSaved,
+             "finished (bilingual) \(bilingualSaved), finished (plain) \(plainSaved), running job \(runningSaved);"
+             + " expected true, true, false")
+
+        // 2. 行数の行の結果を、裏の列で書く時間 (ふだんの保存と同じ列・同じ書き方)
+        if let writer = model.library, let document = model.snapshot(of: job) {
+            let rows = document.transcript.segments.count
+            let result = await writer.run { (store: LibraryStore) throws -> Double in
+                let start = DispatchTime.now().uptimeNanoseconds
+                try store.save(document)
+                return Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+            }
+            switch result {
+            case .success(let ms):
+                lines.append(String(format: "LIBRARY: saved %d rows in %.0f ms (background)", rows, ms))
+            case .failure(let error):
+                step("save \(rows) rows on the background queue", false, error.localizedDescription)
+            }
+        } else {
+            step("save on the background queue", false, "the model has no library or the job has no transcript")
+        }
+
+        // 3. メモと版: A (新しく) → B (新しく) → C (いちばん新しい版に上書き) → A のメモだけに戻す
+        let notesA = "A のメモ: have you ever は「〜したことがある」。\n"
+        let notesB = "B のメモ\n"
+        let notesC = "C のメモ\n"
+        step("versions allowed on the finished job", model.canEditVersions(job), model.versionBlockedReason(job) ?? "allowed")
+        job.notes = notesA
+        let savedA = await model.saveVersion(job, label: "A", mode: .new)
+        step("save version A (new)", savedA && job.versions.count == 1, "versions \(job.versions.count), expected 1")
+        job.notes = notesB
+        let savedB = await model.saveVersion(job, label: "B", mode: .new)
+        step("save version B (new)", savedB && job.versions.count == 2, "versions \(job.versions.count), expected 2")
+        job.notes = notesC
+        let savedC = await model.saveVersion(job, label: "C", mode: .overwriteLatest)
+        let labels = job.versions.map { $0.label }
+        step("save C over the newest version", savedC && labels == ["C", "A"],
+             "versions \(labels), expected [\"C\", \"A\"]")
+        let transcriptBefore = job.transcript
+        if let a = job.versions.first(where: { $0.label == "A" }) {
+            let restored = await model.restoreVersion(job, versionID: a.id, transcript: false, notes: true)
+            let newest = job.versions.first
+            step("restore version A, notes only",
+                 restored && job.notes == notesA && job.transcript == transcriptBefore && job.versions.count == 3
+                    && newest?.origin == .beforeRestore && newest?.label == AppModel.beforeRestoreLabel,
+                 "notes of A \(job.notes == notesA), transcript unchanged \(job.transcript == transcriptBefore),"
+                 + " versions \(job.versions.count) (expected 3), newest origin \(newest.map { "\($0.origin)" } ?? "none")")
+            // 自動で残した版には、戻す前のメモ (C) が入っている
+            let kept = newest.flatMap { try? store.loadVersion(documentID: job.id, versionID: $0.id) }
+            step("the automatic version holds the state before the restore", kept?.notes == notesC,
+                 "notes \(kept.map { "\($0.notes.count) characters" } ?? "unreadable")")
+        } else {
+            step("restore version A, notes only", false, "version A is missing")
+        }
+
+        // 4. 書き終えてから、新しい LibraryStore で読み直して比べる
+        model.flushLibrary()
+        if let loaded = LibraryStore(root: root).load(id: job.id) {
+            let sameID = loaded.id == job.id
+            let sameTranscript = loaded.transcript == job.transcript
+            let sameNotes = loaded.notes == job.notes
+            let sameVersions = loaded.versions.map { $0.id } == job.versions.map { $0.id }
+            step("reload with a fresh LibraryStore", sameID && sameTranscript && sameNotes && sameVersions,
+                 "id \(sameID), transcript equal \(sameTranscript), notes equal \(sameNotes),"
+                 + " versions \(loaded.versions.count) of \(job.versions.count) in the same order \(sameVersions)")
+        } else {
+            step("reload with a fresh LibraryStore", false, "document.json could not be read")
+        }
+
+        // 5. 小さなジョブを、モデルから消す: フォルダが無くなる
+        let small = Job(name: "消す確認 (確認用)", url: nil)
+        small.transcript = Transcript(sourceName: small.name, segments: UILoadSelfTest.makeSegments(0..<10),
+                                      language: "en", duration: 10 * UILoadSelfTest.rowSpacing, elapsed: 1)
+        small.status = .done
+        small.progress = 1
+        small.message = "完了"
+        model.adopt(small, at: model.jobs.count)
+        model.flushLibrary()
+        let existed = fm.fileExists(atPath: store.folder(for: small.id).path)
+        model.delete(small)
+        model.flushLibrary()
+        let remains = fm.fileExists(atPath: store.folder(for: small.id).path)
+        let listed = model.jobs.contains { $0 === small }
+        step("delete a small job through the model", existed && !remains && !listed,
+             "folder before \(existed), after \(remains), still listed \(listed)")
+
+        lines.append(failure.map { "LIBRARY CHECK FAILED: \($0)" } ?? "LIBRARY CHECK OK")
+        return (lines, failure != nil)
+    }
+
+    /// 保存の確認のあとの絵: 07 メモの欄、08 履歴の画面 (シートのウインドウそのものを撮る。メインのウインドウを描いても、
+    /// シートは入らない)
+    func takeLibraryScreenshots(into directory: URL) async -> [String] {
+        guard let window = MainWindow.all().first(where: { $0.isVisible }) else {
+            return ["UI LOAD: screenshot failed (07, 08): no visible main window"]
+        }
+        var lines: [String] = []
+        let job = doneBilingual
+        let wasShowingNotes = model.showNotes
+
+        // 7. 終わったジョブ (対訳) で、メモの欄を出したところ (引用した行を 1 つ含むメモ)
+        Self.live("scene 07: the notes pane")
+        model.select(job)
+        var notes = "have you ever ＝「〜したことがある」。経験をたずねるときの言い方。\n\n聞き取れなかった所: 3 行目の後半。\n"
+        if let segment = job.transcript?.segments.first {
+            notes = NoteQuote.appending(NoteQuote.line(time: segment.start, text: segment.text), to: notes)
+        }
+        job.notes = notes
+        model.showNotes = true
+        await settle()
+        lines += await scroll(to: job.transcript?.segments.first?.id, .top, for: "07")
+        lines.append(shot("07-notes-pane", in: window, to: directory))
+
+        // 8. 同じジョブの履歴の画面 (版が 3 つ以上で、1 つは自動で残したもの)
+        Self.live("scene 08: the history sheet")
+        if job.versions.count < 3 || !job.versions.contains(where: { $0.origin == .beforeRestore }) {
+            lines.append("UI LOAD: screenshot 08-history-sheet.png: the job has \(job.versions.count) versions"
+                         + " (expected 3 or more, one automatic)")
+        }
+        model.historyJobID = job.id
+        await settle()
+        // シートが出きるまで待つ
+        await UILoadSelfTest.sleep(0.6)
+        await settle()
+        if let sheet = window.attachedSheet {
+            lines.append(shot("08-history-sheet", in: sheet, to: directory))
+        } else {
+            lines.append("UI LOAD: screenshot failed 08-history-sheet.png: the history sheet is not shown")
+        }
+        model.historyJobID = nil
+        await settle()
+        if model.showNotes != wasShowingNotes { model.showNotes = wasShowingNotes }
+        return lines
     }
 }
 

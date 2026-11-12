@@ -48,6 +48,16 @@ struct ContentView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+        // 履歴の画面 (操作列の「履歴」、メニューの「版として保存…」「履歴…」)
+        .sheet(isPresented: Binding(
+            get: { model.historyJobID != nil },
+            set: { if !$0 { model.historyJobID = nil } }
+        )) {
+            if let job = model.jobs.first(where: { $0.id == model.historyJobID }) {
+                HistorySheet(job: job)
+                    .environment(model)
+            }
+        }
     }
 
     @ToolbarContentBuilder

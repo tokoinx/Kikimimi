@@ -12,15 +12,32 @@ import UniformTypeIdentifiers
 final class Job: Identifiable {
     enum Status { case queued, running, done, failed, cancelled }
 
-    let id = UUID()
+    /// 保存に関わる変化 (AppModel が onChange で受け取り、少し待ってから保存する)
+    enum Change {
+        /// 状態が変わった (文字起こしが終わったら、はじめて保存する)
+        case status
+        /// 文字起こし・言語・版の一覧・音声の場所が変わった (document.json)
+        case document
+        /// メモが変わった (notes.md)
+        case notes
+    }
+
+    let id: UUID
     let name: String
     var url: URL?
-    var status: Status = .queued
+    /// 音声ファイルの場所 (ファイルが見つからなくなっても覚えておく。保存する)
+    var sourcePath: String? {
+        didSet { if sourcePath != oldValue { onChange?(self, .document) } }
+    }
+    let createdAt: Date
+    var status: Status = .queued {
+        didSet { if status != oldValue { onChange?(self, .status) } }
+    }
     var progress: Double = 0
     var message: String = "順番待ち"
-    /// 文字起こしの結果。中身が変わったら (続きが出た・監査や翻訳が入った・直しを反映した)、まだ書き出していないものとして扱う
+    /// 文字起こしの結果。中身が変わったら (続きが出た・監査や翻訳が入った・直しを反映した)、保存する
     var transcript: Transcript? {
-        didSet { if transcript != oldValue { exported = false } }
+        didSet { if transcript != oldValue { onChange?(self, .document) } }
     }
     var error: String?
     let isRecording: Bool
@@ -28,11 +45,15 @@ final class Job: Identifiable {
     /// 録音した音声 (ファイルから読み直さずに使う)
     @ObservationIgnored var samples: [Float]?
     /// 文字起こしの言語 (nil なら、始めるときの設定)。始めたら、使った言語が入る
-    var languageCode: String?
+    var languageCode: String? {
+        didSet { if languageCode != oldValue { onChange?(self, .document) } }
+    }
     /// 「日本語＋英語でやり直す」の案内を閉じた
     var mixedSuggestionDismissed = false
     /// 日本語と英語が混ざっていたので、自動で「日本語＋英語」に切り替えた。切り替える前の言語 (設定の言語) が入る
-    var autoMixedFrom: String?
+    var autoMixedFrom: String? {
+        didSet { if autoMixedFrom != oldValue { onChange?(self, .document) } }
+    }
     /// 「自動で日本語＋英語にしました」の案内を閉じた
     var autoMixedNoticeDismissed = false
     /// 自動で「日本語＋英語」に切り替えない (案内の「〜だけでやり直す」で作ったジョブ)
@@ -54,12 +75,47 @@ final class Job: Identifiable {
     @ObservationIgnored var postCancel = CancelFlag()
     /// 録音のために一時停止した (メモリの少ない Mac)。録音を止めると再開する
     @ObservationIgnored var pausedForRecording = false
-    /// 結果を書き出した・コピーした (まだなら、ウインドウを閉じてもアプリを終了せず、終了の前に確かめる)
-    @ObservationIgnored var exported = false
 
-    init(name: String, url: URL?, isRecording: Bool = false, samples: [Float]? = nil) {
+    // 保存 (ライブラリ)
+    /// メモ (notes.md に保存する)。これを見るのはメモの欄だけにする (一覧の行は見ない)
+    var notes: String = "" {
+        didSet {
+            guard notes != oldValue else { return }
+            notesRevision += 1
+            let has = !notes.isEmpty
+            if hasNotes != has { hasNotes = has }
+            if notesSaved { notesSaved = false }
+            onChange?(self, .notes)
+        }
+    }
+    /// メモが空でない (空かどうかが変わったときだけ変わる。サイドバーの行と書き出しのメニューが見る)
+    private(set) var hasNotes = false
+    /// いまのメモを書き終えた (メモの欄の「保存しました」)
+    var notesSaved = false
+    /// メモを変えた回数 (書き終えたメモが、いまのメモと同じかを見分ける)
+    @ObservationIgnored private(set) var notesRevision = 0
+    /// 版の一覧 (新しい順)
+    var versions: [VersionInfo] = [] {
+        didSet { if versions != oldValue { onChange?(self, .document) } }
+    }
+    /// ライブラリに入れた (保存した・保存を頼んだ)。版と履歴は、このときだけ使える
+    var inLibrary = false
+    /// 版の保存・戻す・消すの最中
+    var versionBusy = false
+    /// 保存できなかったことを、もう知らせた (書き直すたびには知らせない)
+    @ObservationIgnored var saveErrorReported = false
+    /// document.json を書き終えた (まだなら、メモだけでなく全体を書く。はじめの保存が失敗したときも、メモの保存で書き直す)
+    @ObservationIgnored var documentOnDisk = false
+    /// 保存に関わる変化の受け口 (AppModel.adopt が入れる。一覧から外すと外す)
+    @ObservationIgnored var onChange: (@MainActor (Job, Change) -> Void)?
+
+    init(id: UUID = UUID(), name: String, url: URL?, isRecording: Bool = false, samples: [Float]? = nil,
+         createdAt: Date = Date()) {
+        self.id = id
         self.name = name
         self.url = url
+        self.sourcePath = url?.path
+        self.createdAt = createdAt
         self.isRecording = isRecording
         self.samples = samples
     }
@@ -137,6 +193,10 @@ final class AppModel {
     var autoTranslate: Bool { didSet { save(autoTranslate, "autoTranslate") } }
     /// 原文と日本語訳を左右に並べて表示する
     var showBilingual: Bool { didSet { save(showBilingual, "showBilingual") } }
+    /// 結果の右にメモの欄を出す
+    var showNotes: Bool { didSet { save(showNotes, "showNotes") } }
+    /// 履歴の画面を開いているジョブ (nil なら閉じている)
+    var historyJobID: Job.ID?
     /// 学習した直し (監査の一覧で利用者が決めた直し・設定で自分で書いた直し)。Mac の中だけに保存する
     var ledger = CorrectionLedger()
     /// 学習した直しを使う (監査の前に当てる・断った直しを出さない・正しい語を語彙のヒントに足す)
@@ -168,6 +228,12 @@ final class AppModel {
     @ObservationIgnored private var previewTask: Task<Void, Never>?
     @ObservationIgnored private var vadTask: Task<String?, Never>?
     @ObservationIgnored private var vadRetryAfter: Date?
+    /// 結果の保存先 (nil なら保存しない: 確認用の起動 --selftest-…)
+    @ObservationIgnored private(set) var library: LibraryWriter?
+    /// 少し待ってから document.json を書く予定 (ジョブの id ごと)
+    @ObservationIgnored private var documentSaveTimers: [UUID: Task<Void, Never>] = [:]
+    /// 少し待ってから notes.md を書く予定 (ジョブの id ごと)
+    @ObservationIgnored private var notesSaveTimers: [UUID: Task<Void, Never>] = [:]
 
     init() {
         let d = UserDefaults.standard
@@ -184,6 +250,7 @@ final class AppModel {
         autoAudit = d.object(forKey: "autoAudit") as? Bool ?? true
         autoTranslate = d.object(forKey: "autoTranslate") as? Bool ?? true
         showBilingual = d.object(forKey: "showBilingual") as? Bool ?? true
+        showNotes = d.object(forKey: "showNotes") as? Bool ?? false
         useLedger = d.object(forKey: "useLedger") as? Bool ?? true
         useAdapter = d.object(forKey: "useAdapter") as? Bool ?? true
         llmStore = LLMModelStore(models: store)
@@ -195,6 +262,11 @@ final class AppModel {
         if !Languages.isKnown(languageCode) { languageCode = "ja" }
         refreshInstalled()
         refreshLLMInstalled()
+        // 確認用の起動 (--selftest-…) では保存しない (--selftest-ui-load は、確かめるときに一時フォルダを使う)
+        if !CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest-") }) {
+            library = LibraryWriter(store: LibraryStore(root: LibraryStore.defaultRoot()))
+            loadLibrary()
+        }
     }
 
     private func save(_ value: Any, _ key: String) {
@@ -242,12 +314,6 @@ final class AppModel {
     var isBusy: Bool {
         isRecording || importingLLM || importingAdapter || !downloads.isEmpty || !llmDownloads.isEmpty
             || jobs.contains { $0.isActive || $0.isPostActive }
-    }
-
-    /// 書き出しもコピーもしていない文字起こしの数。結果はファイルに保存していないので、アプリを終了すると消える。
-    /// 1 つでもあれば、ウインドウを閉じてもアプリを終了せず (Dock から開き直せる)、終了の前に確かめる
-    var unsavedResultCount: Int {
-        jobs.filter { !($0.transcript?.segments.isEmpty ?? true) && !$0.exported }.count
     }
 
     var currentModel: WhisperModelSpec {
@@ -662,7 +728,7 @@ final class AppModel {
     func enqueue(_ urls: [URL]) {
         for url in urls {
             let job = Job(name: url.lastPathComponent, url: url)
-            jobs.insert(job, at: 0)
+            adopt(job)
             if selectedJobID == nil || selectedJob?.isActive == false {
                 select(job)
             }
@@ -679,7 +745,7 @@ final class AppModel {
         let again = Job(name: job.name, url: url)
         again.languageCode = code
         again.allowsAutoMixed = autoMixed
-        jobs.insert(again, at: 0)
+        adopt(again)
         job.mixedSuggestionDismissed = true
         job.autoMixedNoticeDismissed = true
         select(again)
@@ -727,11 +793,13 @@ final class AppModel {
         }
     }
 
-    func remove(_ job: Job) {
+    /// 一覧から外す (作業は止める)。保存した結果は delete で消す
+    private func remove(_ job: Job) {
         if job.isActive { cancel(job) }
         cancelPost(job)
         jobs.removeAll { $0.id == job.id }
         if selectedJobID == job.id { select(jobs.first) }
+        if historyJobID == job.id { historyJobID = nil }
     }
 
     private enum Work {
@@ -1355,13 +1423,18 @@ final class AppModel {
         }
         let url = try? saveRecording(samples, startedAt: started)
         let job = Job(name: "録音 \(Self.displayStamp.string(from: started))", url: url, isRecording: true, samples: samples)
-        jobs.insert(job, at: 0)
+        adopt(job)
         select(job)
         ensureWorker()
     }
 
+    /// 録音を置くフォルダ (モデルのフォルダのとなり: ~/Library/Application Support/Kikimimi/Recordings)
+    var recordingsDirectory: URL {
+        store.directory.deletingLastPathComponent().appendingPathComponent("Recordings", isDirectory: true)
+    }
+
     private func saveRecording(_ samples: [Float], startedAt: Date) throws -> URL {
-        let dir = store.directory.deletingLastPathComponent().appendingPathComponent("Recordings", isDirectory: true)
+        let dir = recordingsDirectory
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent("録音-\(Self.fileStamp.string(from: startedAt)).wav")
         try WAV.encode(samples: samples, sampleRate: Int(LiveRecorder.sampleRate)).write(to: url)
@@ -1393,7 +1466,22 @@ final class AppModel {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try Exporter.render(transcript, as: format, content: content).write(to: url, atomically: true, encoding: .utf8)
-            job.exported = true
+        } catch {
+            errorMessage = "保存できませんでした: \(error.localizedDescription)"
+        }
+    }
+
+    /// メモを書き出す (.md。中身はメモの文そのまま)
+    func exportNotes() {
+        guard let job = selectedJob, !job.notes.isEmpty else { return }
+        let panel = NSSavePanel()
+        let base = (job.name as NSString).deletingPathExtension
+        panel.nameFieldStringValue = "\(base.isEmpty ? "notes" : base)-メモ.md"
+        panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try job.notes.write(to: url, atomically: true, encoding: .utf8)
         } catch {
             errorMessage = "保存できませんでした: \(error.localizedDescription)"
         }
@@ -1423,7 +1511,6 @@ final class AppModel {
     /// 本文をコピーする。対訳表示のときは原文と日本語訳を並べたもの
     func copySelectedText() {
         guard let job = selectedJob, let transcript = job.transcript else { return }
-        job.exported = true
         let text: String
         let stats = transcript.translationStats
         if isBilingual(stats, in: job) && stats.hasTranslation {
@@ -1443,6 +1530,415 @@ final class AppModel {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+}
+
+// MARK: - ライブラリ (結果の保存)
+
+/// 版の残し方
+enum VersionSaveMode: Equatable {
+    /// 新しい版として残す
+    case new
+    /// いちばん新しい、自分で残した版に上書きする
+    case overwriteLatest
+}
+
+extension AppModel {
+    /// 保存した結果を読んだもの (音声ファイルがあるかも、裏で確かめておく)
+    struct RestoredDocument: Sendable {
+        let document: SavedDocument
+        let audioExists: Bool
+    }
+
+    /// document.json を書くまでに待つ長さ (この間の変化は、まとめて 1 回で書く)
+    private static let documentSaveDelay: UInt64 = 1_000_000_000
+    /// notes.md を書くまでに待つ長さ
+    private static let notesSaveDelay: UInt64 = 800_000_000
+    /// 版に戻す前に、自動で残す版の名前
+    static let beforeRestoreLabel = "戻す前の状態"
+
+    /// 確認用 (--selftest-ui-load): この場所に保存する (前の結果は読まない)
+    func useLibrary(at root: URL) {
+        library = LibraryWriter(store: LibraryStore(root: root))
+    }
+
+    /// 起動したとき: 保存した結果を裏で読み、一覧の後ろに足す (選びはしない)
+    fileprivate func loadLibrary() {
+        guard let writer = library else { return }
+        let deliver: @MainActor @Sendable ([RestoredDocument], [URL]) -> Void = { [weak self] documents, aside in
+            self?.restore(documents, setAside: aside)
+        }
+        writer.async { store in
+            let loaded = store.loadAll()
+            let restored = loaded.documents.map { document in
+                RestoredDocument(document: document,
+                                 audioExists: document.sourcePath.map { FileManager.default.fileExists(atPath: $0) } ?? false)
+            }
+            let aside = loaded.setAside
+            Task { @MainActor in deliver(restored, aside) }
+        }
+    }
+
+    private func restore(_ documents: [RestoredDocument], setAside: [URL]) {
+        for item in documents {
+            let document = item.document
+            guard !jobs.contains(where: { $0.id == document.id }) else { continue }
+            // 音声ファイルが見つからなければ、再生はできない (場所は覚えておき、選び直せる)
+            let url = item.audioExists ? document.sourcePath.map { URL(fileURLWithPath: $0) } : nil
+            let job = Job(id: document.id, name: document.title, url: url, isRecording: document.isRecording,
+                          createdAt: document.createdAt)
+            job.sourcePath = document.sourcePath
+            job.transcript = document.transcript
+            job.languageCode = document.languageCode
+            job.autoMixedFrom = document.autoMixedFrom
+            job.versions = document.versions
+            job.notes = document.notes
+            job.status = .done
+            job.progress = 1
+            job.message = "完了"
+            job.mixedSuggestionDismissed = true
+            job.autoMixedNoticeDismissed = true
+            job.inLibrary = true
+            job.documentOnDisk = true
+            adopt(job, at: jobs.count)
+        }
+        if !setAside.isEmpty {
+            let text = "保存した結果のうち \(setAside.count) 件を読めなかったので、一覧に出していません。"
+                + "元のファイルは、それぞれのフォルダに「document.unreadable-…」という名前でとってあります。"
+            errorMessage = errorMessage.map { $0 + "\n\n" + text } ?? text
+        }
+    }
+
+    /// ジョブを一覧に入れる (保存の受け口を付ける)。一覧にジョブを足すときは、いつもこれを使う
+    func adopt(_ job: Job, at index: Int = 0) {
+        job.onChange = { [weak self] job, change in
+            self?.jobChanged(job, change)
+        }
+        jobs.insert(job, at: min(max(0, index), jobs.count))
+        // もう終わっているジョブ (確認用に入れたものなど) は、ここではじめて保存する
+        startSavingIfFinished(job)
+    }
+
+    /// ジョブの中身が変わった (Job.onChange から)。少し待ってから保存する
+    private func jobChanged(_ job: Job, _ change: Job.Change) {
+        guard library != nil, jobs.contains(where: { $0 === job }) else { return }
+        switch change {
+        case .status:
+            startSavingIfFinished(job)
+        case .document:
+            if job.inLibrary { scheduleDocumentSave(job) }
+        case .notes:
+            if job.inLibrary { scheduleNotesSave(job) }
+        }
+    }
+
+    /// 文字起こしが終わり、文がある: ライブラリに入れて、保存する (中止・失敗したものは保存しない)
+    private func startSavingIfFinished(_ job: Job) {
+        guard library != nil, !job.inLibrary, job.status == .done,
+              let transcript = job.transcript, !transcript.segments.isEmpty else { return }
+        job.inLibrary = true
+        scheduleDocumentSave(job)
+    }
+
+    /// 保存する中身の写し (値なので、メインスレッドでは写すだけ。JSON にするのは裏の列)
+    func snapshot(of job: Job) -> SavedDocument? {
+        guard let transcript = job.transcript else { return nil }
+        return SavedDocument(id: job.id, title: job.name, sourcePath: job.sourcePath, isRecording: job.isRecording,
+                             createdAt: job.createdAt, updatedAt: Date(), languageCode: job.languageCode,
+                             autoMixedFrom: job.autoMixedFrom, transcript: transcript, versions: job.versions,
+                             notes: job.notes)
+    }
+
+    /// 1 秒ほどあとに document.json を書く。待っているあいだの変化は、その 1 回にまとめる
+    /// (翻訳のように続けて変わるときも、1 秒に 1 回まで。書くときに、そのときの中身を写す)
+    private func scheduleDocumentSave(_ job: Job) {
+        let id = job.id
+        guard documentSaveTimers[id] == nil else { return }
+        documentSaveTimers[id] = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: AppModel.documentSaveDelay)
+            guard !Task.isCancelled else { return }
+            self?.documentSaveDue(id)
+        }
+    }
+
+    private func documentSaveDue(_ id: UUID) {
+        documentSaveTimers[id] = nil
+        guard let job = jobs.first(where: { $0.id == id }) else { return }
+        // 版の作業の最中は、終わるまで待つ (版の一覧を書きかえている最中に、古い一覧で書かない)
+        if job.versionBusy {
+            scheduleDocumentSave(job)
+            return
+        }
+        writeDocument(job)
+    }
+
+    /// いまの中身を写して、裏の列で document.json と notes.md を書く
+    private func writeDocument(_ job: Job) {
+        guard let writer = library, job.status == .done, let document = snapshot(of: job) else { return }
+        // notes.md もいっしょに書くので、待っているメモの保存は要らない
+        notesSaveTimers.removeValue(forKey: job.id)?.cancel()
+        let report = saveReporter(document: true)
+        let id = job.id
+        let revision = job.notesRevision
+        writer.async { store in
+            do {
+                try store.save(document)
+                Task { @MainActor in report(id, revision, nil) }
+            } catch {
+                let message = error.localizedDescription
+                Task { @MainActor in report(id, revision, message) }
+            }
+        }
+    }
+
+    /// 0.8 秒ほどあとに notes.md だけを書く (document.json を書く予定があれば、そちらでいっしょに書く)
+    private func scheduleNotesSave(_ job: Job) {
+        let id = job.id
+        guard notesSaveTimers[id] == nil, documentSaveTimers[id] == nil else { return }
+        notesSaveTimers[id] = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: AppModel.notesSaveDelay)
+            guard !Task.isCancelled else { return }
+            self?.notesSaveDue(id)
+        }
+    }
+
+    private func notesSaveDue(_ id: UUID) {
+        notesSaveTimers[id] = nil
+        guard let job = jobs.first(where: { $0.id == id }) else { return }
+        writeNotesOrDocument(job)
+    }
+
+    /// メモを書く。document.json をまだ書けていなければ (はじめの保存の失敗など)、全体を書く
+    /// (notes.md だけでは、フォルダが無いので何も書かれない)
+    private func writeNotesOrDocument(_ job: Job) {
+        if job.documentOnDisk {
+            writeNotes(job)
+        } else {
+            writeDocument(job)
+        }
+    }
+
+    private func writeNotes(_ job: Job) {
+        guard let writer = library else { return }
+        let id = job.id
+        let text = job.notes
+        let revision = job.notesRevision
+        let report = saveReporter(document: false)
+        writer.async { store in
+            do {
+                try store.saveNotes(id: id, text: text)
+                Task { @MainActor in report(id, revision, nil) }
+            } catch {
+                let message = error.localizedDescription
+                Task { @MainActor in report(id, revision, message) }
+            }
+        }
+    }
+
+    /// 裏の列から、書き終えたことを受け取る口 (メインスレッドで動く)
+    private func saveReporter(document: Bool) -> @MainActor @Sendable (UUID, Int, String?) -> Void {
+        { [weak self] id, revision, failure in
+            self?.saveFinished(id, document: document, notesRevision: revision, failure: failure)
+        }
+    }
+
+    private func saveFinished(_ id: UUID, document: Bool, notesRevision: Int, failure: String?) {
+        guard let job = jobs.first(where: { $0.id == id }) else { return }
+        if let failure {
+            // 知らせるのは 1 回だけ (書き直すたびには出さない)。結果は一覧に残す
+            if !job.saveErrorReported {
+                job.saveErrorReported = true
+                errorMessage = "「\(job.name)」を保存できませんでした (一覧には残しています): " + failure
+            }
+            return
+        }
+        job.saveErrorReported = false
+        if document { job.documentOnDisk = true }
+        // 書いたあとでメモが変わっていなければ、「保存しました」
+        if job.notesRevision == notesRevision, !job.notesSaved { job.notesSaved = true }
+    }
+
+    /// 待っている保存を、いま列に積む
+    private func dispatchPendingSaves(for id: UUID) {
+        if let timer = documentSaveTimers.removeValue(forKey: id) {
+            timer.cancel()
+            if let job = jobs.first(where: { $0.id == id }) { writeDocument(job) }
+        }
+        if let timer = notesSaveTimers.removeValue(forKey: id) {
+            timer.cancel()
+            if let job = jobs.first(where: { $0.id == id }) { writeNotesOrDocument(job) }
+        }
+    }
+
+    /// 待っている保存をすべて積み、書き終わるまで待つ (終了の前と、確認用)
+    func flushLibrary() {
+        guard let writer = library else { return }
+        for id in Set(documentSaveTimers.keys).union(notesSaveTimers.keys) {
+            dispatchPendingSaves(for: id)
+        }
+        writer.flush()
+    }
+
+    /// 結果を消す: 作業を止めて一覧から外し、保存したフォルダをゴミ箱に入れる
+    /// (マイクの録音で、録音がアプリの録音フォルダにあれば、録音もゴミ箱へ)。
+    /// ゴミ箱に入れるのも保存と同じ列で行うので、待っていた保存が、あとからフォルダを作り直すことはない
+    func delete(_ job: Job) {
+        let id = job.id
+        documentSaveTimers.removeValue(forKey: id)?.cancel()
+        notesSaveTimers.removeValue(forKey: id)?.cancel()
+        job.onChange = nil
+        let saved = job.inLibrary
+        job.inLibrary = false
+        remove(job)
+        guard saved, let writer = library else { return }
+        let folder = writer.store.folder(for: id)
+        // 録音を、ほかのジョブ (「やり直す」で作ったもの) も使っていれば、録音は残す
+        let sharedAudio = jobs.contains { $0.sourcePath != nil && $0.sourcePath == job.sourcePath }
+        let recording = job.isRecording && !sharedAudio ? recordingInAppFolder(job.sourcePath) : nil
+        let name = job.name
+        let report: @MainActor @Sendable (String) -> Void = { [weak self] message in
+            self?.errorMessage = message
+        }
+        writer.async { _ in
+            do {
+                try LibraryWriter.trash(folder)
+            } catch {
+                let message = "「\(name)」を消せませんでした: " + error.localizedDescription
+                Task { @MainActor in report(message) }
+            }
+            if let recording { try? LibraryWriter.trash(recording) }
+        }
+    }
+
+    /// アプリの録音フォルダの中のファイルなら、その場所 (ほかの所のファイルは消さない)
+    private func recordingInAppFolder(_ path: String?) -> URL? {
+        guard let path else { return nil }
+        let folder = recordingsDirectory.standardizedFileURL.path + "/"
+        let url = URL(fileURLWithPath: path).standardizedFileURL
+        return url.path.hasPrefix(folder) ? url : nil
+    }
+
+    /// 保存したフォルダを Finder で表示する
+    func revealInLibrary(_ job: Job) {
+        guard let writer = library, job.inLibrary else { return }
+        dispatchPendingSaves(for: job.id)
+        writer.flush()
+        NSWorkspace.shared.activateFileViewerSelecting([writer.store.folder(for: job.id)])
+    }
+
+    /// 音声ファイルを選び直す (動かした・名前を変えたとき)
+    func relocateAudio(of job: Job) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.audio, .movie, .mpeg4Movie, .quickTimeMovie, .mp3, .wav, .aiff, .mpeg4Audio]
+        panel.message = "「\(job.name)」の音声・動画ファイルを選んでください"
+        panel.prompt = "選ぶ"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        job.url = url
+        // 場所が変わったので保存する (Job.sourcePath の変化から)
+        job.sourcePath = url.path
+        if selectedJobID == job.id { player.load(url: url) }
+    }
+
+    /// 行の文をメモに引用する (行の右クリックの「メモに引用」)。メモの欄も出す
+    func quoteToNotes(text: String, time: TimeInterval, in job: Job) {
+        job.notes = NoteQuote.appending(NoteQuote.line(time: time, text: text), to: job.notes)
+        if !showNotes { showNotes = true }
+    }
+
+    // MARK: 版 (履歴)
+
+    /// 版を残す・戻す・消すことができるか (保存した、終わった結果で、監査・翻訳の最中でない)
+    func canEditVersions(_ job: Job) -> Bool {
+        library != nil && job.inLibrary && job.status == .done && !job.isPostActive && !job.versionBusy
+    }
+
+    /// 版の作業ができないときの説明 (できるときは nil)
+    func versionBlockedReason(_ job: Job) -> String? {
+        if library == nil || !job.inLibrary || job.status != .done { return "文字起こしが終わって保存した結果だけ、版を残せます。" }
+        if job.isPostActive { return "監査・翻訳の最中は、版を残したり戻したりできません。終わってからにしてください。" }
+        if job.versionBusy { return "版を書いています…" }
+        return nil
+    }
+
+    /// いまの状態を版として残す
+    @discardableResult
+    func saveVersion(_ job: Job, label: String, mode: VersionSaveMode) async -> Bool {
+        guard canEditVersions(job), let writer = library else { return false }
+        // 待っている保存を先に積む (列の順に書くので、版はそのあとの状態になる)
+        dispatchPendingSaves(for: job.id)
+        guard let document = snapshot(of: job) else { return false }
+        let name = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let overwrite = mode == .overwriteLatest
+        job.versionBusy = true
+        defer { job.versionBusy = false }
+        let result = await writer.run { (store: LibraryStore) throws -> SavedDocument in
+            if overwrite { return try store.overwriteLatestVersion(of: document, label: name) }
+            return try store.addVersion(to: document, label: name, origin: .manual)
+        }
+        switch result {
+        case .success(let updated):
+            guard jobs.contains(where: { $0 === job }) else { return false }
+            job.versions = updated.versions
+            return true
+        case .failure(let error):
+            errorMessage = "版を保存できませんでした: " + error.localizedDescription
+            return false
+        }
+    }
+
+    /// 版に戻す。先に、いまの状態を版 (自動・「戻す前の状態」) として残してから、選んだ所 (文字起こしと訳・メモ) を置きかえる
+    @discardableResult
+    func restoreVersion(_ job: Job, versionID: UUID, transcript: Bool, notes: Bool) async -> Bool {
+        guard transcript || notes, canEditVersions(job), let writer = library else { return false }
+        dispatchPendingSaves(for: job.id)
+        guard let document = snapshot(of: job) else { return false }
+        job.versionBusy = true
+        defer { job.versionBusy = false }
+        let label = AppModel.beforeRestoreLabel
+        let result = await writer.run { (store: LibraryStore) throws -> SavedDocument in
+            // 版を先に読む (読めなければ、何も変えない)
+            let version = try store.loadVersion(documentID: document.id, versionID: versionID)
+            var restored = try store.addVersion(to: document, label: label, origin: .beforeRestore)
+            restored = restored.restoring(version, transcript: transcript, notes: notes)
+            restored.updatedAt = Date()
+            try store.save(restored)
+            return restored
+        }
+        switch result {
+        case .success(let restored):
+            guard jobs.contains(where: { $0 === job }) else { return false }
+            job.versions = restored.versions
+            if transcript { job.transcript = restored.transcript }
+            if notes { job.notes = restored.notes }
+            return true
+        case .failure(let error):
+            errorMessage = "版に戻せませんでした: " + error.localizedDescription
+            return false
+        }
+    }
+
+    /// 版を 1 つ消す
+    @discardableResult
+    func deleteVersion(_ job: Job, versionID: UUID) async -> Bool {
+        guard canEditVersions(job), let writer = library else { return false }
+        dispatchPendingSaves(for: job.id)
+        guard let document = snapshot(of: job) else { return false }
+        job.versionBusy = true
+        defer { job.versionBusy = false }
+        let result = await writer.run { (store: LibraryStore) throws -> SavedDocument in
+            try store.deleteVersion(of: document, versionID: versionID)
+        }
+        switch result {
+        case .success(let updated):
+            guard jobs.contains(where: { $0 === job }) else { return false }
+            job.versions = updated.versions
+            return true
+        case .failure(let error):
+            errorMessage = "版を消せませんでした: " + error.localizedDescription
+            return false
+        }
     }
 }
 

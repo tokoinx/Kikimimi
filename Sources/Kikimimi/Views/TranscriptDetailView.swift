@@ -42,6 +42,10 @@ struct TranscriptDetailView: View {
                 PlayerBar()
                     .padding(.horizontal, 20)
                     .padding(.bottom, 8)
+            } else if job.status == .done, let path = job.sourcePath {
+                MissingAudioNotice(job: job, path: path)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
             }
 
             PostProcessBar(job: job)
@@ -70,20 +74,37 @@ struct TranscriptDetailView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
                 Divider()
-                if bilingual {
-                    BilingualHeader(label: summary.languageLabel, showTimestamp: model.showTimestamps,
-                                    showPlayMark: model.canPlayLines(of: job))
-                    Divider()
+                let items = cache.items(of: transcript, job: job.id, done: job.status == .done,
+                                        bilingual: bilingual, query: model.searchText)
+                // 右にメモの欄 (「メモ」を入れたときだけ)。メモの中身を見るのは NotesPane だけ (打つたびに一覧を作り直さない)。
+                // 一覧は、メモを出しても消しても同じ場所に置く (置き場所を変えると一覧が作り直され、読んでいた位置が始めに戻る)
+                HSplitView {
+                    transcriptColumn(items: items, bilingual: bilingual, languageLabel: summary.languageLabel)
+                        .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                    if model.showNotes {
+                        NotesPane(job: job)
+                            .frame(minWidth: 220, idealWidth: 320, maxWidth: 520, maxHeight: .infinity)
+                    }
                 }
-                TranscriptListView(job: job, items: cache.items(of: transcript, job: job.id, done: job.status == .done,
-                                                                bilingual: bilingual, query: model.searchText),
-                                   bilingual: bilingual, emptyMessage: emptyMessage)
             } else {
                 Spacer()
             }
         }
         .navigationTitle(job.name)
         .navigationSubtitle(subtitle(summary))
+    }
+
+    /// 対訳の見出しと一覧
+    @ViewBuilder
+    private func transcriptColumn(items: [TranscriptListItem], bilingual: Bool, languageLabel: String?) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if bilingual {
+                BilingualHeader(label: languageLabel, showTimestamp: model.showTimestamps,
+                                showPlayMark: model.canPlayLines(of: job))
+                Divider()
+            }
+            TranscriptListView(job: job, items: items, bilingual: bilingual, emptyMessage: emptyMessage)
+        }
     }
 
     // MARK: ヘッダ
@@ -141,7 +162,11 @@ struct TranscriptDetailView: View {
                     .toggleStyle(.checkbox)
                     .help("原文と日本語訳を左右に並べる")
             }
+            Toggle("メモ", isOn: $model.showNotes)
+                .toggleStyle(.checkbox)
+                .help("右にメモの欄を出す (理解したこと・覚えたい表現などを書ける。書いたものは自動で保存される)")
             Spacer()
+            HistoryButton(job: job)
             AuditButton(job: job, transcript: transcript)
                 .disabled(!canPost)
             if stats.translatable > 0 {
@@ -159,7 +184,7 @@ struct TranscriptDetailView: View {
             } label: {
                 Label("コピー", systemImage: "doc.on.doc")
             }
-            ExportMenu(hasTranslation: stats.hasTranslation)
+            ExportMenu(hasTranslation: stats.hasTranslation, job: job)
                 .disabled(job.status != .done)
         }
     }
@@ -656,6 +681,9 @@ struct PlayableRow<Content: View>: View {
             }
             Button("この行をコピー") {
                 model.copyLine(item.text, japanese: item.japanese)
+            }
+            Button("メモに引用") {
+                model.quoteToNotes(text: item.text, time: item.start, in: job)
             }
             // 行の「訳」と同じ (VoiceOver では行が 1 つの要素になるので、ここからも訳せるように)
             if item.canTranslate || item.isTranslated {
@@ -1240,10 +1268,12 @@ struct LLMDownloadControls: View {
 /// 書き出し (原文 / 日本語訳 / 対訳 × 形式)
 struct ExportMenu: View {
     let hasTranslation: Bool
+    /// メモが空かどうかは、この部品の中で見る (結果の画面が見ると、メモを書き始めたときに一覧まで描き直す)
+    let job: Job
 
     var body: some View {
         Menu {
-            ExportMenuItems(hasTranslation: hasTranslation)
+            ExportMenuItems(hasTranslation: hasTranslation, hasNotes: job.hasNotes)
         } label: {
             Label("書き出す", systemImage: "square.and.arrow.up")
         }
@@ -1255,8 +1285,19 @@ struct ExportMenu: View {
 struct ExportMenuItems: View {
     @Environment(AppModel.self) private var model
     let hasTranslation: Bool
+    /// メモが空でない (「メモ (.md)」も出す)
+    let hasNotes: Bool
 
     var body: some View {
+        formats
+        if hasNotes {
+            Divider()
+            Button("メモ (.md)") { model.exportNotes() }
+        }
+    }
+
+    @ViewBuilder
+    private var formats: some View {
         if hasTranslation {
             ForEach(ExportContent.allCases) { content in
                 Section(content.displayName) {
@@ -1269,6 +1310,29 @@ struct ExportMenuItems: View {
             ForEach(ExportFormat.allCases) { format in
                 Button(format.displayName) { model.export(as: format) }
             }
+        }
+    }
+}
+
+/// 音声ファイルが見つからない (保存した結果の音声を動かした・消した)。選び直せる
+struct MissingAudioNotice: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    let path: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "questionmark.folder")
+                .foregroundStyle(.secondary)
+            Text("音声ファイルが見つかりません: " + path)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+            Spacer()
+            Button("音声を選び直す…") { model.relocateAudio(of: job) }
+                .controlSize(.small)
         }
     }
 }
