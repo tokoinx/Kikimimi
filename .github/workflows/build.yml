@@ -126,30 +126,18 @@ jobs:
 
       # 数千行の結果で、画面が固まらないこと (再生位置・1 行だけの再生・文字起こしの続きを起こし、メインスレッドの待ちを測る)。
       # 3000 行では、47 秒の録音で 1 行を本当に再生し、行の終わりで止まるかも確かめる (音を出せない Mac では飛ばす)
-      # 目安 (UILoadSelfTest.Limits) を超えたら失敗にするのは、この 3000 行だけ
+      # 目安 (UILoadSelfTest.Limits) を超えたら失敗にするのは、この 3000 行だけ。ウインドウの絵は build/ui-shots に残す
       - name: UI load self-test (3000 lines, one line played from a recording)
         timeout-minutes: 6
         run: |
           build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000.txt --screenshots build/ui-shots
 
-      # 同じ 3000 行を、一覧の入れ物を LazyVStack にして測る (List と比べるための参考。失敗にしない)。
-      # 一覧の作りのほかは、上の段と同じ引数にしている。ウインドウの絵は build/ui-shots-lazy に残す。
-      # 上の段が目安を超えて失敗しても、比べる数が残るように動かす
-      - name: UI load self-test (3000 lines, lazy list, for comparison, informational)
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        timeout-minutes: 6
-        run: |
-          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000-lazy.txt --list lazy --screenshots build/ui-shots-lazy
-
-      # 画面の重さの確認が残したウインドウの絵 (List と LazyVStack)。確認が失敗しても残す
+      # 画面の重さの確認が残したウインドウの絵。確認が失敗しても残す
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ui-shots-${{ matrix.os }}-xcode${{ matrix.xcode }}
-          path: |
-            build/ui-shots
-            build/ui-shots-lazy
+          path: build/ui-shots
           if-no-files-found: warn
           retention-days: 14
 
@@ -159,7 +147,7 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
-          for f in build/ui-shots/*.png build/ui-shots-lazy/*.png; do
+          for f in build/ui-shots/*.png; do
             [ -f "$f" ] || continue
             sips -s format jpeg -s formatOptions 60 "$f" --out "$f.jpg" >/dev/null 2>&1 || continue
             echo "UI SHOT BEGIN $f"

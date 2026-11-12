@@ -3,7 +3,7 @@ import CoreFoundation
 import Foundation
 import KikimimiCore
 
-/// `Kikimimi --selftest-ui-load [行数] [--audio <音声>] [--report <ファイル>] [--list <list|lazy>] [--screenshots <フォルダ>]`
+/// `Kikimimi --selftest-ui-load [行数] [--audio <音声>] [--report <ファイル>] [--screenshots <フォルダ>]`
 ///
 /// ふつうに起動して (画面も出す)、行数 (既定 3000) の結果を出したまま、使っているときと同じ操作を起こし、
 /// 操作ごとに、メインスレッドがまた空くまでの時間を測る (長い録音を文字起こししている最中に画面が固まった不具合の確認)。
@@ -25,14 +25,13 @@ import KikimimiCore
 /// 4. 文字起こし中のジョブ (いっぺんに届く): 1 つずつの区間 (6 回、まとめる間より長くあけて) と、
 ///    300 の区間をいっぺんに (3 回)
 /// ジョブを選ぶ操作は段階の外で測る (3 回ずつ)。測った数が 20 に足りない操作は、p95 を出すが目安と比べず、最大だけを比べる。
+/// ジョブを選ぶ操作は、測った順の値も出す (初めの 1 回だけが遅いのか、あとの回も遅いのかを見分けるため)。
 /// 行にマウスを載せたときの色は、行の中だけの状態なので、外から変えられない。
 /// 段階の前に、画面を使わずに、一覧の行を作る手間 (TranscriptRowCache: すべてから作り直す / 10 区間を足す) も測る。
 ///
 /// `--audio` を付けると、その音声で 1 行 (5〜7 秒あたり) を本当に再生し、行の終わりで自分で止まるかと、
 /// そのあと下の再生ボタンで行の終わりから続くかも確かめる。行は 0 秒から押すときと、ふつうの再生が後ろ (30 秒あたり)
 /// にいるときに押すときの 2 回。音を出せるかは先にふつうの再生で確かめ、出せない Mac では、その部分は飛ばす。
-///
-/// `--list` は、結果の一覧の作り (TranscriptListKind) を、この回だけ変える (設定の "transcriptListKind" より先)。
 ///
 /// `--screenshots` を付けると、測り終えたあと (測る段階の外で) ウインドウを 1200 x 800 にして、決まった場面の
 /// ウインドウの絵を PNG で、そのフォルダに残す (無ければ作る)。絵を残せなくても、終了コードは変えない。
@@ -57,7 +56,7 @@ enum UILoadSelfTest {
         static let appendMax = 0.500
         /// 段階 3 で、まとめて足した 1 回
         static let steadyBatchP95 = 0.300
-        static let steadyBatchMax = 0.900 // 測った最大 425〜671 ms (SwiftUI の List が 3000 行に 10 行足す手間)
+        static let steadyBatchMax = 0.600 // 測った最大 290 ms (中央の値 110〜180 ms。遅い実行機のぶん余らせる)
         /// 300 の区間をまとめて足し始めてから、すべてが一覧に入り、メインスレッドが空くまで
         static let burst = 1.5
         /// 段階ごとに、そのあいだに見張りが測った最大の待ち (段階 1・2・3)
@@ -65,14 +64,14 @@ enum UILoadSelfTest {
         /// 段階 4 (300 の区間がいっぺんに届く): いっぺんに足すあいだは待つので、300 の区間の目安と同じ
         static let burstWatchdogMax = 1.5
         /// 段階 3 (文字起こし中のジョブ、1 秒に 10 区間) で、メインスレッドが見張りに応えられなかった時間の割合
-        static let steadyUnavailableShare = 0.40 // 測った値 28〜30%
+        static let steadyUnavailableShare = 0.25 // 測った値 4.5〜12.4% (遅い実行機のぶん余らせる)
         /// 段階 3 (文字起こし中のジョブ、1 秒に 10 区間) の再生位置・いまの行が変わる再生位置・1 行だけの再生の開始と停止。
         /// まとめて足す 1 回と測る間が重なると、その手間 (GitHub の実行機で 130〜260 ms ほど) も入る。
         /// GitHub の実行機に合わせた値で、測った値がたまったら詰める
         static let whileAddedP95 = 0.400
         static let whileAddedMax = 0.700
         /// ジョブを選ぶ (最大だけ)
-        static let selectMax = 3.0
+        static let selectMax = 3.0 // 測った値 0.22〜0.94 秒
         /// 測った数がこれより少ない操作は、p95 を目安と比べない (少ないと、p95 は最大と同じになる)。最大だけを比べる
         static let p95MinSamples = 20
     }
@@ -149,7 +148,6 @@ enum UILoadSelfTest {
         let audio = value(after: "--audio", in: arguments).map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
         }
-        let listKind = value(after: "--list", in: arguments)
         let screenshots = value(after: "--screenshots", in: arguments).map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
         }
@@ -167,7 +165,7 @@ enum UILoadSelfTest {
                              + " (the main thread may be stuck)"], code: 3, reportPath: reportPath)
         }
         Task { @MainActor in
-            await run(rows: rows, audio: audio, listKind: listKind, screenshots: screenshots, header: header,
+            await run(rows: rows, audio: audio, screenshots: screenshots, header: header,
                       reportPath: reportPath)
         }
     }
@@ -178,7 +176,7 @@ enum UILoadSelfTest {
     }
 
     @MainActor
-    private static func run(rows: Int, audio: URL?, listKind: String?, screenshots: URL?, header: [String],
+    private static func run(rows: Int, audio: URL?, screenshots: URL?, header: [String],
                             reportPath: String?) async {
         var lines = header
         // 一覧が、絵を残すときに動かす口を入れる (一覧が出る前に)
@@ -196,15 +194,6 @@ enum UILoadSelfTest {
             finish(lines + ["UI LOAD FAILED: no main window after 20 s"], code: 1, reportPath: reportPath)
         }
         AppDelegate.shared?.keepRunningWithoutWindows = true
-        // 一覧の作り: --list があれば、この回だけ変える (保存しない)
-        if let listKind {
-            if let kind = TranscriptListKind(rawValue: listKind) {
-                model.transcriptListKind = kind
-            } else {
-                lines.append("UI LOAD: unknown list kind \"\(listKind)\" (use list or lazy), keeping the setting")
-            }
-        }
-        lines.append("UI LOAD: list kind \(model.transcriptListKind.rawValue)")
 
         // 2. 終わったジョブ 2 つと、文字起こし中のジョブを入れる。
         // 音声が無いときは、無いファイルを開く (行の再生の印は出て、再生しても音は出ない)
@@ -817,6 +806,9 @@ private final class LoadRun {
         measured[name, default: []].append(seconds)
     }
 
+    /// ジョブを選ぶ操作 (目安は最大だけ。結果には、測った順の値も出す)
+    private static let selectActions = [Action.selectBilingual, Action.selectPlain, Action.selectRunning]
+
     /// 操作ごとの目安 (p95 が nil なら最大だけ)。required でないものは、測れなくても失敗にしない
     /// (段階 3 で、いまの行が変わる再生位置は、起きないことがある)
     private static var actionLimits: [(action: String, p95: Double?, max: Double, required: Bool)] {
@@ -836,7 +828,7 @@ private final class LoadRun {
         limits.append((Action.appendSelected, Limits.appendP95, Limits.appendMax, true))
         limits.append((Action.steadyBatch, Limits.steadyBatchP95, Limits.steadyBatchMax, true))
         limits.append((Action.burst, nil, Limits.burst, true))
-        for action in [Action.selectBilingual, Action.selectPlain, Action.selectRunning] {
+        for action in selectActions {
             limits.append((action, nil, Limits.selectMax, true))
         }
         return limits
@@ -1074,7 +1066,8 @@ private final class LoadRun {
                      + " (rounds of a main-queue block and the run loop's beforeWaiting, at least 2, until a round"
                      + " finds no new work)")
         for action in Action.all {
-            let values = (measured[action] ?? []).sorted()
+            let inOrder = measured[action] ?? []
+            let values = inOrder.sorted()
             guard !values.isEmpty else {
                 lines.append("UI LOAD: action \"\(action)\": no samples")
                 continue
@@ -1085,6 +1078,10 @@ private final class LoadRun {
                 ? ", n < \(Limits.p95MinSamples): p95 not checked" : ""
             lines.append("UI LOAD: action \"\(action)\": n \(values.count), median \(f(UILoadSelfTest.percentile(values, 0.5))) ms,"
                          + " p95 \(f(UILoadSelfTest.percentile(values, 0.95))) ms, max \(f(values[values.count - 1])) ms" + unchecked)
+            // ジョブを選ぶ操作は、測った順の値も出す (初めの 1 回だけが遅いのかを見分ける)
+            if Self.selectActions.contains(action) {
+                lines.append("UI LOAD: samples \"\(action)\": " + inOrder.map(f).joined(separator: ", ") + " ms")
+            }
         }
         let samples = probe.samples()
         lines.append("watchdog: a background thread posts a block to the main queue every 50 ms (without waiting for the"
