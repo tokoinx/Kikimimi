@@ -1,3 +1,4 @@
+import AppKit
 import KikimimiCore
 import SwiftUI
 
@@ -17,22 +18,9 @@ struct TranscriptDetailView: View {
                 .padding(.bottom, 10)
 
             if job.status == .running || job.status == .queued {
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if job.status == .running && job.progress > 0 {
-                            ProgressView(value: job.progress)
-                        } else {
-                            ProgressView()
-                                .progressViewStyle(.linear)
-                        }
-                        Text(job.message)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    Button("中止") { model.cancel(job) }
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
+                JobProgressBar(job: job)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
             }
 
             if job.status == .failed {
@@ -224,6 +212,30 @@ struct TranscriptDetailView: View {
     }
 }
 
+/// 文字起こし中の進み具合と知らせ、「中止」。進み具合 (1 秒に何度も変わる) を見るのはこの部品だけにする
+/// (結果の画面全体で見ると、進み具合が変わるたびに、数千行の一覧の部品まで作り直すことになる)
+struct JobProgressBar: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                if job.status == .running && job.progress > 0 {
+                    ProgressView(value: job.progress)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                }
+                Text(job.message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            Button("中止") { model.cancel(job) }
+        }
+    }
+}
+
 /// 結果の画面で、区間の数だけ手間がかかるもの (翻訳の状況・言語の名前・一覧の行) を覚えておく。
 /// 文字起こし・ジョブの状態・表示の条件が同じなら、前に作ったものを返す。
 /// (文字起こしの比べは、区間の数が違えばすぐ終わり、同じ配列ならその場で同じとわかる)
@@ -321,7 +333,15 @@ struct LanguageTagLabel: View {
 }
 
 /// 本文の一覧。再生位置 (0.2 秒ごとに変わる) はここでは見ない (見ると、0.2 秒ごとに数千の行を並べ直すことになる)。
-/// いまの位置にある行は CurrentLineTracker が探して、行が変わったときだけ知らせる
+/// いまの位置にある行は CurrentLineTracker が探して、行が変わったときだけ知らせる。
+///
+/// 文字起こし中は、一覧の終わりを追いかける (新しい行が出たら、いちばん下へ動かす)。ただし:
+/// - 使う人が一覧の上でホイールやトラックパッドで上へ動かす、一覧の中を押す (行もスクロールバーも、押した瞬間に)、
+///   キーボードで上へ動かす (Page Up・Home・上矢印)、行を押して 1 行だけ再生する
+///   と、追いかけるのをやめる (上の行を読んでいる・押そうとしているのに、下へ飛ばさない)。
+/// - 一覧の終わり (見えない印の行) が見えたら、また追いかける。右下の「末尾へ」でも戻せる。
+/// - 再生しているあいだ (1 行だけでも、ふつうの再生でも) は、追いかけていても動かさない。
+/// macOS 14 の SwiftUI の List には、いまのスクロールの位置を知る手段が無いので、この決まりにしている
 struct TranscriptListView: View {
     @Environment(AppModel.self) private var model
     let job: Job
@@ -330,6 +350,8 @@ struct TranscriptListView: View {
     let emptyMessage: String
     /// ふつうの再生で、いまの位置にある行
     @State private var currentID: UUID?
+    /// 文字起こし中に、一覧の終わりを追いかけるか
+    @State private var follow = ListFollow()
 
     var body: some View {
         let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
@@ -337,6 +359,7 @@ struct TranscriptListView: View {
         let playingID = model.player.playingLineID
         let showTimestamps = model.showTimestamps
         let highlight = model.searchText
+        let running = job.status == .running
         ScrollViewReader { proxy in
             // 行に .id() を付けない (付けると List がすべての行を一度に作るようになる。scrollTo は ForEach の id で動く)
             List {
@@ -357,21 +380,141 @@ struct TranscriptListView: View {
                     Text(emptyMessage)
                         .foregroundStyle(.secondary)
                 }
+                if running {
+                    // 一覧の終わりの印 (見えない行)。これが見えたら、使う人は一覧の終わりにいる: また追いかける
+                    Color.clear
+                        .frame(height: 1)
+                        .listRowBackground(Color.clear)
+                        .accessibilityHidden(true)
+                        .onAppear { follow.isOn = true }
+                }
             }
             .listStyle(.inset)
             .background(CurrentLineTracker(job: job, items: items, currentID: $currentID))
+            .background(
+                GeometryReader { geometry in
+                    // ホイールの操作が、この一覧の上かを見分けるための、一覧の位置 (ウインドウの中の横の範囲)
+                    Color.clear
+                        .onAppear { follow.frame = geometry.frame(in: .global) }
+                        .onChange(of: geometry.frame(in: .global)) { _, frame in follow.frame = frame }
+                }
+            )
+            .overlay(alignment: .bottomTrailing) {
+                if running && !follow.isOn {
+                    Button {
+                        follow.isOn = true
+                        if let last = items.last { proxy.scrollTo(last.id, anchor: .bottom) }
+                    } label: {
+                        Label("末尾へ", systemImage: "arrow.down.to.line")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .help("一覧の終わりへ移り、文字起こしの続きを追いかける")
+                    .padding(12)
+                }
+            }
+            .onAppear { follow.install() }
+            .onDisappear { follow.remove() }
+            .onChange(of: job.id) { _, _ in
+                // 別のジョブを選んだ: そのジョブの一覧の終わりから追いかける
+                follow.isOn = true
+            }
+            .onChange(of: playingID) { _, id in
+                // 行を押して 1 行だけ再生した: 押した行のあたりを見ているので、追いかけるのをやめる
+                if id != nil, running { follow.isOn = false }
+            }
             .onChange(of: currentID) { _, id in
                 // 1 行だけの再生では、押した行が見えているので追いかけない
-                if let id, model.player.isPlaying, model.player.playingLineID == nil {
+                guard let id, model.player.isPlaying, model.player.playingLineID == nil else { return }
+                // 一覧を描き直している最中に動かすと、NSTableView が「reentrant operation」と警告するので、次の回に動かす
+                Task { @MainActor in
                     withAnimation { proxy.scrollTo(id, anchor: .center) }
                 }
             }
             .onChange(of: items.count) { _, _ in
-                if job.status == .running, let last = items.last {
-                    proxy.scrollTo(last.id, anchor: .bottom)
+                guard job.status == .running, follow.isOn, !model.player.isPlaying, let last = items.last else { return }
+                let id = last.id
+                // 上と同じ: 描き直しの最中には動かさず、次の回に動かす
+                Task { @MainActor in
+                    guard follow.isOn, !model.player.isPlaying else { return }
+                    proxy.scrollTo(id, anchor: .bottom)
                 }
             }
         }
+    }
+}
+
+/// 文字起こし中に、一覧の終わりを追いかけるか (TranscriptListView)。
+/// 一覧の上でホイール・トラックパッドを上へ動かしたとき、一覧の中を押したとき (行もスクロールバーも、押した瞬間に)、
+/// キーボードで上へ動かしたとき (Page Up・Home・上矢印) に、追いかけるのをやめる
+/// (macOS 14 の SwiftUI にはスクロールの操作を知る手段が無いので、アプリに届くイベントを見る。イベントは止めない)
+@MainActor
+@Observable
+final class ListFollow {
+    var isOn = true
+    /// 一覧の位置 (SwiftUI の global: ウインドウの中、左上から下へ)。まだわからなければ空
+    @ObservationIgnored var frame: CGRect = .zero
+    @ObservationIgnored private var monitor: Any?
+
+    func install() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown, .keyDown],
+                                                   handler: Self.handler(follow: self))
+    }
+
+    func remove() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+
+    nonisolated private static func handler(follow: ListFollow) -> (NSEvent) -> NSEvent? {
+        return { event in
+            MainActor.assumeIsolated { follow.handle(event) }
+            return event
+        }
+    }
+
+    private func handle(_ event: NSEvent) {
+        guard isOn, let window = event.window, MainWindow.all().contains(where: { $0 === window }) else { return }
+        switch event.type {
+        case .scrollWheel:
+            // 一覧の横の範囲の外 (左のジョブの一覧など) の操作は見ない (位置がわからないうちは、どこでも一覧の操作とみなす)
+            let x = event.locationInWindow.x
+            if frame.width > 0, x < frame.minX || x > frame.maxX { return }
+            // 上へ (前の行のほうへ) 動かした
+            if event.scrollingDeltaY > 0 { isOn = false }
+        case .leftMouseDown:
+            // 一覧の中を押した (行・スクロールバー): 離すまでに行が増えても、押したところを動かさないよう、押した瞬間にやめる。
+            // 終わりの印の行と「末尾へ」で、また追いかける
+            if isInList(event, in: window) { isOn = false }
+        case .keyDown:
+            // キーボードで上へ動かした。検索欄などで文字を打っているときは見ない
+            guard window.isKeyWindow, !isTextInput(window.firstResponder) else { return }
+            guard let key = event.specialKey, key == .pageUp || key == .home || key == .upArrow else { return }
+            // 左のジョブの一覧などで押したキーは見ない (位置がわからないうちは、どこでも一覧の操作とみなす)
+            if frame.width > 0, let view = window.firstResponder as? NSView {
+                let rect = view.convert(view.bounds, to: nil)
+                if rect.midX < frame.minX || rect.midX > frame.maxX { return }
+            }
+            isOn = false
+        default:
+            break
+        }
+    }
+
+    /// 押したところが一覧の中か (位置がわからないうちは、一覧の中とみなす)
+    private func isInList(_ event: NSEvent, in window: NSWindow) -> Bool {
+        guard frame.width > 0, frame.height > 0 else { return true }
+        guard let content = window.contentView else { return true }
+        // ウインドウの座標 (左下から上へ) を、SwiftUI の global (内容の左上から下へ) にそろえる
+        let local = content.convert(event.locationInWindow, from: nil)
+        let point = CGPoint(x: local.x, y: content.isFlipped ? local.y : content.bounds.height - local.y)
+        return frame.contains(point)
+    }
+
+    /// 文字を打つところ (テキストの欄、文字の部品。編集中の欄の NSTextView も NSText) か
+    private func isTextInput(_ responder: NSResponder?) -> Bool {
+        responder is NSText || responder is NSTextField
     }
 }
 

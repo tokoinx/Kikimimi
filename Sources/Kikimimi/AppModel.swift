@@ -776,6 +776,8 @@ final class AppModel {
         job.error = nil
         if MemoryBudget.isTight { llm.unload() }
         let spec = currentModel
+        // 認識の途中で届く区間の入れ物。終わり方ごとに閉じる (下の catch と、結果を入れる前)
+        let live = Self.liveFeed(for: job)
         do {
             if !store.isInstalled(spec) {
                 job.message = "\(spec.displayName) をダウンロード中 (初回のみ)…"
@@ -832,16 +834,15 @@ final class AppModel {
                     }
                 },
                 onSegment: { segment in
-                    Task { @MainActor in
-                        guard job.status == .running else { return }
-                        job.transcript?.segments.append(segment)
-                    }
+                    // 区間は貯めておき、0.25 秒ごとにまとめて画面へ出す (LiveSegmentBuffer)
+                    live.append(segment)
                 },
                 onRestart: {
-                    // whisper が途中で失敗して、始めからやり直す: そこまでに出した区間を消す (同じ文が 2 度並ばないように)
+                    // whisper が途中で失敗して、始めからやり直す: そこまでに出した区間を消す (同じ文が 2 度並ばないように)。
+                    // 貯めている区間も捨て、次にまとめて出すときに、画面の区間を消してから足す
+                    live.restart()
                     Task { @MainActor in
                         guard job.status == .running else { return }
-                        job.transcript?.segments.removeAll()
                         job.progress = 0
                         job.message = "認識をやり直しています…"
                     }
@@ -867,6 +868,9 @@ final class AppModel {
                 job.autoMixedFrom = code
                 job.languageCode = Languages.japaneseEnglish.code
             }
+            // 貯まっている途中の区間は捨てる: 結果 (output.segments) はすべての区間を持ち、画面の区間をまるごと置き換える
+            // (先に足すと、一覧を作り直す回数が 1 回増えるだけで、行は同じになる)。閉じたあとに届く区間も足さない
+            live.close()
             job.transcript = Transcript(
                 sourceName: job.name,
                 segments: output.segments,
@@ -879,11 +883,14 @@ final class AppModel {
             job.progress = 1
             job.message = "完了"
         } catch let error as WhisperError where error == .cancelled {
+            // 中止・失敗: 途中の結果が画面に残るので、貯まっている区間を先に足す (状態を変える前に。後始末もこれを含める)
+            Self.applyLive(live.close(), to: job)
             job.status = .cancelled
             job.message = "中止しました"
             if job.url != nil { job.samples = nil }
             cleanPartialTranscript(of: job)
         } catch {
+            Self.applyLive(live.close(), to: job)
             if job.cancelFlag.isSet {
                 job.status = .cancelled
                 job.message = "中止しました"
@@ -896,6 +903,31 @@ final class AppModel {
             if job.url != nil { job.samples = nil }
             cleanPartialTranscript(of: job)
         }
+    }
+
+    /// 認識の途中で届く区間を、まとめて job.transcript に足す入れ物を作る。
+    /// 最初の区間が届いてから 0.25 秒後に、メインスレッドで、そのあいだに届いた分を 1 回の代入で足す
+    /// (一覧の作り直しは 1 秒に 4 回まで。「日本語＋英語」で数百の区間がいっぺんに届いても 1 回)。
+    /// AppModel.run と、画面の重さの確認 (--selftest-ui-load) が使う。
+    /// applied は確認だけで使う: まとめて足したあとに、足した区間の数と、足し始めた時刻 (uptime のナノ秒) を受け取る
+    static func liveFeed(for job: Job,
+                         applied: (@MainActor @Sendable (_ count: Int, _ started: UInt64) -> Void)? = nil) -> LiveSegmentBuffer {
+        LiveSegmentBuffer { buffer in
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(LiveSegmentBuffer.interval * 1_000_000_000))
+                let started = DispatchTime.now().uptimeNanoseconds
+                let batch = buffer.take()
+                applyLive(batch, to: job)
+                if let batch, let applied { applied(batch.segments.count, started) }
+            }
+        }
+    }
+
+    /// まとめた区間を足す。文字起こし中のジョブだけ (止まったあとに遅れて届いた分は、これまでどおり足さない)
+    static func applyLive(_ batch: LiveSegmentBuffer.Batch?, to job: Job) {
+        guard let batch, job.status == .running, var transcript = job.transcript else { return }
+        batch.apply(to: &transcript.segments)
+        job.transcript = transcript
     }
 
     // MARK: 監査・翻訳
@@ -1224,7 +1256,7 @@ final class AppModel {
     }
 
     /// 中止・失敗したジョブの途中結果にも、完了時と同じ繰り返しの後始末をかける (画面に残り、コピーもできるため)。
-    /// 状態を .running 以外にしてから呼ぶので、このあと遅れて届く区間は追加されない。
+    /// 貯まっていた区間は先に足し、入れ物は閉じてある。状態も .running 以外にしてから呼ぶので、このあと遅れて届く区間は追加されない。
     private func cleanPartialTranscript(of job: Job) {
         guard filterHallucinations, var transcript = job.transcript, !transcript.segments.isEmpty else { return }
         transcript.segments = RepetitionFilter.clean(transcript.segments)
