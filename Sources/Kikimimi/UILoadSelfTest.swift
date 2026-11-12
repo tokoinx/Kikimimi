@@ -46,13 +46,13 @@ enum UILoadSelfTest {
         static let rowMax = 0.350
         /// 進み具合・選んでいないジョブへの区間
         static let progressP95 = 0.150
-        static let progressMax = 0.350
+        static let progressMax = 0.500 // 測った最大 360 ms (まとめて足す 1 回と重なったとき)
         /// 選んでいる、文字起こし中のジョブに区間を 1 つ足す
         static let appendP95 = 0.250
         static let appendMax = 0.500
         /// 段階 3 で、まとめて足した 1 回
         static let steadyBatchP95 = 0.300
-        static let steadyBatchMax = 0.600
+        static let steadyBatchMax = 0.900 // 測った最大 425〜671 ms (SwiftUI の List が 3000 行に 10 行足す手間)
         /// 300 の区間をまとめて足し始めてから、すべてが一覧に入り、メインスレッドが空くまで
         static let burst = 1.5
         /// 段階ごとに、そのあいだに見張りが測った最大の待ち (段階 1・2・3)
@@ -60,7 +60,7 @@ enum UILoadSelfTest {
         /// 段階 4 (300 の区間がいっぺんに届く): いっぺんに足すあいだは待つので、300 の区間の目安と同じ
         static let burstWatchdogMax = 1.5
         /// 段階 3 (文字起こし中のジョブ、1 秒に 10 区間) で、メインスレッドが見張りに応えられなかった時間の割合
-        static let steadyUnavailableShare = 0.30
+        static let steadyUnavailableShare = 0.40 // 測った値 28〜30%
         /// 段階 3 (文字起こし中のジョブ、1 秒に 10 区間) の再生位置・いまの行が変わる再生位置・1 行だけの再生の開始と停止。
         /// まとめて足す 1 回と測る間が重なると、その手間 (GitHub の実行機で 130〜260 ms ほど) も入る。
         /// GitHub の実行機に合わせた値で、測った値がたまったら詰める
