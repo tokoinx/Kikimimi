@@ -26,8 +26,11 @@ import KikimimiCore
 ///    300 の区間をいっぺんに (3 回)
 /// ジョブを選ぶ操作は段階の外で測る (3 回ずつ)。測った数が 20 に足りない操作は、p95 を出すが目安と比べず、最大だけを比べる。
 /// ジョブを選ぶ操作は、測った順の値も出す (初めの 1 回だけが遅いのか、あとの回も遅いのかを見分けるため)。
-/// ジョブを選ぶ操作は、その 1 回で一覧が作った行の数 (PlayableRow を作った回数) も出し、目安 (600) と比べる
-/// (一覧が行を遅れて作らず、すべてを作っていないか。時間だけでは、遅い実行機と見分けにくい)。
+/// 段階 1 のすぐあと (段階の外) に、同じジョブを一覧の始めで出したまま、再生位置を 8 割ほど下の行へ動かして再生し、
+/// また始めのほうの行へ戻す (2 回ずつ。再生のつまみを遠くへ動かして再生したとき)。目安は、ジョブを選ぶのと同じく最大だけ。
+/// ジョブを選ぶ操作と、再生位置を遠くへ動かす操作は、その 1 回で一覧が作った行の数 (PlayableRow の init) と、body を
+/// 動かした行の数を出し、body の数を目安 (600) と比べる (一覧が見える分だけを並べているか。時間だけでは、遅い実行機と
+/// 見分けにくい。init は、一覧が終わりへ飛ぶとすべての行の分が呼ばれ、数千になるが、それは軽いので比べない)。
 /// 行にマウスを載せたときの色は、行の中だけの状態なので、外から変えられない。
 /// 段階の前に、画面を使わずに、一覧の行を作る手間 (TranscriptRowCache: すべてから作り直す / 10 区間を足す) も測る。
 ///
@@ -79,9 +82,14 @@ enum UILoadSelfTest {
         static let whileAddedMax = 0.700
         /// ジョブを選ぶ (最大だけ)
         static let selectMax = 3.0 // 測った値 0.22〜0.94 秒
-        /// ジョブを選ぶ 1 回で、一覧が作る行の数 (秒ではなく行の数)。ウインドウに出る行は 15〜40 ほどで、LazyVStack は
-        /// その前後も少し作る。3000 行すべてを作るなら、一覧が行を遅れて作らなくなっている (親の部品が一覧に望みの大きさを
-        /// 尋ねたときなど。HSplitView に入れたときは、選ぶ 1 回が 5〜21 秒になった)
+        /// 終わったジョブの中で、再生位置を遠くへ動かす (最大だけ)。新しく足したもので、まだ測った値に合わせていない
+        /// (ジョブを選ぶのと同じ値にしてある)
+        static let jumpMax = 3.0
+        /// ジョブを選ぶ 1 回・再生位置を遠くへ動かす 1 回で、一覧が body を動かす行の数 (秒ではなく行の数。init の数ではない:
+        /// 一覧が終わりへ飛ぶと、LazyVStack はすべての行の init を呼ぶので数千になるが、それは軽く、並べるのは見える分だけ)。
+        /// ウインドウに出る行は 15〜40 ほどで、LazyVStack はその前後も少し並べる。数千行の body が動くなら、一覧が行を
+        /// 遅れて並べなくなっている (親の部品が一覧に望みの大きさを尋ねたとき: HSplitView に入れたときは、選ぶ 1 回が
+        /// 5〜21 秒になった。一覧が前のジョブの、下まで動かした位置のまま並べたとき: 16.8 秒)
         static let selectRowsBuiltMax = 600
         /// 測った数がこれより少ない操作は、p95 を目安と比べない (少ないと、p95 は最大と同じになる)。最大だけを比べる
         static let p95MinSamples = 20
@@ -92,6 +100,10 @@ enum UILoadSelfTest {
         static let selectBilingual = "select finished job (bilingual)"
         static let selectPlain = "select finished job (plain)"
         static let selectRunning = "select running job"
+        /// 終わったジョブ (対訳) を一覧の始めで出したまま、再生位置を 8 割ほど下の行の始まりへ動かして再生する
+        /// (再生のつまみを遠くへ動かして再生したとき)。そのあと、始めのほうの行へ戻す
+        static let jumpFar = "jump far ahead (bilingual)"
+        static let jumpBack = "jump back to the top (bilingual)"
         /// 再生位置が 0.2 秒進み、いまの行は変わらない
         static let tick = "time tick"
         /// 再生位置が 0.2 秒進み (または 1 行だけの再生のあと、ふつうの再生の位置へ戻り)、いまの行が変わる
@@ -118,7 +130,7 @@ enum UILoadSelfTest {
             lineStop: lineStopWhileAdded
         ]
 
-        static let all = [selectBilingual, selectPlain, selectRunning, tick, rowChange, lineStart, lineStop,
+        static let all = [selectBilingual, selectPlain, selectRunning, jumpFar, jumpBack, tick, rowChange, lineStart, lineStop,
                           tickWhileAdded, rowChangeWhileAdded, lineStartWhileAdded, lineStopWhileAdded,
                           appendSelected, appendOther, burst, progress, steadyBatch]
     }
@@ -499,7 +511,9 @@ enum UILoadSelfTest {
 }
 
 /// 画面の重さの確認から、結果の一覧を動かすための口。確認のあいだだけ、一覧 (TranscriptListView) が現れたときに入れる
-/// (ScrollViewProxy と ListFollow は一覧の中にしか無い)。ふだんの起動では、どれも nil のまま
+/// (ScrollViewProxy と ListFollow は一覧の中にしか無い)。ふだんの起動では、どれも nil のまま。
+/// 一覧はジョブごとに作り直すので、ジョブを選ぶと、新しい一覧の register と古い一覧の unregister が、どちらが先にも来る:
+/// register はいつも入れ替え (あとから現れた一覧のものになる)、unregister は、入れた一覧のものが残っているときだけ外す
 @MainActor
 enum UILoadHooks {
     /// 行のどちらの端に合わせて動かすか
@@ -516,8 +530,33 @@ enum UILoadHooks {
     static var setFollowing: (@MainActor (Bool) -> Void)?
     /// 一覧の終わりを追いかけているか
     static var isFollowing: (@MainActor () -> Bool)?
-    /// 一覧が作った行の数 (PlayableRow を作った回数。確認の最中だけ数える)
+    /// 一覧が作った行の数 (PlayableRow を作った回数。確認の最中だけ数える)。一覧が終わりへ飛ぶと、
+    /// LazyVStack はすべての行を作る (1 つ 0.1 ms ほど) ので、数千にもなる。重さは次の rowBodies で見る
     static var rowsBuilt = 0
+    /// 一覧が body を動かした行の数 (PlayableRow.body の回数。確認の最中だけ数える)。本当に並べた行で、手間はこちら
+    static var rowBodies = 0
+    /// いまの口を入れた一覧 (その一覧の ListFollow)
+    private static var owner: ObjectIdentifier?
+
+    /// 現れた一覧が、口を入れる (前の一覧のものは入れ替える)
+    static func register(owner: ObjectIdentifier,
+                         scrollList: @escaping @MainActor (UUID, Edge) -> Void,
+                         setFollowing: @escaping @MainActor (Bool) -> Void,
+                         isFollowing: @escaping @MainActor () -> Bool) {
+        self.owner = owner
+        self.scrollList = scrollList
+        self.setFollowing = setFollowing
+        self.isFollowing = isFollowing
+    }
+
+    /// 消えた一覧が、口を外す。ほかの一覧 (あとから現れた、新しいジョブの一覧) が入れたものは外さない
+    static func unregister(owner: ObjectIdentifier) {
+        guard self.owner == owner else { return }
+        self.owner = nil
+        scrollList = nil
+        setFollowing = nil
+        isFollowing = nil
+    }
 }
 
 /// 画面の重さの確認の、ジョブと操作と測った値
@@ -563,10 +602,14 @@ private final class LoadRun {
     private var burstWaits: [Double] = []
     /// 一覧の行を作る手間を測ったときに、足した分だけを作る道を通らなかった回数
     private var appendPathMissed = 0
-    /// ジョブを選ぶ操作ごとの、その 1 回で一覧が作った行の数 (測った順)
+    /// ジョブを選ぶ・再生位置を遠くへ動かす操作ごとの、その 1 回で一覧が作った行の数 (PlayableRow の init。測った順)
     private var rowsBuiltBySelect: [String: [Int]] = [:]
-    /// 測る段階のすべて (drive) で、一覧が作った行の数
+    /// 同じく、その 1 回で一覧が body を動かした行の数 (PlayableRow.body。測った順)
+    private var rowBodiesBySelect: [String: [Int]] = [:]
+    /// 測る段階のすべて (drive) で、一覧が作った行の数 (init)
     private var rowsBuiltTotal: Int?
+    /// 測る段階のすべて (drive) で、一覧が body を動かした行の数
+    private var rowBodiesTotal: Int?
 
     init(model: AppModel, rows: Int, url: URL) {
         self.model = model
@@ -620,6 +663,7 @@ private final class LoadRun {
         probe.start()
         let started = Date()
         let rowsAtStart = UILoadHooks.rowsBuilt
+        let bodiesAtStart = UILoadHooks.rowBodies
         // 1. 終わったジョブ (対訳)
         await measure(Action.selectBilingual) { model.select(doneBilingual) }
         await UILoadSelfTest.sleep(0.5)
@@ -627,6 +671,8 @@ private final class LoadRun {
             feedAction = Action.appendOther
             await drivePlayback(seconds: 8, lineJob: doneBilingual, steady: false)
         }
+        // 同じジョブの中で、再生位置を遠くへ動かす (段階の外。2 回ずつ)
+        await jumpRound()
         // 2. 終わったジョブ (ふつう)
         await measure(Action.selectPlain) { model.select(donePlain) }
         await UILoadSelfTest.sleep(0.5)
@@ -670,6 +716,7 @@ private final class LoadRun {
         // 届いていない合図を待つ
         await UILoadSelfTest.sleep(0.3)
         rowsBuiltTotal = UILoadHooks.rowsBuilt - rowsAtStart
+        rowBodiesTotal = UILoadHooks.rowBodies - bodiesAtStart
         log.summaryLine = String(format: "driven for %.1f s: %d ticks (%d of them moved the current row), %d one-line starts,"
                                  + " %d segments delivered to the running job (it now has %d rows; batches are applied every"
                                  + " %.2f s at that size)",
@@ -684,6 +731,30 @@ private final class LoadRun {
         await UILoadSelfTest.sleep(0.3)
         await measure(Action.selectRunning) { model.select(running) }
         await UILoadSelfTest.sleep(0.5)
+    }
+
+    /// 終わったジョブ (対訳) を一覧の始めで出したまま、再生位置を 8 割ほど下の行の始まりへ動かして再生し
+    /// (再生のつまみを遠くへ動かして再生したとき。いまの行が変わるので、一覧はその行へ動く)、また始めのほうの行へ戻す。2 回ずつ。
+    /// 段階 1 のすぐあとに呼ぶ。終わりに、再生位置と再生中かを段階 1 の終わりのものへ戻し、一覧がそこへ動き終わるのを待つ
+    /// (段階 2 は、その位置から、ふつうの再生のまねを続ける)
+    private func jumpRound() async {
+        guard let segments = doneBilingual.transcript?.segments, segments.count >= 2 else { return }
+        if player.playingLineID != nil { player.stopLine() }
+        let time = player.currentTime
+        let wasPlaying = player.isPlaying
+        // 一覧の始めを出す (段階 1 で動いたのは始めのほうだけだが、念のため)
+        UILoadHooks.scrollList?(segments[0].id, .top)
+        await settle()
+        let far = segments[segments.count * 8 / 10]
+        let near = segments[1]
+        for _ in 0..<2 {
+            await measure(Action.jumpFar) { player.selfTestSetTime(far.start, playing: true) }
+            await UILoadSelfTest.sleep(0.5)
+            await measure(Action.jumpBack) { player.selfTestSetTime(near.start, playing: true) }
+            await UILoadSelfTest.sleep(0.5)
+        }
+        player.selfTestSetTime(time, playing: wasPlaying)
+        await settle()
     }
 
     /// 段階を 1 つ行う (見張りの値を、この段階の名前で分ける)。終わりに、まとめて足すのが済むまで待つ
@@ -834,18 +905,24 @@ private final class LoadRun {
         let name = rowsAdded ? (Action.whileAdded[action] ?? action) : action
         log.note(name)
         let rowsBefore = UILoadHooks.rowsBuilt
+        let bodiesBefore = UILoadHooks.rowBodies
         let started = UILoadSelfTest.now()
         body()
         let seconds = await UILoadSelfTest.untilIdle(since: started)
         measured[name, default: []].append(seconds)
-        // ジョブを選ぶ操作は、そのあいだに一覧が作った行の数も記録する
-        if Self.selectActions.contains(name) {
+        // ジョブを選ぶ・再生位置を遠くへ動かす操作は、そのあいだに一覧が作った行と、body を動かした行の数も記録する
+        if Self.rowCountedActions.contains(name) {
             rowsBuiltBySelect[name, default: []].append(UILoadHooks.rowsBuilt - rowsBefore)
+            rowBodiesBySelect[name, default: []].append(UILoadHooks.rowBodies - bodiesBefore)
         }
     }
 
     /// ジョブを選ぶ操作 (目安は最大だけ。結果には、測った順の値も出す)
     private static let selectActions = [Action.selectBilingual, Action.selectPlain, Action.selectRunning]
+    /// 終わったジョブの中で、再生位置を遠くへ動かす操作 (ジョブを選ぶ操作と同じく、目安は最大だけで、測った順の値も出す)
+    private static let jumpActions = [Action.jumpFar, Action.jumpBack]
+    /// 一覧が作った行と、body を動かした行の数を記録し、body の数を目安 (selectRowsBuiltMax) と比べる操作
+    private static let rowCountedActions = selectActions + jumpActions
 
     /// 操作ごとの目安 (p95 が nil なら最大だけ)。required でないものは、測れなくても失敗にしない
     /// (段階 3 で、いまの行が変わる再生位置は、起きないことがある)
@@ -868,6 +945,9 @@ private final class LoadRun {
         limits.append((Action.burst, nil, Limits.burst, true))
         for action in selectActions {
             limits.append((action, nil, Limits.selectMax, true))
+        }
+        for action in jumpActions {
+            limits.append((action, nil, Limits.jumpMax, true))
         }
         return limits
     }
@@ -1115,16 +1195,17 @@ private final class LoadRun {
                 ? ", n < \(Limits.p95MinSamples): p95 not checked" : ""
             lines.append("UI LOAD: action \"\(action)\": n \(values.count), median \(f(UILoadSelfTest.percentile(values, 0.5))) ms,"
                          + " p95 \(f(UILoadSelfTest.percentile(values, 0.95))) ms, max \(f(values[values.count - 1])) ms" + unchecked)
-            // ジョブを選ぶ操作は、測った順の値も出す (初めの 1 回だけが遅いのかを見分ける)
-            if Self.selectActions.contains(action) {
+            // ジョブを選ぶ・再生位置を遠くへ動かす操作は、測った順の値も出す (初めの 1 回だけが遅いのかを見分ける)
+            if Self.rowCountedActions.contains(action) {
                 lines.append("UI LOAD: samples \"\(action)\": " + inOrder.map(f).joined(separator: ", ") + " ms")
-                let built = rowsBuiltBySelect[action] ?? []
-                lines.append("UI LOAD: rows built \"\(action)\": " + built.map { String($0) }.joined(separator: ", "))
+                let built = (rowsBuiltBySelect[action] ?? []).map { String($0) }.joined(separator: ", ")
+                let bodies = (rowBodiesBySelect[action] ?? []).map { String($0) }.joined(separator: ", ")
+                lines.append("UI LOAD: rows built \"\(action)\": inits \(built); bodies \(bodies)")
             }
         }
-        if let rowsBuiltTotal {
-            lines.append("UI LOAD: rows built during the measured part: \(rowsBuiltTotal)"
-                         + " (PlayableRow inits; limit per select: \(Limits.selectRowsBuiltMax))")
+        if let rowsBuiltTotal, let rowBodiesTotal {
+            lines.append("UI LOAD: rows built during the measured part: inits \(rowsBuiltTotal), bodies \(rowBodiesTotal)"
+                         + " (PlayableRow inits and bodies; limit per select or jump: \(Limits.selectRowsBuiltMax) bodies)")
         }
         let samples = probe.samples()
         lines.append("watchdog: a background thread posts a block to the main queue every 50 ms (without waiting for the"
@@ -1180,16 +1261,18 @@ private final class LoadRun {
         for limit in Self.actionLimits {
             check(limit.action, p95: limit.p95, max: limit.max, required: limit.required)
         }
-        // ジョブを選ぶ 1 回で一覧が作った行の数 (一覧が行を遅れて作っているか)
-        for action in Self.selectActions {
-            if let worst = rowsBuiltBySelect[action]?.max(), worst > Limits.selectRowsBuiltMax {
-                failures.append("\"\(action)\" built \(worst) rows in one selection > \(Limits.selectRowsBuiltMax)"
-                                + " (the list is no longer lazy)")
+        // ジョブを選ぶ 1 回・再生位置を遠くへ動かす 1 回で、一覧が body を動かした行の数 (一覧が行を遅れて並べているか)。
+        // init の数は比べない (一覧が終わりへ飛ぶと、数千になってよい)
+        for action in Self.rowCountedActions {
+            if let worst = rowBodiesBySelect[action]?.max(), worst > Limits.selectRowsBuiltMax {
+                failures.append("\"\(action)\" ran the body of \(worst) rows in one action > \(Limits.selectRowsBuiltMax)"
+                                + " (the list laid out far more rows than it shows)")
             }
         }
-        // 一覧が行を作ったのに数えていなければ、上の確かめは役に立たない
-        if rowsBuiltTotal == 0 {
-            failures.append("no rows were counted while measuring (UILoadHooks.rowsBuilt is not incremented by PlayableRow)")
+        // 一覧が行を並べたのに数えていなければ、上の確かめは役に立たない
+        if rowBodiesTotal == 0 {
+            failures.append("no row bodies were counted while measuring (UILoadHooks.rowBodies is not incremented by"
+                            + " PlayableRow.body)")
         }
         // 見張り: 4 つの段階のどれも
         let watchdogLimits: [(phase: String, max: Double)] = [

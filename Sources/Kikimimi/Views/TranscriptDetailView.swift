@@ -117,7 +117,13 @@ struct TranscriptDetailView: View {
                                 showPlayMark: model.canPlayLines(of: job))
                 Divider()
             }
+            // 一覧はジョブごとに作り直す (.id): 別のジョブを選んだら、新しい ScrollView が一覧の始めから出て、
+            // 一覧の状態 (追いかけるか・行の色) も新しくなる。この結果の画面は、別のジョブを選んでも作り直されず使い回されるので、
+            // .id が無いと ScrollView が前のジョブで動かした位置 (ずっと下) を残したまま中身だけが入れ替わり、LazyVStack が
+            // その位置まで数千行を本当に並べた (GitHub の Mac で 3000 行のとき、文字起こし中のジョブを終わりまで出したあとに
+            // 終わったジョブを選ぶ 1 回が 16.8 秒。ふだんは 0.2〜1.1 秒)
             TranscriptListView(job: job, items: items, bilingual: bilingual, emptyMessage: emptyMessage)
+                .id(job.id)
         }
     }
 
@@ -252,7 +258,9 @@ struct LanguageTagLabel: View {
     }
 }
 
-/// 本文の一覧。この body は、行が変わる (区間が増えた・検索・表示の切り替え・ジョブを選んだ) ときだけ動かす:
+/// 本文の一覧。ジョブごとに作り直す (呼ぶ側で .id(job.id) を付ける。理由は TranscriptDetailView.transcriptColumn)。
+/// 下の @State (行の色・追いかけるか) も、ジョブを選ぶたびに新しくなる。
+/// この body は、行が変わる (区間が増えた・検索・表示の切り替え) ときだけ動かす:
 /// 数千行の一覧では、body が動くたびに ForEach が数千の id を比べ直し、一覧を更新する (GitHub の実行機で、3000 行に 10 行を足す 1 回が 110〜180 ms)。
 /// そのため、ここでは再生の様子 (1 行だけ再生している行・再生位置・再生中か) と、追いかけるか (ListFollow.isOn) を見ない:
 /// - 行の色 (1 行だけ再生している行・いまの位置の行) は、行ごとに RowHighlight の RowTintCell を見る。
@@ -280,7 +288,8 @@ struct TranscriptListView: View {
     let emptyMessage: String
     /// 行の色 (1 行だけ再生している行・いまの位置の行)。行と CurrentLineTracker が使い、この body では中を見ない
     @State private var highlight = RowHighlight()
-    /// 文字起こし中に、一覧の終わりを追いかけるか。この body では中を見ない (見ると、一覧の中を押すたびに body が動く)
+    /// 文字起こし中に、一覧の終わりを追いかけるか。この body では中を見ない (見ると、一覧の中を押すたびに body が動く)。
+    /// 一覧ごとに 1 つ (始めは追いかける)。イベントの見張りも、この一覧の ListFollow が自分の分だけを入れ、自分の分だけを外す
     @State private var follow = ListFollow()
 
     var body: some View {
@@ -295,8 +304,9 @@ struct TranscriptListView: View {
         // 一覧の大きさは、外から与えられた大きさに決める (GeometryReader は、与えられた大きさをそのまま取り、
         // 中の部品に望みの大きさを尋ねない)。親の部品が ScrollView に望みの大きさを尋ねると、ScrollView は中身を
         // すべて測るので、LazyVStack が行をすべて作る: GitHub の Mac で 3000 行のとき、終わったジョブを選ぶ 1 回が
-        // 0.13〜1.0 秒から 5〜21 秒になった (結果の画面を HSplitView に入れたとき。その前にも 1 度、初めに選んだ 1 回が
-        // 17.9 秒になったことがある)。
+        // 0.13〜1.0 秒から 5〜21 秒になった (結果の画面を HSplitView に入れたとき)。
+        // 前に 1 度だけ、選んだ 1 回が 17.9 秒になったのは別の理由で、一覧がジョブをまたいで使い回され、
+        // 前のジョブで下まで動かした位置のまま並べたためと見ている (いまはジョブごとに作り直す: transcriptColumn)。
         // 大きさが変わると (ウインドウやメモの欄の幅を変えると) この中が動くが、行の中身は TranscriptRows に分けてあり、
         // 渡すものが変わらないので、行を作り直さない
         GeometryReader { geometry in
@@ -322,18 +332,21 @@ struct TranscriptListView: View {
                 }
                 .onAppear {
                     follow.install()
-                    // 画面の重さの確認 (--selftest-ui-load --screenshots) が、絵を撮る前に一覧を動かす口
+                    // 画面の重さの確認 (--selftest-ui-load --screenshots) が、絵を撮る前に一覧を動かす口。
+                    // ジョブを選ぶと一覧が作り直され、新しい一覧の onAppear と古い一覧の onDisappear は、どちらが先にも来る:
+                    // 入れるときは、いつも新しい一覧のものに入れ替え、外すときは、自分が入れたものが残っているときだけ外す
                     if UILoadHooks.isActive {
-                        UILoadHooks.scrollList = { id, edge in
+                        UILoadHooks.register(owner: ObjectIdentifier(follow), scrollList: { id, edge in
                             proxy.scrollTo(id, anchor: edge == .top ? .top : .bottom)
-                        }
-                        UILoadHooks.setFollowing = { on in
+                        }, setFollowing: { on in
                             if follow.isOn != on { follow.isOn = on }
-                        }
-                        UILoadHooks.isFollowing = { follow.isOn }
+                        }, isFollowing: { follow.isOn })
                     }
                 }
-                .onDisappear { follow.remove() }
+                .onDisappear {
+                    follow.remove()
+                    if UILoadHooks.isActive { UILoadHooks.unregister(owner: ObjectIdentifier(follow)) }
+                }
             }
         }
     }
@@ -434,7 +447,10 @@ private struct FollowButton: View {
 /// 文字起こし中に、一覧の終わりを追いかけるか (TranscriptListView)。
 /// 一覧の上でホイール・トラックパッドを上へ動かしたとき、一覧の中を押したとき (行もスクロールバーも、押した瞬間に)、
 /// キーボードで上へ動かしたとき (Page Up・Home・上矢印) に、追いかけるのをやめる
-/// (macOS 14 の SwiftUI にはスクロールの操作を知る手段が無いので、アプリに届くイベントを見る。イベントは止めない)
+/// (macOS 14 の SwiftUI にはスクロールの操作を知る手段が無いので、アプリに届くイベントを見る。イベントは止めない)。
+/// 一覧ごとに 1 つ (一覧はジョブごとに作り直すので、ジョブを選ぶたびに新しくなり、始めは追いかける)。
+/// イベントの見張りは、それぞれが自分の分 (monitor) だけを持ち、remove はそれだけを外す: ジョブを選んで、古い一覧の
+/// remove が新しい一覧の install よりあとに来ても、新しい一覧の見張りは外れない
 @MainActor
 @Observable
 final class ListFollow {
@@ -454,9 +470,10 @@ final class ListFollow {
         monitor = nil
     }
 
+    /// 見張りは、この ListFollow を弱く持つ (外し損ねても、消えた一覧の ListFollow を残さない。消えたあとのイベントでは何もしない)
     nonisolated private static func handler(follow: ListFollow) -> (NSEvent) -> NSEvent? {
-        return { event in
-            MainActor.assumeIsolated { follow.handle(event) }
+        return { [weak follow] event in
+            MainActor.assumeIsolated { follow?.handle(event) }
             return event
         }
     }
@@ -508,7 +525,9 @@ final class ListFollow {
 /// 一覧の行の色: 1 行だけ再生している行と、ふつうの再生でいまの位置にある行。
 /// 行は自分の RowTintCell (行の id ごと) だけを見る。色が変わるときは、色が変わる行の Cell だけを書き換えるので、
 /// 描き直されるのは、その行だけ (Observation では、読んだ部品だけが描き直される。画面の外の行は LazyVStack が作っていないので、
-/// Cell はあっても描き直すものが無い)。一覧の body はこれを見ない
+/// Cell はあっても描き直すものが無い)。一覧の body はこれを見ない。
+/// 一覧ごとに 1 つ (一覧はジョブごとに作り直すので、別のジョブを選ぶと、Cell の無い新しいものになる。
+/// いまの様子は、CurrentLineTracker が現れたときに渡す)
 @MainActor
 @Observable
 final class RowHighlight {
@@ -524,7 +543,7 @@ final class RowHighlight {
     @ObservationIgnored private(set) var playingID: UUID?
     /// ふつうの再生で、いまの位置にある行
     @ObservationIgnored private(set) var currentID: UUID?
-    /// 行の id ごとの Cell。行が初めて作られたときに足す (数は、画面に出したことのある行の数まで)
+    /// 行の id ごとの Cell。行が初めて作られたときに足す (数は、この一覧で画面に出したことのある行の数まで)
     @ObservationIgnored private var cells: [UUID: RowTintCell] = [:]
     /// update を呼んだ回数 (CurrentLineTracker が、遅れて渡す様子が古くないかを見る)
     @ObservationIgnored private(set) var updates = 0
@@ -586,7 +605,9 @@ final class RowTintCell {
 /// - ふつうの再生で、いまの行が変わったら、その行が見えるように動かす (1 行だけの再生では動かさない)。
 /// - 文字起こし中に、行を押して 1 行だけ再生したら、一覧の終わりを追いかけるのをやめる。
 /// - 文字起こし中に行が増えたら、追いかけていて、再生していなければ、一覧の終わりへ動かす。
-/// - 別のジョブを選んだら、そのジョブの一覧の終わりから追いかける。
+/// - 一覧が現れたとき (一覧はジョブごとに作り直すので、ジョブを選んだとき): 文字起こし中のジョブなら、一覧の終わりへ動かす
+///   (追いかけるのは、新しい一覧の ListFollow が始めから isOn なので、そのまま続く)。再生していれば、動かさない
+///   (そのときは、ふつうの再生でいまの行がこのジョブにあれば、その行が見えるように動かす)。
 /// 一覧を動かす (scrollTo) のは、どれも次の回にする: 一覧を並べている最中に動かすと、
 /// その場でまた並べ直すことになる
 private struct CurrentLineTracker: View {
@@ -606,8 +627,19 @@ private struct CurrentLineTracker: View {
                 // 一覧と同時に現れる (一覧が行を作っている最中かもしれない): 行の色は次の回に変える。
                 // それまでに様子が変わって (onChange で) 渡し直していれば、古い様子では上書きしない
                 let updates = highlight.updates
+                // 文字起こし中のジョブを選んだ: 一覧の終わりから追いかける (一覧が使い回されていたころは、
+                // .onChange(of: job.id) が追いかけるのを戻し、行の数が変わったのを見て終わりへ動かしていた。
+                // いまは一覧がジョブごとに新しく、始めは一覧の始めにいるので、ここで終わりへ動かす)
+                let last = job.status == .running ? items.last?.id : nil
+                // ふつうの再生で、いまの行がこのジョブにある (同じ音声のジョブ): その行が見えるように動かす
+                let current = player.isPlaying && player.playingLineID == nil ? state.current : nil
                 Task { @MainActor in
                     if highlight.updates == updates { highlight.update(state) }
+                    if let last, follow.isOn, !player.isPlaying {
+                        proxy.scrollTo(last, anchor: .bottom)
+                    } else if let current, player.isPlaying, player.playingLineID == nil {
+                        proxy.scrollTo(current, anchor: .center)
+                    }
                 }
             }
             .onChange(of: state) { _, new in
@@ -631,10 +663,6 @@ private struct CurrentLineTracker: View {
                     guard follow.isOn, !player.isPlaying else { return }
                     proxy.scrollTo(id, anchor: .bottom)
                 }
-            }
-            .onChange(of: job.id) { _, _ in
-                // 別のジョブを選んだ: そのジョブの一覧の終わりから追いかける
-                if !follow.isOn { follow.isOn = true }
             }
     }
 
@@ -690,11 +718,15 @@ struct PlayableRow<Content: View>: View {
         self.canPlay = canPlay
         self.highlight = highlight
         self.content = content()
-        // 画面の重さの確認が、一覧が作った行の数を数える (一覧が行を遅れて作っているか。ふだんは Bool を 1 つ見るだけ)
+        // 画面の重さの確認が、一覧が作った行の数を数える (ふだんは Bool を 1 つ見るだけ)。一覧が終わりへ飛ぶと、
+        // LazyVStack はすべての行を作るが (1 つ 0.1 ms ほど)、並べるのは見える分だけなので、重さは body の数 (下) で見る
         if UILoadHooks.isActive { UILoadHooks.rowsBuilt += 1 }
     }
 
     var body: some View {
+        // 画面の重さの確認が、body を動かした行の数も数える (一覧が本当に並べた行。init の数は、一覧が終わりへ飛ぶと
+        // 数千になるが、それは軽い。重いのは、こちら)
+        if UILoadHooks.isActive { UILoadHooks.rowBodies += 1 }
         let tint = highlight.cell(for: item.id).tint
         let isPlaying = tint == .playing
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
