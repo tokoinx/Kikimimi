@@ -277,6 +277,7 @@ enum WhisperSelfTest {
                 + (c.trusted ? "" : " (untrusted)"))
         }
         log("probe: \(p.decision.rawValue), \(p.probes.count) of \(p.probeableChunks) chunks checked,"
+            + " majority \(p.majority ?? "-"), other language in \(p.evidence) of \(p.detectedCount),"
             + " trusted ja \(p.trusted["ja"] ?? 0) en \(p.trusted["en"] ?? 0), untrusted \(p.untrustedCount)"
             + (p.isMixed ? " -> \(p.candidates.joined(separator: "+"))" : ""))
     }

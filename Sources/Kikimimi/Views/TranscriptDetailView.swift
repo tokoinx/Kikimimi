@@ -58,7 +58,7 @@ struct TranscriptDetailView: View {
                 // 翻訳の状況は、描くたびに 1 回だけ数える (長い録音では区間が数千あるため)。
                 // 文字起こしの最中は区間が増えるたびに描き直すので数えない (終わってから使う)
                 let stats = job.status == .done ? transcript.translationStats : Transcript.TranslationStats()
-                let bilingual = model.isBilingual(stats)
+                let bilingual = model.isBilingual(stats, in: job)
                 if job.status == .done, let from = job.autoMixedFrom, !job.autoMixedNoticeDismissed {
                     AutoMixedLanguageNotice(job: job, from: from)
                         .padding(.horizontal, 20)
@@ -81,7 +81,8 @@ struct TranscriptDetailView: View {
                     .padding(.vertical, 8)
                 Divider()
                 if bilingual {
-                    BilingualHeader(label: transcript.languageLabel, showTimestamp: model.showTimestamps)
+                    BilingualHeader(label: transcript.languageLabel, showTimestamp: model.showTimestamps,
+                                    showPlayMark: model.canPlayLines(of: job))
                     Divider()
                 }
                 TranscriptListView(job: job, items: listItems(transcript, bilingual: bilingual),
@@ -141,7 +142,11 @@ struct TranscriptDetailView: View {
             Toggle("時刻", isOn: $model.showTimestamps)
                 .toggleStyle(.checkbox)
             if stats.hasTranslation || stats.isMainlyForeign {
-                Toggle("対訳", isOn: $model.showBilingual)
+                // 行の「訳」で対訳を出しているジョブでは、設定がオフでもチェックを付けて見せる
+                Toggle("対訳", isOn: Binding(
+                    get: { model.showsBilingual(job) },
+                    set: { model.setShowsBilingual($0, for: job) }
+                ))
                     .toggleStyle(.checkbox)
                     .help("原文と日本語訳を左右に並べる")
             }
@@ -176,19 +181,28 @@ struct TranscriptDetailView: View {
                                  uniquingKeysWith: { a, _ in a })
         // 「日本語＋英語」で 2 つの言語が混ざるときだけ、行に言語の印 (英・日) を付ける
         let tags = transcript.spokenLanguages.count >= 2
+        // 行の「訳」は、文字起こしが終わってから (訳がある文 = ほかの区間の訳に含まれる区間も、訳がある行として扱う)
+        let done = job.status == .done
+        let covered = done ? transcript.coveredIDs : Set<UUID>()
         let items: [TranscriptListItem]
         if bilingual {
             items = transcript.bilingualUnits().map { unit in
-                TranscriptListItem(id: unit.id, start: unit.start, end: unit.end, text: unit.text,
-                                   japanese: unit.japanese, isOriginalJapanese: unit.isOriginalJapanese,
-                                   changes: unit.segments.compactMap { changes[$0.id] },
-                                   languageTag: tags ? LanguageTag.short(unit.language) : nil)
+                let translated = unit.segments[0].translation != nil
+                return TranscriptListItem(id: unit.id, start: unit.start, end: unit.end, text: unit.text,
+                                          japanese: unit.japanese, isOriginalJapanese: unit.isOriginalJapanese,
+                                          changes: unit.segments.compactMap { changes[$0.id] },
+                                          languageTag: tags ? LanguageTag.short(unit.language) : nil,
+                                          canTranslate: done && unit.japanese == nil && !covered.contains(unit.id),
+                                          isTranslated: done && translated)
             }
         } else {
             items = transcript.segments.map { seg in
-                TranscriptListItem(id: seg.id, start: seg.start, end: seg.end, text: seg.text,
-                                   japanese: nil, isOriginalJapanese: false, changes: changes[seg.id].map { [$0] } ?? [],
-                                   languageTag: tags ? LanguageTag.short(seg.language) : nil)
+                let translated = seg.translation != nil || covered.contains(seg.id)
+                return TranscriptListItem(id: seg.id, start: seg.start, end: seg.end, text: seg.text,
+                                          japanese: nil, isOriginalJapanese: false, changes: changes[seg.id].map { [$0] } ?? [],
+                                          languageTag: tags ? LanguageTag.short(seg.language) : nil,
+                                          canTranslate: done && !translated && transcript.needsTranslation(seg),
+                                          isTranslated: done && translated)
             }
         }
         guard !q.isEmpty else { return items }
@@ -219,6 +233,10 @@ struct TranscriptListItem: Identifiable, Hashable {
     let changes: [AuditChange]
     /// 原文の言語の印 (英・日)。2 つの言語が混ざる文字起こしのときだけ
     var languageTag: String? = nil
+    /// 行の「訳」を出す (日本語以外で、まだ訳がない)
+    var canTranslate = false
+    /// 訳がある文の行 (右クリックで訳し直せる)
+    var isTranslated = false
 }
 
 /// 行の言語の印
@@ -257,25 +275,23 @@ struct TranscriptListView: View {
 
     var body: some View {
         let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
+        let canPlay = model.canPlayLines(of: job)
+        let playingID = model.player.playingLineID
         ScrollViewReader { proxy in
             List {
                 ForEach(items) { item in
-                    Group {
+                    // 1 行だけを再生しているあいだは、その行だけを色付けする (再生位置の色と重ねない)
+                    PlayableRow(item: item, job: job, canPlay: canPlay, isPlaying: playingID == item.id,
+                                isCurrent: playingID == nil && isCurrent(item)) {
                         if bilingual {
                             BilingualRow(item: item, isTranslating: translating, showTimestamp: model.showTimestamps,
-                                         highlight: model.searchText, isCurrent: isCurrent(item), job: job)
+                                         highlight: model.searchText, job: job)
                         } else {
                             SegmentRow(item: item, showTimestamp: model.showTimestamps,
-                                       highlight: model.searchText, isCurrent: isCurrent(item), job: job)
+                                       highlight: model.searchText, job: job)
                         }
                     }
                     .id(item.id)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if job.url != nil {
-                            model.player.seek(to: item.start, andPlay: true)
-                        }
-                    }
                 }
                 if items.isEmpty {
                     Text(emptyMessage)
@@ -284,7 +300,8 @@ struct TranscriptListView: View {
             }
             .listStyle(.inset)
             .onChange(of: model.player.currentTime) { _, _ in
-                if model.player.isPlaying, let cur = items.first(where: isCurrent) {
+                // 1 行だけの再生では、押した行が見えているので追いかけない
+                if model.player.isPlaying, model.player.playingLineID == nil, let cur = items.first(where: isCurrent) {
                     withAnimation { proxy.scrollTo(cur.id, anchor: .center) }
                 }
             }
@@ -317,11 +334,98 @@ func highlighted(_ text: String, _ query: String) -> AttributedString {
     return s
 }
 
+/// 行そのものを再生のボタンにする。クリックでその行だけを再生し、再生中の行をもう一度クリックすると止める。
+/// 行の文字はクリックを再生に使うため選べない (コピーは右クリックの「この行をコピー」か、上の「コピー」)
+struct PlayableRow<Content: View>: View {
+    @Environment(AppModel.self) private var model
+    let item: TranscriptListItem
+    let job: Job
+    /// 音声を再生できる (できないときは、クリックしても何もせず、再生の印も出さない)
+    let canPlay: Bool
+    /// この行だけを再生している
+    let isPlaying: Bool
+    /// ふつうの再生で、いまの位置がこの行にある
+    let isCurrent: Bool
+    let content: Content
+    @State private var hovering = false
+
+    init(item: TranscriptListItem, job: Job, canPlay: Bool, isPlaying: Bool, isCurrent: Bool,
+         @ViewBuilder content: () -> Content) {
+        self.item = item
+        self.job = job
+        self.canPlay = canPlay
+        self.isPlaying = isPlaying
+        self.isCurrent = isCurrent
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            if canPlay {
+                Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle")
+                    .foregroundStyle(isPlaying ? Color.accentColor : Color.secondary)
+                    .frame(width: 16)
+            }
+            content
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if canPlay { toggle() }
+        }
+        .onHover { inside in
+            hovering = inside
+        }
+        .help(canPlay ? hint : "")
+        .contextMenu {
+            if canPlay {
+                Button(isPlaying ? "この行の再生を止める" : "この行だけを再生") { toggle() }
+                Button("ここから続けて再生") {
+                    model.player.seek(to: item.start, andPlay: true)
+                }
+                Divider()
+            }
+            Button("この行をコピー") {
+                model.copyLine(item.text, japanese: item.japanese)
+            }
+            // 行の「訳」と同じ (VoiceOver では行が 1 つの要素になるので、ここからも訳せるように)
+            if item.canTranslate || item.isTranslated {
+                Divider()
+                Button(item.isTranslated ? "この文を訳し直す" : "この文だけ日本語に訳す") {
+                    model.translateLine(item.id, in: job, redo: item.isTranslated)
+                }
+                .disabled(job.lineQueue.contains(item.id) || job.postState.task == .translate
+                          || job.postQueue.contains(.translate))
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(canPlay ? item.text + "。" + hint : item.text))
+        .accessibilityAddTraits(canPlay ? .isButton : [])
+        .accessibilityAction {
+            if canPlay { toggle() }
+        }
+        .listRowBackground(background)
+    }
+
+    private var hint: String {
+        isPlaying ? "クリックで停止" : "クリックで、この行だけを再生"
+    }
+
+    private var background: Color {
+        if isPlaying { return Color.accentColor.opacity(0.24) }
+        if isCurrent { return Color.accentColor.opacity(0.12) }
+        if hovering && canPlay { return Color.primary.opacity(0.06) }
+        return Color.clear
+    }
+
+    private func toggle() {
+        model.player.toggleLine(id: item.id, start: item.start, end: item.end)
+    }
+}
+
 struct SegmentRow: View {
     let item: TranscriptListItem
     let showTimestamp: Bool
     let highlight: String
-    let isCurrent: Bool
     let job: Job
 
     var body: some View {
@@ -331,14 +435,43 @@ struct SegmentRow: View {
             }
             LanguageTagLabel(tag: item.languageTag)
             Text(highlighted(item.text, highlight))
-                .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
             ForEach(item.changes) { change in
                 AuditBadge(change: change, job: job)
             }
+            TranslateLineButton(item: item, job: job)
         }
         .padding(.vertical, 3)
-        .listRowBackground(isCurrent ? Color.accentColor.opacity(0.12) : Color.clear)
+    }
+}
+
+/// 行の「訳」: その行を含む 1 文だけを日本語に訳す (まとめて訳すより軽い)。行の再生とは別のボタンで、押しても再生しない。
+/// 文が訳されるのを待っているあいだ・訳しているあいだは、くるくるに変わる
+struct TranslateLineButton: View {
+    @Environment(AppModel.self) private var model
+    let item: TranscriptListItem
+    let job: Job
+
+    var body: some View {
+        if job.lineQueue.contains(item.id) {
+            ProgressView()
+                .controlSize(.small)
+                .help("この文を訳しています (順番待ちを含む)")
+        } else if item.canTranslate && job.postState.task != .translate && !job.postQueue.contains(.translate) {
+            // まとめての「翻訳」を待っている・動いているあいだは出さない (その「翻訳」がこの行も訳す)
+            Button {
+                model.translateLine(item.id, in: job)
+            } label: {
+                Text("訳")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                    .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .help("この文だけ日本語に訳す")
+        }
     }
 }
 
@@ -359,9 +492,14 @@ struct BilingualHeader: View {
     /// 原文の言語の名前 (「英語」「英語＋日本語」など)
     let label: String?
     let showTimestamp: Bool
+    /// 行の頭に再生の印がある (その幅だけ空ける)
+    var showPlayMark = false
 
     var body: some View {
         HStack(spacing: 12) {
+            if showPlayMark {
+                Color.clear.frame(width: 16, height: 1)
+            }
             if showTimestamp {
                 Color.clear.frame(width: 52, height: 1)
             }
@@ -383,7 +521,6 @@ struct BilingualRow: View {
     let isTranslating: Bool
     let showTimestamp: Bool
     let highlight: String
-    let isCurrent: Bool
     let job: Job
 
     var body: some View {
@@ -394,28 +531,30 @@ struct BilingualRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 LanguageTagLabel(tag: item.languageTag)
                 Text(highlighted(item.text, highlight))
-                    .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 ForEach(item.changes) { change in
                     AuditBadge(change: change, job: job)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Group {
-                if let japanese = item.japanese {
-                    Text(highlighted(japanese, highlight))
-                        .foregroundStyle(item.isOriginalJapanese ? Color.secondary : Color.primary)
-                        .textSelection(.enabled)
-                } else {
-                    Text(isTranslating ? "翻訳中…" : "未翻訳")
-                        .foregroundStyle(.tertiary)
-                        .italic()
+            // 訳の列。まだ訳がない行は、訳が入る所に「訳」を出す
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Group {
+                    if let japanese = item.japanese {
+                        Text(highlighted(japanese, highlight))
+                            .foregroundStyle(item.isOriginalJapanese ? Color.secondary : Color.primary)
+                    } else {
+                        Text(isTranslating || job.lineQueue.contains(item.id) ? "翻訳中…" : "未翻訳")
+                            .foregroundStyle(.tertiary)
+                            .italic()
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                TranslateLineButton(item: item, job: job)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 3)
-        .listRowBackground(isCurrent ? Color.accentColor.opacity(0.12) : Color.clear)
     }
 }
 
@@ -659,7 +798,13 @@ struct PostProcessBar: View {
     }
 
     private var queued: String {
-        job.postQueue.map { $0 == .audit ? "監査" : "翻訳" }.joined(separator: "・")
+        job.postQueue.map { task in
+            switch task {
+            case .audit: return "監査"
+            case .translate: return "翻訳"
+            case .translateLines: return "選んだ文の翻訳"
+            }
+        }.joined(separator: "・")
     }
 }
 

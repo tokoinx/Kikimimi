@@ -3,8 +3,12 @@ import Foundation
 /// 「日本語」「英語」「自動判定」で文字にする前に、日本語と英語が混ざった録音かどうかを確かめる。
 ///
 /// 「日本語＋英語」と同じ VAD と区切りを作り、録音全体から均等に選んだ区切り (発話 3 秒以上、最大 24 個) の言語を、
-/// 日本語か英語かで判定する。少ない側の言語が、信じられる判定で 2 個以上、かつ信じられる判定の 10% 以上あれば
-/// 「混ざっている」とする (信じられるかどうかは、「日本語＋英語」の区切りの判定と同じ決まり)。
+/// 日本語か英語かで判定する。判定の確率の合計が多い側を「多い側の言語」とし、もう一方の言語の確率が 0.25 以上の区切りを
+/// 「もう一方の言語がある区切り」と数える (もう一方の言語と判定された区切りと、どちらか確かでない区切りの両方)。
+/// これが 2 個以上、かつ判定できた区切りの 10% 以上あれば「混ざっている」とする。
+/// 1 つの言語だけの録音では、区切りの判定は確か (日本語の話で 0.977 以上、英語で 0.998 以上) なので数に入らない。
+/// 英語の講師と日本語の通訳が短く交代する講演では、ほとんどの区切りに両方の言語が入って判定が確かでなくなり、
+/// どちらかの言語と確かに判定される区切りが少ないので、確かでない区切りも混ざっている証として数える。
 /// 混ざっていれば「日本語＋英語」で文字にし、混ざっていなければ、今までどおり 1 つの言語で文字にする。
 public enum MixedProbe {
     private typealias R = MixedLanguageRules
@@ -17,10 +21,12 @@ public enum MixedProbe {
     public static let minSpeechSeconds = 3.0
     /// 判定できる区切りがこれより少なければ確かめない (短い録音)
     public static let minProbeableChunks = 4
-    /// 少ない側の言語の、信じられる判定の数の下限
-    public static let minMinorityChunks = 2
-    /// 少ない側の言語の、信じられる判定に占める割合の下限
-    public static let minMinorityShare = 0.10
+    /// 「もう一方の言語がある区切り」とする、多い側でない言語の確率の下限
+    public static let minOtherProbability = 0.25
+    /// 「もう一方の言語がある区切り」の数の下限
+    public static let minEvidenceChunks = 2
+    /// 「もう一方の言語がある区切り」の、判定できた区切りに占める割合の下限
+    public static let minEvidenceShare = 0.10
 
     /// 確かめた結果
     public enum Decision: String, Codable, Hashable, Sendable {
@@ -42,6 +48,12 @@ public enum MixedProbe {
         public var detected: String?
         public var confidence: Double?
         public var trusted: Bool
+
+        /// language の確率 (日本語と英語の 2 つで判定するので、判定されなかった側は 1 − 確からしさ)。判定できなかったら nil
+        public func probability(of language: String) -> Double? {
+            guard let detected, let confidence else { return nil }
+            return detected == language ? confidence : 1 - confidence
+        }
     }
 
     public struct Result: Codable, Hashable, Sendable {
@@ -50,8 +62,14 @@ public enum MixedProbe {
         public var probeableChunks: Int
         /// 判定した区切り
         public var probes: [Probe]
-        /// 言語ごとの、信じられる判定の数
+        /// 言語ごとの、信じられる判定の数 (診断用。決めるのには使わない)
         public var trusted: [String: Int]
+        /// 多い側の言語 (判定の確率の合計が多い側。判定できた区切りが無ければ nil)
+        public var majority: String?
+        /// 判定できた区切りの数
+        public var detectedCount: Int
+        /// 「もう一方の言語がある区切り」の数 (多い側でない言語の確率が 0.25 以上)
+        public var evidence: Int
         /// 「日本語＋英語」で文字にするときの候補 (混ざっていたときだけ。先頭が既定の言語)
         public var candidates: [String]
 
@@ -74,29 +92,44 @@ public enum MixedProbe {
     }
 
     /// 判定の結果から決める。preferred は利用者の設定の言語 ("ja" / "en" / "auto")。
-    /// 候補は、利用者の言語を先に (自動判定なら、信じられる判定の多い言語を先に。同じ数なら日本語)
+    /// 多い側の言語は、判定の確率の合計が多い側 (同じなら利用者の言語。自動判定なら日本語)。
+    /// 候補は、利用者の言語を先に (自動判定なら、多い側の言語を先に)
     public static func decide(_ probes: [Probe], probeableChunks: Int, preferred: String) -> Result {
         var trusted: [String: Int] = [:]
         for p in probes where p.trusted {
             if let language = p.detected { trusted[language, default: 0] += 1 }
         }
+        let detected = probes.filter { $0.detected != nil && $0.confidence != nil }
+        var sums: [String: Double] = [:]
+        for p in detected {
+            for language in languages { sums[language, default: 0] += p.probability(of: language) ?? 0 }
+        }
+        var majority: String?
+        if !detected.isEmpty {
+            let ja = sums["ja"] ?? 0, en = sums["en"] ?? 0
+            // 同じ (足す順の誤差は無視する)
+            if abs(ja - en) < 1e-9 {
+                majority = languages.contains(preferred) ? preferred : "ja"
+            } else {
+                majority = en > ja ? "en" : "ja"
+            }
+        }
+        var evidence = 0
+        if let majority {
+            let other = languages.filter { $0 != majority }
+            for p in detected where other.contains(where: { (p.probability(of: $0) ?? 0) >= minOtherProbability }) {
+                evidence += 1
+            }
+        }
         var result = Result(decision: .notMixed, probeableChunks: probeableChunks, probes: probes, trusted: trusted,
-                            candidates: [])
+                            majority: majority, detectedCount: detected.count, evidence: evidence, candidates: [])
         guard probeableChunks >= minProbeableChunks else {
             result.decision = .skippedTooShort
             return result
         }
-        let ja = trusted["ja"] ?? 0, en = trusted["en"] ?? 0
-        let total = ja + en
-        let minority = min(ja, en)
-        if total > 0, minority >= minMinorityChunks, Double(minority) >= minMinorityShare * Double(total) {
+        if let majority, evidence >= minEvidenceChunks, Double(evidence) >= minEvidenceShare * Double(detected.count) {
             result.decision = .mixed
-            let first: String
-            if languages.contains(preferred) {
-                first = preferred
-            } else {
-                first = en > ja ? "en" : "ja"
-            }
+            let first = languages.contains(preferred) ? preferred : majority
             result.candidates = [first] + languages.filter { $0 != first }
         }
         return result
@@ -111,7 +144,8 @@ public enum MixedProbe {
         }
         try checkCancel()
         guard !samples.isEmpty, let map = try engine.speechMap(of: samples) else {
-            return Result(decision: .skippedNoVAD, probeableChunks: 0, probes: [], trusted: [:], candidates: [])
+            return Result(decision: .skippedNoVAD, probeableChunks: 0, probes: [], trusted: [:], majority: nil,
+                          detectedCount: 0, evidence: 0, candidates: [])
         }
         try checkCancel()
         // 「日本語＋英語」と同じ区切り (話者の切り替わりは使わない)

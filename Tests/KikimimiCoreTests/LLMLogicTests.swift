@@ -642,6 +642,148 @@ final class TranslatorTests: XCTestCase {
         XCTAssertEqual(failed, 1)
         XCTAssertThrowsError(try Translator.translate(segments, language: "en", generator: fake, shouldCancel: { true }) { _, _, _ in })
     }
+
+    // MARK: 1 文だけを訳す (行ごとの「訳」)
+
+    /// 文の途中で切れた 3 区間 + 別の文 + 日本語の区間
+    private func lineSegments() -> [TranscriptSegment] {
+        [
+            seg(0, "We set up a weekly meeting where", length: 2),
+            seg(2, "each person could share their progress and", length: 2),
+            seg(4, "any problems they were having.", length: 2),
+            seg(9, "It worked well.", length: 2),
+            seg(12, "よかったです。", length: 2),
+        ]
+    }
+
+    private func echoTranslator() -> FakeGenerator {
+        FakeGenerator { prompt in
+            numberedLines(in: prompt).map { "[\($0.0)] 訳(\($0.1))" }.joined(separator: "\n") + "\n"
+        }
+    }
+
+    func testUnitOfMidSentenceSegment() {
+        let s = lineSegments()
+        let unit = [s[0].id, s[1].id, s[2].id]
+        XCTAssertEqual(Translator.unitIDs(containing: s[1].id, in: s, language: "en"), unit, "文の途中の区間は、文の頭から終わりまで")
+        XCTAssertEqual(Translator.unitIDs(containing: s[2].id, in: s, language: "en"), unit)
+        XCTAssertEqual(Translator.unitIDs(containing: s[3].id, in: s, language: "en"), [s[3].id])
+        XCTAssertEqual(Translator.unitIDs(containing: s[4].id, in: s, language: "en"), [], "日本語の区間は訳さない")
+    }
+
+    func testTranslateOnlyOneSentence() throws {
+        let s = lineSegments()
+        let fake = echoTranslator()
+        var results: [TranslationResult] = []
+        var totals: [Int] = []
+        let failed = try Translator.translate(s, language: "en", only: [s[1].id], generator: fake,
+                                              shouldCancel: { false }) { batch, _, total in
+            results += batch
+            totals.append(total)
+        }
+        XCTAssertEqual(failed, 0)
+        XCTAssertEqual(fake.prompts.count, 1)
+        XCTAssertEqual(results.count, 1, "押した区間を含む文だけ")
+        XCTAssertEqual(results[0].head, s[0].id)
+        XCTAssertEqual(results[0].covers, [s[1].id, s[2].id])
+        XCTAssertEqual(results[0].text,
+                       "訳(We set up a weekly meeting where each person could share their progress and any problems they were having.)",
+                       "「翻訳」でまとめて訳したときと同じ 1 行")
+        XCTAssertEqual(totals.last, 3)
+    }
+
+    func testTwoRequestsInOneSentenceTranslateOnce() throws {
+        let s = lineSegments()
+        let fake = echoTranslator()
+        var results: [TranslationResult] = []
+        _ = try Translator.translate(s, language: "en", only: [s[0].id, s[2].id], generator: fake,
+                                     shouldCancel: { false }) { batch, _, _ in results += batch }
+        XCTAssertEqual(fake.prompts.count, 1)
+        XCTAssertEqual(numberedLines(in: fake.prompts[0]).count, 1, "同じ文は 1 行として 1 度だけ訳す")
+        XCTAssertEqual(results.count, 1)
+    }
+
+    func testNothingToDoForTranslatedOrJapaneseLine() throws {
+        var s = lineSegments()
+        s[3].translation = "うまくいきました。"
+        let fake = echoTranslator()
+        XCTAssertEqual(Translator.unitIDs(containing: s[3].id, in: s, language: "en"), [], "もう訳がある")
+        let failed = try Translator.translate(s, language: "en", only: [s[3].id, s[4].id], generator: fake,
+                                              shouldCancel: { false }) { batch, _, _ in XCTAssertTrue(batch.isEmpty) }
+        XCTAssertEqual(failed, 0)
+        XCTAssertEqual(fake.prompts.count, 0, "訳済みの行・日本語の行では LLM を呼ばない")
+    }
+
+    func testFullTranslationSkipsLineTranslatedBefore() throws {
+        let s = lineSegments()
+        var t = Transcript(sourceName: "x", segments: s, language: "en")
+        let sources = Dictionary(uniqueKeysWithValues: s.map { ($0.id, $0.text) })
+        _ = try Translator.translate(t.segments, language: "en", only: [s[1].id], generator: echoTranslator(),
+                                     shouldCancel: { false }) { batch, _, _ in
+            for r in batch { XCTAssertTrue(t.apply(r, sources: sources)) }
+        }
+        XCTAssertEqual(t.untranslatedCount, 1)
+        XCTAssertTrue(t.hasTranslation, "1 文だけ訳しても対訳の列が出る")
+        XCTAssertEqual(Translator.unitIDs(containing: s[1].id, in: t.segments, language: "en"), [], "訳した文の区間は、もう訳さない")
+        let fake = echoTranslator()
+        var later: [TranslationResult] = []
+        _ = try Translator.translate(t.segments, language: "en", generator: fake, shouldCancel: { false }) { batch, _, _ in
+            later += batch
+        }
+        XCTAssertEqual(later.map(\.head), [s[3].id], "あとの「翻訳」は残りだけを訳す")
+        XCTAssertEqual(numberedLines(in: fake.prompts[0]).map(\.1), ["It worked well."])
+    }
+
+    func testRetranslateSentence() throws {
+        var t = Transcript(sourceName: "x", segments: lineSegments(), language: "en")
+        let s = t.segments
+        let sources = Dictionary(uniqueKeysWithValues: s.map { ($0.id, $0.text) })
+        XCTAssertTrue(t.apply(TranslationResult(head: s[0].id, covers: [s[1].id, s[2].id], text: "古い訳"), sources: sources))
+        // 文の途中の区間から訳し直しても、文ごと訳し直す。訳し終えるまでは前の訳を残す (外すのは写しの上だけ)
+        let cleared = Translator.clearingTranslations(of: [s[2].id], in: t.segments)
+        XCTAssertNil(cleared[0].translation)
+        XCTAssertEqual(t.segments[0].translation, "古い訳")
+        let unit = Translator.unitIDs(containing: s[2].id, in: cleared, language: "en")
+        XCTAssertEqual(unit, [s[0].id, s[1].id, s[2].id])
+        _ = try Translator.translate(cleared, language: "en", only: Set(unit), generator: echoTranslator(),
+                                     shouldCancel: { false }) { batch, _, _ in
+            for r in batch { XCTAssertTrue(t.apply(r, sources: sources)) }
+        }
+        XCTAssertTrue(t.segments[0].translation?.hasPrefix("訳(We set up") ?? false)
+        XCTAssertEqual(t.segments[0].translationCovers, [s[1].id, s[2].id])
+        XCTAssertEqual(t.untranslatedCount, 1)
+    }
+
+    func testRetranslateSentenceSplitByAudit() throws {
+        var t = Transcript(sourceName: "x", segments: lineSegments(), language: "en")
+        let s = t.segments
+        let old = Dictionary(uniqueKeysWithValues: s.map { ($0.id, $0.text) })
+        XCTAssertTrue(t.apply(TranslationResult(head: s[0].id, covers: [s[1].id, s[2].id], text: "古い訳"), sources: old))
+        // あとで監査の直しで、2 つ目の区間が文の終わりになった (訳のまとまりはそのまま)
+        t.segments[1].text = "each person could share their progress."
+        XCTAssertEqual(Translator.translationGroupIDs(of: s[1].id, in: t.segments), [s[0].id, s[1].id, s[2].id],
+                       "文の続きの区間からも、前の訳のまとまりを全部")
+        // 頭の区間から訳し直す。前の訳でまとめていた区間は、いまは 2 文になっていても全部訳し直す
+        let ids = Translator.redoUnitIDs(containing: s[0].id, in: t.segments, language: "en")
+        XCTAssertEqual(ids, [s[0].id, s[1].id, s[2].id])
+        XCTAssertEqual(Translator.redoUnitIDs(containing: s[2].id, in: t.segments, language: "en"), ids)
+        let cleared = Translator.clearingTranslations(of: [s[0].id], in: t.segments)
+        let sources = Dictionary(uniqueKeysWithValues: t.segments.map { ($0.id, $0.text) })
+        var results: [TranslationResult] = []
+        _ = try Translator.translate(cleared, language: "en", only: Set(ids), generator: echoTranslator(),
+                                     shouldCancel: { false }) { batch, _, _ in
+            results += batch
+            for r in batch { XCTAssertTrue(t.apply(r, sources: sources)) }
+        }
+        XCTAssertEqual(results.map(\.head), [s[0].id, s[2].id], "いまの区切りで 2 文")
+        XCTAssertEqual(results.map(\.covers), [[s[1].id], []])
+        XCTAssertEqual(t.segments[0].translation,
+                       "訳(We set up a weekly meeting where each person could share their progress.)")
+        XCTAssertEqual(t.segments[0].translationCovers, [s[1].id])
+        XCTAssertEqual(t.segments[2].translation, "訳(any problems they were having.)", "前の訳に含めていた区間も訳し直す")
+        XCTAssertEqual(t.untranslatedCount, 1, "訳が無いのは、もともと訳していない「It worked well.」だけ")
+        XCTAssertNil(t.segments[3].translation)
+    }
 }
 
 final class BilingualExportTests: XCTestCase {

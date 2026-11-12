@@ -94,6 +94,10 @@ struct LLMSettingsForm: View {
             Section("監査・翻訳 (ローカル LLM)") {
                 Toggle("文字起こしのあとに監査する (繰り返し・聞き取りミスの見直し)", isOn: $model.autoAudit)
                 Toggle("日本語以外の区間を、日本語に翻訳する", isOn: $model.autoTranslate)
+                Text("オフにしても、結果の行の「訳」で、読みたい文だけを 1 文ずつ訳せます (まとめて訳すより軽く済みます)。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Picker("LLM", selection: $model.llmModelID) {
                     ForEach(LLMCatalog.all) { spec in
                         Text(spec.displayName + (spec.recommended ? " (おすすめ)" : "")).tag(spec.id)

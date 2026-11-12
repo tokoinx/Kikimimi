@@ -45,6 +45,12 @@ final class Job: Identifiable {
     var postState: PostState = .idle
     /// 監査・翻訳のお知らせ (失敗・一部だけ訳せなかった など)
     var postNote: String?
+    /// 行の「訳」で頼まれた文の区間 (頼まれた順。訳し終えるまで残る。行ではこの区間に待ちの印を出す)
+    var lineQueue: [UUID] = []
+    /// 行の「訳」で頼まれた区間のうち、訳のある文を訳し直すもの (右クリックの「この文を訳し直す」)
+    var lineRedo: Set<UUID> = []
+    /// 行の「訳」を押したので、対訳の設定がオフでもこのジョブは対訳で表示する (設定には残さない。「対訳」を外すと消える)
+    var showsLineTranslations = false
     @ObservationIgnored var postCancel = CancelFlag()
     /// 録音のために一時停止した (メモリの少ない Mac)。録音を止めると再開する
     @ObservationIgnored var pausedForRecording = false
@@ -67,6 +73,8 @@ final class Job: Identifiable {
 enum PostTask: Equatable {
     case audit
     case translate
+    /// 行の「訳」で頼まれた文だけを訳す (頼まれた文は Job.lineQueue。1 つの仕事で、待っている文をまとめて順に訳す)
+    case translateLines
 }
 
 enum PostState: Equatable {
@@ -707,6 +715,8 @@ final class AppModel {
     func cancelPost(_ job: Job) {
         let hadQueue = !job.postQueue.isEmpty
         job.postQueue.removeAll()
+        job.lineQueue.removeAll()
+        job.lineRedo.removeAll()
         // 録音のための一時停止を取りやめる (止まったあとに「録音を止めると再開します」と出さない)
         job.pausedForRecording = false
         if job.postState != .idle {
@@ -921,6 +931,28 @@ final class AppModel {
         schedulePostTasks(for: job, automatic: false, tasks: [.translate])
     }
 
+    /// その区間を含む 1 文だけを日本語に訳す (行の「訳」)。redo は、訳のある文を訳し直す (行の右クリック)。
+    /// 文のまとめ方とプロンプトは「翻訳」と同じなので、あとの「翻訳」「残りを翻訳」はこの文を飛ばす
+    func translateLine(_ id: UUID, in job: Job, redo: Bool = false) {
+        guard isLLMInstalled else {
+            errorMessage = "日本語に訳すには、ローカル LLM「\(currentLLM.name)」が必要です。設定の「監査・翻訳」から取得してください。"
+            return
+        }
+        guard job.status == .done, let transcript = job.transcript, !job.lineQueue.contains(id) else { return }
+        // 訳し直しは、前の訳でまとめていた区間をすべて訳し直す (監査で文の区切りが変わっていても、訳の無い区間を残さない)
+        let unit = redo
+            ? Translator.redoUnitIDs(containing: id, in: transcript.segments, language: transcript.language)
+            : Translator.unitIDs(containing: id, in: transcript.segments, language: transcript.language)
+        // 同じ文の別の行がもう頼まれていれば、もう一度は訳さない
+        let added = unit.filter { !job.lineQueue.contains($0) }
+        guard !added.isEmpty else { return }
+        job.lineQueue += added
+        if redo { job.lineRedo.insert(id) }
+        // 訳した行が見えるように、このジョブだけ対訳で表示する (対訳の設定は変えない)
+        job.showsLineTranslations = true
+        schedulePostTasks(for: job, automatic: false, tasks: [.translateLines])
+    }
+
     /// 監査の 1 か所を反映する / 元に戻す
     func setAuditChange(_ change: AuditChange, applied: Bool, in job: Job) {
         guard var transcript = job.transcript else { return }
@@ -1094,6 +1126,60 @@ final class AppModel {
                 apply(all)
                 if failed > 0 {
                     job.postNote = "\(failed) 区間は訳せませんでした。もう一度「翻訳」を押すと、残りだけを訳し直します。"
+                }
+                job.postNote = adapterNote(job.postNote)
+
+            case .translateLines:
+                guard useLLM else {
+                    job.lineQueue.removeAll()
+                    job.lineRedo.removeAll()
+                    return
+                }
+                if pauseIfRecording(.translateLines, job: job) { return }
+                // いま待っている文をまとめて訳す (このあいだに頼まれた文は、終わってから続けて訳す)
+                let lines = job.lineQueue
+                guard !lines.isEmpty else { return }
+                let only = Set(lines)
+                defer {
+                    // 訳し終えた (訳せなかった) 文を待ちから外す。録音のための一時停止なら残し、録音のあとで続ける
+                    if !job.pausedForRecording {
+                        job.lineQueue.removeAll { only.contains($0) }
+                        job.lineRedo.subtract(only)
+                        if !job.lineQueue.isEmpty && !job.postQueue.contains(.translateLines) {
+                            job.postQueue.append(.translateLines)
+                        }
+                    }
+                }
+                job.postState = .running(.translateLines, message: "選んだ文を翻訳中…" + preparing, progress: nil)
+                // 訳し直す文は、写しの上で訳を外してから文の区切りを決める (訳し終えるまで、画面には前の訳を残す)
+                let segments = Translator.clearingTranslations(of: job.lineRedo.intersection(only), in: transcript.segments)
+                let sources = Dictionary(segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
+                let options = TranslationOptions(glossary: glossary)
+                let apply: @MainActor ([TranslationResult]) -> Void = { batch in
+                    guard !batch.isEmpty, var t = job.transcript else { return }
+                    // 訳しているあいだに監査で文が変わった区間には付けない
+                    for result in batch { t.apply(result, sources: sources) }
+                    t.translationModel = selection.name
+                    job.transcript = t
+                }
+                let (failed, all) = try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
+                                                      shouldCancel: { flag.isSet }) { engine in
+                    var all: [TranslationResult] = []
+                    let failed = try Translator.translate(segments, language: language, options: options, only: only,
+                                                          generator: engine, shouldCancel: { flag.isSet }) { batch, done, total in
+                        all += batch
+                        Task { @MainActor in
+                            apply(batch)
+                            guard case .running(.translateLines, _, _) = job.postState, job.postCancel === flag else { return }
+                            job.postState = .running(.translateLines, message: "選んだ文を翻訳中 \(done)/\(total)",
+                                                     progress: total > 0 ? Double(done) / Double(total) : nil)
+                        }
+                    }
+                    return (failed, all)
+                }
+                apply(all)
+                if failed > 0 {
+                    job.postNote = "選んだ文のうち \(failed) 区間は訳せませんでした。行の「訳」をもう一度押すと、訳し直します。"
                 }
                 job.postNote = adapterNote(job.postNote)
             }
@@ -1278,18 +1364,34 @@ final class AppModel {
         }
     }
 
-    /// 対訳で表示しているか (対訳表示がオンで、日本語以外が主な文字起こしか、訳が 1 つでもある)
-    func isBilingual(_ stats: Transcript.TranslationStats) -> Bool {
-        showBilingual && (stats.hasTranslation || stats.isMainlyForeign)
+    /// 対訳で表示しているか (対訳表示がオンか、そのジョブで行の「訳」を押した。そして、日本語以外が主な文字起こしか、訳が 1 つでもある)
+    func isBilingual(_ stats: Transcript.TranslationStats, in job: Job) -> Bool {
+        showsBilingual(job) && (stats.hasTranslation || stats.isMainlyForeign)
+    }
+
+    /// 「対訳」のチェック (対訳の設定がオンか、そのジョブで行の「訳」を押した)
+    func showsBilingual(_ job: Job) -> Bool {
+        showBilingual || job.showsLineTranslations
+    }
+
+    /// 「対訳」のチェックを変える。外したときは、行の「訳」で出していたこのジョブの対訳も隠す
+    func setShowsBilingual(_ on: Bool, for job: Job) {
+        if !on { job.showsLineTranslations = false }
+        if showBilingual != on { showBilingual = on }
+    }
+
+    /// 結果の行をクリックして再生できるか (その文字起こしの音声をプレイヤーが開いている)
+    func canPlayLines(of job: Job) -> Bool {
+        job.url != nil && player.url == job.url
     }
 
     /// 本文をコピーする。対訳表示のときは原文と日本語訳を並べたもの
     func copySelectedText() {
-        guard let transcript = selectedJob?.transcript else { return }
-        selectedJob?.exported = true
+        guard let job = selectedJob, let transcript = job.transcript else { return }
+        job.exported = true
         let text: String
         let stats = transcript.translationStats
-        if isBilingual(stats) && stats.hasTranslation {
+        if isBilingual(stats, in: job) && stats.hasTranslation {
             text = Exporter.txt(transcript, content: .bilingual)
         } else {
             text = transcript.text(withTimestamps: showTimestamps)
@@ -1297,6 +1399,15 @@ final class AppModel {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(text, forType: .string)
+    }
+
+    /// 1 行だけをコピーする (行の右クリックから。行のクリックは再生に使うので、行の文字は選べない)
+    func copyLine(_ text: String, japanese: String?) {
+        var lines = [text]
+        if let japanese, japanese != text { lines.append(japanese) }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(lines.joined(separator: "\n"), forType: .string)
     }
 }
 

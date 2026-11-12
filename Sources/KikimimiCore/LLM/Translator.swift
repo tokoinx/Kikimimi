@@ -89,6 +89,48 @@ public enum Translator {
         return units
     }
 
+    /// その区間を含む「1 文」の区間の id (文の頭から順に)。訳す必要がない・もう訳がある (ほかの区間の訳に含まれる) なら空。
+    /// 「翻訳」でまとめて訳すときと同じまとめ方なので、1 文だけ訳しても「翻訳」と同じ訳になる
+    public static func unitIDs(containing id: UUID, in segments: [TranscriptSegment], language: String?) -> [UUID] {
+        let pending = pendingIndices(segments, language: language)
+        guard let unit = sentenceUnits(pending, in: segments).first(where: { $0.contains { segments[$0].id == id } }) else {
+            return []
+        }
+        return unit.map { segments[$0].id }
+    }
+
+    /// 訳し直す区間の訳を外した区間の並び (その区間を含む訳は、文ごと外す)。訳し直しで文の区切りを決め直すのに使う
+    public static func clearingTranslations(of ids: Set<UUID>, in segments: [TranscriptSegment]) -> [TranscriptSegment] {
+        var out = segments
+        for i in out.indices where ids.contains(out[i].id) || (out[i].translationCovers ?? []).contains(where: ids.contains) {
+            out[i].translation = nil
+            out[i].translationCovers = nil
+        }
+        return out
+    }
+
+    /// その区間を含む訳のまとまりの区間の id (訳のある区間と、その訳に含めた区間)。訳が無ければ、その区間だけ
+    public static func translationGroupIDs(of id: UUID, in segments: [TranscriptSegment]) -> [UUID] {
+        guard let head = segments.first(where: { s in
+            s.translation != nil && (s.id == id || (s.translationCovers ?? []).contains(id))
+        }) else { return [id] }
+        return [head.id] + (head.translationCovers ?? [])
+    }
+
+    /// 訳し直す (右クリックの「この文を訳し直す」) ときに訳す区間の id (文の頭から順に)。
+    /// 前の訳でまとめていた区間は、いまの文の区切りで何文になっていても全部含める
+    /// (監査の直しで文の途中が文の終わりになっていると、押した区間の文だけ訳し直すと残りの区間の訳が無くなる)
+    public static func redoUnitIDs(containing id: UUID, in segments: [TranscriptSegment], language: String?) -> [UUID] {
+        let cleared = clearingTranslations(of: [id], in: segments)
+        var out: [UUID] = []
+        for member in translationGroupIDs(of: id, in: segments) where !out.contains(member) {
+            for u in unitIDs(containing: member, in: cleared, language: language) where !out.contains(u) {
+                out.append(u)
+            }
+        }
+        return out
+    }
+
     static func systemPrompt(language: String?) -> String {
         let lang = Script.englishName(for: language)
         return """
@@ -159,15 +201,20 @@ public enum Translator {
     }
 
     /// まだ訳していない区間を、文ごとに訳す。1 まとまり訳すごとに onChunk を呼ぶ (done / total は区間の数)。
+    /// only を渡すと、その区間を含む文だけを訳す (行ごとの「訳」。文のまとめ方は全体を訳すときと同じ)。
     /// 戻り値は、最後まで訳せなかった区間の数。
     @discardableResult
     public static func translate(_ segments: [TranscriptSegment], language: String?, options: TranslationOptions = TranslationOptions(),
+                                 only: Set<UUID>? = nil,
                                  generator: any TextGenerating, shouldCancel: () -> Bool,
                                  onChunk: (_ results: [TranslationResult], _ done: Int, _ total: Int) -> Void) throws -> Int {
-        let pending = pendingIndices(segments, language: language)
+        var units = sentenceUnits(pendingIndices(segments, language: language), in: segments)
+        if let only {
+            units = units.filter { unit in unit.contains { only.contains(segments[$0].id) } }
+        }
+        let pending = units.flatMap { $0 }
         // 「日本語＋英語」では、訳す区間に付いた言語 (いちばん多いもの) を原文の言語としてプロンプトに書く
         let source = sourceLanguage(of: pending.map { segments[$0] }) ?? language
-        let units = sentenceUnits(pending, in: segments)
         let sources = units.map { unit in Transcript.join(unit.map { segments[$0].text }) }
         let chunks = LLMChunker.chunks(Array(units.indices), cost: { generator.tokenCount(sources[$0]) + 4 },
                                        maxLines: options.maxLinesPerChunk, maxCost: options.maxTokensPerChunk)
@@ -268,7 +315,10 @@ extension Transcript {
         guard following.count == result.covers.count, zip(following, result.covers).allSatisfy({ $0.id == $1 }) else { return false }
         segments[index].translation = result.text
         segments[index].translationCovers = result.covers.isEmpty ? nil : result.covers
-        for i in following.indices { segments[i].translation = nil }
+        for i in following.indices {
+            segments[i].translation = nil
+            segments[i].translationCovers = nil
+        }
         return true
     }
 }
