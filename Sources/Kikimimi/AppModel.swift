@@ -163,7 +163,9 @@ final class AppModel {
     var searchText = ""
     /// 設定で開いているタブ (保存しない。LLM の案内の「設定で選ぶ…」で「監査・翻訳」に切り替える)
     var settingsTab: SettingsTab = .transcription
-    let player = PlayerController()
+    let player: PlayerController
+    /// 聞き取りの練習 (続けて流す・速さ・隠す・書き取り)。行の再生は、どこからでもこれを通す
+    let practice: PracticeController
 
     // 録音
     var isRecording = false
@@ -246,6 +248,9 @@ final class AppModel {
     @ObservationIgnored private var notesSaveTimers: [UUID: Task<Void, Never>] = [:]
 
     init() {
+        let player = PlayerController()
+        self.player = player
+        practice = PracticeController(player: player)
         let d = UserDefaults.standard
         languageCode = d.string(forKey: "languageCode") ?? "ja"
         let savedModel = d.string(forKey: "modelID") ?? ModelCatalog.defaultModelID
@@ -765,6 +770,8 @@ final class AppModel {
     }
 
     func select(_ job: Job?) {
+        // 別のジョブを選んだら、練習の続きは終わりにする (同じ音声のジョブでも)
+        practice.select(job)
         selectedJobID = job?.id
         searchText = ""
         if let url = job?.url {
@@ -1372,6 +1379,8 @@ final class AppModel {
             return
         }
         self.recorder = recorder
+        // 録音を始めたら、練習の続きは終わりにする
+        practice.stop()
         isRecording = true
         recordingStartedAt = Date()
         livePreviewText = ""

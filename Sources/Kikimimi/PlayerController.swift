@@ -13,6 +13,21 @@ final class PlayerController {
     private(set) var isPlaying = false
     /// 1 行だけを再生しているときの、その行。終わりで自動で止まる。ふつうの再生では nil
     private(set) var playingLineID: UUID?
+    /// 再生の速さ (1.0 がふつう)。ふつうの再生にも 1 行だけの再生にも使う。再生中に変えると、その場で変わる。
+    /// 声の高さは変えない (audioTimePitchAlgorithm を .timeDomain にする)
+    var rate: Double = 1.0 {
+        didSet {
+            guard rate != oldValue else { return }
+            applyRate()
+        }
+    }
+
+    /// 頼まれた 1 行が、行の終わりまで来て自分で止まった (止めた・別の行に替えた・古い知らせでは呼ばない)。
+    /// 呼ぶのは、こちらの状態 (止まった印・位置) を整えたあと
+    @ObservationIgnored var onLineFinished: (@MainActor (UUID) -> Void)?
+    /// 再生ボタン・つまみ・「ここから続けて再生」・音声を閉じる、で、使う人が再生を自分で動かした (練習の続きを止めるため)。
+    /// 1 行だけの再生 (playLine / stopLine) では呼ばない
+    @ObservationIgnored var onUserControl: (@MainActor () -> Void)?
 
     @ObservationIgnored private var player: AVPlayer?
     @ObservationIgnored private var item: AVPlayerItem?
@@ -42,9 +57,13 @@ final class PlayerController {
         unload()
         self.url = url
         let item = AVPlayerItem(url: url)
+        // 速さを変えても、声の高さはそのまま (話し声に向いたやり方)
+        item.audioTimePitchAlgorithm = .timeDomain
         let player = AVPlayer(playerItem: item)
         self.item = item
         self.player = player
+        // play() は、この速さで始まる (macOS 13 から)
+        player.defaultRate = Float(rate)
         // どちらの見張りもメインのキューで呼ばれるので、その場で反映する
         // (Task を挟むと、メインスレッドが混んでいるときに知らせが遅れて溜まる)
         timeObserver = player.addPeriodicTimeObserver(
@@ -67,6 +86,7 @@ final class PlayerController {
     }
 
     func unload() {
+        onUserControl?()
         endLine()
         if let player, let timeObserver { player.removeTimeObserver(timeObserver) }
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
@@ -86,6 +106,7 @@ final class PlayerController {
     /// (行を再生し終えたあとなら、その行の終わりから続ける)
     func togglePlay() {
         guard let player else { return }
+        onUserControl?()
         endLine()
         if isPlaying {
             player.pause()
@@ -108,6 +129,7 @@ final class PlayerController {
     /// 指定の位置へ移る (つまみ・「ここから続けて再生」)。1 行だけの再生は終わりにする
     func seek(to seconds: TimeInterval, andPlay: Bool = false) {
         guard player != nil else { return }
+        onUserControl?()
         endLine()
         stoppedAtLineEnd = false
         move(to: seconds)
@@ -139,6 +161,8 @@ final class PlayerController {
     /// - 行の終わりがファイルの終わり: 止める位置はファイルの長さになり、ファイルの終わりの知らせで止まる
     ///   (位置は行の終わりの近くなので、いまの行の終わりとして受け取る)。
     /// - 行がふつうに終わる: AVFoundation が止める位置で止まり、知らせが届く。位置が行の終わりの近くなので受け取り、止める。
+    /// - 速さを変えていても同じ: 止める位置も、知らせの位置も、音声の中の時刻 (速さによらない) で比べる。
+    ///   再生は play() で始め、play() は defaultRate (いまの速さ) で鳴らす。
     func playLine(id: UUID, start: TimeInterval, end: TimeInterval) {
         guard let player else { return }
         endLine()
@@ -210,10 +234,13 @@ final class PlayerController {
         }
         // 先に音を止めてから、止まった印にする (印だけ先に変わると、次の再生ボタンが「止める」ではなく「再生」になり、止められない)
         player.pause()
-        stoppedAtLineEnd = playingLineID != nil
+        let finished = playingLineID
+        stoppedAtLineEnd = finished != nil
         isPlaying = false
         if now.isFinite { timeDidChange(now) }
         endLine()
+        // 頼まれた行が、行の終わりまで来た (こちらの状態を整えてから知らせる。知らせを受けて次の行を始めてもよい)
+        if let finished { onLineFinished?(finished) }
     }
 
     /// 1 行だけの再生の印と止める位置を外す (再生そのものは止めない。そこから先も続けて再生できるようにする)。
@@ -224,6 +251,14 @@ final class PlayerController {
         lineEnd = nil
         if let item, item.forwardPlaybackEndTime.isValid { item.forwardPlaybackEndTime = .invalid }
         if playingLineID != nil { playingLineID = nil }
+    }
+
+    /// 速さを AVPlayer に渡す: これからの play() の速さ (defaultRate) と、鳴っていれば、いまの速さ
+    private func applyRate() {
+        guard let player else { return }
+        let value = Float(rate)
+        player.defaultRate = value
+        if player.rate != 0 { player.rate = value }
     }
 
     /// 再生位置を変える (同じ値なら変えない: 変えると、位置を見ている画面が描き直される)

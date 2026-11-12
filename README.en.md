@@ -80,6 +80,22 @@ Transcripts are saved on the Mac without you doing anything, and they are listed
 - The trash button deletes a version. Versions cannot be kept or restored while the result is being audited or translated.
 - The transcript, translation and notes are saved every time they change, even without versions. A version is a copy of one moment.
 
+## Listening practice
+
+The rows of a result double as English listening practice. Clicking a row plays it, and two buttons at the right end of the player bar below change how it plays. The settings are kept for the next launch (except "隠す" (Hide), which starts as "隠さない" (Hide nothing) at every launch).
+
+- **Speed** (the "1.0×" button): choose 0.5×, 0.6×, 0.75×, 0.85×, 1.0× or 1.25×. It applies to normal playback and to playing a line, and changes at once even while playing. The pitch of the voice stays the same.
+- **The "練習" (Practice) button** (tinted when any setting differs from the default):
+  - "繰り返し" (Repeat): play a line 1, 2, 3 or 5 times, or "止めるまで" (until stopped).
+  - "行のあとの間" (Pause after the line): "行と同じ長さだけ空ける" (as long as the line) leaves a pause after each play, to say the line aloud yourself (as long as the line took to play at the current speed, 1-15 s). During the pause the player bar shows "間 (声に出してみましょう)" (Pause: try saying it aloud).
+  - "自動で次の行へ進む" (Go on to the next line): after the repeats and pauses, move on to the next line.
+  - "隠す" (Hide): "原文を隠す" (Hide the original) turns the original text of every row that is not Japanese into grey bars (Japanese rows stay visible). "原文と訳を隠す" (Hide the original and the translation) hides the Japanese translation of those rows too. The eye button on a hidden row shows or hides that row alone (shown rows are hidden again when you change the hide setting or select another result). Searching still finds the real text.
+  - "書き取りの欄を出す" (Show the dictation box): shows the dictation box under the list (below).
+- **Keys**: ↓ plays the next line, ↑ the previous line, ← the current line again (also in the "再生" (Playback) menu). The space key and the play button stop a running sequence. While the focus is in a field you type into (such as the search field), the keys go to that field as usual. While you are working in the list of results on the left, the arrows move through that list (clicking a line brings them back to the lines). A line started by a key or by going on automatically is scrolled into view with as little movement as possible.
+- Clicking a row, clicking the playing row again (stop), dragging the playback slider, "ここから続けて再生" (Play from here), selecting another result, deleting the result and starting a microphone recording also stop a running sequence.
+
+**Dictation**: play a line, type what you heard into the box under the list and press Return: it is compared with the line and the result appears (the line is also shown in the list). Correct words are in the normal colour; for a wrong word, the word you typed is in red with a strikethrough, followed by the right word in green; a word you left out is in orange in square brackets; an extra word you typed is in red with a strikethrough. On the right it shows "12 / 14 語" (words; Japanese lines are compared character by character, "字") or "全部合っています" (all correct). Upper and lower case and punctuation around words do not count. Pressing Return again clears the box and plays the next line. There are also the buttons "もう一度聞く" (Listen again, ⌘L), "前の行" (Previous line) and "次の行" (Next line). Editing the text clears the result, and the box is cleared when the current line changes.
+
 ## Audit and translation (local LLM)
 
 A small LLM running on your Mac reads the transcript once more.
@@ -277,6 +293,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | Fine-tuning (the MLX training itself) | Confirmed end to end on GitHub's Mac (macOS 15) with Qwen3.5 0.8B: train with MLX (425 steps, validation loss 0.80 → 0.11), convert five intermediate adapters to GGUF, compare them with the built app's evaluation harness and pick one. Of 5 lines never seen in training, the plain model found 0 and the chosen adapter found 4 (as suggestions; no wrong fix, no correct line harmed). The adapters from 85–255 steps found 0 and the one from 340 steps found 1. How the training must be done (answer-only loss, no padding position, Adam bias correction, number of steps and side effects) was worked out by running the same training in PyTorch and evaluating the converted adapters with the real llama.cpp (Linux). Not verified on real hardware (an 8 GB M1) or with 2B and larger (GitHub's Mac has a virtual GPU and needs 1 h 40 min for 425 steps on 0.8B; the speed on real hardware is unknown) |
 | The confirmation before quitting, quitting when the window is closed, the fine-tuning settings screen | Not verified (implemented and built only; the UI cannot be exercised on Linux or on GitHub's Mac) |
 | Library (automatic saving, reloading, deleting), notes, history (keeping, overwriting and restoring versions) | The storage (`LibraryStore`) is unit tested. In the app, GitHub's Mac runs the save check inside `--selftest-ui-load` (LIBRARY CHECK) on every push: in a temporary folder, using the same AppModel functions as the app, it saves the finished results (not the running one), writes notes, keeps versions A and B as new versions, overwrites with C (2 versions), restores the notes of A only (an automatic version is added, making 3; the transcript is unchanged), reloads the folder and compares the contents, and deletes a small result and checks that its folder is gone. It also prints how long writing the 3000-line result takes in the background. The look of the notes pane and the history sheet was checked only on the pictures from that run (07, 08). Not yet verified on real hardware |
+| Listening practice (speed, repeat, pause after the line, going on to the next line, the ↓↑← keys, hiding, dictation) | The sequencer (`LineSequencer`), the settings, the dictation check and the hiding rule are unit tested. In the app, GitHub's Mac runs the practice check inside `--selftest-ui-load --audio` (PRACTICE CHECK) on every push: with the real sound of the 47 s recording, the real practice controller and player, it checks that one line at 0.5× stops by itself at its end and takes about twice the line's length, that repeat 2 at 1.25× plays exactly twice and stops, that the pause as long as the line lasts more than 1 s, that it goes on to the next line by itself and plays nothing after being stopped, that next, previous and again move the current line as expected (previous at the first line does nothing), and that the space-key path stops it both while playing and during the pause (about 30 s; skipped on a Mac that cannot play audio). The look of hidden rows with the eye button, and of the dictation box and its colours, was checked only on the pictures from that run (09, 10). The keys, and real hardware, are not verified yet |
 | A transcript with thousands of lines keeps the window responsive while lines play and a transcription runs, and a single line stops at its end | GitHub Actions runs the built app's `--selftest-ui-load` on every push (3000 lines decide pass or fail; 8000 lines are measured for information only and do not fail the build, since a real transcript of a 2-hour recording has about 2000-4000 lines). It adds finished jobs (bilingual and plain) and a running job that starts with the same number of lines and grows, and for each action measures how long until the main thread is idle again (count, median, 95th percentile, maximum). The actions are: selecting a job, a playback-position update (advancing 0.2 s like the real observer; updates that keep the current row and updates that move it to another row are counted separately), starting and stopping a single line, appending one segment to the selected and to a non-selected job, one batch applied while a running job receives 10 segments a second, delivering 300 segments at once (timed from the start of applying the batch), and a progress update. Segments are delivered from another thread into the same buffer the transcription uses (batches are applied every 0.25-1 s depending on the number of rows). A watchdog thread also measures the main thread's wait per phase and how long it could not respond (also as a share of the phase), and lists the five longest stalls with the action before each. Without a window it also times building the list rows (a full rebuild from all lines, and appending 10 segments to a running job; median and maximum of 20 runs each). It fails above its limits (`UILoadSelfTest.Limits`, set for GitHub's runner). With 3000 lines it also really plays one line of the 47 s recording and checks that it stops at the end of the line and that the play button then continues from there; that part is skipped on a Mac that cannot play audio. After measuring, it also saves pictures of the window (`--screenshots`; kept as a CI artifact). Result on GitHub's Mac with 3000 lines: while a transcription runs, the main thread is busy 1-12% of the time, one batch of new lines takes 0.1-0.3 s, and opening a result takes 0.1-1.0 s. A single line stopped exactly at its end. Not verified on real hardware (a 2-hour recording) |
 
 ## Tests
@@ -310,6 +327,13 @@ Sources/
     Exporter.swift       txt / srt / vtt / md / csv / json
     ModelCatalog.swift   Model list, download URLs, model file validation
     HallucinationFilter.swift  Removes common hallucinations
+    Practice/            Listening practice (the parts that do not depend on the player)
+      PracticeSettings.swift  Speed, repeat, pause, go on, hide: the settings and how they are saved
+      LineSequencer.swift  Decides what to do next (play, wait, stop)
+      LineNeighbors.swift  The previous and next line, the line at a time
+      DictationCheck.swift  Checks a dictation
+      DictationDisplay.swift  How a dictation result is laid out
+      HiddenText.swift   Which text of a row is hidden, the speed labels
     WAV.swift            Saves recordings (16-bit PCM)
     Library/             The library (saved results)
       SavedDocument.swift  A saved result, version headers and contents
@@ -352,8 +376,11 @@ Sources/
     UILoadSelfTest.swift --selftest-ui-load (checks that a transcript with thousands of lines does not freeze the window, and the saving, for CI)
     AudioDecoder.swift   Audio/video to 16 kHz mono
     LiveRecorder.swift   Microphone recording
-    PlayerController.swift  Playback and seeking
+    PlayerController.swift  Playback, seeking and speed
+    PracticeController.swift  Listening practice (playing lines in sequence, hiding, dictation); runs the player as the sequencer decides
     Views/               UI
+      PracticeMenu.swift The speed and "練習" (Practice) buttons of the player bar, the pause note
+      DictationBar.swift The dictation box and its result
       NotesPane.swift    The notes pane
       HistorySheet.swift The history sheet (keep, restore and delete versions)
 Resources/               Info.plist, icon

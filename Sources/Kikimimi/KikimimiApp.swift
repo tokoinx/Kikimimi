@@ -207,9 +207,18 @@ private struct AppLifecycleHook: View {
     }
 }
 
-/// スペースキーで再生 / 一時停止 (1 行だけの再生も止まる)。
-/// メニューの key equivalent にすると、検索欄で空白を打てなくなるので、メインのウインドウに届くキーを見て決める。
-/// 文字を入力している欄や、フォーカスのあるボタンでは、ふつうにスペースを渡す
+/// PlaybackKeys が見るキー
+enum PlaybackKey {
+    case space
+    case down
+    case up
+    case left
+}
+
+/// スペースキーで再生 / 一時停止 (1 行だけの再生と、練習で続けて流しているのも止まる)。
+/// 下の矢印で次の行、上の矢印で前の行、左の矢印でいまの行をもう一度 (練習: 繰り返し・間・自動で次へ が効く)。
+/// メニューの key equivalent にすると、検索欄で空白や矢印を使えなくなるので、メインのウインドウに届くキーを見て決める。
+/// 文字を入力している欄や、フォーカスのあるボタンでは、ふつうにキーを渡す。使ったキーだけを止める
 @MainActor
 enum PlaybackKeys {
     private static var monitor: Any?
@@ -221,16 +230,28 @@ enum PlaybackKeys {
 
     nonisolated private static func handler(model: AppModel) -> (NSEvent) -> NSEvent? {
         return { event in
-            // スペースキー (49) を、修飾キーなしで押した
-            guard event.keyCode == 49, !event.isARepeat,
-                  event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock).isEmpty,
-                  let window = event.window else { return event }
-            let used = MainActor.assumeIsolated { handle(in: window, model: model) }
+            guard !event.isARepeat, let key = playbackKey(of: event), let window = event.window else { return event }
+            let used = MainActor.assumeIsolated { handle(key, in: window, model: model) }
             return used ? nil : event
         }
     }
 
-    private static func handle(in window: NSWindow, model: AppModel) -> Bool {
+    /// 修飾キーなしで押した、スペース (49)・下 (125)・上 (126)・左 (123) の矢印。
+    /// 矢印のキーには、押しただけで numericPad と function の印が付くので、それは除いて見る
+    nonisolated private static func playbackKey(of event: NSEvent) -> PlaybackKey? {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
+        switch event.keyCode {
+        case 49:
+            return flags.isEmpty ? .space : nil
+        case 123, 125, 126:
+            guard flags.subtracting([.numericPad, .function]).isEmpty else { return nil }
+            return event.keyCode == 125 ? .down : (event.keyCode == 126 ? .up : .left)
+        default:
+            return nil
+        }
+    }
+
+    private static func handle(_ key: PlaybackKey, in window: NSWindow, model: AppModel) -> Bool {
         guard window.attachedSheet == nil,
               MainWindow.all().contains(where: { $0 === window }),
               model.player.url != nil else { return false }
@@ -238,7 +259,20 @@ enum PlaybackKeys {
             if responder is NSText { return false }
             if responder is NSControl, !(responder is NSTableView) { return false }
         }
-        model.player.togglePlay()
+        if key == .space {
+            model.practice.togglePlay()
+            return true
+        }
+        // 矢印は、選んでいる結果の音声を開いているときだけ。左の結果の一覧を触っているあいだは、一覧の上下に使う
+        // (行を押すと、一覧から手が離れる: PlayableRow)
+        if window.firstResponder is NSTableView { return false }
+        guard let job = model.selectedJob, model.canPlayLines(of: job) else { return false }
+        switch key {
+        case .down: model.practice.next()
+        case .up: model.practice.previous()
+        case .left: model.practice.replay()
+        case .space: break
+        }
         return true
     }
 }
@@ -340,11 +374,19 @@ struct KikimimiApp: App {
                           || (model.selectedJob?.transcript?.untranslatedCount ?? 0) == 0)
             }
             CommandMenu("再生") {
-                // ショートカットはスペースキー (PlaybackKeys。メニューに付けると、検索欄で空白を打てなくなる)
-                Button(model.player.isPlaying ? "一時停止 (スペースキー)" : "再生 (スペースキー)") {
-                    model.player.togglePlay()
+                // ショートカットはスペースキーと矢印 (PlaybackKeys。メニューに付けると、検索欄で空白や矢印を使えなくなる)
+                Button(model.player.isPlaying || model.practice.isWaiting ? "一時停止 (スペースキー)" : "再生 (スペースキー)") {
+                    model.practice.togglePlay()
                 }
                 .disabled(model.player.url == nil)
+                Divider()
+                let canPlayLines = model.selectedJob.map { model.canPlayLines(of: $0) } ?? false
+                Button("次の行を再生 (↓)") { model.practice.next() }
+                    .disabled(!canPlayLines)
+                Button("前の行を再生 (↑)") { model.practice.previous() }
+                    .disabled(!canPlayLines)
+                Button("この行をもう一度 (←)") { model.practice.replay() }
+                    .disabled(!canPlayLines)
             }
         }
         Settings {

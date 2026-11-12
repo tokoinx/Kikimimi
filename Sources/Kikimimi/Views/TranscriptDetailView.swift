@@ -124,6 +124,9 @@ struct TranscriptDetailView: View {
             // 終わったジョブを選ぶ 1 回が 16.8 秒。ふだんは 0.2〜1.1 秒)
             TranscriptListView(job: job, items: items, bilingual: bilingual, emptyMessage: emptyMessage)
                 .id(job.id)
+            // 一覧の下の書き取りの欄 (「書き取りの欄を出す」のときだけ)。出すかどうかと中身を見るのは、この部品だけ
+            // (この body が見ると、打つたびや設定を変えるたびに、一覧まで作り直すことになる)
+            DictationSlot(job: job)
         }
     }
 
@@ -267,6 +270,9 @@ struct LanguageTagLabel: View {
 ///   色が変わったときに描き直すのは、色が変わる、画面に出ている行だけ (画面の外の行は、LazyVStack が作っていない)。
 /// - 再生位置を見て、いまの行を探し、行の色を変え、いまの行や一覧の終わりへ動かすのは、一覧の外の見えない部品
 ///   (CurrentLineTracker)。「末尾へ」のボタンも、一覧の外の部品 (FollowButton) が ListFollow.isOn を見る。
+/// - 練習の様子 (続けて流している行・隠し方・見せた行・書き取り) も見ない。行が自分で、練習の小さな入れ物
+///   (PracticeController.hideMode・RowReveal の RevealCell) を見る。一覧の行を練習に知らせるのは、見えない部品
+///   (PracticeRowsFeeder) で、一覧の行が変わったときだけ動く。
 ///
 /// 文字起こし中は、一覧の終わりを追いかける (新しい行が出たら、いちばん下へ動かす)。ただし:
 /// - 使う人が一覧の上でホイールやトラックパッドで上へ動かす、一覧の中を押す (行もスクロールバーも、押した瞬間に)、
@@ -319,6 +325,8 @@ struct TranscriptListView: View {
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .background(Color(nsColor: .controlBackgroundColor))
                 .background(CurrentLineTracker(job: job, items: items, highlight: highlight, follow: follow, proxy: proxy))
+                // 練習の行を、一覧の行に合わせる (一覧が変わったときだけ知らせる)
+                .background(PracticeRowsFeeder(job: job, items: items, bilingual: bilingual))
                 .background(
                     GeometryReader { geometry in
                         // ホイールの操作が、この一覧の上かを見分けるための、一覧の位置 (ウインドウの中の横の範囲)
@@ -537,7 +545,7 @@ final class RowHighlight {
         var current: UUID?
     }
 
-    /// 1 行だけを再生している行 (PlayerController.playingLineID の写し)。
+    /// 1 行だけを再生している行 (練習で続けて流している行 PracticeController.activeLineID の写し。間を待っているあいだも入る)。
     /// 次の currentID とともに、見張らない (行の Cell を作るときに読むので、見張ると、Cell を作った行の body がすべて
     /// これを見ることになり、変わるたびに、それらの行がみな描き直される。行は自分の RowTintCell だけを見る)
     @ObservationIgnored private(set) var playingID: UUID?
@@ -620,7 +628,9 @@ private struct CurrentLineTracker: View {
 
     var body: some View {
         let player = model.player
-        let state = RowHighlight.Snapshot(playing: player.playingLineID, current: currentLine())
+        let practice = model.practice
+        // 「再生中」の行は、練習の続きの行 (間を待っているあいだも)。練習を通さない 1 行だけの再生 (確認用) なら、その行
+        let state = RowHighlight.Snapshot(playing: practice.activeLineID ?? player.playingLineID, current: currentLine())
         Color.clear
             .frame(width: 0, height: 0)
             .onAppear {
@@ -656,6 +666,14 @@ private struct CurrentLineTracker: View {
                     withAnimation { proxy.scrollTo(id, anchor: .center) }
                 }
             }
+            .onChange(of: practice.scrollRequest) { _, request in
+                // キー (上下・左の矢印) や「自動で次へ」で始めた行が見えるように、少しだけ動かす (見えていれば動かさない)。
+                // 行を押して始めた行は見えているので、頼まれない
+                guard let request else { return }
+                Task { @MainActor in
+                    proxy.scrollTo(request.id)
+                }
+            }
             .onChange(of: items.count) { _, _ in
                 guard job.status == .running, follow.isOn, !player.isPlaying, let last = items.last else { return }
                 let id = last.id
@@ -683,6 +701,29 @@ private struct CurrentLineTracker: View {
     }
 }
 
+/// 一覧の行が変わったら、練習 (PracticeController) に知らせる見えない部品。練習は、次に要るときに行を作り直す。
+/// 練習の様子は見ないので、この body は、一覧の body が動いたときだけ動く
+private struct PracticeRowsFeeder: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    let items: [TranscriptListItem]
+    let bilingual: Bool
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onAppear {
+                model.practice.rowsChanged(job: job, bilingual: bilingual)
+            }
+            .onChange(of: items) { _, _ in
+                model.practice.rowsChanged(job: job, bilingual: bilingual)
+            }
+            .onChange(of: bilingual) { _, on in
+                model.practice.rowsChanged(job: job, bilingual: on)
+            }
+    }
+}
+
 /// 検索語に色を付ける
 func highlighted(_ text: String, _ query: String) -> AttributedString {
     var s = AttributedString(text)
@@ -697,7 +738,8 @@ func highlighted(_ text: String, _ query: String) -> AttributedString {
     return s
 }
 
-/// 行そのものを再生のボタンにする。クリックでその行だけを再生し、再生中の行をもう一度クリックすると止める。
+/// 行そのものを再生のボタンにする。クリックでその行だけを再生し、再生中の行をもう一度クリックすると止める
+/// (再生は練習 (PracticeController) を通すので、繰り返し・間・自動で次へ の設定が効く。間を待っているあいだも「再生中」)。
 /// 行の文字はクリックを再生に使うため選べない (コピーは右クリックの「この行をコピー」か、上の「コピー」)
 struct PlayableRow<Content: View>: View {
     @Environment(AppModel.self) private var model
@@ -729,6 +771,9 @@ struct PlayableRow<Content: View>: View {
         if UILoadHooks.isActive { UILoadHooks.rowBodies += 1 }
         let tint = highlight.cell(for: item.id).tint
         let isPlaying = tint == .playing
+        // 原文を隠している行は、読み上げにも文を出さない
+        let hidden = model.practice.concealment(of: item).hidesSource
+        let spoken = hidden ? "隠している行" : item.text
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
             if canPlay {
                 Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle")
@@ -774,7 +819,7 @@ struct PlayableRow<Content: View>: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(canPlay ? item.text + "。" + hint(isPlaying) : item.text))
+        .accessibilityLabel(Text(canPlay ? spoken + "。" + hint(isPlaying) : spoken))
         .accessibilityAddTraits(canPlay ? .isButton : [])
         .accessibilityAction {
             if canPlay { toggle() }
@@ -795,8 +840,14 @@ struct PlayableRow<Content: View>: View {
         }
     }
 
+    /// 練習を通して流す (繰り返し・間・自動で次へ が効く)。続けて流している行なら止める
     private func toggle() {
-        model.player.toggleLine(id: item.id, start: item.start, end: item.end)
+        // 左の結果の一覧を触ったあとなら、一覧から手を離す (このあと、矢印のキーで行を移れるように)。
+        // メモや書き取りを打っている最中なら、そのままにする
+        if let window = NSApp.keyWindow, window.firstResponder is NSTableView {
+            window.makeFirstResponder(nil)
+        }
+        model.practice.toggleLine(item.id)
     }
 }
 
@@ -807,19 +858,27 @@ private enum RowMetrics {
 }
 
 struct SegmentRow: View {
+    @Environment(AppModel.self) private var model
     let item: TranscriptListItem
     let showTimestamp: Bool
     let highlight: String
     let job: Job
 
     var body: some View {
+        // 練習で隠すか (隠し方と、隠す行ならその行の「見せた」だけを見る)
+        let conceal = model.practice.concealment(of: item)
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             if showTimestamp {
                 TimestampLabel(time: item.start)
             }
             LanguageTagLabel(tag: item.languageTag)
             Text(highlighted(item.text, highlight))
+                // 隠すときは、同じ場所に灰色の帯を出す (行の高さは変わらない)
+                .redacted(reason: conceal.hidesSource ? .placeholder : [])
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if conceal.canHide {
+                RevealLineButton(id: item.id, revealed: conceal.revealed)
+            }
             ForEach(item.changes) { change in
                 AuditBadge(change: change, job: job)
             }
@@ -901,6 +960,7 @@ struct BilingualHeader: View {
 
 /// 対訳表示の 1 行 (左: 原文 / 右: 日本語訳)。文がいくつかの区間にまたがるときは、まとめて 1 行
 struct BilingualRow: View {
+    @Environment(AppModel.self) private var model
     let item: TranscriptListItem
     let isTranslating: Bool
     let showTimestamp: Bool
@@ -908,6 +968,8 @@ struct BilingualRow: View {
     let job: Job
 
     var body: some View {
+        // 練習で隠すか (隠し方と、隠す行ならその行の「見せた」だけを見る)
+        let conceal = model.practice.concealment(of: item)
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             if showTimestamp {
                 TimestampLabel(time: item.start)
@@ -915,7 +977,11 @@ struct BilingualRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 LanguageTagLabel(tag: item.languageTag)
                 Text(highlighted(item.text, highlight))
+                    .redacted(reason: conceal.hidesSource ? .placeholder : [])
                     .frame(maxWidth: .infinity, alignment: .leading)
+                if conceal.canHide {
+                    RevealLineButton(id: item.id, revealed: conceal.revealed)
+                }
                 ForEach(item.changes) { change in
                     AuditBadge(change: change, job: job)
                 }
@@ -927,6 +993,7 @@ struct BilingualRow: View {
                     if let japanese = item.japanese {
                         Text(highlighted(japanese, highlight))
                             .foregroundStyle(item.isOriginalJapanese ? Color.secondary : Color.primary)
+                            .redacted(reason: conceal.hidesTranslation ? .placeholder : [])
                     } else {
                         Text(isTranslating || job.lineQueue.contains(item.id) ? "翻訳中…" : "未翻訳")
                             .foregroundStyle(.tertiary)
@@ -939,6 +1006,25 @@ struct BilingualRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 3)
+    }
+}
+
+/// 練習で隠している行の、目のボタン。押すと、その行だけを見せる / また隠す
+struct RevealLineButton: View {
+    @Environment(AppModel.self) private var model
+    let id: UUID
+    let revealed: Bool
+
+    var body: some View {
+        Button {
+            model.practice.reveal.toggle(id)
+        } label: {
+            Image(systemName: revealed ? "eye.slash" : "eye")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(revealed ? "この行を隠す" : "この行を見る")
+        .accessibilityLabel(Text(revealed ? "この行を隠す" : "この行を見る"))
     }
 }
 
@@ -1421,11 +1507,14 @@ struct PlayerBar: View {
 
     var body: some View {
         let p = model.player
+        // 練習で間を待っているあいだも「止める」の形にする (押すと、続けて流すのが止まる)
+        let playing = p.isPlaying || model.practice.isWaiting
         HStack(spacing: 12) {
             Button {
-                p.togglePlay()
+                // 練習で続けて流している最中なら、それも終わりにする
+                model.practice.togglePlay()
             } label: {
-                Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
+                Image(systemName: playing ? "pause.fill" : "play.fill")
                     .frame(width: 16)
             }
             .buttonStyle(.bordered)
@@ -1443,6 +1532,10 @@ struct PlayerBar: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .frame(width: 56, alignment: .leading)
+            // 練習: 間の知らせ・速さ・繰り返しなど (再生位置は見ない部品に分けてある)
+            PracticeGapNote()
+            SpeedMenu()
+            PracticeMenu()
         }
     }
 }
