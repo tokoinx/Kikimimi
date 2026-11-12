@@ -160,7 +160,8 @@ enum UILoadSelfTest {
         ]
         // メインスレッドが止まったまま終わらないなら、別のスレッドから知らせて終わる
         // (8000 行では、段階と、行を作る手間を測るのとで 2 分近くかかることがある)
-        let hangLimit = 170.0
+        // ウインドウの絵も残すときは、場面を出して落ち着くのを待つぶん、長くかかる
+        let hangLimit = screenshots == nil ? 170.0 : 260.0
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
             finish(header + ["UI LOAD FAILED: the self-test did not finish in \(Int(hangLimit)) s"
                              + " (the main thread may be stuck)"], code: 3, reportPath: reportPath)
@@ -924,6 +925,7 @@ private final class LoadRun {
         player.selfTestSetTime(0, playing: false)
 
         // 1. 終わったジョブ (対訳)、一覧の始め
+        Self.live("scene 01: select the finished bilingual job")
         model.select(doneBilingual)
         await settle()
         lines += await scroll(to: doneBilingual.transcript?.segments.first?.id, .top, for: "01")
@@ -933,6 +935,7 @@ private final class LoadRun {
         // 音声が無くても、playLine は行の印を付ける (音は出ない)
         if let segments = doneBilingual.transcript?.segments, segments.count > 3 {
             let segment = segments[3]
+            Self.live("scene 02: one-line playback of row 4")
             player.playLine(id: segment.id, start: segment.start, end: segment.end)
             await settle()
             let playing = player.playingLineID == segment.id
@@ -948,12 +951,14 @@ private final class LoadRun {
         player.selfTestSetTime(0, playing: false)
 
         // 3. 終わったジョブ (日本語だけ)
+        Self.live("scene 03: select the finished plain job")
         model.select(donePlain)
         await settle()
         lines += await scroll(to: donePlain.transcript?.segments.first?.id, .top, for: "03")
         lines.append(shot("03-finished-plain", in: window, to: directory))
 
         // 4. 文字起こし中のジョブ、一覧の終わり (進み具合と、出てきた行)
+        Self.live("scene 04: select the running job")
         model.select(running)
         await settle()
         UILoadHooks.setFollowing?(true)
@@ -962,6 +967,7 @@ private final class LoadRun {
 
         // 5. 同じジョブで、追いかけるのをやめ、15 行ほど上へ動かしたところ (右下の「末尾へ」)
         let segments = running.transcript?.segments ?? []
+        Self.live("scene 05: scroll up and stop following")
         lines += await scroll(to: segments.isEmpty ? nil : segments[max(0, segments.count - 15)].id, .bottom, for: "05")
         UILoadHooks.setFollowing?(false)
         await settle()
@@ -984,6 +990,7 @@ private final class LoadRun {
         mixed.exported = true
         mixed.autoMixedFrom = "ja"
         mixed.languageCode = Languages.japaneseEnglish.code
+        Self.live("scene 06: select the automatically switched job")
         model.jobs.insert(mixed, at: 0)
         model.select(mixed)
         await settle()
@@ -1005,8 +1012,10 @@ private final class LoadRun {
         guard let scrollList = UILoadHooks.scrollList else {
             return ["UI LOAD: screenshot \(name): could not scroll the list (the list did not register its scroll hook)"]
         }
+        Self.live("  scroll for \(name)")
         scrollList(id, edge)
         await settle()
+        Self.live("  scrolled for \(name)")
         return []
     }
 
@@ -1014,6 +1023,8 @@ private final class LoadRun {
     /// 撮れなければ内容の view から撮る
     private func shot(_ name: String, in window: NSWindow, to directory: URL) -> String {
         let file = name + ".png"
+        Self.live("  draw \(file)")
+        defer { Self.live("  drew \(file)") }
         var picture: (data: Data, width: Int, height: Int)?
         var what = ""
         if let frameView = window.contentView?.superview, let p = Self.png(of: frameView) {
@@ -1032,6 +1043,12 @@ private final class LoadRun {
             return "UI LOAD: screenshot failed \(file): \(error.localizedDescription)"
         }
         return "UI LOAD: screenshot \(file) \(picture.width)x\(picture.height) (\(what))"
+    }
+
+    /// いま何をしているかを、その場で標準エラーへ書く (結果の行は終わりにまとめて出るので、途中で止まったときに
+    /// どこで止まったかが分かるように)
+    private static func live(_ text: String) {
+        FileHandle.standardError.write(Data(("UI LOAD (live): " + text + "\n").utf8))
     }
 
     /// view を描いた PNG と、その画素の幅と高さ (描けなければ nil)

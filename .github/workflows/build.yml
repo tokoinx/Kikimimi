@@ -128,7 +128,7 @@ jobs:
       # 3000 行では、47 秒の録音で 1 行を本当に再生し、行の終わりで止まるかも確かめる (音を出せない Mac では飛ばす)
       # 目安 (UILoadSelfTest.Limits) を超えたら失敗にするのは、この 3000 行だけ
       - name: UI load self-test (3000 lines, one line played from a recording)
-        timeout-minutes: 4
+        timeout-minutes: 6
         run: |
           build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000.txt --screenshots build/ui-shots
 
@@ -138,7 +138,7 @@ jobs:
       - name: UI load self-test (3000 lines, lazy list, for comparison, informational)
         if: ${{ !cancelled() }}
         continue-on-error: true
-        timeout-minutes: 4
+        timeout-minutes: 6
         run: |
           build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000-lazy.txt --list lazy --screenshots build/ui-shots-lazy
 
@@ -152,6 +152,21 @@ jobs:
             build/ui-shots-lazy
           if-no-files-found: warn
           retention-days: 14
+
+      # ウインドウの絵を、小さくしてログにも出す (成果物を取り出せない所からでも、ログから絵に戻して見られるように)。
+      # 1 枚が「UI SHOT BEGIN <名前>」と「UI SHOT END」のあいだの base64 (JPEG)
+      - name: UI screenshots into the log (small JPEG, base64)
+        if: always()
+        continue-on-error: true
+        run: |
+          for f in build/ui-shots/*.png build/ui-shots-lazy/*.png; do
+            [ -f "$f" ] || continue
+            sips -s format jpeg -s formatOptions 60 "$f" --out "$f.jpg" >/dev/null 2>&1 || continue
+            echo "UI SHOT BEGIN $f"
+            base64 -i "$f.jpg" | fold -w 4000
+            echo "UI SHOT END"
+            rm -f "$f.jpg"
+          done
 
       # 8000 行は参考に測るだけ (失敗にしない)。2 時間の録音の本当の文字起こしは 2000〜4000 行ほどなので、
       # 目安は 3000 行で決めている。8000 行で目安を超えても、この段は止めずに先へ進む
