@@ -6,6 +6,8 @@ struct TranscriptDetailView: View {
     @Environment(AppModel.self) private var model
     let job: Job
     @State private var cache = TranscriptRowCache()
+    /// メモの欄と一覧を並べている欄の幅 (NotesSidebar だけが見る。この body では中を見ない)
+    @State private var notesSpace = NotesSpace()
 
     var body: some View {
         // 翻訳の状況・言語の名前・一覧の行は、文字起こしが変わったときだけ作り直す (長い録音では区間が数千あるため。
@@ -77,15 +79,27 @@ struct TranscriptDetailView: View {
                 let items = cache.items(of: transcript, job: job.id, done: job.status == .done,
                                         bilingual: bilingual, query: model.searchText)
                 // 右にメモの欄 (「メモ」を入れたときだけ)。メモの中身を見るのは NotesPane だけ (打つたびに一覧を作り直さない)。
-                // 一覧は、メモを出しても消しても同じ場所に置く (置き場所を変えると一覧が作り直され、読んでいた位置が始めに戻る)
-                HSplitView {
+                // メモの欄の幅を見るのも NotesSidebar だけ (区切りを動かしても、この body は動かない)。
+                // 一覧は、メモを出しても消しても同じ場所に置く (置き場所を変えると一覧が作り直され、読んでいた位置が始めに戻る)。
+                // HSplitView は使わない: 下の NSSplitView が、中の部品に望みの大きさを尋ね、尋ねられた ScrollView は
+                // 中身をすべて測るので、LazyVStack が 3000 行をすべて作った (GitHub の Mac で、終わったジョブを 2 回目に選ぶと
+                // 5〜21 秒。HSplitView の前は 0.13〜1.0 秒)
+                let space = notesSpace
+                HStack(spacing: 0) {
                     transcriptColumn(items: items, bilingual: bilingual, languageLabel: summary.languageLabel)
-                        .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(minWidth: CGFloat(NotesSidebar.listMinWidth), maxWidth: .infinity, maxHeight: .infinity)
                     if model.showNotes {
-                        NotesPane(job: job)
-                            .frame(minWidth: 220, idealWidth: 320, maxWidth: 520, maxHeight: .infinity)
+                        NotesSidebar(job: job, space: space)
                     }
                 }
+                .background(
+                    GeometryReader { geometry in
+                        // 並べている欄の幅 (メモの欄を広げても、一覧に 360 pt を残すため)。見るのは NotesSidebar だけ
+                        Color.clear
+                            .onAppear { space.width = Double(geometry.size.width) }
+                            .onChange(of: geometry.size.width) { _, width in space.width = Double(width) }
+                    }
+                )
             } else {
                 Spacer()
             }
@@ -278,49 +292,78 @@ struct TranscriptListView: View {
         // 中を見ずに、入れ物そのものを渡す (行・見えない部品・ボタンが、それぞれ要るものだけを見る)
         let highlight = self.highlight
         let follow = self.follow
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    rows(canPlay: canPlay, translating: translating, showTimestamps: showTimestamps,
-                         highlightText: highlightText, running: running, highlight: highlight, follow: follow)
+        // 一覧の大きさは、外から与えられた大きさに決める (GeometryReader は、与えられた大きさをそのまま取り、
+        // 中の部品に望みの大きさを尋ねない)。親の部品が ScrollView に望みの大きさを尋ねると、ScrollView は中身を
+        // すべて測るので、LazyVStack が行をすべて作る: GitHub の Mac で 3000 行のとき、終わったジョブを選ぶ 1 回が
+        // 0.13〜1.0 秒から 5〜21 秒になった (結果の画面を HSplitView に入れたとき。その前にも 1 度、初めに選んだ 1 回が
+        // 17.9 秒になったことがある)。
+        // 大きさが変わると (ウインドウやメモの欄の幅を変えると) この中が動くが、行の中身は TranscriptRows に分けてあり、
+        // 渡すものが変わらないので、行を作り直さない
+        GeometryReader { geometry in
+            ScrollViewReader { proxy in
+                ScrollView {
+                    TranscriptRows(job: job, items: items, bilingual: bilingual, emptyMessage: emptyMessage,
+                                   canPlay: canPlay, translating: translating, showTimestamps: showTimestamps,
+                                   highlightText: highlightText, running: running, highlight: highlight, follow: follow)
                 }
-                .padding(.vertical, 6)
-            }
-            .background(Color(nsColor: .controlBackgroundColor))
-            .background(CurrentLineTracker(job: job, items: items, highlight: highlight, follow: follow, proxy: proxy))
-            .background(
-                GeometryReader { geometry in
-                    // ホイールの操作が、この一覧の上かを見分けるための、一覧の位置 (ウインドウの中の横の範囲)
-                    Color.clear
-                        .onAppear { follow.frame = geometry.frame(in: .global) }
-                        .onChange(of: geometry.frame(in: .global)) { _, frame in follow.frame = frame }
-                }
-            )
-            .overlay(alignment: .bottomTrailing) {
-                FollowButton(follow: follow, running: running, lastID: items.last?.id, proxy: proxy)
-            }
-            .onAppear {
-                follow.install()
-                // 画面の重さの確認 (--selftest-ui-load --screenshots) が、絵を撮る前に一覧を動かす口
-                if UILoadHooks.isActive {
-                    UILoadHooks.scrollList = { id, edge in
-                        proxy.scrollTo(id, anchor: edge == .top ? .top : .bottom)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .background(CurrentLineTracker(job: job, items: items, highlight: highlight, follow: follow, proxy: proxy))
+                .background(
+                    GeometryReader { geometry in
+                        // ホイールの操作が、この一覧の上かを見分けるための、一覧の位置 (ウインドウの中の横の範囲)
+                        Color.clear
+                            .onAppear { follow.frame = geometry.frame(in: .global) }
+                            .onChange(of: geometry.frame(in: .global)) { _, frame in follow.frame = frame }
                     }
-                    UILoadHooks.setFollowing = { on in
-                        if follow.isOn != on { follow.isOn = on }
-                    }
-                    UILoadHooks.isFollowing = { follow.isOn }
+                )
+                .overlay(alignment: .bottomTrailing) {
+                    FollowButton(follow: follow, running: running, lastID: items.last?.id, proxy: proxy)
                 }
+                .onAppear {
+                    follow.install()
+                    // 画面の重さの確認 (--selftest-ui-load --screenshots) が、絵を撮る前に一覧を動かす口
+                    if UILoadHooks.isActive {
+                        UILoadHooks.scrollList = { id, edge in
+                            proxy.scrollTo(id, anchor: edge == .top ? .top : .bottom)
+                        }
+                        UILoadHooks.setFollowing = { on in
+                            if follow.isOn != on { follow.isOn = on }
+                        }
+                        UILoadHooks.isFollowing = { follow.isOn }
+                    }
+                }
+                .onDisappear { follow.remove() }
             }
-            .onDisappear { follow.remove() }
         }
     }
+}
 
-    /// 一覧の中身: 行、行が無いときの知らせ、一覧の終わりの印。
-    /// 行に .id() は付けない (scrollTo は ForEach の id で動くので、要らない)
+/// 一覧の中身: 行、行が無いときの知らせ、一覧の終わりの印 (TranscriptListView の ScrollView の中)。
+/// 一覧の大きさが変わっても、渡すものは変わらないので、この body は動かない (動くと、ForEach が数千の id を比べ直す)。
+/// 行に .id() は付けない (scrollTo は ForEach の id で動くので、要らない)
+private struct TranscriptRows: View {
+    let job: Job
+    let items: [TranscriptListItem]
+    let bilingual: Bool
+    let emptyMessage: String
+    let canPlay: Bool
+    let translating: Bool
+    let showTimestamps: Bool
+    let highlightText: String
+    let running: Bool
+    let highlight: RowHighlight
+    let follow: ListFollow
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            rows
+        }
+        .padding(.vertical, 6)
+    }
+
     @ViewBuilder
-    private func rows(canPlay: Bool, translating: Bool, showTimestamps: Bool,
-                      highlightText: String, running: Bool, highlight: RowHighlight, follow: ListFollow) -> some View {
+    private var rows: some View {
         let lastID = items.last?.id
         ForEach(items) { item in
             // 行と、その下の区切りの線 (行の背景の外に、行の余白と同じだけ内側へ寄せて引く。最後の行の下には引かない)
@@ -639,6 +682,7 @@ struct PlayableRow<Content: View>: View {
     let content: Content
     @State private var hovering = false
 
+    @MainActor
     init(item: TranscriptListItem, job: Job, canPlay: Bool, highlight: RowHighlight,
          @ViewBuilder content: () -> Content) {
         self.item = item
@@ -646,6 +690,8 @@ struct PlayableRow<Content: View>: View {
         self.canPlay = canPlay
         self.highlight = highlight
         self.content = content()
+        // 画面の重さの確認が、一覧が作った行の数を数える (一覧が行を遅れて作っているか。ふだんは Bool を 1 つ見るだけ)
+        if UILoadHooks.isActive { UILoadHooks.rowsBuilt += 1 }
     }
 
     var body: some View {

@@ -26,6 +26,8 @@ import KikimimiCore
 ///    300 の区間をいっぺんに (3 回)
 /// ジョブを選ぶ操作は段階の外で測る (3 回ずつ)。測った数が 20 に足りない操作は、p95 を出すが目安と比べず、最大だけを比べる。
 /// ジョブを選ぶ操作は、測った順の値も出す (初めの 1 回だけが遅いのか、あとの回も遅いのかを見分けるため)。
+/// ジョブを選ぶ操作は、その 1 回で一覧が作った行の数 (PlayableRow を作った回数) も出し、目安 (600) と比べる
+/// (一覧が行を遅れて作らず、すべてを作っていないか。時間だけでは、遅い実行機と見分けにくい)。
 /// 行にマウスを載せたときの色は、行の中だけの状態なので、外から変えられない。
 /// 段階の前に、画面を使わずに、一覧の行を作る手間 (TranscriptRowCache: すべてから作り直す / 10 区間を足す) も測る。
 ///
@@ -77,6 +79,10 @@ enum UILoadSelfTest {
         static let whileAddedMax = 0.700
         /// ジョブを選ぶ (最大だけ)
         static let selectMax = 3.0 // 測った値 0.22〜0.94 秒
+        /// ジョブを選ぶ 1 回で、一覧が作る行の数 (秒ではなく行の数)。ウインドウに出る行は 15〜40 ほどで、LazyVStack は
+        /// その前後も少し作る。3000 行すべてを作るなら、一覧が行を遅れて作らなくなっている (親の部品が一覧に望みの大きさを
+        /// 尋ねたときなど。HSplitView に入れたときは、選ぶ 1 回が 5〜21 秒になった)
+        static let selectRowsBuiltMax = 600
         /// 測った数がこれより少ない操作は、p95 を目安と比べない (少ないと、p95 は最大と同じになる)。最大だけを比べる
         static let p95MinSamples = 20
     }
@@ -510,6 +516,8 @@ enum UILoadHooks {
     static var setFollowing: (@MainActor (Bool) -> Void)?
     /// 一覧の終わりを追いかけているか
     static var isFollowing: (@MainActor () -> Bool)?
+    /// 一覧が作った行の数 (PlayableRow を作った回数。確認の最中だけ数える)
+    static var rowsBuilt = 0
 }
 
 /// 画面の重さの確認の、ジョブと操作と測った値
@@ -555,6 +563,10 @@ private final class LoadRun {
     private var burstWaits: [Double] = []
     /// 一覧の行を作る手間を測ったときに、足した分だけを作る道を通らなかった回数
     private var appendPathMissed = 0
+    /// ジョブを選ぶ操作ごとの、その 1 回で一覧が作った行の数 (測った順)
+    private var rowsBuiltBySelect: [String: [Int]] = [:]
+    /// 測る段階のすべて (drive) で、一覧が作った行の数
+    private var rowsBuiltTotal: Int?
 
     init(model: AppModel, rows: Int, url: URL) {
         self.model = model
@@ -607,6 +619,7 @@ private final class LoadRun {
     func drive() async {
         probe.start()
         let started = Date()
+        let rowsAtStart = UILoadHooks.rowsBuilt
         // 1. 終わったジョブ (対訳)
         await measure(Action.selectBilingual) { model.select(doneBilingual) }
         await UILoadSelfTest.sleep(0.5)
@@ -656,6 +669,7 @@ private final class LoadRun {
         probe.stop()
         // 届いていない合図を待つ
         await UILoadSelfTest.sleep(0.3)
+        rowsBuiltTotal = UILoadHooks.rowsBuilt - rowsAtStart
         log.summaryLine = String(format: "driven for %.1f s: %d ticks (%d of them moved the current row), %d one-line starts,"
                                  + " %d segments delivered to the running job (it now has %d rows; batches are applied every"
                                  + " %.2f s at that size)",
@@ -819,10 +833,15 @@ private final class LoadRun {
     private func measure(_ action: String, _ body: () -> Void) async {
         let name = rowsAdded ? (Action.whileAdded[action] ?? action) : action
         log.note(name)
+        let rowsBefore = UILoadHooks.rowsBuilt
         let started = UILoadSelfTest.now()
         body()
         let seconds = await UILoadSelfTest.untilIdle(since: started)
         measured[name, default: []].append(seconds)
+        // ジョブを選ぶ操作は、そのあいだに一覧が作った行の数も記録する
+        if Self.selectActions.contains(name) {
+            rowsBuiltBySelect[name, default: []].append(UILoadHooks.rowsBuilt - rowsBefore)
+        }
     }
 
     /// ジョブを選ぶ操作 (目安は最大だけ。結果には、測った順の値も出す)
@@ -1099,7 +1118,13 @@ private final class LoadRun {
             // ジョブを選ぶ操作は、測った順の値も出す (初めの 1 回だけが遅いのかを見分ける)
             if Self.selectActions.contains(action) {
                 lines.append("UI LOAD: samples \"\(action)\": " + inOrder.map(f).joined(separator: ", ") + " ms")
+                let built = rowsBuiltBySelect[action] ?? []
+                lines.append("UI LOAD: rows built \"\(action)\": " + built.map { String($0) }.joined(separator: ", "))
             }
+        }
+        if let rowsBuiltTotal {
+            lines.append("UI LOAD: rows built during the measured part: \(rowsBuiltTotal)"
+                         + " (PlayableRow inits; limit per select: \(Limits.selectRowsBuiltMax))")
         }
         let samples = probe.samples()
         lines.append("watchdog: a background thread posts a block to the main queue every 50 ms (without waiting for the"
@@ -1154,6 +1179,17 @@ private final class LoadRun {
         }
         for limit in Self.actionLimits {
             check(limit.action, p95: limit.p95, max: limit.max, required: limit.required)
+        }
+        // ジョブを選ぶ 1 回で一覧が作った行の数 (一覧が行を遅れて作っているか)
+        for action in Self.selectActions {
+            if let worst = rowsBuiltBySelect[action]?.max(), worst > Limits.selectRowsBuiltMax {
+                failures.append("\"\(action)\" built \(worst) rows in one selection > \(Limits.selectRowsBuiltMax)"
+                                + " (the list is no longer lazy)")
+            }
+        }
+        // 一覧が行を作ったのに数えていなければ、上の確かめは役に立たない
+        if rowsBuiltTotal == 0 {
+            failures.append("no rows were counted while measuring (UILoadHooks.rowsBuilt is not incremented by PlayableRow)")
         }
         // 見張り: 4 つの段階のどれも
         let watchdogLimits: [(phase: String, max: Double)] = [

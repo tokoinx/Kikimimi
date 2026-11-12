@@ -195,6 +195,16 @@ final class AppModel {
     var showBilingual: Bool { didSet { save(showBilingual, "showBilingual") } }
     /// 結果の右にメモの欄を出す
     var showNotes: Bool { didSet { save(showNotes, "showNotes") } }
+    /// メモの欄の幅 (pt)。メモの欄の左の区切りをつかんで変える
+    var notesWidth: Double {
+        didSet {
+            let fitted = min(max(notesWidth, Self.notesWidthRange.lowerBound), Self.notesWidthRange.upperBound)
+            if fitted != notesWidth { notesWidth = fitted }
+            save(notesWidth, "notesWidth")
+        }
+    }
+    /// メモの欄の幅の範囲 (pt)
+    static let notesWidthRange: ClosedRange<Double> = 220...520
     /// 履歴の画面を開いているジョブ (nil なら閉じている)
     var historyJobID: Job.ID?
     /// 学習した直し (監査の一覧で利用者が決めた直し・設定で自分で書いた直し)。Mac の中だけに保存する
@@ -251,6 +261,8 @@ final class AppModel {
         autoTranslate = d.object(forKey: "autoTranslate") as? Bool ?? true
         showBilingual = d.object(forKey: "showBilingual") as? Bool ?? true
         showNotes = d.object(forKey: "showNotes") as? Bool ?? false
+        notesWidth = min(max(d.object(forKey: "notesWidth") as? Double ?? 320, Self.notesWidthRange.lowerBound),
+                         Self.notesWidthRange.upperBound)
         useLedger = d.object(forKey: "useLedger") as? Bool ?? true
         useAdapter = d.object(forKey: "useAdapter") as? Bool ?? true
         llmStore = LLMModelStore(models: store)
