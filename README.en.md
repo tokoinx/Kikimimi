@@ -13,7 +13,7 @@ Neither your audio nor the transcript leaves your Mac. The only network access i
 - Finder's "Open With" and drops on the Dock icon work too
 - Text appears sentence by sentence while it is being recognized, and any job can be cancelled
 - Microphone recording, with a live preview of the last few seconds while you record; the full recording is transcribed carefully when you stop
-- Click a line to play just that line (click it again to stop; right-click › ここから続けて再生 to keep playing from there); search highlights matches
+- Click a line to play just that line; it stops at the end of the line (click it again to stop; the space bar or the play button below also stops it, and pressing it again continues from where it stopped; right-click › ここから続けて再生 to keep playing from there); search highlights matches
 - **Auditor**: after transcription, a reviewer looks for repeated sentences and misheard words. Only confident corrections are applied; the rest are kept as suggestions. Every change can be reviewed and undone
 - **English → Japanese translation**: the original on the left, the Japanese translation on the right (Chinese, Korean and others can be translated to Japanese too). Translate everything at once, or only the sentences you want, one at a time, with the "訳" button on a line
 - Export to txt / srt / vtt / Markdown / csv / json (original, Japanese, or both side by side)
@@ -256,6 +256,7 @@ Models are stored in `~/Library/Application Support/Kikimimi/Models`. Download, 
 | Loading a LoRA adapter | Checked with the real llama.cpp (Linux) and Qwen3.5 0.8B: an all-zero adapter leaves the output unchanged, a random one changes it, a broken file or an adapter for another model is not loaded and the plain LLM is used. On GitHub's Mac, a zero adapter converted from the MLX layout also leaves the evaluation result unchanged |
 | Fine-tuning (the MLX training itself) | Confirmed end to end on GitHub's Mac (macOS 15) with Qwen3.5 0.8B: train with MLX (425 steps, validation loss 0.80 → 0.11), convert five intermediate adapters to GGUF, compare them with the built app's evaluation harness and pick one. Of 5 lines never seen in training, the plain model found 0 and the chosen adapter found 4 (as suggestions; no wrong fix, no correct line harmed). The adapters from 85–255 steps found 0 and the one from 340 steps found 1. How the training must be done (answer-only loss, no padding position, Adam bias correction, number of steps and side effects) was worked out by running the same training in PyTorch and evaluating the converted adapters with the real llama.cpp (Linux). Not verified on real hardware (an 8 GB M1) or with 2B and larger (GitHub's Mac has a virtual GPU and needs 1 h 40 min for 425 steps on 0.8B; the speed on real hardware is unknown) |
 | Results kept when the window is closed, the confirmation before quitting, the fine-tuning settings screen | Not verified (implemented and built only; the UI cannot be exercised on Linux or on GitHub's Mac) |
+| A transcript with thousands of lines keeps the window responsive while lines play and a transcription runs, and a single line stops at its end | GitHub Actions runs the built app's `--selftest-ui-load` on every push (3000 and 8000 lines. For about 7 s it moves the playback position, starts and stops single lines and appends segments to a running transcription; it passes when the main thread's wait is under 0.25 s at the 95th percentile and under 1 s at most. With 3000 lines it also really plays one line of the 47 s recording and checks that it stops at the end of the line and that the play button then continues from there; that part is skipped on a Mac that cannot play audio). Not verified on real hardware (a 2-hour recording) |
 
 ## Tests
 
@@ -321,6 +322,7 @@ Sources/
     TrainingExport.swift --export-training (fine-tuning data export)
     WhisperSelfTest.swift  --selftest-whisper (diagnostics and CI)
     LaunchSelfTest.swift --selftest-launch (launch and window check, for make doctor and CI)
+    UILoadSelfTest.swift --selftest-ui-load (checks that a transcript with thousands of lines does not freeze the window, for CI)
     AudioDecoder.swift   Audio/video to 16 kHz mono
     LiveRecorder.swift   Microphone recording
     PlayerController.swift  Playback and seeking

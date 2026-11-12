@@ -124,6 +124,18 @@ jobs:
           cat build/launch-external.txt
           grep -q "LAUNCH SELFTEST OK" build/launch-external.txt
 
+      # 数千行の結果で、画面が固まらないこと (再生位置・1 行だけの再生・文字起こしの続きを起こし、メインスレッドの待ちを測る)。
+      # 3000 行では、47 秒の録音で 1 行を本当に再生し、行の終わりで止まるかも確かめる (音を出せない Mac では飛ばす)
+      - name: UI load self-test (3000 lines, one line played from a recording)
+        timeout-minutes: 3
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000.txt
+
+      - name: UI load self-test (8000 lines)
+        timeout-minutes: 3
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 8000 --report build/ui-load-8000.txt
+
       - name: Version line
         run: |
           build/Kikimimi.app/Contents/MacOS/Kikimimi --version

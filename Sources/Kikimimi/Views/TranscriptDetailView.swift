@@ -4,8 +4,12 @@ import SwiftUI
 struct TranscriptDetailView: View {
     @Environment(AppModel.self) private var model
     let job: Job
+    @State private var cache = TranscriptViewCache()
 
     var body: some View {
+        // 翻訳の状況・言語の名前は、文字起こしが変わったときだけ数え直す (長い録音では区間が数千あるため。
+        // 画面は、進み具合や検索欄の入力でも描き直される)
+        let summary = job.transcript.map { cache.summary(of: $0, job: job) }
         VStack(alignment: .leading, spacing: 0) {
             header
                 .padding(.horizontal, 20)
@@ -54,10 +58,8 @@ struct TranscriptDetailView: View {
 
             PostProcessBar(job: job)
 
-            if let transcript = job.transcript {
-                // 翻訳の状況は、描くたびに 1 回だけ数える (長い録音では区間が数千あるため)。
-                // 文字起こしの最中は区間が増えるたびに描き直すので数えない (終わってから使う)
-                let stats = job.status == .done ? transcript.translationStats : Transcript.TranslationStats()
+            if let transcript = job.transcript, let summary {
+                let stats = summary.stats
                 let bilingual = model.isBilingual(stats, in: job)
                 if job.status == .done, let from = job.autoMixedFrom, !job.autoMixedNoticeDismissed {
                     AutoMixedLanguageNotice(job: job, from: from)
@@ -65,7 +67,7 @@ struct TranscriptDetailView: View {
                         .padding(.bottom, 8)
                 }
                 if job.status == .done, job.languageCode == "ja", job.url != nil, !job.mixedSuggestionDismissed,
-                   job.allowsAutoMixed, transcript.spokenLanguages.isEmpty, stats.isMainlyForeign {
+                   job.allowsAutoMixed, summary.spokenLanguages.isEmpty, stats.isMainlyForeign {
                     MixedLanguageSuggestion(job: job)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
@@ -81,18 +83,19 @@ struct TranscriptDetailView: View {
                     .padding(.vertical, 8)
                 Divider()
                 if bilingual {
-                    BilingualHeader(label: transcript.languageLabel, showTimestamp: model.showTimestamps,
+                    BilingualHeader(label: summary.languageLabel, showTimestamp: model.showTimestamps,
                                     showPlayMark: model.canPlayLines(of: job))
                     Divider()
                 }
-                TranscriptListView(job: job, items: listItems(transcript, bilingual: bilingual),
+                TranscriptListView(job: job, items: cache.items(of: transcript, job: job, bilingual: bilingual,
+                                                                query: model.searchText, make: listItems),
                                    bilingual: bilingual, emptyMessage: emptyMessage)
             } else {
                 Spacer()
             }
         }
         .navigationTitle(job.name)
-        .navigationSubtitle(subtitle)
+        .navigationSubtitle(subtitle(summary))
     }
 
     // MARK: ヘッダ
@@ -123,10 +126,10 @@ struct TranscriptDetailView: View {
         .font(.callout)
     }
 
-    private var subtitle: String {
-        guard let t = job.transcript else { return "" }
+    private func subtitle(_ summary: TranscriptViewCache.Summary?) -> String {
+        guard let t = job.transcript, let summary else { return "" }
         var parts: [String] = []
-        if let l = t.languageLabel { parts.append(l) }
+        if let l = summary.languageLabel { parts.append(l) }
         if let m = t.model, let spec = ModelCatalog.spec(id: m) { parts.append(spec.displayName) }
         return parts.joined(separator: " · ")
     }
@@ -174,9 +177,9 @@ struct TranscriptDetailView: View {
     }
 
     // MARK: 本文
-    /// 一覧に出す行 (対訳表示なら訳ごと、そうでなければ区間ごと)。検索語で絞る
-    private func listItems(_ transcript: Transcript, bilingual: Bool) -> [TranscriptListItem] {
-        let q = model.searchText.trimmingCharacters(in: .whitespaces)
+    /// 一覧に出す行 (対訳表示なら訳ごと、そうでなければ区間ごと)。検索語で絞る (作り直すのは TranscriptViewCache が決める)
+    private func listItems(_ transcript: Transcript, bilingual: Bool, query: String) -> [TranscriptListItem] {
+        let q = query.trimmingCharacters(in: .whitespaces)
         let changes = Dictionary((transcript.audit?.changes ?? []).map { ($0.original.id, $0) },
                                  uniquingKeysWith: { a, _ in a })
         // 「日本語＋英語」で 2 つの言語が混ざるときだけ、行に言語の印 (英・日) を付ける
@@ -218,6 +221,58 @@ struct TranscriptDetailView: View {
         case .done: return "言葉を検出できませんでした。無音か、言語の設定が合っていない可能性があります。"
         default: return ""
         }
+    }
+}
+
+/// 結果の画面で、区間の数だけ手間がかかるもの (翻訳の状況・言語の名前・一覧の行) を覚えておく。
+/// 文字起こし・ジョブの状態・表示の条件が同じなら、前に作ったものを返す。
+/// (文字起こしの比べは、区間の数が違えばすぐ終わり、同じ配列ならその場で同じとわかる)
+@MainActor
+final class TranscriptViewCache {
+    struct Summary {
+        var stats = Transcript.TranslationStats()
+        var spokenLanguages: [String] = []
+        var languageLabel: String?
+    }
+
+    private struct SummaryKey: Equatable {
+        let job: UUID
+        let transcript: Transcript
+        let done: Bool
+    }
+
+    private struct ItemsKey: Equatable {
+        let summary: SummaryKey
+        let bilingual: Bool
+        let query: String
+    }
+
+    private var summaryKey: SummaryKey?
+    private var summaryValue = Summary()
+    private var itemsKey: ItemsKey?
+    private var itemsValue: [TranscriptListItem] = []
+
+    func summary(of transcript: Transcript, job: Job) -> Summary {
+        let key = SummaryKey(job: job.id, transcript: transcript, done: job.status == .done)
+        if key != summaryKey {
+            // 翻訳の状況は、文字起こしが終わってから数える (最中は区間が増えるたびに数え直すことになるため)
+            let stats = key.done ? transcript.translationStats : Transcript.TranslationStats()
+            summaryValue = Summary(stats: stats, spokenLanguages: transcript.spokenLanguages,
+                                   languageLabel: transcript.languageLabel)
+            summaryKey = key
+        }
+        return summaryValue
+    }
+
+    func items(of transcript: Transcript, job: Job, bilingual: Bool, query: String,
+               make: (Transcript, Bool, String) -> [TranscriptListItem]) -> [TranscriptListItem] {
+        let key = ItemsKey(summary: SummaryKey(job: job.id, transcript: transcript, done: job.status == .done),
+                           bilingual: bilingual, query: query)
+        if key != itemsKey {
+            itemsValue = make(transcript, bilingual, query)
+            itemsKey = key
+        }
+        return itemsValue
     }
 }
 
@@ -265,33 +320,38 @@ struct LanguageTagLabel: View {
     }
 }
 
-/// 本文の一覧。再生位置 (0.2 秒ごとに変わる) を見るのはここだけにして、画面ぜんたいを描き直さない
+/// 本文の一覧。再生位置 (0.2 秒ごとに変わる) はここでは見ない (見ると、0.2 秒ごとに数千の行を並べ直すことになる)。
+/// いまの位置にある行は CurrentLineTracker が探して、行が変わったときだけ知らせる
 struct TranscriptListView: View {
     @Environment(AppModel.self) private var model
     let job: Job
     let items: [TranscriptListItem]
     let bilingual: Bool
     let emptyMessage: String
+    /// ふつうの再生で、いまの位置にある行
+    @State private var currentID: UUID?
 
     var body: some View {
         let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
         let canPlay = model.canPlayLines(of: job)
         let playingID = model.player.playingLineID
+        let showTimestamps = model.showTimestamps
+        let highlight = model.searchText
         ScrollViewReader { proxy in
+            // 行に .id() を付けない (付けると List がすべての行を一度に作るようになる。scrollTo は ForEach の id で動く)
             List {
                 ForEach(items) { item in
                     // 1 行だけを再生しているあいだは、その行だけを色付けする (再生位置の色と重ねない)
                     PlayableRow(item: item, job: job, canPlay: canPlay, isPlaying: playingID == item.id,
-                                isCurrent: playingID == nil && isCurrent(item)) {
+                                isCurrent: playingID == nil && currentID == item.id) {
                         if bilingual {
-                            BilingualRow(item: item, isTranslating: translating, showTimestamp: model.showTimestamps,
-                                         highlight: model.searchText, job: job)
+                            BilingualRow(item: item, isTranslating: translating, showTimestamp: showTimestamps,
+                                         highlight: highlight, job: job)
                         } else {
-                            SegmentRow(item: item, showTimestamp: model.showTimestamps,
-                                       highlight: model.searchText, job: job)
+                            SegmentRow(item: item, showTimestamp: showTimestamps,
+                                       highlight: highlight, job: job)
                         }
                     }
-                    .id(item.id)
                 }
                 if items.isEmpty {
                     Text(emptyMessage)
@@ -299,24 +359,56 @@ struct TranscriptListView: View {
                 }
             }
             .listStyle(.inset)
-            .onChange(of: model.player.currentTime) { _, _ in
+            .background(CurrentLineTracker(job: job, items: items, currentID: $currentID))
+            .onChange(of: currentID) { _, id in
                 // 1 行だけの再生では、押した行が見えているので追いかけない
-                if model.player.isPlaying, model.player.playingLineID == nil, let cur = items.first(where: isCurrent) {
-                    withAnimation { proxy.scrollTo(cur.id, anchor: .center) }
+                if let id, model.player.isPlaying, model.player.playingLineID == nil {
+                    withAnimation { proxy.scrollTo(id, anchor: .center) }
                 }
             }
             .onChange(of: items.count) { _, _ in
                 if job.status == .running, let last = items.last {
-                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                    proxy.scrollTo(last.id, anchor: .bottom)
                 }
             }
         }
     }
+}
 
-    private func isCurrent(_ item: TranscriptListItem) -> Bool {
-        guard model.player.url != nil, model.player.url == job.url else { return false }
-        let t = model.player.currentTime
-        return t >= item.start && t < max(item.end, item.start + 0.3)
+/// 再生位置 (0.2 秒ごとに変わる) を見るのは、この見えない部品だけ。
+/// いまの位置にある行を、行の始まりの時刻で二分探索して探し、行が変わったときだけ一覧に知らせる
+private struct CurrentLineTracker: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    let items: [TranscriptListItem]
+    @Binding var currentID: UUID?
+
+    var body: some View {
+        let id = currentLine()
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onAppear {
+                if currentID != id { currentID = id }
+            }
+            .onChange(of: id) { _, new in
+                currentID = new
+            }
+    }
+
+    private func currentLine() -> UUID? {
+        let player = model.player
+        guard player.url != nil, player.url == job.url else { return nil }
+        let t = player.currentTime
+        // 行は始まりの時刻の順に並んでいる: t までに始まった最後の行
+        var low = 0
+        var high = items.count
+        while low < high {
+            let mid = (low + high) / 2
+            if items[mid].start <= t { low = mid + 1 } else { high = mid }
+        }
+        guard low > 0 else { return nil }
+        let item = items[low - 1]
+        return t < max(item.end, item.start + 0.3) ? item.id : nil
     }
 }
 
@@ -1009,7 +1101,7 @@ struct PlayerBar: View {
                     .frame(width: 16)
             }
             .buttonStyle(.bordered)
-            .help("再生 / 一時停止")
+            .help("再生 / 一時停止 (スペースキー)")
             Text(TimeFormat.short(p.currentTime))
                 .monospacedDigit()
                 .font(.callout)

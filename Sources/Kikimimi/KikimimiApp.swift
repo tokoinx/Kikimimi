@@ -6,6 +6,7 @@ import SwiftUI
 /// 起動の入り口。`--selftest-llm <GGUF>` / `--selftest-whisper <音声>` のときは画面を出さずに、
 /// LLM / 文字起こしの動作確認だけをして終わる (診断・CI 用)。
 /// `--selftest-launch` は、ふつうに起動して、数秒後にウインドウができたかを確かめて終わる (起動しないときの診断用)。
+/// `--selftest-ui-load` は、ふつうに起動して、数千行の結果を出したまま再生や文字起こしと同じ変化を起こし、画面が固まらないかを測る。
 /// `--eval-llm` は、決まった場面で監査役・翻訳役を動かして成績を数える (評価ハーネス)
 @main
 enum KikimimiMain {
@@ -33,6 +34,9 @@ enum KikimimiMain {
         }
         if args.contains("--selftest-launch") {
             LaunchSelfTest.arm(arguments: args)
+        }
+        if args.contains("--selftest-ui-load") {
+            UILoadSelfTest.arm(arguments: args)
         }
         LaunchLog.note("launch: \(LaunchLog.versionLine); \(LaunchLog.environmentLine); other instances: \(LaunchLog.otherInstances())")
         // 前回のウインドウの状態を復元しない。強制終了の後 (make run は前のアプリを終了させてから起動する) の起動では、
@@ -71,6 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var openMainWindow: (@MainActor () -> Void)?
     /// 起動の確認 (`--selftest-launch --reopen`) のあいだは、ウインドウを閉じても終了しない
     var keepRunningWithoutWindows = false
+    /// ウインドウの中のモデル (画面の重さの確認 `--selftest-ui-load` が、結果を入れるのに使う)
+    weak var model: AppModel?
     /// 呼ばれたときに、こちらでウインドウを開き直した回数 (確認用)
     private(set) var windowsReopened = 0
 
@@ -194,8 +200,46 @@ private struct AppLifecycleHook: View {
                 delegate.isBusy = { model.isBusy }
                 delegate.unsavedResultCount = { model.unsavedResultCount }
                 delegate.openMainWindow = { openWindow(id: MainWindow.id) }
+                delegate.model = model
+                PlaybackKeys.install(model: model)
                 LaunchLog.note("window appeared")
             }
+    }
+}
+
+/// スペースキーで再生 / 一時停止 (1 行だけの再生も止まる)。
+/// メニューの key equivalent にすると、検索欄で空白を打てなくなるので、メインのウインドウに届くキーを見て決める。
+/// 文字を入力している欄や、フォーカスのあるボタンでは、ふつうにスペースを渡す
+@MainActor
+enum PlaybackKeys {
+    private static var monitor: Any?
+
+    static func install(model: AppModel) {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: handler(model: model))
+    }
+
+    nonisolated private static func handler(model: AppModel) -> (NSEvent) -> NSEvent? {
+        return { event in
+            // スペースキー (49) を、修飾キーなしで押した
+            guard event.keyCode == 49, !event.isARepeat,
+                  event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock).isEmpty,
+                  let window = event.window else { return event }
+            let used = MainActor.assumeIsolated { handle(in: window, model: model) }
+            return used ? nil : event
+        }
+    }
+
+    private static func handle(in window: NSWindow, model: AppModel) -> Bool {
+        guard window.attachedSheet == nil,
+              MainWindow.all().contains(where: { $0 === window }),
+              model.player.url != nil else { return false }
+        if let responder = window.firstResponder {
+            if responder is NSText { return false }
+            if responder is NSControl, !(responder is NSTableView) { return false }
+        }
+        model.player.togglePlay()
+        return true
     }
 }
 
@@ -261,7 +305,10 @@ struct KikimimiApp: App {
             }
             CommandGroup(after: .saveItem) {
                 Menu("書き出す") {
-                    ExportMenuItems(hasTranslation: model.selectedJob?.transcript?.hasTranslation ?? false)
+                    // 文字起こしの最中は数えない (区間が増えるたびにメニューを作り直すので、区間を全部見ることになる)
+                    ExportMenuItems(hasTranslation: model.selectedJob.map {
+                        $0.status == .done && ($0.transcript?.hasTranslation ?? false)
+                    } ?? false)
                         .environment(model)
                 }
                 .disabled(model.selectedJob?.status != .done)
@@ -280,6 +327,13 @@ struct KikimimiApp: App {
                 .keyboardShortcut("t", modifiers: [.command, .shift])
                 .disabled(model.selectedJob?.status != .done || model.selectedJob?.isPostActive == true
                           || (model.selectedJob?.transcript?.untranslatedCount ?? 0) == 0)
+            }
+            CommandMenu("再生") {
+                // ショートカットはスペースキー (PlaybackKeys。メニューに付けると、検索欄で空白を打てなくなる)
+                Button(model.player.isPlaying ? "一時停止 (スペースキー)" : "再生 (スペースキー)") {
+                    model.player.togglePlay()
+                }
+                .disabled(model.player.url == nil)
             }
         }
         Settings {
