@@ -76,25 +76,18 @@ public struct Transcript: Codable, Hashable, Sendable {
 
     /// 区間ごとの言語 (「日本語＋英語」で文字にしたもの) を、話された時間の長い順に並べたもの。区間に言語が無ければ空
     public var spokenLanguages: [String] {
-        var seconds: [String: TimeInterval] = [:]
-        var order: [String] = []
-        for s in segments {
-            guard let code = s.language else { continue }
-            if seconds[code] == nil { order.append(code) }
-            seconds[code, default: 0] += s.duration
-        }
-        // 同じ長さなら先に出てきた言語を前に (並びを毎回同じにする)
-        return order.enumerated()
-            .sorted { a, b in
-                let ta = seconds[a.element] ?? 0, tb = seconds[b.element] ?? 0
-                return ta != tb ? ta > tb : a.offset < b.offset
-            }
-            .map(\.element)
+        var tally = LanguageTally()
+        tally.add(segments)
+        return tally.ranked
     }
 
     /// 画面や書き出しに出す言語の名前。2 つ以上の言語なら「英語＋日本語」のようにつなぐ
     public var languageLabel: String? {
-        let spoken = spokenLanguages
+        Self.languageLabel(spoken: spokenLanguages, language: language)
+    }
+
+    /// languageLabel の中身 (spoken は spokenLanguages。結果の一覧の覚えておく所 TranscriptRowCache も使う)
+    static func languageLabel(spoken: [String], language: String?) -> String? {
         if spoken.count >= 2 { return spoken.map { Languages.name(for: $0) }.joined(separator: "＋") }
         guard let code = language ?? spoken.first, !code.isEmpty else { return nil }
         return Languages.name(for: code)
@@ -194,12 +187,18 @@ public struct Transcript: Codable, Hashable, Sendable {
                     i += 1
                 }
             }
-            let needs = needsTranslation(head)
-            units.append(BilingualUnit(segments: members,
-                                       japanese: head.translation ?? (needs ? nil : head.text),
-                                       isOriginalJapanese: head.translation == nil && !needs))
+            units.append(bilingualUnit(members))
         }
         return units
+    }
+
+    /// 区間 (先頭が訳を持つ区間、続きはその訳に含まれる区間) から、対訳の 1 行を作る
+    func bilingualUnit(_ members: [TranscriptSegment]) -> BilingualUnit {
+        let head = members[0]
+        let needs = needsTranslation(head)
+        return BilingualUnit(segments: members,
+                             japanese: head.translation ?? (needs ? nil : head.text),
+                             isOriginalJapanese: head.translation == nil && !needs)
     }
 
     /// 区間の文をつなぐ。語を空白で区切らない文字 (漢字・かな・全角の記号) の境目以外には空白を入れる
@@ -242,6 +241,32 @@ public struct Transcript: Codable, Hashable, Sendable {
                 segments[i].translationCovers = nil
             }
         }
+    }
+}
+
+/// 区間ごとの言語を、話された時間とともに数える (Transcript.spokenLanguages と、結果の一覧の覚えておく所が使う。
+/// 区間を足していけるので、文字起こし中に区間が増えたときは、増えた分だけを数える)
+struct LanguageTally: Equatable {
+    private var seconds: [String: TimeInterval] = [:]
+    /// 出てきた順
+    private var order: [String] = []
+
+    mutating func add<S: Sequence>(_ segments: S) where S.Element == TranscriptSegment {
+        for s in segments {
+            guard let code = s.language else { continue }
+            if seconds[code] == nil { order.append(code) }
+            seconds[code, default: 0] += s.duration
+        }
+    }
+
+    /// 話された時間の長い順。同じ長さなら先に出てきた言語を前に (並びを毎回同じにする)
+    var ranked: [String] {
+        order.enumerated()
+            .sorted { a, b in
+                let ta = seconds[a.element] ?? 0, tb = seconds[b.element] ?? 0
+                return ta != tb ? ta > tb : a.offset < b.offset
+            }
+            .map(\.element)
     }
 }
 

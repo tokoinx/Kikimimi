@@ -834,7 +834,7 @@ final class AppModel {
                     }
                 },
                 onSegment: { segment in
-                    // 区間は貯めておき、0.25 秒ごとにまとめて画面へ出す (LiveSegmentBuffer)
+                    // 区間は貯めておき、少しずつまとめて画面へ出す (LiveSegmentBuffer。行が多いほど間をあける)
                     live.append(segment)
                 },
                 onRestart: {
@@ -906,15 +906,18 @@ final class AppModel {
     }
 
     /// 認識の途中で届く区間を、まとめて job.transcript に足す入れ物を作る。
-    /// 最初の区間が届いてから 0.25 秒後に、メインスレッドで、そのあいだに届いた分を 1 回の代入で足す
-    /// (一覧の作り直しは 1 秒に 4 回まで。「日本語＋英語」で数百の区間がいっぺんに届いても 1 回)。
+    /// 最初の区間が届いてから少し待って (LiveSegmentBuffer.interval(forRows:): 画面に出ている行が 500 未満なら 0.25 秒、
+    /// 2000 までは 0.5 秒、それより多ければ 1 秒)、メインスレッドで、そのあいだに届いた分を 1 回の代入で足す
+    /// (一覧に行を足すのは、多くても 1 秒に 4 回。「日本語＋英語」で数百の区間がいっぺんに届いても 1 回)。
     /// AppModel.run と、画面の重さの確認 (--selftest-ui-load) が使う。
     /// applied は確認だけで使う: まとめて足したあとに、足した区間の数と、足し始めた時刻 (uptime のナノ秒) を受け取る
     static func liveFeed(for job: Job,
                          applied: (@MainActor @Sendable (_ count: Int, _ started: UInt64) -> Void)? = nil) -> LiveSegmentBuffer {
         LiveSegmentBuffer { buffer in
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: UInt64(LiveSegmentBuffer.interval * 1_000_000_000))
+                // 待つ長さは、知らせを受けた時点の行の数で決める (やり直しで行が消えたあとは、また短く)
+                let wait = LiveSegmentBuffer.interval(forRows: job.transcript?.segments.count ?? 0)
+                try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
                 let started = DispatchTime.now().uptimeNanoseconds
                 let batch = buffer.take()
                 applyLive(batch, to: job)

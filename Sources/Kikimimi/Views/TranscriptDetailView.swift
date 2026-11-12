@@ -5,12 +5,12 @@ import SwiftUI
 struct TranscriptDetailView: View {
     @Environment(AppModel.self) private var model
     let job: Job
-    @State private var cache = TranscriptViewCache()
+    @State private var cache = TranscriptRowCache()
 
     var body: some View {
-        // 翻訳の状況・言語の名前は、文字起こしが変わったときだけ数え直す (長い録音では区間が数千あるため。
-        // 画面は、進み具合や検索欄の入力でも描き直される)
-        let summary = job.transcript.map { cache.summary(of: $0, job: job) }
+        // 翻訳の状況・言語の名前・一覧の行は、文字起こしが変わったときだけ作り直す (長い録音では区間が数千あるため。
+        // 画面は、進み具合や検索欄の入力でも描き直される)。文字起こし中に区間が末尾に増えたときは、増えた分だけを足す
+        let summary = job.transcript.map { cache.summary(of: $0, job: job.id, done: job.status == .done) }
         VStack(alignment: .leading, spacing: 0) {
             header
                 .padding(.horizontal, 20)
@@ -75,8 +75,8 @@ struct TranscriptDetailView: View {
                                     showPlayMark: model.canPlayLines(of: job))
                     Divider()
                 }
-                TranscriptListView(job: job, items: cache.items(of: transcript, job: job, bilingual: bilingual,
-                                                                query: model.searchText, make: listItems),
+                TranscriptListView(job: job, items: cache.items(of: transcript, job: job.id, done: job.status == .done,
+                                                                bilingual: bilingual, query: model.searchText),
                                    bilingual: bilingual, emptyMessage: emptyMessage)
             } else {
                 Spacer()
@@ -114,7 +114,7 @@ struct TranscriptDetailView: View {
         .font(.callout)
     }
 
-    private func subtitle(_ summary: TranscriptViewCache.Summary?) -> String {
+    private func subtitle(_ summary: TranscriptRowCache.Summary?) -> String {
         guard let t = job.transcript, let summary else { return "" }
         var parts: [String] = []
         if let l = summary.languageLabel { parts.append(l) }
@@ -164,44 +164,6 @@ struct TranscriptDetailView: View {
         }
     }
 
-    // MARK: 本文
-    /// 一覧に出す行 (対訳表示なら訳ごと、そうでなければ区間ごと)。検索語で絞る (作り直すのは TranscriptViewCache が決める)
-    private func listItems(_ transcript: Transcript, bilingual: Bool, query: String) -> [TranscriptListItem] {
-        let q = query.trimmingCharacters(in: .whitespaces)
-        let changes = Dictionary((transcript.audit?.changes ?? []).map { ($0.original.id, $0) },
-                                 uniquingKeysWith: { a, _ in a })
-        // 「日本語＋英語」で 2 つの言語が混ざるときだけ、行に言語の印 (英・日) を付ける
-        let tags = transcript.spokenLanguages.count >= 2
-        // 行の「訳」は、文字起こしが終わってから (訳がある文 = ほかの区間の訳に含まれる区間も、訳がある行として扱う)
-        let done = job.status == .done
-        let covered = done ? transcript.coveredIDs : Set<UUID>()
-        let items: [TranscriptListItem]
-        if bilingual {
-            items = transcript.bilingualUnits().map { unit in
-                let translated = unit.segments[0].translation != nil
-                return TranscriptListItem(id: unit.id, start: unit.start, end: unit.end, text: unit.text,
-                                          japanese: unit.japanese, isOriginalJapanese: unit.isOriginalJapanese,
-                                          changes: unit.segments.compactMap { changes[$0.id] },
-                                          languageTag: tags ? LanguageTag.short(unit.language) : nil,
-                                          canTranslate: done && unit.japanese == nil && !covered.contains(unit.id),
-                                          isTranslated: done && translated)
-            }
-        } else {
-            items = transcript.segments.map { seg in
-                let translated = seg.translation != nil || covered.contains(seg.id)
-                return TranscriptListItem(id: seg.id, start: seg.start, end: seg.end, text: seg.text,
-                                          japanese: nil, isOriginalJapanese: false, changes: changes[seg.id].map { [$0] } ?? [],
-                                          languageTag: tags ? LanguageTag.short(seg.language) : nil,
-                                          canTranslate: done && !translated && transcript.needsTranslation(seg),
-                                          isTranslated: done && translated)
-            }
-        }
-        guard !q.isEmpty else { return items }
-        return items.filter {
-            $0.text.localizedCaseInsensitiveContains(q) || ($0.japanese?.localizedCaseInsensitiveContains(q) ?? false)
-        }
-    }
-
     private var emptyMessage: String {
         if !model.searchText.isEmpty { return "一致する区間はありません" }
         switch job.status {
@@ -236,87 +198,6 @@ struct JobProgressBar: View {
     }
 }
 
-/// 結果の画面で、区間の数だけ手間がかかるもの (翻訳の状況・言語の名前・一覧の行) を覚えておく。
-/// 文字起こし・ジョブの状態・表示の条件が同じなら、前に作ったものを返す。
-/// (文字起こしの比べは、区間の数が違えばすぐ終わり、同じ配列ならその場で同じとわかる)
-@MainActor
-final class TranscriptViewCache {
-    struct Summary {
-        var stats = Transcript.TranslationStats()
-        var spokenLanguages: [String] = []
-        var languageLabel: String?
-    }
-
-    private struct SummaryKey: Equatable {
-        let job: UUID
-        let transcript: Transcript
-        let done: Bool
-    }
-
-    private struct ItemsKey: Equatable {
-        let summary: SummaryKey
-        let bilingual: Bool
-        let query: String
-    }
-
-    private var summaryKey: SummaryKey?
-    private var summaryValue = Summary()
-    private var itemsKey: ItemsKey?
-    private var itemsValue: [TranscriptListItem] = []
-
-    func summary(of transcript: Transcript, job: Job) -> Summary {
-        let key = SummaryKey(job: job.id, transcript: transcript, done: job.status == .done)
-        if key != summaryKey {
-            // 翻訳の状況は、文字起こしが終わってから数える (最中は区間が増えるたびに数え直すことになるため)
-            let stats = key.done ? transcript.translationStats : Transcript.TranslationStats()
-            summaryValue = Summary(stats: stats, spokenLanguages: transcript.spokenLanguages,
-                                   languageLabel: transcript.languageLabel)
-            summaryKey = key
-        }
-        return summaryValue
-    }
-
-    func items(of transcript: Transcript, job: Job, bilingual: Bool, query: String,
-               make: (Transcript, Bool, String) -> [TranscriptListItem]) -> [TranscriptListItem] {
-        let key = ItemsKey(summary: SummaryKey(job: job.id, transcript: transcript, done: job.status == .done),
-                           bilingual: bilingual, query: query)
-        if key != itemsKey {
-            itemsValue = make(transcript, bilingual, query)
-            itemsKey = key
-        }
-        return itemsValue
-    }
-}
-
-/// 一覧の 1 行 (区間 1 つ、または訳 1 つ分の区間)
-struct TranscriptListItem: Identifiable, Hashable {
-    let id: UUID
-    let start: TimeInterval
-    let end: TimeInterval
-    let text: String
-    let japanese: String?
-    let isOriginalJapanese: Bool
-    /// この行に当たる監査の直し
-    let changes: [AuditChange]
-    /// 原文の言語の印 (英・日)。2 つの言語が混ざる文字起こしのときだけ
-    var languageTag: String? = nil
-    /// 行の「訳」を出す (日本語以外で、まだ訳がない)
-    var canTranslate = false
-    /// 訳がある文の行 (右クリックで訳し直せる)
-    var isTranslated = false
-}
-
-/// 行の言語の印
-enum LanguageTag {
-    static func short(_ code: String?) -> String? {
-        switch code {
-        case "ja": return "日"
-        case "en": return "英"
-        default: return nil
-        }
-    }
-}
-
 /// 行の頭の言語の印 (英・日)
 struct LanguageTagLabel: View {
     let tag: String?
@@ -332,8 +213,13 @@ struct LanguageTagLabel: View {
     }
 }
 
-/// 本文の一覧。再生位置 (0.2 秒ごとに変わる) はここでは見ない (見ると、0.2 秒ごとに数千の行を並べ直すことになる)。
-/// いまの位置にある行は CurrentLineTracker が探して、行が変わったときだけ知らせる。
+/// 本文の一覧。この body は、行が変わる (区間が増えた・検索・表示の切り替え・ジョブを選んだ) ときだけ動かす:
+/// 数千行の一覧では、body が動くたびに ForEach が数千の id を比べ直し、表を更新する (GitHub の実行機で 1 回 50〜250 ms)。
+/// そのため、ここでは再生の様子 (1 行だけ再生している行・再生位置・再生中か) と、追いかけるか (ListFollow.isOn) を見ない:
+/// - 行の色 (1 行だけ再生している行・いまの位置の行) は、行ごとに RowHighlight の RowTintCell を見る。
+///   色が変わったときに描き直すのは、色が変わる、画面に出ている行だけ (画面の外の行は、List が作っていない)。
+/// - 再生位置を見て、いまの行を探し、行の色を変え、いまの行や一覧の終わりへ動かすのは、一覧の外の見えない部品
+///   (CurrentLineTracker)。「末尾へ」のボタンも、一覧の外の部品 (FollowButton) が ListFollow.isOn を見る。
 ///
 /// 文字起こし中は、一覧の終わりを追いかける (新しい行が出たら、いちばん下へ動かす)。ただし:
 /// - 使う人が一覧の上でホイールやトラックパッドで上へ動かす、一覧の中を押す (行もスクロールバーも、押した瞬間に)、
@@ -348,31 +234,31 @@ struct TranscriptListView: View {
     let items: [TranscriptListItem]
     let bilingual: Bool
     let emptyMessage: String
-    /// ふつうの再生で、いまの位置にある行
-    @State private var currentID: UUID?
-    /// 文字起こし中に、一覧の終わりを追いかけるか
+    /// 行の色 (1 行だけ再生している行・いまの位置の行)。行と CurrentLineTracker が使い、この body では中を見ない
+    @State private var highlight = RowHighlight()
+    /// 文字起こし中に、一覧の終わりを追いかけるか。この body では中を見ない (見ると、一覧の中を押すたびに body が動く)
     @State private var follow = ListFollow()
 
     var body: some View {
         let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
         let canPlay = model.canPlayLines(of: job)
-        let playingID = model.player.playingLineID
         let showTimestamps = model.showTimestamps
-        let highlight = model.searchText
+        let highlightText = model.searchText
         let running = job.status == .running
+        // 中を見ずに、入れ物そのものを渡す (行・見えない部品・ボタンが、それぞれ要るものだけを見る)
+        let highlight = self.highlight
+        let follow = self.follow
         ScrollViewReader { proxy in
             // 行に .id() を付けない (付けると List がすべての行を一度に作るようになる。scrollTo は ForEach の id で動く)
             List {
                 ForEach(items) { item in
-                    // 1 行だけを再生しているあいだは、その行だけを色付けする (再生位置の色と重ねない)
-                    PlayableRow(item: item, job: job, canPlay: canPlay, isPlaying: playingID == item.id,
-                                isCurrent: playingID == nil && currentID == item.id) {
+                    PlayableRow(item: item, job: job, canPlay: canPlay, highlight: highlight) {
                         if bilingual {
                             BilingualRow(item: item, isTranslating: translating, showTimestamp: showTimestamps,
-                                         highlight: highlight, job: job)
+                                         highlight: highlightText, job: job)
                         } else {
                             SegmentRow(item: item, showTimestamp: showTimestamps,
-                                       highlight: highlight, job: job)
+                                       highlight: highlightText, job: job)
                         }
                     }
                 }
@@ -381,16 +267,23 @@ struct TranscriptListView: View {
                         .foregroundStyle(.secondary)
                 }
                 if running {
-                    // 一覧の終わりの印 (見えない行)。これが見えたら、使う人は一覧の終わりにいる: また追いかける
+                    // 一覧の終わりの印 (見えない行)。これが見えたら、使う人は一覧の終わりにいる: また追いかける。
+                    // onAppear は、表 (NSTableView) が行を作っている最中に呼ばれる。ここで状態を変えると、表を更新している
+                    // 最中に SwiftUI がまた表を更新しようとして「reentrant operation」と警告されるので、次の回に変える。
+                    // 同じ値でも書くと見ている部品が描き直されるので、変わるときだけ書く
                     Color.clear
                         .frame(height: 1)
                         .listRowBackground(Color.clear)
                         .accessibilityHidden(true)
-                        .onAppear { follow.isOn = true }
+                        .onAppear {
+                            Task { @MainActor in
+                                if !follow.isOn { follow.isOn = true }
+                            }
+                        }
                 }
             }
             .listStyle(.inset)
-            .background(CurrentLineTracker(job: job, items: items, currentID: $currentID))
+            .background(CurrentLineTracker(job: job, items: items, highlight: highlight, follow: follow, proxy: proxy))
             .background(
                 GeometryReader { geometry in
                     // ホイールの操作が、この一覧の上かを見分けるための、一覧の位置 (ウインドウの中の横の範囲)
@@ -400,46 +293,34 @@ struct TranscriptListView: View {
                 }
             )
             .overlay(alignment: .bottomTrailing) {
-                if running && !follow.isOn {
-                    Button {
-                        follow.isOn = true
-                        if let last = items.last { proxy.scrollTo(last.id, anchor: .bottom) }
-                    } label: {
-                        Label("末尾へ", systemImage: "arrow.down.to.line")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .help("一覧の終わりへ移り、文字起こしの続きを追いかける")
-                    .padding(12)
-                }
+                FollowButton(follow: follow, running: running, lastID: items.last?.id, proxy: proxy)
             }
             .onAppear { follow.install() }
             .onDisappear { follow.remove() }
-            .onChange(of: job.id) { _, _ in
-                // 別のジョブを選んだ: そのジョブの一覧の終わりから追いかける
+        }
+    }
+}
+
+/// 一覧の右下の「末尾へ」。文字起こし中に、一覧の終わりを追いかけていないときだけ出す。
+/// ListFollow.isOn を見るのは、この部品だけ (一覧の body では見ない)
+private struct FollowButton: View {
+    let follow: ListFollow
+    let running: Bool
+    let lastID: UUID?
+    let proxy: ScrollViewProxy
+
+    var body: some View {
+        if running && !follow.isOn {
+            Button {
                 follow.isOn = true
+                if let lastID { proxy.scrollTo(lastID, anchor: .bottom) }
+            } label: {
+                Label("末尾へ", systemImage: "arrow.down.to.line")
             }
-            .onChange(of: playingID) { _, id in
-                // 行を押して 1 行だけ再生した: 押した行のあたりを見ているので、追いかけるのをやめる
-                if id != nil, running { follow.isOn = false }
-            }
-            .onChange(of: currentID) { _, id in
-                // 1 行だけの再生では、押した行が見えているので追いかけない
-                guard let id, model.player.isPlaying, model.player.playingLineID == nil else { return }
-                // 一覧を描き直している最中に動かすと、NSTableView が「reentrant operation」と警告するので、次の回に動かす
-                Task { @MainActor in
-                    withAnimation { proxy.scrollTo(id, anchor: .center) }
-                }
-            }
-            .onChange(of: items.count) { _, _ in
-                guard job.status == .running, follow.isOn, !model.player.isPlaying, let last = items.last else { return }
-                let id = last.id
-                // 上と同じ: 描き直しの最中には動かさず、次の回に動かす
-                Task { @MainActor in
-                    guard follow.isOn, !model.player.isPlaying else { return }
-                    proxy.scrollTo(id, anchor: .bottom)
-                }
-            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help("一覧の終わりへ移り、文字起こしの続きを追いかける")
+            .padding(12)
         }
     }
 }
@@ -518,23 +399,136 @@ final class ListFollow {
     }
 }
 
-/// 再生位置 (0.2 秒ごとに変わる) を見るのは、この見えない部品だけ。
-/// いまの位置にある行を、行の始まりの時刻で二分探索して探し、行が変わったときだけ一覧に知らせる
+/// 一覧の行の色: 1 行だけ再生している行と、ふつうの再生でいまの位置にある行。
+/// 行は自分の RowTintCell (行の id ごと) だけを見る。色が変わるときは、色が変わる行の Cell だけを書き換えるので、
+/// 描き直されるのは、その行だけ (Observation では、読んだ部品だけが描き直される。画面の外の行は List が作っていないので、
+/// Cell はあっても描き直すものが無い)。一覧の body はこれを見ない
+@MainActor
+@Observable
+final class RowHighlight {
+    /// CurrentLineTracker が見つけた、いまの様子
+    struct Snapshot: Equatable {
+        var playing: UUID?
+        var current: UUID?
+    }
+
+    /// 1 行だけを再生している行 (PlayerController.playingLineID の写し)。
+    /// 次の currentID とともに、見張らない (行の Cell を作るときに読むので、見張ると、Cell を作った行の body がすべて
+    /// これを見ることになり、変わるたびに、それらの行がみな描き直される。行は自分の RowTintCell だけを見る)
+    @ObservationIgnored private(set) var playingID: UUID?
+    /// ふつうの再生で、いまの位置にある行
+    @ObservationIgnored private(set) var currentID: UUID?
+    /// 行の id ごとの Cell。行が初めて作られたときに足す (数は、画面に出したことのある行の数まで)
+    @ObservationIgnored private var cells: [UUID: RowTintCell] = [:]
+    /// update を呼んだ回数 (CurrentLineTracker が、遅れて渡す様子が古くないかを見る)
+    @ObservationIgnored private(set) var updates = 0
+
+    /// 行の Cell (無ければ、いまの様子の色で作る)。行の body から呼ぶ (足しても、何も描き直さない)
+    func cell(for id: UUID) -> RowTintCell {
+        if let cell = cells[id] { return cell }
+        let cell = RowTintCell(tint: tint(of: id))
+        cells[id] = cell
+        return cell
+    }
+
+    /// 様子が変わった: 前とあとで色が変わる行 (多くて 4 つ) の Cell だけを書き換える
+    func update(_ state: Snapshot) {
+        updates += 1
+        guard state.playing != playingID || state.current != currentID else { return }
+        let touched = [playingID, currentID, state.playing, state.current].compactMap { $0 }
+        playingID = state.playing
+        currentID = state.current
+        for id in Set(touched) {
+            guard let cell = cells[id] else { continue }
+            let tint = tint(of: id)
+            if cell.tint != tint { cell.tint = tint }
+        }
+    }
+
+    private func tint(of id: UUID) -> RowTint {
+        if id == playingID { return .playing }
+        // 1 行だけを再生しているあいだは、その行だけを色付けする (再生位置の色と重ねない)
+        if playingID == nil, id == currentID { return .current }
+        return .plain
+    }
+}
+
+/// 行の色
+enum RowTint: Equatable {
+    /// 色を付けない (マウスを載せたときの色だけ)
+    case plain
+    /// ふつうの再生で、いまの位置がこの行にある
+    case current
+    /// この行だけを再生している
+    case playing
+}
+
+/// 行 1 つ分の色 (RowHighlight が持つ)。行の body はこれだけを見る
+@MainActor
+@Observable
+final class RowTintCell {
+    fileprivate(set) var tint: RowTint
+
+    init(tint: RowTint) {
+        self.tint = tint
+    }
+}
+
+/// 再生の様子 (再生位置は 0.2 秒ごとに変わる) を見るのは、一覧の外の、この見えない部品だけ。
+/// - いまの位置にある行を、行の始まりの時刻で二分探索して探し、1 行だけ再生している行とともに RowHighlight に渡す
+///   (色が変わる行だけが描き直される。一覧の body は動かない)。
+/// - ふつうの再生で、いまの行が変わったら、その行が見えるように動かす (1 行だけの再生では動かさない)。
+/// - 文字起こし中に、行を押して 1 行だけ再生したら、一覧の終わりを追いかけるのをやめる。
+/// - 文字起こし中に行が増えたら、追いかけていて、再生していなければ、一覧の終わりへ動かす。
+/// - 別のジョブを選んだら、そのジョブの一覧の終わりから追いかける。
+/// 一覧を動かす (scrollTo) のは、どれも次の回にする: 一覧を描き直している最中に動かすと、
+/// NSTableView が「reentrant operation」と警告する
 private struct CurrentLineTracker: View {
     @Environment(AppModel.self) private var model
     let job: Job
     let items: [TranscriptListItem]
-    @Binding var currentID: UUID?
+    let highlight: RowHighlight
+    let follow: ListFollow
+    let proxy: ScrollViewProxy
 
     var body: some View {
-        let id = currentLine()
+        let player = model.player
+        let state = RowHighlight.Snapshot(playing: player.playingLineID, current: currentLine())
         Color.clear
             .frame(width: 0, height: 0)
             .onAppear {
-                if currentID != id { currentID = id }
+                // 一覧と同時に現れる (表が行を作っている最中かもしれない): 行の色は次の回に変える。
+                // それまでに様子が変わって (onChange で) 渡し直していれば、古い様子では上書きしない
+                let updates = highlight.updates
+                Task { @MainActor in
+                    if highlight.updates == updates { highlight.update(state) }
+                }
             }
-            .onChange(of: id) { _, new in
-                currentID = new
+            .onChange(of: state) { _, new in
+                highlight.update(new)
+            }
+            .onChange(of: state.playing) { _, id in
+                // 行を押して 1 行だけ再生した: 押した行のあたりを見ているので、追いかけるのをやめる
+                if id != nil, job.status == .running, follow.isOn { follow.isOn = false }
+            }
+            .onChange(of: state.current) { _, id in
+                // 1 行だけの再生では、押した行が見えているので動かさない
+                guard let id, player.isPlaying, player.playingLineID == nil else { return }
+                Task { @MainActor in
+                    withAnimation { proxy.scrollTo(id, anchor: .center) }
+                }
+            }
+            .onChange(of: items.count) { _, _ in
+                guard job.status == .running, follow.isOn, !player.isPlaying, let last = items.last else { return }
+                let id = last.id
+                Task { @MainActor in
+                    guard follow.isOn, !player.isPlaying else { return }
+                    proxy.scrollTo(id, anchor: .bottom)
+                }
+            }
+            .onChange(of: job.id) { _, _ in
+                // 別のジョブを選んだ: そのジョブの一覧の終わりから追いかける
+                if !follow.isOn { follow.isOn = true }
             }
     }
 
@@ -577,25 +571,24 @@ struct PlayableRow<Content: View>: View {
     let job: Job
     /// 音声を再生できる (できないときは、クリックしても何もせず、再生の印も出さない)
     let canPlay: Bool
-    /// この行だけを再生している
-    let isPlaying: Bool
-    /// ふつうの再生で、いまの位置がこの行にある
-    let isCurrent: Bool
+    /// 行の色 (この行だけを再生している・ふつうの再生でいまの位置がこの行にある)。この行の Cell だけを見る
+    let highlight: RowHighlight
     let content: Content
     @State private var hovering = false
 
-    init(item: TranscriptListItem, job: Job, canPlay: Bool, isPlaying: Bool, isCurrent: Bool,
+    init(item: TranscriptListItem, job: Job, canPlay: Bool, highlight: RowHighlight,
          @ViewBuilder content: () -> Content) {
         self.item = item
         self.job = job
         self.canPlay = canPlay
-        self.isPlaying = isPlaying
-        self.isCurrent = isCurrent
+        self.highlight = highlight
         self.content = content()
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
+        let tint = highlight.cell(for: item.id).tint
+        let isPlaying = tint == .playing
+        return HStack(alignment: .firstTextBaseline, spacing: 12) {
             if canPlay {
                 Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle")
                     .foregroundStyle(isPlaying ? Color.accentColor : Color.secondary)
@@ -610,7 +603,7 @@ struct PlayableRow<Content: View>: View {
         .onHover { inside in
             hovering = inside
         }
-        .help(canPlay ? hint : "")
+        .help(canPlay ? hint(isPlaying) : "")
         .contextMenu {
             if canPlay {
                 Button(isPlaying ? "この行の再生を止める" : "この行だけを再生") { toggle() }
@@ -633,23 +626,24 @@ struct PlayableRow<Content: View>: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(canPlay ? item.text + "。" + hint : item.text))
+        .accessibilityLabel(Text(canPlay ? item.text + "。" + hint(isPlaying) : item.text))
         .accessibilityAddTraits(canPlay ? .isButton : [])
         .accessibilityAction {
             if canPlay { toggle() }
         }
-        .listRowBackground(background)
+        .listRowBackground(background(tint))
     }
 
-    private var hint: String {
+    private func hint(_ isPlaying: Bool) -> String {
         isPlaying ? "クリックで停止" : "クリックで、この行だけを再生"
     }
 
-    private var background: Color {
-        if isPlaying { return Color.accentColor.opacity(0.24) }
-        if isCurrent { return Color.accentColor.opacity(0.12) }
-        if hovering && canPlay { return Color.primary.opacity(0.06) }
-        return Color.clear
+    private func background(_ tint: RowTint) -> Color {
+        switch tint {
+        case .playing: return Color.accentColor.opacity(0.24)
+        case .current: return Color.accentColor.opacity(0.12)
+        case .plain: return hovering && canPlay ? Color.primary.opacity(0.06) : Color.clear
+        }
     }
 
     private func toggle() {
