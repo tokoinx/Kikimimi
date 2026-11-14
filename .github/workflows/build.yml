@@ -36,6 +36,12 @@ jobs:
           if [ -d "$XCODE" ]; then
             sudo xcode-select -s "$XCODE"
           else
+            # 16.2 (Swift 6.0) の列は、Swift 6.0 で通ることを確かめるための列。その Xcode が無いのに既定の Xcode で進むと、
+            # 新しい Swift でしか通らない書き方 (引数の末尾のカンマなど) を見逃すので、ここで止める
+            if [ "${{ matrix.xcode }}" = "16.2" ]; then
+              echo "::error::$XCODE is not on this runner image; the Swift 6.0 build cannot be checked"
+              exit 1
+            fi
             echo "::warning::$XCODE is not on this runner image; using the default Xcode"
           fi
           xcodebuild -version
