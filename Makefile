@@ -1,4 +1,4 @@
-.PHONY: app run doctor install test clean reset
+.PHONY: app run doctor install test check-ui clean reset
 
 app:            ## Kikimimi.app を build/ に作る
 	Scripts/build-app.sh
@@ -16,6 +16,9 @@ install: app    ## /Applications にコピー
 
 test:           ## コアのユニットテスト
 	swift test
+
+check-ui:       ## アプリの確認 (3000 行・1 行の再生・練習。ウインドウが開き、音が鳴る。先に make app で作っておく)
+	build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio Tests/Fixtures/mixed-en-ja.wav --screenshots build/ui-shots
 
 clean:          ## ビルド成果物を消す
 	rm -rf .build build

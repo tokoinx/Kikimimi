@@ -18,10 +18,11 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 1. `swift build` (門: 通る)
 2. `swift test` (門: 通る。Bash の timeout は 600000 にしておく)
 3. `make app` (門: 確認が出る。`build/Kikimimi.app` ができる)
-4. `build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio Tests/Fixtures/mixed-en-ja.wav --screenshots build/ui-shots` (門: 確認が出る。ウインドウが開き、音が鳴る。数分かかるので run_in_background で走らせる)
+4. `make check-ui` (門: 確認が出る。ウインドウが開き、音が鳴る。数分かかるので run_in_background で走らせる)
 
-- 4 は CI (`.github/workflows/build.yml` の「UI load self-test (3000 lines, …)」の段) と同じ確認。音声は相対パスで読める (プロジェクトの根から走らせた時)。`$PWD` は門で止まるので書かない。
-- 結果の行は標準エラーへ、終わりにまとめて出る。途中では `UI LOAD (live): …` の行だけが出る。ファイルにも残したい時は `--report build/ui-load-3000.txt` を足す。
+- 4 が走らせる命令は `Makefile` の `check-ui` に在る。CI (`.github/workflows/build.yml` の「UI load self-test (3000 lines, …)」の段) と同じ確認。アプリは作らないので、先に 3 を行う。
+- `make` を通すので、アプリの終了コード N は `make: *** [check-ui] Error N` の行に出る (`make` 自身は 2 を返す)。この行が無く `make` が 0 で終われば、アプリの終了コードは 0。
+- 結果の行は標準エラーへ、終わりにまとめて出る。途中では `UI LOAD (live): …` の行だけが出る。
 - `--selftest-…` の時は、ふだんのライブラリに保存しない (確認は一時フォルダで行い、終わりに消す)。
 - `make app` が `PCH was compiled with module cache path '…'` で失敗した時は、フォルダの名前が変わる前の release の成果物が残っている。`.build/arm64-apple-macosx/release` を、まだ無い別の名前へ `mv` でよけて (門: 確認が出る。`rm -r` は拒まれる) から、もう一度 `make app`。よけた物を消すのは利用者に頼む。
 
