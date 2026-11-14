@@ -27,7 +27,7 @@
 ## 確かめ方と「完了」
 
 - 「完了」と報告する前に `swift test` を走らせ、失敗が 0 件である事を見る。件数は、走らせた出力から写す。
-- 画面 (`Sources/Kikimimi`) を変えた時は、加えて「アプリの確認」を行う: アプリを作り、`--selftest-ui-load 3000` を音声と絵の指定つきで走らせ、「UI LOAD OK」「LIBRARY CHECK OK」「PRACTICE CHECK OK」が出て、終了コードが 0 である事を見る。命令は `.github/workflows/build.yml` の「UI load self-test (3000 lines, …)」の段と同じ。終了コードの意味は `Sources/Kikimimi/UILoadSelfTest.swift` の始めの注釈に在る。
+- 画面 (`Sources/Kikimimi`) を変えた時は、加えて「アプリの確認」を行う: アプリを作り、`--selftest-ui-load 3000` を音声と絵の指定つきで走らせ、「UI LOAD OK」「LIBRARY CHECK OK」「PRACTICE CHECK OK」が出て、終了コードが 0 である事を見る。手順・命令・出力と終了コードの読み方は、Skill `kikimimi-verify` (`.claude/skills/kikimimi-verify/SKILL.md`) に在る。
 
 ## 命令の書き方 (この Mac では、Bash の命令が門を通る)
 
