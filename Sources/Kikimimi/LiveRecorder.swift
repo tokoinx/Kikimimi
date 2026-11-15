@@ -146,6 +146,7 @@ final class LiveRecorder {
         return { buffer, _ in
             let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 32
             guard let converted = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return }
+            let input = TapInput(buffer: buffer)
             var consumed = false
             var conversionError: NSError?
             let status = converter.convert(to: converted, error: &conversionError) { _, inputStatus in
@@ -155,7 +156,7 @@ final class LiveRecorder {
                 }
                 consumed = true
                 inputStatus.pointee = .haveData
-                return buffer
+                return input.buffer
             }
             guard status != .error, converted.frameLength > 0, let channels = converted.floatChannelData else { return }
             let count = Int(converted.frameLength)
@@ -166,4 +167,10 @@ final class LiveRecorder {
             level((sum / Float(count)).squareRoot())
         }
     }
+}
+
+/// タップに届いた音声を、変換の入力の閉包へ渡すための包み (新しい SDK では、その閉包が `@Sendable` になっている)。
+/// 安全な理由: 変換 (`convert`) は、この閉包をその場で同じスレッドから呼び、戻った後は使わない。
+private struct TapInput: @unchecked Sendable {
+    let buffer: AVAudioPCMBuffer
 }
