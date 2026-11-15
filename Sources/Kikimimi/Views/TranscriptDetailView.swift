@@ -83,7 +83,7 @@ struct TranscriptDetailView: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
                 }
-                controls(transcript, stats)
+                TranscriptControls(job: job, transcript: transcript, stats: stats)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
                 Divider()
@@ -177,53 +177,6 @@ struct TranscriptDetailView: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: 操作列
-    private func controls(_ transcript: Transcript, _ stats: Transcript.TranslationStats) -> some View {
-        @Bindable var model = model
-        let canPost = job.status == .done && !transcript.segments.isEmpty
-        return HStack(spacing: 12) {
-            TextField(L("Search results"), text: $model.searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 220)
-            Toggle(L("Timestamps"), isOn: $model.showTimestamps)
-                .toggleStyle(.checkbox)
-            if stats.hasTranslation || stats.isMainlyForeign {
-                // 行の「訳」で対訳を出しているジョブでは、設定がオフでもチェックを付けて見せる
-                Toggle(L("Bilingual"), isOn: Binding(
-                    get: { model.showsBilingual(job) },
-                    set: { model.setShowsBilingual($0, for: job) }
-                ))
-                    .toggleStyle(.checkbox)
-                    .help(L("Show the original and the Japanese translation side by side"))
-            }
-            Toggle(L("Notes"), isOn: $model.showNotes)
-                .toggleStyle(.checkbox)
-                .help(L("Show a notes pane on the right (for what you understood, phrases to remember, and so on. What you write is saved automatically)"))
-            Spacer()
-            RedoMenu(job: job)
-            HistoryButton(job: job)
-            AuditButton(job: job, transcript: transcript)
-                .disabled(!canPost)
-            if stats.translatable > 0 {
-                Button {
-                    model.translate(job)
-                } label: {
-                    Label(stats.untranslated > 0 && stats.hasTranslation ? L("Translate the rest") : L("Translate"),
-                          systemImage: "character.bubble")
-                }
-                .help(L("Translate non-Japanese segments into Japanese with the LLM on your Mac"))
-                .disabled(!canPost || job.isPostActive || stats.untranslated == 0)
-            }
-            Button {
-                model.copySelectedText()
-            } label: {
-                Label(L("Copy"), systemImage: "doc.on.doc")
-            }
-            ExportMenu(hasTranslation: stats.hasTranslation, job: job)
-                .disabled(job.status != .done)
-        }
-    }
-
     private var emptyMessage: String {
         if !model.searchText.isEmpty { return L("No matching segments") }
         switch job.status {
@@ -231,6 +184,219 @@ struct TranscriptDetailView: View {
         case .done: return L("No speech was detected. The audio may be silent, or the language setting may not match.")
         default: return ""
         }
+    }
+}
+
+/// 結果の画面の操作の列 (検索・チェック・ボタン)。ここは一覧の外。
+/// 画面の言語によって字の長さが違うので、並べ方を 3 つから選ぶ: 1 行 → 2 行 (下の行に字つきのボタン) → 2 行 (印だけ)。
+/// ViewThatFits は使わない: 文字起こし中は行が増えるたびにレイアウトが走り、そのたびに候補を測り直して重くなった
+/// (タイ語で、メインスレッドがふさがる割合が 6.9% から 26.0% に)。代わりに、使える幅 (幅が変わったときだけ変わる) と、
+/// 字の幅の見積もり (言語ごとに 1 度だけ測る) から 1 つを決め、それだけを描く。
+/// 使える幅を、結果の画面 (一覧を含む) の状態にしない: 幅を変えるたびに一覧まで描き直すことになる
+struct TranscriptControls: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    let transcript: Transcript
+    let stats: Transcript.TranslationStats
+    /// 操作の列に使える幅 (幅が変わったときだけ入れる。文字起こし中に行が増えても変わらない)
+    @State private var width: CGFloat?
+    @State private var textWidths = ControlsTextWidths()
+
+    var body: some View {
+        Group {
+            switch arrangement(for: width) {
+            case .oneLine:
+                HStack(spacing: ControlsMetrics.spacing) {
+                    // 1 行の形は、前と同じ見た目にする (検索の欄は 220 pt まで)
+                    searchField(maxWidth: 220)
+                    toggles
+                    Spacer()
+                    actions(iconOnly: false)
+                }
+            case .twoLines:
+                twoLines(iconOnly: false)
+            case .twoLinesIconOnly:
+                twoLines(iconOnly: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newWidth in
+            width = newWidth
+        }
+    }
+
+    /// 2 行の形: 上に検索とチェック、下に右寄せのボタン
+    private func twoLines(iconOnly: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: ControlsMetrics.spacing) {
+                searchField(maxWidth: .infinity)
+                toggles
+            }
+            HStack(spacing: ControlsMetrics.spacing) {
+                Spacer()
+                actions(iconOnly: iconOnly)
+            }
+        }
+    }
+
+    /// 検索の欄。残りの幅を使うが、140 pt より細くしない
+    private func searchField(maxWidth: CGFloat) -> some View {
+        @Bindable var model = model
+        return TextField(L("Search results"), text: $model.searchText)
+            .textFieldStyle(.roundedBorder)
+            .frame(minWidth: 140, maxWidth: maxWidth)
+    }
+
+    /// 「時刻」「対訳」「メモ」のチェック。字は 1 行のまま、縮めない
+    @ViewBuilder
+    private var toggles: some View {
+        @Bindable var model = model
+        Toggle(L("Timestamps"), isOn: $model.showTimestamps)
+            .toggleStyle(.checkbox)
+            .lineLimit(1)
+            .fixedSize()
+        if showsBilingualToggle {
+            // 行の「訳」で対訳を出しているジョブでは、設定がオフでもチェックを付けて見せる
+            Toggle(L("Bilingual"), isOn: Binding(
+                get: { model.showsBilingual(job) },
+                set: { model.setShowsBilingual($0, for: job) }
+            ))
+                .toggleStyle(.checkbox)
+                .lineLimit(1)
+                .fixedSize()
+                .help(L("Show the original and the Japanese translation side by side"))
+        }
+        Toggle(L("Notes"), isOn: $model.showNotes)
+            .toggleStyle(.checkbox)
+            .lineLimit(1)
+            .fixedSize()
+            .help(L("Show a notes pane on the right (for what you understood, phrases to remember, and so on. What you write is saved automatically)"))
+    }
+
+    /// 操作の列のボタンとメニュー。iconOnly のときは印だけにする (字は読み上げと .help に出す)。字は 1 行のまま、縮めない
+    @ViewBuilder
+    private func actions(iconOnly: Bool) -> some View {
+        let canPost = job.status == .done && !transcript.segments.isEmpty
+        RedoMenu(job: job, iconOnly: iconOnly)
+        // 履歴のボタンは別のファイルの部品なので、印だけにするのは外から掛ける (中にポップオーバーは無い)
+        HistoryButton(job: job)
+            .actionLabelStyle(iconOnly: iconOnly)
+            .accessibilityLabel(Text(L("History")))
+            .lineLimit(1)
+            .fixedSize()
+        AuditButton(job: job, transcript: transcript, iconOnly: iconOnly)
+            .lineLimit(1)
+            .fixedSize()
+            .disabled(!canPost)
+        if stats.translatable > 0 {
+            let title = translateTitle
+            Button {
+                model.translate(job)
+            } label: {
+                Label(title, systemImage: "character.bubble")
+                    .actionLabelStyle(iconOnly: iconOnly)
+                    .accessibilityLabel(Text(title))
+            }
+            .lineLimit(1)
+            .fixedSize()
+            .help(L("Translate non-Japanese segments into Japanese with the LLM on your Mac"))
+            .disabled(!canPost || job.isPostActive || stats.untranslated == 0)
+        }
+        Button {
+            model.copySelectedText()
+        } label: {
+            Label(L("Copy"), systemImage: "doc.on.doc")
+                .actionLabelStyle(iconOnly: iconOnly)
+                .accessibilityLabel(Text(L("Copy")))
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .iconOnlyHelp(iconOnly, L("Copy"))
+        ExportMenu(hasTranslation: stats.hasTranslation, job: job, iconOnly: iconOnly)
+            .disabled(job.status != .done)
+    }
+
+    /// 翻訳のボタンの字 (並べ方の見積もりと、ボタンの両方で使う)
+    private var translateTitle: String {
+        stats.untranslated > 0 && stats.hasTranslation ? L("Translate the rest") : L("Translate")
+    }
+
+    /// 「対訳」のチェックを出す
+    private var showsBilingualToggle: Bool {
+        stats.hasTranslation || stats.isMainlyForeign
+    }
+
+    /// 使える幅に収まる並べ方を、見積もりで選ぶ。字の幅は ControlsTextWidths が覚えているので、ここでは足し算だけ
+    private func arrangement(for width: CGFloat?) -> ControlsArrangement {
+        // 幅をまだ測っていない始めの 1 回は、1 行にしておく (日本語の画面のふだんの形)
+        guard let width else { return .oneLine }
+        let m = ControlsMetrics.self
+        var toggleTitles = [L("Timestamps")]
+        if showsBilingualToggle { toggleTitles.append(L("Bilingual")) }
+        toggleTitles.append(L("Notes"))
+        let toggles = toggleTitles.map { textWidths.width(of: $0) + m.checkbox }
+
+        var buttons: [CGFloat] = []
+        if job.url != nil { buttons.append(textWidths.width(of: L("Transcribe again")) + m.button + m.menuIndicator) }
+        buttons.append(textWidths.width(of: L("History")) + m.button)
+        buttons.append(textWidths.width(of: transcript.audit.map { AuditButton.title(of: $0) } ?? L("Audit")) + m.button)
+        if stats.translatable > 0 { buttons.append(textWidths.width(of: translateTitle) + m.button) }
+        buttons.append(textWidths.width(of: L("Copy")) + m.button)
+        buttons.append(textWidths.width(of: L("Export")) + m.button + m.menuIndicator)
+
+        let buttonsWidth = buttons.reduce(0, +) + m.spacing * CGFloat(buttons.count - 1)
+        // 1 行: 検索・チェック・Spacer・ボタン。間隔は (チェックの数 + ボタンの数 + 1) 個
+        let oneLine = m.searchMin + toggles.reduce(0, +) + m.spacerMin + buttonsWidth
+            + m.spacing * CGFloat(toggles.count + 2) + m.safety
+        if oneLine <= width { return .oneLine }
+        // 2 行の下の行: Spacer・ボタン
+        let bottomLine = m.spacerMin + m.spacing + buttonsWidth + m.safety
+        if bottomLine <= width { return .twoLines }
+        return .twoLinesIconOnly
+    }
+}
+
+/// 操作の列の並べ方
+enum ControlsArrangement {
+    /// 1 行 (検索・チェック・ボタンが、字つきで並ぶ)
+    case oneLine
+    /// 2 行 (上に検索とチェック、下に字つきのボタン)
+    case twoLines
+    /// 2 行 (下のボタンは印だけ)
+    case twoLinesIconOnly
+}
+
+/// 操作の列の並べ方を見積もるための、字以外の幅 (pt)。足りないと字が切れるので、少し多めにしてある
+enum ControlsMetrics {
+    /// 部品の間隔 (HStack の spacing)
+    static let spacing: CGFloat = 12
+    /// 検索の欄の最小の幅
+    static let searchMin: CGFloat = 140
+    /// Spacer の最小の幅 (macOS)
+    static let spacerMin: CGFloat = 8
+    /// チェックの箱と、箱と字の間
+    static let checkbox: CGFloat = 20
+    /// ボタンの縁の内側の余白 (左右)・印・印と字の間
+    static let button: CGFloat = 34
+    /// メニューの矢印と、その前の間 (「やり直す」「書き出す」)
+    static let menuIndicator: CGFloat = 14
+    /// 見積もりの余り (迷う幅のときは、次の並べ方に落とす)
+    static let safety: CGFloat = 12
+}
+
+/// 操作の列の字の幅。AppKit で、操作の列が使う字 (システムの 13 pt) で測り、同じ字は 1 度だけ測る。
+/// 画面の言語を変えると、ウインドウの中身が .id(model.uiLanguage) で作り直されるので、ここも作り直される
+final class ControlsTextWidths {
+    private var widths: [String: CGFloat] = [:]
+    private let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+
+    func width(of text: String) -> CGFloat {
+        if let width = widths[text] { return width }
+        let width = ceil((text as NSString).size(withAttributes: [.font: font]).width)
+        widths[text] = width
+        return width
     }
 }
 
@@ -1133,6 +1299,8 @@ struct AuditButton: View {
     @Environment(AppModel.self) private var model
     let job: Job
     let transcript: Transcript
+    /// 印だけにする (操作の列が狭いとき)。字は読み上げに出す
+    var iconOnly = false
     @State private var showing = false
 
     var body: some View {
@@ -1140,7 +1308,10 @@ struct AuditButton: View {
             Button {
                 showing = true
             } label: {
-                Label(summary(audit), systemImage: "checkmark.seal")
+                // 印だけの形は、ボタンの字にだけ掛ける (ポップオーバーの中の字まで消さないため)
+                Label(Self.title(of: audit), systemImage: "checkmark.seal")
+                    .actionLabelStyle(iconOnly: iconOnly)
+                    .accessibilityLabel(Text(Self.title(of: audit)))
             }
             .help(L("See the audit results (fixes made and suggested fixes)"))
             .popover(isPresented: $showing, arrowEdge: .bottom) {
@@ -1152,6 +1323,8 @@ struct AuditButton: View {
                 model.audit(job)
             } label: {
                 Label(L("Audit"), systemImage: "checkmark.seal")
+                    .actionLabelStyle(iconOnly: iconOnly)
+                    .accessibilityLabel(Text(L("Audit")))
             }
             .help(model.isLLMInstalled
                   ? L("Check for repetitions and mishearings with the LLM on your Mac")
@@ -1160,7 +1333,8 @@ struct AuditButton: View {
         }
     }
 
-    private func summary(_ audit: AuditReport) -> String {
+    /// ボタンの字 (操作の列の並べ方の見積もりでも使う)
+    static func title(of audit: AuditReport) -> String {
         var parts: [String] = []
         if audit.appliedFixes > 0 { parts.append(LPlural(audit.appliedFixes, one: "%d fix", other: "%d fixes")) }
         if audit.appliedDeletes > 0 {
@@ -1416,6 +1590,8 @@ struct VADSkippedNotice: View {
 struct RedoMenu: View {
     @Environment(AppModel.self) private var model
     let job: Job
+    /// 印だけにする (操作の列が狭いとき)。字は読み上げに出す
+    var iconOnly = false
 
     var body: some View {
         if job.url != nil {
@@ -1423,6 +1599,8 @@ struct RedoMenu: View {
                 RedoMenuItems(job: job)
             } label: {
                 Label(L("Transcribe again"), systemImage: "arrow.clockwise")
+                    .actionLabelStyle(iconOnly: iconOnly)
+                    .accessibilityLabel(Text(L("Transcribe again")))
             }
             .menuStyle(.button)
             .fixedSize()
@@ -1543,15 +1721,43 @@ struct ExportMenu: View {
     let hasTranslation: Bool
     /// メモが空かどうかは、この部品の中で見る (結果の画面が見ると、メモを書き始めたときに一覧まで描き直す)
     let job: Job
+    /// 印だけにする (操作の列が狭いとき)。字は読み上げと .help に出す
+    var iconOnly = false
 
     var body: some View {
         Menu {
             ExportMenuItems(hasTranslation: hasTranslation, hasNotes: job.hasNotes)
         } label: {
             Label(L("Export"), systemImage: "square.and.arrow.up")
+                .actionLabelStyle(iconOnly: iconOnly)
+                .accessibilityLabel(Text(L("Export")))
         }
         .menuStyle(.button)
         .fixedSize()
+        .iconOnlyHelp(iconOnly, L("Export"))
+    }
+}
+
+/// 操作の列の、印だけの形 (狭いとき)
+extension View {
+    /// iconOnly のときは、ボタンやメニューの字を隠して印だけにする。そうでないときは、今のまま
+    @ViewBuilder
+    func actionLabelStyle(iconOnly: Bool) -> some View {
+        if iconOnly {
+            labelStyle(.iconOnly)
+        } else {
+            self
+        }
+    }
+
+    /// 印だけのときに、字を .help に出す (ほかに .help が無いボタン用)
+    @ViewBuilder
+    func iconOnlyHelp(_ iconOnly: Bool, _ text: String) -> some View {
+        if iconOnly {
+            help(text)
+        } else {
+            self
+        }
     }
 }
 
