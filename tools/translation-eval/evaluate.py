@@ -15,6 +15,12 @@
 今の採点の決まりで採点し直す (`Kikimimi --eval-llm none --rescore <結果> --report <新しい結果>`)。
 新しいフォルダ (`--out`。既定は <元のフォルダ>-rescored) に、問題ごとの結果と summary.md・summary.json を作る。
 元のフォルダは変えない。
+
+    python3 tools/translation-eval/evaluate.py --gate build/translation-eval/sets --out <出力のフォルダ>
+
+`--gate <フォルダ>` は、LLM を回さずに、フォルダの中の問題か結果 (summary.json・gate.json は除く) の全部を
+1 回のアプリ (`Kikimimi --eval-llm none --gate <ファイル> … --report gate.json`) に渡し、訳の関門を掛ける。
+`--out` (既定は、そのフォルダ) に gate.md・gate.json・gate.log を作る。
 """
 import argparse
 import datetime
@@ -195,6 +201,70 @@ def rescore(args, app, baseline):
     return write_summary(out, f"翻訳の評価 (採点し直し): {model or '-'}", info, summary, rows, failures, baseline)
 
 
+def fmt_ratio(count):
+    return "-" if count is None else f"{count.get('caught', 0)}/{count.get('tried', 0)}"
+
+
+def gate(args, app):
+    """--gate: フォルダの中の問題か結果の全部に、訳の関門を掛ける (LLM は使わない)"""
+    source = Path(args.gate).expanduser().resolve()
+    if not source.is_dir():
+        fail(f"{source} がありません (--gate)。")
+    out = Path(args.out).expanduser() if args.out else source
+    # 前に作った gate.json と、まとめの summary.json は、問題でも結果でもないので外す
+    files = sorted(p for p in source.glob("*.json") if p.name not in ("summary.json", "gate.json"))
+    if not files:
+        fail(f"{source} に問題も結果もありません (--gate)。")
+    out.mkdir(parents=True, exist_ok=True)
+    report = out / "gate.json"
+    log = out / "gate.log"
+    command = [str(app), "--eval-llm", "none"]
+    for path in files:
+        command += ["--gate", str(path)]
+    command += ["--report", str(report)]
+    print(f"▸ {source} の {len(files)} 個のファイルに関門を掛けます → {out}")
+    done = run_app(command, log)
+    if done is None:
+        fail("アプリを起動できませんでした。")
+    if done.returncode != 0 or not report.exists():
+        fail(f"終了コード {done.returncode} (出力は {log})")
+    result = json.loads(report.read_text(encoding="utf-8"))
+    flags = ["failed", "script", "long", "repeated", "copied", "language", "number", "term", "short"]
+    lines = [f"# 訳の関門の測り: {source.name}", "",
+             f"- 日付: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
+             f"- 読んだファイル: {', '.join(result.get('files') or [])}",
+             f"- short の比: {result.get('shortRatio')} (原文の重さ {result.get('shortMinimumSourceWeight')} 以上の時だけ見る)",
+             f"- 重い印 (訳し直す物): {', '.join(result.get('severe') or [])}",
+             f"- 細かい所 (原文・訳・符号): {report}"]
+    references = result.get("references") or {}
+    if references:
+        mutations = sorted({m for s in references.values() for m in (s.get("mutations") or {})})
+        lines += ["", "## 人の訳に掛けた結果", "",
+                  "印の列は、人の訳に誤って印が付いた数。「壊し」の列は、壊した訳を拾った数 / 壊した数。", ""]
+        header = ["訳す先", "まとまり", "印あり"] + flags + [f"壊し {m}" for m in mutations]
+        lines += ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+        for code, s in sorted(references.items()):
+            cells = [code, str(s.get("units", 0)), str(s.get("flaggedUnits", 0))]
+            cells += [str((s.get("flags") or {}).get(f, 0)) for f in flags]
+            cells += [fmt_ratio((s.get("mutations") or {}).get(m)) for m in mutations]
+            lines.append("| " + " | ".join(cells) + " |")
+    outputs = result.get("outputs") or {}
+    if outputs:
+        lines += ["", "## LLM の訳に掛けた結果", "",
+                  "chrF は、人の訳の在るまとまりだけのコーパスの点 (かっこの中は、まとまりの数)。", ""]
+        header = ["訳す先", "まとまり", "印あり", "重い印"] + flags + ["chrF 印あり", "chrF 印なし"]
+        lines += ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+        for code, s in sorted(outputs.items()):
+            cells = [code, str(s.get("units", 0)), str(s.get("flaggedUnits", 0)), str(s.get("severeUnits", 0))]
+            cells += [str((s.get("flags") or {}).get(f, 0)) for f in flags]
+            cells += [f"{fmt_chrf(s.get('flaggedChrF'))} ({s.get('flaggedWithReference', 0)})",
+                      f"{fmt_chrf(s.get('unflaggedChrF'))} ({s.get('unflaggedWithReference', 0)})"]
+            lines.append("| " + " | ".join(cells) + " |")
+    (out / "gate.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"▸ まとめ: {out / 'gate.md'}")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="翻訳を 13 言語の問題で測る")
     parser.add_argument("--model", help="測る LLM (GGUF)。--rescore の時は要らない")
@@ -206,6 +276,7 @@ def main():
                                       "--rescore の時は <元のフォルダ>-rescored)")
     parser.add_argument("--baseline", help="前の結果のフォルダ (同じ名前の結果と比べる)")
     parser.add_argument("--rescore", help="前の結果のフォルダ: LLM を回さず、残した訳を今の採点の決まりで採点し直す")
+    parser.add_argument("--gate", help="問題か結果のフォルダ: LLM を回さず、訳の関門を掛けて gate.md・gate.json を作る")
     parser.add_argument("--adapter", help="アプリにそのまま渡す: 追加学習の差分 (.lora.gguf)")
     parser.add_argument("--ledger", help="アプリにそのまま渡す: 学習した直しの台帳 (.json)")
     parser.add_argument("--cpu", action="store_true", help="アプリにそのまま渡す: GPU を使わない")
@@ -219,6 +290,8 @@ def main():
         fail("--out と --baseline が同じフォルダです。前の結果を上書きしてしまうので、別のフォルダを指定してください。")
     if not app.exists():
         fail(f"{app} がありません。先に make app でアプリを組み立ててください (--app)。")
+    if args.gate:
+        return gate(args, app)
     if args.rescore:
         return rescore(args, app, baseline)
 

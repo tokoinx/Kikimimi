@@ -11,6 +11,8 @@ import KikimimiLLM
 /// `--baseline` を付けると前の結果と比べ、悪くなっていれば終了コード 3 を返す (差分を使う前の関門)。
 /// 結果には、翻訳の問題ごとの LLM の訳そのもの (`translationOutputs`) を残す。`--rescore` は、それを今の採点の決まりで
 /// 採点し直す (LLM は使わない。採点の決まりを直した時に、測り直さずに済む)
+/// `Kikimimi --eval-llm none --gate <問題.json か 結果.json> [--gate …] [--report <出力.json>]` は、訳の関門
+/// (`TranslationGate`) を LLM なしで測る (問題なら人の訳と壊した訳に、結果なら残した LLM の訳に掛ける)
 enum LLMEvalRunner {
     /// 結果の JSON (中身と、古い結果の読み方・採点し直しは KikimimiCore の `LLMEvalReport`)
     typealias Report = LLMEvalReport
@@ -54,6 +56,76 @@ enum LLMEvalRunner {
         return 0
     }
 
+    /// `--gate`: 訳の関門 (`TranslationGate`) を LLM なしで測る。問題のファイルなら人の訳 (と壊した訳) に、
+    /// 結果のファイルなら残した LLM の訳に、関門を掛ける (中身は KikimimiCore の `TranslationGateEval`)
+    private static func gate(_ paths: [String], report reportPath: String?) -> Int32 {
+        var report = TranslationGateReport()
+        for path in paths {
+            let name = (path as NSString).lastPathComponent
+            let data: Data
+            do {
+                data = try Data(contentsOf: URL(fileURLWithPath: expand(path)))
+            } catch {
+                log("GATE FAILED: could not read \(path): \(error.localizedDescription)")
+                return 1
+            }
+            // 結果のファイル (model と audit が在る) か、問題のファイルか
+            if let old = try? JSONDecoder().decode(Report.self, from: data) {
+                guard let outputs = old.translationOutputs else {
+                    log("GATE FAILED: \(path) has no translationOutputs (the LLM translations were not saved in this report)")
+                    return 1
+                }
+                let result = TranslationGateEval.checkOutputs(outputs, file: name)
+                for (target, stats) in result.byTarget { report.outputs[target, default: TranslationGateEval.OutputStats()].add(stats) }
+                report.examples += result.examples
+                log("\(name): \(outputs.count) translation cases (LLM translations), \(result.examples.count) flagged units")
+            } else {
+                let set: LLMEvalSet
+                do {
+                    set = try JSONDecoder().decode(LLMEvalSet.self, from: data)
+                } catch {
+                    log("GATE FAILED: \(path) is neither a report nor a set: \(error.localizedDescription)")
+                    return 1
+                }
+                guard !set.translation.isEmpty else {
+                    log("\(name): no translation cases, skipped")
+                    continue
+                }
+                let result = TranslationGateEval.checkReferences(set, file: name)
+                for (target, stats) in result.byTarget {
+                    report.references[target, default: TranslationGateEval.ReferenceStats()].add(stats)
+                }
+                report.examples += result.examples
+                log("\(name): \(set.translation.count) translation cases (references)")
+            }
+            report.files.append(name)
+        }
+        for e in report.examples {
+            log("  [\(e.file) \(e.id) \(e.lines.map { "\($0 + 1)" }.joined(separator: ","))] \(e.kind) \(e.flags.joined(separator: ","))"
+                + (e.detail.map { " (\($0))" } ?? "") + ": \(e.source) => \(e.translation ?? "(none)")")
+        }
+        if !report.references.isEmpty {
+            log("gate on references (flags = false alarms on human translations; +name = caught/tried on broken translations):")
+            for line in TranslationGateEval.referenceTable(report.references) { log("  " + line) }
+        }
+        if !report.outputs.isEmpty {
+            log("gate on LLM translations (chrF of flagged / unflagged units, units with a reference in brackets):")
+            for line in TranslationGateEval.outputTable(report.outputs) { log("  " + line) }
+        }
+        if let reportPath {
+            do {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                try encoder.encode(report).write(to: URL(fileURLWithPath: expand(reportPath)), options: .atomic)
+                log("report: \(reportPath)")
+            } catch {
+                log("GATE FAILED: \(error.localizedDescription)")
+                return 1
+            }
+        }
+        return 0
+    }
+
     static func run(arguments args: [String]) -> Int32 {
         func value(_ name: String) -> String? {
             guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
@@ -61,6 +133,10 @@ enum LLMEvalRunner {
         }
         func values(_ name: String) -> [String] {
             args.indices.filter { args[$0] == name && $0 + 1 < args.count }.map { args[$0 + 1] }
+        }
+        let gatePaths = values("--gate")
+        if !gatePaths.isEmpty {
+            return gate(gatePaths, report: value("--report"))
         }
         let rulesOnly = args.contains("--rules-only")
         let modelPath = value("--eval-llm") ?? ""
@@ -82,6 +158,7 @@ enum LLMEvalRunner {
             log("usage: Kikimimi --eval-llm <model.gguf> --set <cases.json> [--set …] [--adapter <lora.gguf>] [--ledger <ledger.json>]"
                 + " [--rules-only] [--cpu] [--report <out.json>] [--baseline <earlier report.json>]")
             log("       Kikimimi --eval-llm none --rescore <report.json> [--report <out.json>] [--baseline <earlier report.json>]")
+            log("       Kikimimi --eval-llm none --gate <cases.json or report.json> [--gate …] [--report <out.json>]")
             return 2
         }
         do {

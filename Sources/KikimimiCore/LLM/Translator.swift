@@ -216,27 +216,37 @@ public enum Translator {
     }
 
     /// 訳として受け取ってよいか (延々と続く・空のもの・ほかの言語になったものは捨てる)
+    /// 中の検査は `isTooLong` と `hasWrongScript` (訳の関門 `TranslationGate` も、同じ 2 つを使う)
     static func isPlausible(_ translation: String, source: String, target: String = "ja") -> Bool {
         let t = translation.trimmingCharacters(in: .whitespacesAndNewlines)
-        if target == "ja" {
-            // 日本語: 中国語になったものを捨てる (これまでと同じ)
-            guard !t.isEmpty, !Script.containsNonJapaneseHan(t) else { return false }
-            return t.count <= source.count * 4 + 40
-        }
-        guard !t.isEmpty, t.count <= source.count * 6 + 60 else { return false }
+        guard !t.isEmpty else { return false }
+        return !isTooLong(t, source: source, target: target) && !hasWrongScript(t, source: source, target: target)
+    }
+
+    /// 訳が長すぎるか (延々と続いた訳)。translation は、前後の空白を外した物
+    static func isTooLong(_ translation: String, source: String, target: String = "ja") -> Bool {
+        if target == "ja" { return translation.count > source.count * 4 + 40 }
+        return translation.count > source.count * 6 + 60
+    }
+
+    /// 訳の文字の種類が、訳す先の言語に合わないか。translation は、前後の空白を外した物
+    static func hasWrongScript(_ translation: String, source: String, target: String = "ja") -> Bool {
+        let t = translation
         switch target {
+        case "ja":
+            // 日本語: 中国語になったものを捨てる (これまでと同じ)
+            return Script.containsNonJapaneseHan(t)
         case "ko", "ru", "th":
             // その言語の文字が 1 つも無い訳は捨てる。ただし、原文をそのまま写したもの (名前だけの行など) は受け取る。
             // 写したかは、文字と数字だけで比べる (「NVIDIA.」を「NVIDIA」と写した時のように、句読点だけ違っても写し)
             let s = source.trimmingCharacters(in: .whitespacesAndNewlines)
-            if Script.hasLetters(s), !Script.hasLetters(t, of: target), lettersAndDigits(t) != lettersAndDigits(s) { return false }
-            return true
+            return Script.hasLetters(s) && !Script.hasLetters(t, of: target) && lettersAndDigits(t) != lettersAndDigits(s)
         case "zh":
             // 簡体字の訳に、かなが入っていたら日本語に流れている (中黒「・」と長音「ー」は、かなと数えない)
-            return !Script.hasKanaLetters(t)
+            return Script.hasKanaLetters(t)
         default:
             // ラテン文字の言語は、文字の種類を見ない (原文と同じ文字なので、見分けられない)
-            return true
+            return false
         }
     }
 

@@ -431,6 +431,12 @@ public enum LLMEval {
         }
     }
 
+    /// 訳が、原文をそのまま写しただけか (原文の言語が訳す先と違う時だけ。空白の違いは見ない)。
+    /// 原文の言語が分からない (nil) 時は、違うと見る。採点 (`score`) と訳の関門 (`TranslationGate`) の両方が使う
+    static func isCopy(_ text: String, source: String, sourceLanguage: String?, target: String) -> Bool {
+        sourceLanguage?.lowercased() != target && normalized(text) == normalized(source)
+    }
+
     /// 訳す先の言語の文字が在るか (ko: ハングル、ru: キリル文字、th: タイ文字、zh: 漢字が在り、かなが無い)。
     /// ほかの言語は、文字の種類では見分けられないので false
     static func hasTargetScript(_ text: String, target: String) -> Bool {
@@ -577,7 +583,7 @@ public enum LLMEval {
             } else {
                 details.append("\(label) not in \(target): \(source) => \(text)")
             }
-            if o.language.lowercased() != target, normalized(text) == normalized(source) {
+            if isCopy(text, source: source, sourceLanguage: o.language, target: target) {
                 score.copied += indices.count
                 details.append("\(label) copied: \(text)")
             }

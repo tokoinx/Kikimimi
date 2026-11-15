@@ -53,6 +53,17 @@
    python3 tools/translation-eval/evaluate.py --rescore build/translation-eval/results/<前の結果>
    ```
 
+6. **訳の関門を測る** (LLM を回さない): 訳に「要確認」の印を付ける関門 (`TranslationGate`) を、フォルダの中のファイルの全部に掛けます。
+
+   ```bash
+   python3 tools/translation-eval/evaluate.py --gate build/translation-eval/sets --out build/translation-eval/results/gate-sets
+   python3 tools/translation-eval/evaluate.py --gate build/translation-eval/results/<結果> --out build/translation-eval/results/<結果>-gate
+   ```
+
+   問題のフォルダなら、人の訳に誤って付いた印の数と、人の訳を機械的に壊した訳 (数を消す・原文を写す・別の言語・繰り返し・空・短く切る) を拾った数を、
+   結果のフォルダなら、LLM の訳に付いた印の数と、印の有る・無いまとまりの chrF を出します。
+   `--out` (既定は、そのフォルダ) に `gate.md`・`gate.json` (印の付いたまとまりの原文・訳・符号) を作ります。
+
 ## 表の読み方
 
 | 列 | 意味 |
