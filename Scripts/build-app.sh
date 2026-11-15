@@ -59,13 +59,23 @@ codesign --force --sign - "$APP" \
   || { echo "✗ 署名できませんでした。iCloud や Dropbox で同期しているフォルダの中では失敗することがあります (xattr -cr build を試すか、フォルダを移してください)。" >&2; exit 1; }
 codesign --verify --deep --strict "$APP"
 
-# この Mac で読み込めるかを、入れ替える前に確かめる (同梱したフレームワークを読み込めないと、ここで止まる)
-if ! VERSION="$("$APP/Contents/MacOS/Kikimimi" --version 2>&1)"; then
+# この Mac で読み込めるかを確かめる (同梱したフレームワークを読み込めないと、ここで止まる)。
+# 確かめは、入れ替えた後の置き場から走らせる。whisper.cpp / llama.cpp は、初めて使う時に Metal のシェーダーを作り
+# (30〜40 秒)、macOS はその結果を、アプリの置き場ごとに覚える。別の名前 (.new) のまま走らせると、その準備は
+# 入れ替えた後のアプリには効かず、最初の起動でもう一度かかる (2026-11-15 に、フォルダの名前を変えて確かめた)。
+# 前のアプリは別の名前によけておき、読み込めなかった時は元の場所へ戻す
+PREVIOUS="build/Kikimimi.app.previous"
+rm -rf "$PREVIOUS"
+if [ -d "$FINAL" ]; then mv "$FINAL" "$PREVIOUS"; fi
+mv "$APP" "$FINAL"
+if ! VERSION="$("$FINAL/Contents/MacOS/Kikimimi" --version 2>&1)"; then
   echo "$VERSION" >&2
-  echo "✗ 組み立てたアプリを、この Mac で読み込めません。上のメッセージを報告してください (前のアプリはそのままです)。" >&2
+  mv "$FINAL" "$APP"
+  if [ -d "$PREVIOUS" ]; then mv "$PREVIOUS" "$FINAL"; fi
+  echo "✗ 組み立てたアプリを、この Mac で読み込めません。上のメッセージを報告してください (前のアプリはそのままです。読み込めなかった物は $APP に在ります)。" >&2
   exit 1
 fi
+rm -rf "$PREVIOUS"
 
-rm -rf "$FINAL"
-mv "$APP" "$FINAL"
-echo "✓ $FINAL — $(printf '%s\n' "$VERSION" | head -1)"
+# 版の行 (「Kikimimi 1.1.0 (…)」) を出す。--version の出力には、ggml の記録の行も混ざっている
+echo "✓ $FINAL — $(printf '%s\n' "$VERSION" | grep -m 1 '^Kikimimi ' || true)"
