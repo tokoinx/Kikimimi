@@ -28,10 +28,11 @@
 ## 残っている事
 
 アプリ:
-- `swift build` に、「Swift 6 の言語モードでは誤りになる」という警告が 5 か所出る (直していない。文は、CI の Xcode 16.2 の列の記録から写した)。
-  - 4 か所は `@unknown default` の無い switch: `PracticeController.swift:324` (`LineSequencer.Action`)、`DictationBar.swift:105` (`DictationDisplay.Style`)、`AppModel.swift:940` と `WhisperSelfTest.swift:131` (`TranscriptionStage`)。元は、`Package.swift` が KikimimiCore を `-enable-library-evolution` で作っている事 (その公開の enum は、アプリ本体から「後で case が増えうる型」に見える)。
-  - 残る 1 か所は `AudioDecoder.swift:36`: Sendable でない `[AVAssetTrack]` を、`DispatchQueue.global().async` の中へ持ち込んでいる。
-  - アプリ本体は Swift 5 の言語モードなので、今は警告で済んでいる。
+- ビルドの警告 5 か所 (Xcode 16.2 の列) は、2026-11-15 に直した。
+  - switch の 4 か所: 定義の側の 3 つの enum (`LineSequencer.Action`・`DictationDisplay.Style`・`TranscriptionStage`) に `@frozen` を付けた。`Package.swift` が KikimimiCore とラッパーを `-enable-library-evolution` で作っているので、付けないと、アプリ本体から「後で case が増えうる型」に見える。使う側の switch は変えていない。
+  - `AudioDecoder.swift`: Sendable でない `[AVAssetTrack]` を、`@unchecked Sendable` の包みに入れて、別のスレッドへ渡す形にした。
+  - 手元 (Xcode 16.2) の `swift build` と `make app` に、`warning:` の行は無い。
+- 残っている警告: Xcode 26.3 の列でだけ、`LiveRecorder.swift:158` に、Sendable でない `AVAudioPCMBuffer` を別のスレッドへ持ち込む警告が出る (直していない)。
 - CI の `Process completed with exit code 1` は、「Launch while a self-test is running」の段 (失敗にしない設定) が出している。`open` の後、30 秒待っても `build/launch-busy.txt` ができず、`cat` が失敗する。段を足した 2026-11-09 から、見た 4 回の実行 (11-09・11-10・11-12・11-14) の 2 列すべてで同じ。
   - 理由 (2026-11-15 の実行 43664280091 で、段に足した記録から): `open` は新しいプロセスを起こしている。そのプロセスが、`LaunchSelfTest.swift:35` (llama.cpp の情報を取る所 → Metal の準備) で 30 秒より長く待つ。16.2 の列は、起動の 34 秒後もそこで待っていた。26.3 の列は、起動の 31 秒後に起動の記録の最初の行が出た。ほかの段では、同じ準備は 0.01〜0.04 秒で終わる。文字起こしと同時の時だけ長くなる理由は、分かっていない。
   - 手元 (macOS 14.8.3・M1、2026-11-15) で見た事: 確認用の文字起こしの実行中でも、`open` は新しく起動する。Metal の準備が初回の時は、起動の確認が結果を書くまで 26〜51 秒かかる (2 回目からは 5 秒)。`LaunchSelfTest.arm` は、止まった時の見張りを仕掛ける前に whisper.cpp / llama.cpp の情報を取るので、そこで待っている間は結果が書かれない。
