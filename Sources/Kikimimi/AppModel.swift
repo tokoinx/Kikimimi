@@ -67,6 +67,8 @@ final class Job: Identifiable {
     }
     /// 「無音を飛ばさずに文字起こししました」の案内を閉じた
     var vadSkippedNoticeDismissed = false
+    /// 「設定の訳す先と違う言語に訳してあります」の案内を閉じた (この起動のあいだだけ。保存しない)
+    var translationLanguageNoticeDismissed = false
 
     // 文字起こしのあとの監査・翻訳
     /// これから行う監査・翻訳
@@ -273,7 +275,24 @@ final class AppModel {
     }
     var autoAudit: Bool { didSet { save(autoAudit, "autoAudit") } }
     var autoTranslate: Bool { didSet { save(autoTranslate, "autoTranslate") } }
-    /// 原文と日本語訳を左右に並べて表示する
+    /// 利用者が選んだ訳す先の言語 (nil なら、まだ選んでいない)。確認用の起動 (--selftest-…) では、いつも "ja" で始め、保存しない
+    private var chosenTranslationLanguage: String?
+    /// 確認用の起動 (--selftest-…)。設定を保存しない
+    private static let isSelfTestLaunch = CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest-") })
+    /// 設定の、訳す先の言語 (13 言語のコード。UserDefaults の translationLanguage)。
+    /// 選んでいなければ、今の画面の言語 (保存はしない。利用者が選んだ時に初めて保存する)。
+    /// 確認用の起動では日本語 (絵と確認が、日本語へ訳す前提のため)。
+    /// もう訳の在る結果は、これではなく、その結果の言語で訳す (`translationTarget(for:)`)
+    var translationLanguage: String {
+        get { TranslationTarget.normalized(chosenTranslationLanguage ?? uiLanguage.rawValue) }
+        set {
+            let code = TranslationTarget.normalized(newValue)
+            guard code != chosenTranslationLanguage else { return }
+            chosenTranslationLanguage = code
+            if !Self.isSelfTestLaunch { save(code, "translationLanguage") }
+        }
+    }
+    /// 原文と訳を左右に並べて表示する
     var showBilingual: Bool { didSet { save(showBilingual, "showBilingual") } }
     /// 結果の右にメモの欄を出す
     var showNotes: Bool { didSet { save(showNotes, "showNotes") } }
@@ -349,6 +368,9 @@ final class AppModel {
         llmModelID = d.string(forKey: "llmModelID") ?? LLMCatalog.defaultModelID
         autoAudit = d.object(forKey: "autoAudit") as? Bool ?? true
         autoTranslate = d.object(forKey: "autoTranslate") as? Bool ?? true
+        // 確認用の起動では、設定を読まず、日本語に決める
+        chosenTranslationLanguage = Self.isSelfTestLaunch
+            ? "ja" : d.string(forKey: "translationLanguage").map { TranslationTarget.normalized($0) }
         showBilingual = d.object(forKey: "showBilingual") as? Bool ?? true
         showNotes = d.object(forKey: "showNotes") as? Bool ?? false
         notesWidth = min(max(d.object(forKey: "notesWidth") as? Double ?? 320, Self.notesWidthRange.lowerBound),
@@ -749,7 +771,8 @@ final class AppModel {
                 if currentLLM.spec?.id == spec.id, let job = selectedJob, job.status == .done, let t = job.transcript {
                     var tasks: [PostTask] = []
                     if autoAudit, t.audit?.model == nil { tasks.append(.audit) }
-                    if autoTranslate, t.isMainlyForeign, t.untranslatedCount > 0 { tasks.append(.translate) }
+                    let stats = translationStats(of: t)
+                    if autoTranslate, stats.isMainlyForeign, stats.untranslated > 0 { tasks.append(.translate) }
                     if !tasks.isEmpty { schedulePostTasks(for: job, automatic: false, tasks: tasks) }
                 }
             } catch is CancellationError {
@@ -1195,8 +1218,10 @@ final class AppModel {
         var wanted = tasks ?? []
         if automatic {
             if autoAudit { wanted.append(.audit) }
-            // 翻訳は LLM が手元にあり、日本語以外が主な文字起こしのときだけ (LLM が無ければ画面で取得を案内する)
-            if autoTranslate, isLLMInstalled, transcript.isMainlyForeign { wanted.append(.translate) }
+            // 翻訳は LLM が手元にあり、訳す先の言語以外が主な文字起こしのときだけ (LLM が無ければ画面で取得を案内する)
+            if autoTranslate, isLLMInstalled, transcript.isMainlyForeign(target: translationTarget(for: transcript)) {
+                wanted.append(.translate)
+            }
         }
         let added = wanted.filter { !job.postQueue.contains($0) && job.postState.task != $0 }
         guard !added.isEmpty else { return }
@@ -1211,27 +1236,78 @@ final class AppModel {
         schedulePostTasks(for: job, automatic: false, tasks: [.audit])
     }
 
-    /// まだ訳していない区間を日本語に訳す
+    /// その結果の訳す先の言語。翻訳に関わる所 (訳す・訳していない数・対訳・行・練習の「隠す」・書き出し) は、すべてこれを使う。
+    /// 訳が在れば、その結果が訳した言語 (1 つの結果の訳は 1 つの言語にそろえる。設定の言語が変わっても変えない)。
+    /// 訳が無ければ設定の言語。ただし「〇〇語で訳し直す」で訳を外した結果は、訳が無い間も、選んだ言語
+    /// (`retranslate` が translationLanguage を先に入れてある)
+    func translationTarget(for transcript: Transcript) -> String {
+        if let pending = transcript.translationLanguage, !transcript.hasTranslation {
+            return TranslationTarget.normalized(pending)
+        }
+        return TranslationTarget.normalized(transcript.translationTarget(default: translationLanguage))
+    }
+
+    /// その結果の訳す先の言語の名前 (画面に出す。今の画面の言語での名前)
+    func translationTargetName(for transcript: Transcript) -> String {
+        TranslationTarget.displayName(for: translationTarget(for: transcript))
+    }
+
+    /// その結果の、訳す先の言語へ訳す時の翻訳の状況 (区間を 1 回だけ見て数える)
+    func translationStats(of transcript: Transcript) -> Transcript.TranslationStats {
+        transcript.translationStats(target: translationTarget(for: transcript))
+    }
+
+    /// LLM が無いので訳せない時の知らせ (target は訳す先の言語のコード)
+    private func llmNeededForTranslation(_ target: String) -> String {
+        L("Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.",
+          TranslationTarget.displayName(for: target), currentLLM.name)
+    }
+
+    /// まだ訳していない区間を、その結果の訳す先の言語に訳す
     func translate(_ job: Job) {
         guard isLLMInstalled else {
-            errorMessage = L("Translating to Japanese needs the local LLM “%@”. Download it in the “Audit & translation” tab of Settings.", currentLLM.name)
+            errorMessage = llmNeededForTranslation(job.transcript.map { translationTarget(for: $0) } ?? translationLanguage)
             return
         }
         schedulePostTasks(for: job, automatic: false, tasks: [.translate])
     }
 
-    /// その区間を含む 1 文だけを日本語に訳す (行の「訳」)。redo は、訳のある文を訳し直す (行の右クリック)。
+    /// 訳す先を変えて訳し直す (結果の画面の「〇〇語で訳し直す…」。確かめてから呼ぶ)。
+    /// (a) 今の状態を、履歴の版 (自動) として残す。版を残せない時 (保存していない結果・監査や翻訳の最中) は、
+    ///     「戻す」と同じく何もしない。残せなかった時も何も変えない
+    /// (b) 訳を全部外す (c) この結果の訳す先を target にして、翻訳を始める
+    func retranslate(_ job: Job, into target: String) {
+        let target = TranslationTarget.normalized(target)
+        guard isLLMInstalled else {
+            errorMessage = llmNeededForTranslation(target)
+            return
+        }
+        guard job.status == .done, job.transcript != nil, canEditVersions(job) else { return }
+        Task {
+            guard await saveVersion(job, label: AppModel.beforeRetranslateLabel, mode: .new, origin: .beforeRestore) else { return }
+            // 版を残しているあいだに、ほかの仕事が始まった・結果が変わった時は、訳を外さない (版は残る)
+            guard job.status == .done, !job.isPostActive, var transcript = job.transcript else { return }
+            transcript.removeAllTranslations()
+            // 訳が 1 つも無い間も、この結果は target で訳す (translationTarget(for:) が見る)
+            transcript.translationLanguage = target
+            job.transcript = transcript
+            schedulePostTasks(for: job, automatic: false, tasks: [.translate])
+        }
+    }
+
+    /// その区間を含む 1 文だけを、その結果の訳す先の言語に訳す (行の「訳」)。redo は、訳のある文を訳し直す (行の右クリック)。
     /// 文のまとめ方とプロンプトは「翻訳」と同じなので、あとの「翻訳」「残りを翻訳」はこの文を飛ばす
     func translateLine(_ id: UUID, in job: Job, redo: Bool = false) {
         guard isLLMInstalled else {
-            errorMessage = L("Translating to Japanese needs the local LLM “%@”. Download it in the “Audit & translation” tab of Settings.", currentLLM.name)
+            errorMessage = llmNeededForTranslation(job.transcript.map { translationTarget(for: $0) } ?? translationLanguage)
             return
         }
         guard job.status == .done, let transcript = job.transcript, !job.lineQueue.contains(id) else { return }
+        let target = translationTarget(for: transcript)
         // 訳し直しは、前の訳でまとめていた区間をすべて訳し直す (監査で文の区切りが変わっていても、訳の無い区間を残さない)
         let unit = redo
-            ? Translator.redoUnitIDs(containing: id, in: transcript.segments, language: transcript.language)
-            : Translator.unitIDs(containing: id, in: transcript.segments, language: transcript.language)
+            ? Translator.redoUnitIDs(containing: id, in: transcript.segments, language: transcript.language, target: target)
+            : Translator.unitIDs(containing: id, in: transcript.segments, language: transcript.language, target: target)
         // 同じ文の別の行がもう頼まれていれば、もう一度は訳さない
         let added = unit.filter { !job.lineQueue.contains($0) }
         guard !added.isEmpty else { return }
@@ -1286,6 +1362,8 @@ final class AppModel {
         let learned = useLedger ? ledger : nil
         let adapter = activeAdapterPath
         let language = transcript.language
+        // 訳す先は、仕事を始めた時に決める (訳している途中に設定の言語が変わっても、この言語で終える)
+        let target = translationTarget(for: transcript)
         defer { job.postState = .idle }
         defer {
             if job.pausedForRecording {
@@ -1396,12 +1474,14 @@ final class AppModel {
                     // 訳しているあいだに監査で文が変わった区間には付けない
                     for result in batch { t.apply(result, sources: sources) }
                     t.translationModel = selection.name
+                    t.translationLanguage = target
                     job.transcript = t
                 }
                 let (failed, all) = try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
                                                       shouldCancel: { flag.isSet }) { engine in
                     var all: [TranslationResult] = []
-                    let failed = try Translator.translate(segments, language: language, options: options, generator: engine,
+                    let failed = try Translator.translate(segments, language: language, target: target, options: options,
+                                                          generator: engine,
                                                           shouldCancel: { flag.isSet }) { batch, done, total in
                         all += batch
                         Task { @MainActor in
@@ -1450,12 +1530,14 @@ final class AppModel {
                     // 訳しているあいだに監査で文が変わった区間には付けない
                     for result in batch { t.apply(result, sources: sources) }
                     t.translationModel = selection.name
+                    t.translationLanguage = target
                     job.transcript = t
                 }
                 let (failed, all) = try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
                                                       shouldCancel: { flag.isSet }) { engine in
                     var all: [TranslationResult] = []
-                    let failed = try Translator.translate(segments, language: language, options: options, only: only,
+                    let failed = try Translator.translate(segments, language: language, target: target, options: options,
+                                                          only: only,
                                                           generator: engine, shouldCancel: { flag.isSet }) { batch, done, total in
                         all += batch
                         Task { @MainActor in
@@ -1653,12 +1735,15 @@ final class AppModel {
         guard let job = selectedJob, let transcript = job.transcript else { return }
         let panel = NSSavePanel()
         let base = (job.name as NSString).deletingPathExtension
-        panel.nameFieldStringValue = "\(base.isEmpty ? "transcript" : base)\(content.fileSuffix).\(format.fileExtension)"
+        // 訳・対訳は、その結果の訳す先の言語で書き出す (ファイルの名前の印も、その言語のコード)
+        let target = translationTarget(for: transcript)
+        panel.nameFieldStringValue = "\(base.isEmpty ? "transcript" : base)\(content.fileSuffix(target: target)).\(format.fileExtension)"
         panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .plainText]
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            try Exporter.render(transcript, as: format, content: content).write(to: url, atomically: true, encoding: .utf8)
+            try Exporter.render(transcript, as: format, content: content, target: target)
+                .write(to: url, atomically: true, encoding: .utf8)
         } catch {
             errorMessage = L("Could not save: %@", error.localizedDescription)
         }
@@ -1680,7 +1765,8 @@ final class AppModel {
         }
     }
 
-    /// 対訳で表示しているか (対訳表示がオンか、そのジョブで行の「訳」を押した。そして、日本語以外が主な文字起こしか、訳が 1 つでもある)
+    /// 対訳で表示しているか (対訳表示がオンか、そのジョブで行の「訳」を押した。そして、訳す先の言語以外が主な文字起こしか、
+    /// 訳が 1 つでもある)。stats は、その結果の訳す先の言語で数えたもの (`translationStats(of:)`)
     func isBilingual(_ stats: Transcript.TranslationStats, in job: Job) -> Bool {
         showsBilingual(job) && (stats.hasTranslation || stats.isMainlyForeign)
     }
@@ -1701,13 +1787,14 @@ final class AppModel {
         job.url != nil && player.url == job.url
     }
 
-    /// 本文をコピーする。対訳表示のときは原文と日本語訳を並べたもの
+    /// 本文をコピーする。対訳表示のときは原文と訳を並べたもの
     func copySelectedText() {
         guard let job = selectedJob, let transcript = job.transcript else { return }
         let text: String
-        let stats = transcript.translationStats
+        let target = translationTarget(for: transcript)
+        let stats = transcript.translationStats(target: target)
         if isBilingual(stats, in: job) && stats.hasTranslation {
-            text = Exporter.txt(transcript, content: .bilingual)
+            text = Exporter.txt(transcript, content: .bilingual, target: target)
         } else {
             text = transcript.text(withTimestamps: showTimestamps)
         }
@@ -1750,6 +1837,8 @@ extension AppModel {
     /// 版に戻す前に、自動で残す版の名前
     /// (保存される名前なので、作った時の画面の言語のまま残る。版を見分ける時は、名前ではなく origin で見る)
     static var beforeRestoreLabel: String { L("Before restoring") }
+    /// 訳す先を変えて訳し直す前に、自動で残す版の名前 (保存される名前なので、作った時の画面の言語のまま残る)
+    static var beforeRetranslateLabel: String { L("Before changing the translation language") }
 
     /// 確認用 (--selftest-ui-load): この場所に保存する (前の結果は読まない)
     func useLibrary(at root: URL) {
@@ -2071,9 +2160,10 @@ extension AppModel {
         return nil
     }
 
-    /// いまの状態を版として残す
+    /// いまの状態を版として残す。origin は、新しい版のときの残し方 (自分で残した版か、自動で残した版か)
     @discardableResult
-    func saveVersion(_ job: Job, label: String, mode: VersionSaveMode) async -> Bool {
+    func saveVersion(_ job: Job, label: String, mode: VersionSaveMode,
+                     origin: VersionInfo.Origin = .manual) async -> Bool {
         guard canEditVersions(job), let writer = library else { return false }
         // 待っている保存を先に積む (列の順に書くので、版はそのあとの状態になる)
         dispatchPendingSaves(for: job.id)
@@ -2084,7 +2174,7 @@ extension AppModel {
         defer { job.versionBusy = false }
         let result = await writer.run { (store: LibraryStore) throws -> SavedDocument in
             if overwrite { return try store.overwriteLatestVersion(of: document, label: name) }
-            return try store.addVersion(to: document, label: name, origin: .manual)
+            return try store.addVersion(to: document, label: name, origin: origin)
         }
         switch result {
         case .success(let updated):

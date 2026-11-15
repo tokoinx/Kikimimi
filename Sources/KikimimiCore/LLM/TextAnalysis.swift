@@ -116,9 +116,37 @@ public enum Script {
         hasLetters(text) && !isJapanese(text, transcriptLanguage: transcriptLanguage)
     }
 
+    /// 訳す必要がある区間か (訳す先 target の言語でなく、文字を含む)。翻訳の区間の決め方は、すべてここを通る。
+    /// - target が日本語: これまでの決め方そのまま。区間の言語が日本語 (「日本語＋英語」で日本語とわかっている区間) なら、
+    ///   かなが無くても (「Ruth先生」など) 訳さない。ほかは文字の種類で見る (`needsTranslation(_:transcriptLanguage:)`)。
+    /// - ほかの target: 文字が無ければ訳さない。言語 (区間の言語、無ければ文字起こし全体の言語) が分かれば、
+    ///   それが target と同じ時だけ訳さない。言語が分からなければ訳す (指示文に「もうその言語の行は、そのまま写す」と書いてある)
+    public static func needsTranslation(_ text: String, segmentLanguage: String?, transcriptLanguage: String?,
+                                        target: String) -> Bool {
+        if target == "ja" {
+            return segmentLanguage != "ja"
+                && needsTranslation(text, transcriptLanguage: segmentLanguage ?? transcriptLanguage)
+        }
+        guard hasLetters(text) else { return false }
+        guard let language = segmentLanguage ?? transcriptLanguage else { return true }
+        return language.lowercased() != target.lowercased()
+    }
+
     /// かなを含むか
     public static func hasKana(_ text: String) -> Bool {
         text.unicodeScalars.contains { isKana($0.value) }
+    }
+
+    /// その言語の文字を含むか (ko: ハングル、ru: キリル文字、th: タイ文字。ほかの言語は、いつも false)。訳の検査に使う
+    static func hasLetters(_ text: String, of language: String) -> Bool {
+        let ranges: [ClosedRange<UInt32>]
+        switch language {
+        case "ko": ranges = [0xAC00...0xD7AF, 0x1100...0x11FF, 0x3130...0x318F]
+        case "ru": ranges = [0x0400...0x052F]
+        case "th": ranges = [0x0E00...0x0E7F]
+        default: return false
+        }
+        return text.unicodeScalars.contains { s in ranges.contains { $0.contains(s.value) } }
     }
 
     private static func isBasicLatin(_ v: UInt32) -> Bool {
@@ -157,7 +185,8 @@ public enum Script {
         }
     }
 
-    /// プロンプトに書く言語名 (英語)
+    /// プロンプトに書く言語名 (英語)。ja は「the original language」のまま (監査の指示文が、前と同じ文になるように。
+    /// 翻訳の指示文で原文の言語の名前が要る時は、`Translator.sourceLanguageName(for:)` が ja を "Japanese" にする)
     public static func englishName(for code: String?) -> String {
         switch code?.lowercased() {
         case "en": return "English"

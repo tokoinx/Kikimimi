@@ -23,7 +23,8 @@ extension JA {
         "History…": "履歴…",
         "Transcribe again": "やり直す",
         "Audit (repetitions and mishearings)": "監査する (繰り返し・聞き取りミス)",
-        "Translate to Japanese": "日本語に翻訳",
+        // %@ は、選んでいる結果の訳す先の言語の名前
+        "Translate to %@": "%@に翻訳",
         "Playback": "再生",
         "Pause (Space)": "一時停止 (スペースキー)",
         "Play (Space)": "再生 (スペースキー)",
@@ -91,7 +92,7 @@ extension JA {
         "Could not audit: %@": "監査できませんでした: %@",
         "Could not translate: %@": "翻訳できませんでした: %@",
         "Paused while recording. It resumes when you stop recording.": "録音のあいだ一時停止しています。録音を止めると再開します。",
-        "Translating to Japanese needs the local LLM “%@”. Download it in the “Audit & translation” tab of Settings.": "日本語に訳すには、ローカル LLM「%@」が必要です。設定の「監査・翻訳」から取得してください。",
+        "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "%1$@に訳すには、ローカル LLM「%2$@」が必要です。設定の「監査・翻訳」から取得してください。",
         // errorMessage
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "学習した直しのファイルを読めなかったので、空の状態から始めます。元のファイルは「%@」という名前で、同じフォルダにとってあります。",
         "Could not save the learned corrections: %@": "学習した直しを保存できませんでした: %@",
@@ -127,6 +128,7 @@ extension JA {
         // ジョブと版の名前・版の案内
         "Recording %@": "録音 %@",
         "Before restoring": "戻す前の状態",
+        "Before changing the translation language": "訳す先の言語を変える前",
         "Versions can be saved only for finished, saved transcription results.": "文字起こしが終わって保存した結果だけ、版を残せます。",
         "You cannot save or restore versions during audit or translation. Wait until it finishes.": "監査・翻訳の最中は、版を残したり戻したりできません。終わってからにしてください。",
         "Saving the version…": "版を書いています…",

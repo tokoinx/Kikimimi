@@ -854,7 +854,7 @@ private final class LoadRun {
 
     func isShownBilingual(_ job: Job) -> String {
         guard let transcript = job.transcript else { return "no" }
-        let stats = job.status == .done ? transcript.translationStats : Transcript.TranslationStats()
+        let stats = job.status == .done ? model.translationStats(of: transcript) : Transcript.TranslationStats()
         return model.isBilingual(stats, in: job) ? "yes" : "no"
     }
 

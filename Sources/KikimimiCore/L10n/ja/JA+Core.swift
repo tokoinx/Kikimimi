@@ -33,13 +33,15 @@ extension JA {
         "Subtitles SRT (.srt)": "字幕 SRT (.srt)",
         "Subtitles WebVTT (.vtt)": "字幕 WebVTT (.vtt)",
         "Original": "原文",
-        "Japanese translation": "日本語訳",
-        "Bilingual (original + Japanese)": "対訳 (原文 + 日本語)",
+        // %@ は訳した言語の名前 (日本語なら「日本語訳」「対訳 (原文 + 日本語)」で、これまでと同じ文になる)。
+        // 「%@ translation」は、結果の画面の対訳の見出し (TranscriptDetailView) にも使う
+        "%@ translation": "%@訳",
+        "Bilingual (original + %@)": "対訳 (原文 + %@)",
         "Language: %@": "言語: %@",
         "Length: %@": "長さ: %@",
         "Model: %@": "モデル: %@",
         "Translation: %@": "翻訳: %@",
-        "| Time | Original | Japanese translation |": "| 時刻 | 原文 | 日本語訳 |",
+        "| Time | Original | %@ translation |": "| 時刻 | 原文 | %@訳 |",
         // DictationDisplay
         "All correct": "全部合っています",
         "%1$d / %2$d words": "%1$d / %2$d 語",

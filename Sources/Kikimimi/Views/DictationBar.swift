@@ -48,7 +48,9 @@ struct DictationBar: View {
                         practice.settings.hide = .source
                     }
                     .controlSize(.small)
-                    .help(L("Hide the original text of lines that are not Japanese (the eye button on a line shows it one line at a time)"))
+                    // 隠さない行は、その結果の訳す先の言語の行 (練習が、一覧から受け取った言語)
+                    .help(L("Hide the original text of lines that are not %@ (the eye button on a line shows it one line at a time)",
+                            TranslationTarget.displayName(for: practice.target)))
                 }
                 Button(L("Listen again")) {
                     practice.replay()

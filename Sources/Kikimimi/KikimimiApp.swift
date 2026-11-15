@@ -14,7 +14,10 @@ enum KikimimiMain {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--selftest-llm") {
             let path = i + 1 < args.count ? args[i + 1] : ""
-            exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu"), strict: args.contains("--strict")))
+            // --translate-to <コード>: 翻訳の例を、その言語へ訳す (無ければ、これまでどおり日本語へ)
+            let translateTo = args.firstIndex(of: "--translate-to").map { $0 + 1 < args.count ? args[$0 + 1] : "" }
+            exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu"), strict: args.contains("--strict"),
+                                 translateTo: translateTo))
         }
         if args.contains("--selftest-whisper") {
             exit(WhisperSelfTest.run(arguments: args))
@@ -364,6 +367,15 @@ struct KikimimiApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
 
+    /// 選んでいる結果の訳す先の言語 (メニューの「〇〇語に翻訳」と書き出しの名前)。
+    /// 文字起こしの最中は、結果を見ずに設定の言語にする (区間が増えるたびに、全部の区間から訳の有無を探さないように)
+    private var selectedTranslationTarget: String {
+        guard let job = model.selectedJob, job.status == .done, let transcript = job.transcript else {
+            return model.translationLanguage
+        }
+        return model.translationTarget(for: transcript)
+    }
+
     var body: some Scene {
         WindowGroup(L("Kikimimi"), id: MainWindow.id) {
             ContentView()
@@ -413,7 +425,7 @@ struct KikimimiApp: App {
                     // 文字起こしの最中は数えない (区間が増えるたびにメニューを作り直すので、区間を全部見ることになる)
                     ExportMenuItems(hasTranslation: model.selectedJob.map {
                         $0.status == .done && ($0.transcript?.hasTranslation ?? false)
-                    } ?? false, hasNotes: model.selectedJob?.hasNotes ?? false)
+                    } ?? false, target: selectedTranslationTarget, hasNotes: model.selectedJob?.hasNotes ?? false)
                         .environment(model)
                 }
                 .disabled(model.selectedJob?.status != .done)
@@ -445,12 +457,15 @@ struct KikimimiApp: App {
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
                 .disabled(model.selectedJob?.status != .done || model.selectedJob?.isPostActive == true)
-                Button(L("Translate to Japanese")) {
+                // 選んでいる結果の訳す先の言語へ訳す (文字起こしの最中は数えない: 区間が増えるたびにメニューを作り直すため)
+                Button(L("Translate to %@", TranslationTarget.displayName(for: selectedTranslationTarget))) {
                     if let job = model.selectedJob { model.translate(job) }
                 }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
                 .disabled(model.selectedJob?.status != .done || model.selectedJob?.isPostActive == true
-                          || (model.selectedJob?.transcript?.untranslatedCount ?? 0) == 0)
+                          || (model.selectedJob.flatMap { job in
+                              job.status == .done ? job.transcript.map { model.translationStats(of: $0).untranslated } : nil
+                          } ?? 0) == 0)
             }
             CommandMenu(L("Playback")) {
                 // ショートカットはスペースキーと矢印 (PlaybackKeys。メニューに付けると、検索欄で空白や矢印を使えなくなる)

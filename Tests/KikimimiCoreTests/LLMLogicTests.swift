@@ -822,9 +822,9 @@ final class BilingualExportTests: XCTestCase {
 
     func testJapaneseText() {
         let t = sample()
-        XCTAssertEqual(t.japaneseText(of: t.segments[0]), "こんにちは、世界。")
-        XCTAssertEqual(t.japaneseText(of: t.segments[1]), "こんにちは")
-        XCTAssertNil(t.japaneseText(of: t.segments[2]))
+        XCTAssertEqual(t.translationText(of: t.segments[0]), "こんにちは、世界。")
+        XCTAssertEqual(t.translationText(of: t.segments[1]), "こんにちは")
+        XCTAssertNil(t.translationText(of: t.segments[2]))
         XCTAssertTrue(t.hasTranslation)
         XCTAssertEqual(t.translatableCount, 2)
         XCTAssertEqual(t.untranslatedCount, 1)
@@ -844,12 +844,12 @@ final class BilingualExportTests: XCTestCase {
 
     func testFormats() {
         let t = sample()
-        XCTAssertEqual(Exporter.txt(t, content: .japanese), "こんにちは、世界。\nこんにちは\nUntranslated line.\n")
+        XCTAssertEqual(Exporter.txt(t, content: .translation), "こんにちは、世界。\nこんにちは\nUntranslated line.\n")
         XCTAssertTrue(Exporter.txt(t, content: .bilingual).hasPrefix("[00:00] Hello | world.\n        こんにちは、世界。\n[00:02] こんにちは\n"))
         let srt = Exporter.srt(t, content: .bilingual)
         XCTAssertTrue(srt.hasPrefix("1\n00:00:00,000 --> 00:00:02,000\nHello | world.\nこんにちは、世界。\n"), srt)
         XCTAssertTrue(srt.contains("2\n00:00:02,000 --> 00:00:04,000\nこんにちは\n"), "日本語の区間は 1 行だけ")
-        XCTAssertTrue(Exporter.vtt(t, content: .japanese).contains("00:00:00.000 --> 00:00:02.000\nこんにちは、世界。"))
+        XCTAssertTrue(Exporter.vtt(t, content: .translation).contains("00:00:00.000 --> 00:00:02.000\nこんにちは、世界。"))
         let md = Exporter.markdown(t, content: .bilingual)
         XCTAssertTrue(md.contains("翻訳: Qwen3.5 4B"))
         XCTAssertTrue(md.contains("| 00:00 | Hello \\| world. | こんにちは、世界。 |"), md)

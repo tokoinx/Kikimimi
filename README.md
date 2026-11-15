@@ -330,7 +330,7 @@ swift test
 build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper ~/Downloads/lecture.mp3 --languages ja,en --from 120 --to 240 --report ~/Desktop/kikimimi-report.json
 ```
 
-組み立てたアプリで LLM をひと通り動かす診断もあります (画面は出ません)。取得した LLM で例文を訳し、監査し、かかった時間を表示します。`--strict` を付けると、訳がすべて日本語か・聞き間違い (Roblocks → Roblox) を直せたかまで確かめます。`--cpu` で GPU を使わずに動かします。
+組み立てたアプリで LLM をひと通り動かす診断もあります (画面は出ません)。取得した LLM で例文を訳し、監査し、かかった時間を表示します。`--strict` を付けると、訳がすべて日本語か・聞き間違い (Roblocks → Roblox) を直せたかまで確かめます。`--cpu` で GPU を使わずに動かします。`--translate-to <言語のコード>` (en・zh・ko など 13 言語) を付けると、例文をその言語へ訳し (en なら日本語の例文、ほかは英語の例文を訳す)、`--strict` では 3 行以上がその言語らしい訳か (韓国語・ロシア語・タイ語・中国語・日本語はその言語の文字を含むか、ほかは原文と違うか) を確かめます。
 
 ```bash
 build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf --strict

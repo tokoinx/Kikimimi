@@ -6,7 +6,7 @@ public struct TranscriptSegment: Codable, Hashable, Identifiable, Sendable {
     public var start: TimeInterval
     public var end: TimeInterval
     public var text: String
-    /// 日本語訳 (まだ訳していなければ nil)
+    /// 訳 (訳した言語は `Transcript.translationLanguage`。まだ訳していなければ nil)
     public var translation: String?
     /// 1 つの文が何区間かに分かれているとき、この区間の訳に一緒に含めた後ろの区間の ID。
     /// 文の途中で区間を区切って訳すと、日本語の語順のせいで訳が隣の区間にずれるので、文ごとに訳す
@@ -41,10 +41,13 @@ public struct Transcript: Codable, Hashable, Sendable {
     public var audit: AuditReport?
     /// 翻訳に使った LLM の名前
     public var translationModel: String?
+    /// 訳した言語のコード (ja・en など)。訳す先を選べるようになる前の結果は nil (その訳は日本語)。
+    /// 読み書きは `translationTarget(default:)` を通す
+    public var translationLanguage: String?
 
     public init(sourceName: String, segments: [TranscriptSegment] = [], language: String? = nil,
                 model: String? = nil, duration: TimeInterval = 0, elapsed: TimeInterval = 0,
-                audit: AuditReport? = nil, translationModel: String? = nil) {
+                audit: AuditReport? = nil, translationModel: String? = nil, translationLanguage: String? = nil) {
         self.sourceName = sourceName
         self.segments = segments
         self.language = language
@@ -53,6 +56,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.elapsed = elapsed
         self.audit = audit
         self.translationModel = translationModel
+        self.translationLanguage = translationLanguage
     }
 
     /// 本文 (1 区間 1 行)
@@ -101,20 +105,36 @@ public struct Transcript: Codable, Hashable, Sendable {
         segment.language ?? language
     }
 
-    /// 日本語に訳す必要がある区間か (日本語の文字でも、「日本語＋英語」で日本語とわかっている区間でもない)
-    public func needsTranslation(_ segment: TranscriptSegment) -> Bool {
-        Translator.needsTranslation(segment, transcriptLanguage: language)
+    /// 訳す先 target (既定は日本語) に訳す必要がある区間か。決め方は `Script.needsTranslation(_:segmentLanguage:transcriptLanguage:target:)`
+    public func needsTranslation(_ segment: TranscriptSegment, target: String = "ja") -> Bool {
+        Translator.needsTranslation(segment, transcriptLanguage: language, target: target)
+    }
+
+    /// この結果の訳す先の言語。訳が 1 つでも在れば、訳した言語 (記録の無い古い結果の訳は日本語)。
+    /// 訳が 1 つも無ければ fallback (設定の言語)
+    public func translationTarget(default fallback: String) -> String {
+        hasTranslation ? (translationLanguage ?? "ja") : fallback
+    }
+
+    /// 訳を全部外す (訳す先を変えて訳し直す時に使う)。訳したモデルと言語の記録も消す
+    public mutating func removeAllTranslations() {
+        for i in segments.indices {
+            segments[i].translation = nil
+            segments[i].translationCovers = nil
+        }
+        translationModel = nil
+        translationLanguage = nil
     }
 
     /// 翻訳の状況 (画面の表示に使う。区間を 1 回だけ見て数える)
     public struct TranslationStats: Equatable, Sendable {
-        /// 日本語訳が 1 つでもある
+        /// 訳が 1 つでもある
         public var hasTranslation = false
-        /// 日本語に訳す必要がある区間の数 (日本語の区間や、数字・記号だけの区間は数えない)
+        /// 訳す先の言語に訳す必要がある区間の数 (訳す先の言語の区間や、数字・記号だけの区間は数えない)
         public var translatable = 0
         /// 訳す必要があるのに、まだ訳がない区間の数
         public var untranslated = 0
-        /// 日本語以外が主な文字起こしか (自動翻訳と対訳表示の対象)。文字を含む区間の 2 割以上が日本語以外なら true。
+        /// 訳す先の言語以外が主な文字起こしか (自動翻訳と対訳表示の対象)。文字を含む区間の 2 割以上が訳す先の言語以外なら true。
         /// 日本語の講演に英語の相づちが数行まじる程度では false (対訳にしても右の列がほぼ原文の繰り返しになるため)
         public var isMainlyForeign = false
 
@@ -122,7 +142,11 @@ public struct Transcript: Codable, Hashable, Sendable {
         public init() {}
     }
 
-    public var translationStats: TranslationStats {
+    /// 日本語へ訳す時の翻訳の状況 (`translationStats(target: "ja")`)
+    public var translationStats: TranslationStats { translationStats(target: "ja") }
+
+    /// 訳す先 target の言語へ訳す時の翻訳の状況
+    public func translationStats(target: String) -> TranslationStats {
         var stats = TranslationStats()
         let covered = coveredIDs
         var lettered = 0
@@ -130,7 +154,7 @@ public struct Transcript: Codable, Hashable, Sendable {
             if s.translation != nil { stats.hasTranslation = true }
             guard Script.hasLetters(s.text) else { continue }
             lettered += 1
-            guard needsTranslation(s) else { continue }
+            guard needsTranslation(s, target: target) else { continue }
             stats.translatable += 1
             if s.translation == nil && !covered.contains(s.id) { stats.untranslated += 1 }
         }
@@ -142,6 +166,8 @@ public struct Transcript: Codable, Hashable, Sendable {
     public var translatableCount: Int { translationStats.translatable }
     public var untranslatedCount: Int { translationStats.untranslated }
     public var isMainlyForeign: Bool { translationStats.isMainlyForeign }
+    /// 訳す先 target の言語以外が主な文字起こしか
+    public func isMainlyForeign(target: String) -> Bool { translationStats(target: target).isMainlyForeign }
 
     /// ほかの区間の訳に含まれている区間 (文の続き)
     public var coveredIDs: Set<UUID> {
@@ -152,19 +178,19 @@ public struct Transcript: Codable, Hashable, Sendable {
         return ids
     }
 
-    /// 右の列 (日本語) に出す文: 訳があれば訳、訳す必要のない区間は原文のまま (文の続きの区間は nil)
-    public func japaneseText(of segment: TranscriptSegment) -> String? {
+    /// 右の列 (訳) に出す文: 訳があれば訳、訳す必要のない区間 (もともと訳す先の言語) は原文のまま (文の続きの区間は nil)
+    public func translationText(of segment: TranscriptSegment, target: String = "ja") -> String? {
         if let t = segment.translation { return t }
-        return needsTranslation(segment) ? nil : segment.text
+        return needsTranslation(segment, target: target) ? nil : segment.text
     }
 
     /// 対訳の 1 行 (1 つの訳と、それに当たる区間)。ふつうは 1 区間、文が分かれていれば数区間
     public struct BilingualUnit: Identifiable, Hashable, Sendable {
         public var segments: [TranscriptSegment]
-        /// 日本語訳。もともと日本語の区間は原文。まだ訳がなければ nil
-        public var japanese: String?
-        /// もともと日本語の区間 (右の列には原文をそのまま出す)
-        public var isOriginalJapanese: Bool
+        /// 訳。もともと訳す先の言語の区間は原文。まだ訳がなければ nil
+        public var translation: String?
+        /// もともと訳す先の言語の区間 (右の列には原文をそのまま出す)
+        public var isOriginalInTarget: Bool
 
         public var id: UUID { segments[0].id }
         /// 原文の言語 (「日本語＋英語」で文字にしたときだけ入る。先頭の区間の言語)
@@ -176,7 +202,7 @@ public struct Transcript: Codable, Hashable, Sendable {
     }
 
     /// 対訳の行に分ける (訳がいくつかの区間にまたがるものは 1 行にまとめる)
-    public func bilingualUnits() -> [BilingualUnit] {
+    public func bilingualUnits(target: String = "ja") -> [BilingualUnit] {
         var units: [BilingualUnit] = []
         var i = 0
         while i < segments.count {
@@ -190,18 +216,18 @@ public struct Transcript: Codable, Hashable, Sendable {
                     i += 1
                 }
             }
-            units.append(bilingualUnit(members))
+            units.append(bilingualUnit(members, target: target))
         }
         return units
     }
 
     /// 区間 (先頭が訳を持つ区間、続きはその訳に含まれる区間) から、対訳の 1 行を作る
-    func bilingualUnit(_ members: [TranscriptSegment]) -> BilingualUnit {
+    func bilingualUnit(_ members: [TranscriptSegment], target: String = "ja") -> BilingualUnit {
         let head = members[0]
-        let needs = needsTranslation(head)
+        let needs = needsTranslation(head, target: target)
         return BilingualUnit(segments: members,
-                             japanese: head.translation ?? (needs ? nil : head.text),
-                             isOriginalJapanese: head.translation == nil && !needs)
+                             translation: head.translation ?? (needs ? nil : head.text),
+                             isOriginalInTarget: head.translation == nil && !needs)
     }
 
     /// 区間の文をつなぐ。語を空白で区切らない文字 (漢字・かな・全角の記号) の境目以外には空白を入れる

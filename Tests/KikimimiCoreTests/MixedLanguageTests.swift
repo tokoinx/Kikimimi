@@ -872,7 +872,7 @@ final class MixedLanguageTests: XCTestCase {
         ], language: "en")
         XCTAssertEqual(Translator.pendingIndices(t.segments, language: t.language), [0, 2])
         XCTAssertFalse(t.needsTranslation(t.segments[1]))
-        XCTAssertEqual(t.japaneseText(of: t.segments[1]), "Ruth先生")
+        XCTAssertEqual(t.translationText(of: t.segments[1]), "Ruth先生")
         XCTAssertEqual(t.translationStats.translatable, 2)
         // 言語の無い区間 (1 つの言語の文字起こし) は、これまでどおり文字で決める
         XCTAssertTrue(Transcript(sourceName: "y", segments: [], language: "en")
@@ -916,7 +916,7 @@ final class MixedLanguageTests: XCTestCase {
         XCTAssertEqual(t.languageLabel, "英語＋日本語")
         XCTAssertEqual(t.language(of: t.segments[1]), "ja")
         XCTAssertEqual(t.bilingualUnits().map(\.language), ["en", "ja", "en"])
-        XCTAssertEqual(t.bilingualUnits().map(\.isOriginalJapanese), [false, true, false])
+        XCTAssertEqual(t.bilingualUnits().map(\.isOriginalInTarget), [false, true, false])
 
         // 区間の言語は保存して読み戻せる。言語の無い区間は、これまでと同じ形 (language の項目なし)
         let data = try JSONEncoder().encode(t)

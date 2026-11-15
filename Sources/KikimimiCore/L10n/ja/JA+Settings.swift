@@ -50,7 +50,10 @@ extension JA {
     private static let llm: [String: String] = [
         "Audit & translation (local LLM)": "監査・翻訳 (ローカル LLM)",
         "Audit after transcription (check for repetitions and mishearings)": "文字起こしのあとに監査する (繰り返し・聞き取りミスの見直し)",
-        "Translate segments that are not in Japanese into Japanese": "日本語以外の区間を、日本語に翻訳する",
+        // 訳す先の言語 (%1$@・%2$@ は、どちらも設定の訳す先の言語の名前)
+        "Translate into": "訳す先の言語",
+        "Results that are already translated keep their language. To use another language, translate again on the result screen.": "もう訳してある結果は、その結果の言語のまま続きます。別の言語にするには、結果の画面で訳し直します。",
+        "Translate segments that are not in %1$@ into %2$@": "%1$@以外の区間を、%2$@に翻訳する",
         "Even when this is off, you can translate only the sentences you want to read, one at a time, with “Translate” on a result line (lighter than translating everything).": "オフにしても、結果の行の「訳」で、読みたい文だけを 1 文ずつ訳せます (まとめて訳すより軽く済みます)。",
         "Your file: %@": "手持ち: %@",
         "Added GGUF": "取り込んだ GGUF",

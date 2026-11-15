@@ -160,7 +160,19 @@ struct LLMSettingsForm: View {
         Form {
             Section(L("Audit & translation (local LLM)")) {
                 Toggle(L("Audit after transcription (check for repetitions and mishearings)"), isOn: $model.autoAudit)
-                Toggle(L("Translate segments that are not in Japanese into Japanese"), isOn: $model.autoTranslate)
+                // 訳す先の言語 (13 言語)。もう訳してある結果は、その結果の言語のまま (結果の画面で訳し直せる)
+                Picker(L("Translate into"), selection: $model.translationLanguage) {
+                    ForEach(TranslationTarget.all, id: \.self) { code in
+                        Text(TranslationTarget.displayName(for: code)).tag(code)
+                    }
+                }
+                Text(L("Results that are already translated keep their language. To use another language, translate again on the result screen."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Toggle(L("Translate segments that are not in %1$@ into %2$@",
+                         TranslationTarget.displayName(for: model.translationLanguage),
+                         TranslationTarget.displayName(for: model.translationLanguage)), isOn: $model.autoTranslate)
                 Text(L("Even when this is off, you can translate only the sentences you want to read, one at a time, with “Translate” on a result line (lighter than translating everything)."))
                     .font(.caption)
                     .foregroundStyle(.secondary)

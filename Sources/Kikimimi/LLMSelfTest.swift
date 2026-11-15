@@ -3,15 +3,24 @@ import KikimimiCore
 import KikimimiLLM
 import KikimimiWhisper
 
-/// `Kikimimi --selftest-llm <GGUF> [--cpu] [--strict]`
+/// `Kikimimi --selftest-llm <GGUF> [--cpu] [--strict] [--translate-to <code>]`
 ///
 /// 画面を出さずに、LLM の読み込み・翻訳・監査をひと通り試して結果を表示する (動作確認・CI 用)。
 /// whisper.framework と llama.framework を同じプロセスで使えることの確認も兼ねる。
 /// 乱数の重みのモデル (CI) でも成り立つことだけを必ず確かめ、`--strict` では本物のモデルの答えの中身まで確かめる。
+/// `--translate-to <code>` (13 言語のどれか) を付けると、翻訳の例をその言語へ訳す
+/// (en なら日本語の数行、ほかは英語の数行を原文にする)。付けなければ、これまでどおり日本語へ訳す
 enum LLMSelfTest {
-    static func run(modelPath: String, useGPU: Bool, strict: Bool) -> Int32 {
+    static func run(modelPath: String, useGPU: Bool, strict: Bool, translateTo: String? = nil) -> Int32 {
+        let usage = "usage: Kikimimi --selftest-llm <model.gguf> [--cpu] [--strict] [--translate-to <code>]"
         guard !modelPath.isEmpty, FileManager.default.fileExists(atPath: modelPath) else {
-            log("usage: Kikimimi --selftest-llm <model.gguf> [--cpu] [--strict]")
+            log(usage)
+            return 2
+        }
+        let target = translateTo?.lowercased()
+        if let target, !TranslationTarget.all.contains(target) {
+            log("unknown language for --translate-to: \"\(target)\" (one of:\(TranslationTarget.all.joined(separator: " ")))")
+            log(usage)
             return 2
         }
         log("whisper.cpp: " + WhisperContext.systemInfo.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -66,11 +75,22 @@ enum LLMSelfTest {
 
             clock = Date()
             var translations: [UUID: String] = [:]
-            let failed = try Translator.translate(segments, language: "en", generator: engine, shouldCancel: { false }) { batch, _, _ in
-                for result in batch { translations[result.head] = result.text }
+            // 訳す先を選んだ時は、その言語へ訳す例 (原文は、英語へ訳す時は日本語、ほかは英語)
+            let sources = target.map { $0 == "en" ? japaneseSamples : englishSamples } ?? segments
+            let failed: Int
+            if let target {
+                failed = try Translator.translate(sources, language: target == "en" ? "ja" : "en", target: target,
+                                                  generator: engine, shouldCancel: { false }) { batch, _, _ in
+                    for result in batch { translations[result.head] = result.text }
+                }
+                log("translate to \(target): \(translations.count) translated, \(failed) failed, \(seconds(since: clock))")
+            } else {
+                failed = try Translator.translate(segments, language: "en", generator: engine, shouldCancel: { false }) { batch, _, _ in
+                    for result in batch { translations[result.head] = result.text }
+                }
+                log("translate: \(translations.count) translated, \(failed) failed, \(seconds(since: clock))")
             }
-            log("translate: \(translations.count) translated, \(failed) failed, \(seconds(since: clock))")
-            for s in segments {
+            for s in sources {
                 log("  \(s.text)\n    => \(translations[s.id] ?? "(not translated)")")
             }
 
@@ -85,6 +105,10 @@ enum LLMSelfTest {
             }
 
             let duplicateRemoved = report.changes.contains { $0.original.id == segments[3].id && $0.kind == .delete && $0.isConfident }
+            if let target {
+                return check(target: target, sources: sources, translations: translations, failed: failed,
+                             duplicateRemoved: duplicateRemoved, report: report, auditedFirst: segments[0].id, strict: strict)
+            }
             let japaneseKept = translations[segments[1].id] == nil
             guard duplicateRemoved, japaneseKept, translations.count + failed == 4 else {
                 log("SELFTEST FAILED: duplicate removed=\(duplicateRemoved), japanese kept=\(japaneseKept)")
@@ -109,6 +133,64 @@ enum LLMSelfTest {
             log("SELFTEST FAILED: \(error.localizedDescription)")
             return 1
         }
+    }
+
+    /// 英語へ訳す時の原文 (日本語の 4 行)
+    private static let japaneseSamples = [
+        TranscriptSegment(start: 0, end: 3, text: "今日は、ゲームの作り方についてお話しします。", language: nil),
+        TranscriptSegment(start: 3, end: 6, text: "まず、新しい場所を開いて、部品を 1 つ置きます。", language: nil),
+        TranscriptSegment(start: 6, end: 9, text: "次に、再生のボタンを押して試してみましょう。", language: nil),
+        TranscriptSegment(start: 9, end: 12, text: "全部で 10 分ほどかかります。", language: nil),
+    ]
+
+    /// 日本語のほかの言語へ訳す時の原文 (英語の 4 行)
+    private static let englishSamples = [
+        TranscriptSegment(start: 0, end: 3, text: "Welcome to today's session about building games.", language: nil),
+        TranscriptSegment(start: 3, end: 6, text: "First, we will open a new place and add a part.", language: nil),
+        TranscriptSegment(start: 6, end: 9, text: "Then we press the play button to test it.", language: nil),
+        TranscriptSegment(start: 9, end: 12, text: "It takes about ten minutes in total.", language: nil),
+    ]
+
+    /// 訳す先を選んだ時の確かめ。乱数の重みのモデルでも成り立つこと (重なりが消えた・どの行も訳せたか訳せなかったか) を必ず見て、
+    /// --strict では、3 行以上が訳す先の言語らしい訳か (ko・ru・th・zh・ja はその言語の文字を含むか、
+    /// ほかは空でなく原文と違うか) と、聞き間違い (Roblocks → Roblox) を直せたかを見る
+    private static func check(target: String, sources: [TranscriptSegment], translations: [UUID: String], failed: Int,
+                              duplicateRemoved: Bool, report: AuditReport, auditedFirst: UUID, strict: Bool) -> Int32 {
+        guard duplicateRemoved, translations.count + failed == sources.count else {
+            log("SELFTEST FAILED: duplicate removed=\(duplicateRemoved), translated=\(translations.count) + failed=\(failed) of \(sources.count)")
+            return 1
+        }
+        if strict {
+            let good = sources.filter { s in
+                translations[s.id].map { looksTranslated($0, source: s.text, into: target) } ?? false
+            }.count
+            let fixedName = report.changes.contains {
+                $0.original.id == auditedFirst && $0.kind == .fix && ($0.replacement ?? "").contains("Roblox")
+            }
+            guard good >= 3, fixedName else {
+                log("SELFTEST FAILED (strict): translated into \(target)=\(good)/\(sources.count), fixed Roblocks=\(fixedName)")
+                return 1
+            }
+        }
+        log("SELFTEST OK" + (strict ? " (strict)" : "") + " (translated into \(target))")
+        return 0
+    }
+
+    /// 訳す先の言語らしい訳か。文字で見分けられる言語 (ko・ru・th・zh・ja) は、その言語の文字を含むか。
+    /// ほかの言語 (ラテン文字) は、空でなく、原文と違うか
+    static func looksTranslated(_ translation: String, source: String, into target: String) -> Bool {
+        let t = translation.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return false }
+        let ranges: [ClosedRange<UInt32>]
+        switch target {
+        case "ko": ranges = [0xAC00...0xD7AF, 0x1100...0x11FF, 0x3130...0x318F]
+        case "ru": ranges = [0x0400...0x04FF]
+        case "th": ranges = [0x0E00...0x0E7F]
+        case "zh": ranges = [0x4E00...0x9FFF]
+        case "ja": ranges = [0x3040...0x30FF]
+        default: return t != source.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return t.unicodeScalars.contains { s in ranges.contains { $0.contains(s.value) } }
     }
 
     private static func seconds(since date: Date) -> String {

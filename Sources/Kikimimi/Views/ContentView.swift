@@ -412,7 +412,8 @@ struct LLMSetupCard: View {
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 6) {
-                Text(L("You can also audit for mishearings and translate from English to Japanese"))
+                Text(L("You can also audit for mishearings and translate from other languages into %@",
+                       TranslationTarget.displayName(for: model.translationLanguage)))
                     .font(.callout.weight(.semibold))
                 Text(detail)
                     .font(.caption)

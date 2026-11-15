@@ -1,6 +1,6 @@
 // 日本語の表: 結果の画面 (TranscriptDetailView)。
 // 鍵 = 英語、値 = 日本語。値は、英語の画面にする前の文と一字も変えない。
-// JA+Core・JA+App にもう在る鍵 (Error・Canceled・Export・Transcribe again・Translating…・Original・Japanese translation) は足さない
+// JA+Core・JA+App にもう在る鍵 (Error・Canceled・Export・Transcribe again・Translating…・Original・%@ translation・Cancel) は足さない
 extension JA {
     static let detail: [String: String] = screen.merging(audit) { first, _ in first }
         .merging(notices) { first, _ in first }
@@ -19,12 +19,13 @@ extension JA {
         "Search results": "結果を検索",
         "Timestamps": "時刻",
         "Bilingual": "対訳",
-        "Show the original and the Japanese translation side by side": "原文と日本語訳を左右に並べる",
+        // %@ (%1$@・%2$@) は、その結果の訳す先の言語の名前
+        "Show the original and the %@ translation side by side": "原文と%@訳を左右に並べる",
         "Notes": "メモ",
         "Show a notes pane on the right (for what you understood, phrases to remember, and so on. What you write is saved automatically)": "右にメモの欄を出す (理解したこと・覚えたい表現などを書ける。書いたものは自動で保存される)",
         "Translate the rest": "残りを翻訳",
         "Translate": "翻訳",
-        "Translate non-Japanese segments into Japanese with the LLM on your Mac": "日本語以外の区間を、Mac の中の LLM で日本語に訳す",
+        "Translate segments that are not in %1$@ into %2$@ with the LLM on your Mac": "%1$@以外の区間を、Mac の中の LLM で%2$@に訳す",
         "Copy": "コピー",
         // 一覧が空のとき
         "No matching segments": "一致する区間はありません",
@@ -44,7 +45,8 @@ extension JA {
         "Copy this line": "この行をコピー",
         "Quote in notes": "メモに引用",
         "Translate this sentence again": "この文を訳し直す",
-        "Translate only this sentence into Japanese": "この文だけ日本語に訳す",
+        // %@ は、その結果の訳す先の言語の名前
+        "Translate only this sentence into %@": "この文だけ%@に訳す",
         "%1$@. %2$@": "%1$@。%2$@",
         "Click to stop": "クリックで停止",
         "Click to play only this line": "クリックで、この行だけを再生",
@@ -123,6 +125,12 @@ extension JA {
         // 無音を飛ばさなかった案内
         "There was continuous sound but very little text, so it was transcribed without skipping silence (it seems to be singing or music).": "音が続いているのに文字が少なかったので、無音を飛ばさずに文字起こししました (歌や音楽のようです)。",
         "Transcribe again, skipping silence": "無音を飛ばしてやり直す",
+        // 設定の訳す先と違う言語に訳してある結果の案内 (%1$@ はこの結果が訳した言語、%2$@ と %@ は設定の訳す先の言語)
+        "This result is translated into %1$@. The language set to translate into is %2$@.": "この結果は%1$@に訳してあります。設定の訳す先は%2$@です。",
+        "Translate again into %@…": "%@で訳し直す…",
+        "Translate again into %@?": "%@で訳し直しますか？",
+        "Translate again": "訳し直す",
+        "The current %1$@ translation will be removed, and the result will be translated again into %2$@. The current state is kept as a version in the history.": "今の%1$@の訳を外し、%2$@に訳し直します。今の状態は、履歴に版として残ります。",
         // やり直す
         "Transcribe this audio again. The original result is kept": "この音声を、もう一度文字起こしします。元の結果は残ります",
         "Transcribe again with the same settings": "同じ設定でやり直す",
@@ -131,7 +139,7 @@ extension JA {
         "Try transcribing again": "もう一度文字起こしする",
         "Transcribe this audio again with the same settings. The original result is kept": "この音声を、同じ設定でもう一度文字起こしします。元の結果は残ります",
         // LLM の案内
-        "The Japanese translation and the mishearing audit use an LLM that runs on your Mac": "日本語訳と聞き取りミスの監査には、Mac の中で動く LLM を使います",
+        "The %@ translation and the mishearing audit use an LLM that runs on your Mac": "%@訳と聞き取りミスの監査には、Mac の中で動く LLM を使います",
         "The mishearing audit uses an LLM that runs on your Mac (for now, only repetitions are checked)": "聞き取りミスの監査には、Mac の中で動く LLM を使います (いまは繰り返しだけを見直しています)",
         "%1$@ (about %2$@) is downloaded only once. Your transcriptions never leave your Mac.": "%1$@ (約 %2$@) を一度だけダウンロードします。文字起こしの内容は Mac の外に出ません。",
         "Close (you can download it at any time in the “Audit & translation” tab of Settings)": "閉じる (設定の「監査・翻訳」タブから、いつでも取得できます)",

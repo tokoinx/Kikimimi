@@ -100,7 +100,7 @@ final class L10nTests: XCTestCase {
         XCTAssertTrue(md.contains("Language: English + Japanese / Length: "), md)
         XCTAssertTrue(md.contains("| Time | Original | Japanese translation |"), md)
         XCTAssertEqual(ExportFormat.txt.displayName, "Text (.txt)")
-        XCTAssertEqual(ExportContent.bilingual.displayName, "Bilingual (original + Japanese)")
+        XCTAssertEqual(ExportContent.bilingual.displayName(target: "ja"), "Bilingual (original + Japanese)")
     }
 
     // MARK: 表とソース
@@ -236,6 +236,8 @@ struct SourceScan {
         ("KikimimiCore/RepetitionFilter.swift", "list of number words"),
         // LLM への指示文 (プロンプト) とその例文
         ("KikimimiCore/LLM/Translator.swift", "LLM prompt"),
+        // 翻訳の手本 (LLM に見せる、訳す先の言語ごとの依頼と答えの例。画面には出ない)
+        ("KikimimiCore/LLM/TranslationExamples.swift", "LLM translation examples"),
     ]
 
     /// 鍵も日本語も見ないファイル: 訳の表そのものと、確認用の実行・診断の出力

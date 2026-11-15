@@ -45,7 +45,8 @@ extension JA {
         "Open a file…": "ファイルを開く",
         "Record with microphone": "マイクで録音",
         "Audit & translation: %@": "監査・翻訳: %@",
-        "You can also audit for mishearings and translate from English to Japanese": "聞き取りミスの監査と、英語から日本語への翻訳もできます",
+        // %@ は、設定の訳す先の言語の名前
+        "You can also audit for mishearings and translate from other languages into %@": "聞き取りミスの監査と、ほかの言語から%@への翻訳もできます",
         "Both use the LLM “%1$@” (about %2$@), which runs on your Mac, and the translation is shown side by side with the original. You can transcribe without it, so you can download it later. The transcription never leaves your Mac.": "どちらも Mac の中で動く LLM「%1$@」(約 %2$@) を使い、訳は原文と左右に並べて表示します。なくても文字起こしはできるので、ダウンロードはあとからでも構いません。文字起こしの内容は Mac の外に出ません。",
         "Both use the LLM “%@”, which runs on your Mac, and the translation is shown side by side with the original. You can transcribe without it, so you can download it later. The transcription never leaves your Mac.": "どちらも Mac の中で動く LLM「%@」を使い、訳は原文と左右に並べて表示します。なくても文字起こしはできるので、ダウンロードはあとからでも構いません。文字起こしの内容は Mac の外に出ません。",
         "Close (you can download it any time in the “Audit & translation” tab of Settings)": "閉じる (設定の「監査・翻訳」タブから、いつでも取得できます)",
@@ -87,7 +88,8 @@ extension JA {
         // DictationBar
         "Dictation": "書き取り",
         "When you play a line, you can write it down here.": "行を再生すると、その行をここで書き取れます。",
-        "Hide the original text of lines that are not Japanese (the eye button on a line shows it one line at a time)": "日本語でない行の原文を隠す (行の目のボタンで、1 行ずつ見られます)",
+        // %@ は、その結果の訳す先の言語の名前
+        "Hide the original text of lines that are not %@ (the eye button on a line shows it one line at a time)": "%@でない行の原文を隠す (行の目のボタンで、1 行ずつ見られます)",
         "Listen again": "もう一度聞く",
         "Play the current line again (⌘L)": "いまの行をもう一度流す (⌘L)",
         "Previous line": "前の行",
