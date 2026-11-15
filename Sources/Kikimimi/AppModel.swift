@@ -529,9 +529,11 @@ final class AppModel {
         let model = transcript.translationModel
         guard let note = transcript.setUserTranslation(text, for: head) else {
             // 機械の訳と同じに書き直した: 機械の訳に戻した (印の付いた機械の訳なら、"llm" の覚えが戻っている)
-            guard before?.isEdited == true, transcript.translationNote(for: head)?.isEdited != true else { return false }
+            guard let before, before.isEdited, transcript.translationNote(for: head)?.isEdited != true else { return false }
             job.transcript = transcript
-            if translationMemory.forget(source: source, target: target) { saveTranslationMemory() }
+            let forgot = translationMemory.forget(source: source, target: target)
+            let uncounted = withdrawGateVote(of: before, target: target)
+            if forgot || uncounted { saveTranslationMemory() }
             return true
         }
         if transcript.translationLanguage == nil { transcript.translationLanguage = target }
@@ -539,8 +541,33 @@ final class AppModel {
         let translation = transcript.segments.first { $0.id == head }?.translation ?? text
         translationMemory.remember(source: source, sourceLanguage: sourceLanguage, target: target, translation: translation,
                                    machine: note.machine, model: note.machine == nil ? nil : model)
+        // 印の付いた機械の訳を、初めて直した: 検査が当たった数を足す (もう数えてある訳には足さない)
+        if note.vote == TranslationNote.edited, before?.vote != TranslationNote.edited {
+            countGateVote(flags: note.flags, target: target, edited: 1)
+        }
         saveTranslationMemory()
         return true
+    }
+
+    // MARK: 関門が、利用者の判定から学ぶ
+
+    /// 印の付いた訳への判定を、訳の記憶の検査ごとの数に足す (負の数で引く)。保存は呼ぶ側
+    /// (確認用の起動も、これを呼んで「止める → 元に戻す」を確かめる)
+    @discardableResult
+    func countGateVote(flags: [String], target: String, confirmed: Int = 0, edited: Int = 0) -> Bool {
+        translationMemory.countGate(flags: flags, target: target, confirmed: confirmed, edited: edited)
+    }
+
+    /// 直して足した判定 (覚えの vote が "edited") を引く (「機械の訳に戻す」の時)。引いたら true。保存は呼ぶ側
+    private func withdrawGateVote(of note: TranslationNote, target: String) -> Bool {
+        guard note.vote == TranslationNote.edited else { return false }
+        return countGateVote(flags: note.flags, target: target, edited: -1)
+    }
+
+    /// 設定の「印を出さなくなった検査」の [元に戻す]: その検査 × 訳す先の数を 0 に戻す (また印を出す)
+    func resetGateCheck(_ check: String, target: String) {
+        guard translationMemory.resetGate(check: check, target: target) else { return }
+        saveTranslationMemory()
     }
 
     /// 利用者が直した訳を、機械の訳に戻す (訳を直す画面の「機械の訳に戻す」)。訳の記憶からも、その 1 件を消す
@@ -549,18 +576,27 @@ final class AppModel {
               let head = Translator.translationGroupIDs(of: id, in: transcript.segments).first else { return }
         let target = translationTarget(for: transcript)
         let source = transcript.translationSource(ofHead: head)
-        guard transcript.revertUserTranslation(of: head) != nil else { return }
+        guard let removed = transcript.revertUserTranslation(of: head) else { return }
         job.transcript = transcript
-        if let source, translationMemory.forget(source: source, target: target) { saveTranslationMemory() }
+        let forgot = source.map { translationMemory.forget(source: $0, target: target) } ?? false
+        let uncounted = withdrawGateVote(of: removed, target: target)
+        if forgot || uncounted { saveTranslationMemory() }
     }
 
     /// 印の付いた訳を「この訳でよい」とする (訳を直す画面のボタン)。印は消え、覚えの出どころは "confirmed" になる。
-    /// 訳の記憶には入れない (入れるのは、利用者が直した訳だけ)。変えたら true
+    /// 訳の記憶の文には入れない (入れるのは、利用者が直した訳だけ)。まだ数えていない訳なら、
+    /// その印の検査ごとに「検査の誤り」の数を足す (`TranslationMemory.countGate`)。変えたら true
     @discardableResult
     func confirmTranslation(head id: UUID, in job: Job) -> Bool {
         guard job.status == .done, var transcript = job.transcript,
-              transcript.confirmTranslation(of: id) != nil else { return false }
+              let head = Translator.translationGroupIDs(of: id, in: transcript.segments).first else { return false }
+        let before = transcript.translationNote(for: head)
+        guard let note = transcript.confirmTranslation(of: id) else { return false }
         job.transcript = transcript
+        if before?.vote == nil, note.vote == TranslationNote.confirmed,
+           countGateVote(flags: note.flags, target: translationTarget(for: transcript), confirmed: 1) {
+            saveTranslationMemory()
+        }
         return true
     }
 

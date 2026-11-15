@@ -64,6 +64,40 @@
    結果のフォルダなら、LLM の訳に付いた印の数と、印の有る・無いまとまりの chrF を出します。
    `--out` (既定は、そのフォルダ) に `gate.md`・`gate.json` (印の付いたまとまりの原文・訳・符号) を作ります。
 
+## 自己改善の輪 (利用者の直しで、前より良いかを測る)
+
+追加学習なしで回す輪です。LLM を回すのは 3 だけです。
+
+1. **直しをためる**: アプリの対訳の行で、訳を直す・「この訳でよい」を押す。直した訳は訳の記憶 (`translation-memory.json`) に入り、
+   5 件に 1 件は評価用に取り分けられます (`heldOut`)。「この訳でよい」が多い検査は、その言語で印を出さなくなります
+   (設定の「覚えた訳」の「印を出さなくなった検査」。[元に戻す] で戻せます)。
+2. **取り分けた直しを、問題にする** (LLM なし):
+
+   ```bash
+   build/Kikimimi.app/Contents/MacOS/Kikimimi --export-translation-eval build/translation-eval/sets-memory/memory.json \
+     [--memory <translation-memory.json>]
+   ```
+
+   取り分けた直しだけを、1 件 = 1 場面 (原文 1 行、人の訳 = 直した訳) の問題にします。訳す先ごとの件数を出します。
+   `--memory` が無ければ、アプリの今の記憶 (`~/Library/Application Support/Kikimimi/translation-memory.json`) を読みます。0 件でも、空の問題を作って終了コード 0 です。
+3. **記憶を渡して測る**: `evaluate.py --model <GGUF> --memory <translation-memory.json> --baseline <前の結果>`
+   (アプリの `--eval-llm … --memory` にそのまま渡します)。翻訳に、記憶の文・訳語の対・止めた検査を渡します。
+   ただし問題の行と同じ文は、記憶から抜いて測ります (答えを見て訳す事になるため)。記憶に当たった行の数は、結果の `reused` に残ります。
+4. **判定を見る**: `--baseline` と比べると、summary.md の末尾・標準出力・summary.json の `verdict` に判定が出ます。
+   - 訳す先ごと: 30 行に満たない → 「参考 (行が少ない)」。悪くなった (下の「比べる」の決まり) → 「悪くなった」。
+     chrF が前より 1.0 より大きく上がった → 「良くなった」。ほか → 「変わらない」。前の結果と比べていない → 「比べられない」。
+   - 全体: 「悪くなった」が在る → 「採らない」。無く、「良くなった」が 1 つ以上 → 「採る」。どちらでもない → 「変わらない (採る理由が無い)」。
+   - 秒/行が前の 1.10 倍を超えた訳す先は「遅くなった」と知らせます (判定には入れません。秒は、同時に走る作業で揺れるため)。
+   - `evaluate.py` の終了コードは、判定では変わりません (失敗した問題が在る時だけ 1)。
+5. **基準を残す**: 採った結果を、リポジトリの `tools/translation-eval/baselines/<名前>/` に写します (`build/` は git に入らないため)。
+
+   ```bash
+   python3 tools/translation-eval/evaluate.py --save-baseline <名前> --from build/translation-eval/results/<結果>
+   ```
+
+   測り・採点し直しと一緒に `--save-baseline <名前>` を付けると、その結果を写します。もう在る名前には上書きしません。
+   次からは `--baseline tools/translation-eval/baselines/<名前>` で比べます。
+
 ## 表の読み方
 
 | 列 | 意味 |

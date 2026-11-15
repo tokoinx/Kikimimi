@@ -21,16 +21,44 @@
 `--gate <フォルダ>` は、LLM を回さずに、フォルダの中の問題か結果 (summary.json・gate.json は除く) の全部を
 1 回のアプリ (`Kikimimi --eval-llm none --gate <ファイル> … --report gate.json`) に渡し、訳の関門を掛ける。
 `--out` (既定は、そのフォルダ) に gate.md・gate.json・gate.log を作る。
+
+`--baseline` と比べた時は、訳す先ごとと全体の「判定」(採る・採らない) を summary.md の末尾・標準出力・
+summary.json の `verdict` に出す (決まりは `judge`)。終了コードは判定で変えない (失敗した問題が在る時だけ 1)。
+
+    python3 tools/translation-eval/evaluate.py --save-baseline <名前> --from build/translation-eval/results/<結果>
+
+`--save-baseline <名前>` は、結果のフォルダ (`--from`。測りと一緒に付けた時は、その測りの結果) の summary.json・summary.md と、
+問題ごとの結果の JSON を、`tools/translation-eval/baselines/<名前>/` に写す (もう在る名前には上書きしない)。
 """
 import argparse
 import datetime
 import json
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
+BASELINES = HERE / "baselines"
+
+# 判定の決まり (`judge`)
+# 行がこれより少ない訳す先は「参考」: 30 行の chrF は 1〜2 点揺れるので、採る・採らないに使わない
+VERDICT_MIN_LINES = 30
+# chrF がこれより大きく上がった訳す先を「良くなった」とする (下がる側の決まり chrFTolerance と同じ 1 点)
+VERDICT_CHRF_GAIN = 1.0
+# 秒/行が前のこの倍を超えた訳す先を「遅くなった」と知らせる (判定には入れない。秒は、同時に走る作業で揺れるため)
+VERDICT_SLOWER_RATIO = 1.10
+
+VERDICT_REFERENCE = "参考 (行が少ない)"
+VERDICT_WORSE = "悪くなった"
+VERDICT_BETTER = "良くなった"
+VERDICT_SAME = "変わらない"
+VERDICT_NOT_COMPARED = "比べられない"
+OVERALL_ADOPT = "採る"
+OVERALL_REJECT = "採らない"
+OVERALL_SAME = "変わらない (採る理由が無い)"
 
 
 def fail(message):
@@ -102,14 +130,81 @@ def collect_rows(stem, result, old, returncode, compared, not_comparable):
             "copied": score.get("copied", 0), "repeated": score.get("repeated", 0), "chrF": score.get("chrF"),
             "retried": score.get("retried", 0), "retryFixed": score.get("retryFixed", 0),
             "secondsPerLine": score.get("seconds", 0) / score["lines"] if score.get("lines") else 0,
+            "reused": score.get("reused", 0),
             "baselineChrF": previous.get("chrF") if previous else None,
+            "baselineSecondsPerLine": (previous.get("seconds", 0) / previous["lines"]
+                                       if previous and previous.get("lines") else None),
             "worse": (returncode == 3) if compared else None,
             "notComparable": not_comparable,
         })
     return rows
 
 
+def row_verdict(r):
+    """問題 1 つ × 訳す先 1 つの判定 (決まりは judge の説明)"""
+    if r.get("notComparable") or r.get("worse") is None:
+        return VERDICT_NOT_COMPARED
+    if (r.get("lines") or 0) < VERDICT_MIN_LINES:
+        return VERDICT_REFERENCE
+    if r["worse"]:
+        return VERDICT_WORSE
+    now, before = r.get("chrF"), r.get("baselineChrF")
+    if now is not None and before is not None and now - before > VERDICT_CHRF_GAIN:
+        return VERDICT_BETTER
+    return VERDICT_SAME
+
+
+def judge(rows):
+    """前の結果と比べた行 (collect_rows の行) から、採る・採らないを決める。
+
+    訳す先ごと (行の順に):
+    - 前の結果と比べていない (前の結果が無い・問題の数か行の数が違う) → 「比べられない」
+    - 行の数が VERDICT_MIN_LINES (30) に満たない → 「参考 (行が少ない)」
+    - アプリが「悪くなった」とした (translationRegressions に当たった。終了コード 3) → 「悪くなった」
+    - chrF が前より VERDICT_CHRF_GAIN (1.0) より大きく上がった → 「良くなった」
+    - ほか → 「変わらない」
+    全体: 「悪くなった」が在る → 「採らない」。無く、「良くなった」が 1 つ以上 → 「採る」。どちらでもない → 「変わらない (採る理由が無い)」。
+    時間: 秒/行が前の VERDICT_SLOWER_RATIO (1.10) 倍を超えた訳す先を slower に並べる (判定には入れない)
+    """
+    targets, slower = [], []
+    for r in rows:
+        verdict = row_verdict(r)
+        targets.append({"set": r.get("set"), "target": r.get("target"), "lines": r.get("lines"),
+                        "chrF": r.get("chrF"), "baselineChrF": r.get("baselineChrF"), "verdict": verdict})
+        before, now = r.get("baselineSecondsPerLine"), r.get("secondsPerLine")
+        if verdict != VERDICT_NOT_COMPARED and before and now is not None and now > before * VERDICT_SLOWER_RATIO:
+            slower.append({"set": r.get("set"), "target": r.get("target"),
+                           "secondsPerLine": now, "baselineSecondsPerLine": before})
+    verdicts = [t["verdict"] for t in targets]
+    if VERDICT_WORSE in verdicts:
+        overall = OVERALL_REJECT
+    elif VERDICT_BETTER in verdicts:
+        overall = OVERALL_ADOPT
+    else:
+        overall = OVERALL_SAME
+    return {"overall": overall, "targets": targets, "slower": slower,
+            "rules": {"minLines": VERDICT_MIN_LINES, "chrFGain": VERDICT_CHRF_GAIN, "slowerRatio": VERDICT_SLOWER_RATIO}}
+
+
+def verdict_lines(verdict):
+    """判定を、summary.md と標準出力に出す行にする"""
+    lines = ["## 判定", "", f"- 全体: **{verdict['overall']}**"]
+    for t in verdict["targets"]:
+        lines.append(f"- {t['set']} ({t['target']}): {t['verdict']} (chrF {fmt_chrf(t['baselineChrF'])} → {fmt_chrf(t['chrF'])}、"
+                     f"{t['lines']} 行)")
+    if verdict["slower"]:
+        lines.append("- 遅くなった (判定には入れない。秒は、同時に走っていた作業で揺れる): "
+                     + "、".join(f"{s['set']} ({s['target']}) {s['baselineSecondsPerLine']:.2f} → {s['secondsPerLine']:.2f} 秒/行"
+                                for s in verdict["slower"]))
+    lines.append(f"- 決まり: {VERDICT_MIN_LINES} 行に満たない訳す先は参考。chrF が {VERDICT_CHRF_GAIN} より大きく上がれば良くなった。"
+                 f"悪くなった訳す先が 1 つでも在れば採らない。秒/行が {VERDICT_SLOWER_RATIO} 倍を超えたら遅くなったと知らせる")
+    return lines
+
+
 def write_summary(out, title, info_lines, summary, rows, failures, baseline):
+    judgement = judge(rows) if baseline else None
+    if judgement:
+        summary["verdict"] = judgement
     (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     lines = [f"# {title}", ""] + info_lines
     lines += ["", "chrF はコーパスの点 (0〜100、高いほど人の訳に近い)。ja-en は日本語が訳された文なので、参考の値。",
@@ -135,8 +230,13 @@ def write_summary(out, title, info_lines, summary, rows, failures, baseline):
         lines.append("| " + " | ".join(cells) + " |")
     if failures:
         lines += ["", "## 失敗した問題", ""] + [f"- {f}" for f in failures]
+    if judgement:
+        lines += [""] + verdict_lines(judgement)
     (out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"▸ まとめ: {out / 'summary.md'}")
+    if judgement:
+        for line in verdict_lines(judgement)[2:]:
+            print("  " + line.replace("**", ""))
     if failures:
         print("✗ 失敗した問題:")
         for f in failures:
@@ -268,6 +368,28 @@ def gate(args, app):
     return 0
 
 
+def save_baseline(name, source):
+    """結果のフォルダ source の summary.json・summary.md と、問題ごとの結果の JSON を、baselines/<name>/ に写す。
+    もう在る名前には上書きしない。写したファイルの数を返す"""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name or ""):
+        fail(f"--save-baseline の名前 {name!r} は、英数字と . _ - だけにしてください (先頭は英数字)。")
+    source = Path(source).expanduser().resolve()
+    if not source.is_dir():
+        fail(f"{source} がありません (--save-baseline の元)。")
+    if not (source / "summary.json").exists():
+        fail(f"{source} に summary.json がありません (結果のフォルダを指定してください)。")
+    target = BASELINES / name
+    if target.exists():
+        fail(f"{target} はもう在ります。上書きしないので、別の名前にしてください。")
+    files = [source / "summary.json"] + ([source / "summary.md"] if (source / "summary.md").exists() else [])
+    files += sorted(p for p in source.glob("*.json") if p.name not in ("summary.json", "gate.json"))
+    target.mkdir(parents=True)
+    for path in files:
+        shutil.copy2(path, target / path.name)
+    print(f"▸ 基準を残しました: {target} ({len(files)} 個のファイル)")
+    return len(files)
+
+
 def main():
     parser = argparse.ArgumentParser(description="翻訳を 13 言語の問題で測る")
     parser.add_argument("--model", help="測る LLM (GGUF)。--rescore の時は要らない")
@@ -287,7 +409,22 @@ def main():
                         help="アプリにそのまま渡す: 訳の後ろが抜けた時の、文に分けた訳し直しを切る")
     parser.add_argument("--no-terms", action="store_true",
                         help="アプリにそのまま渡す: 問題の訳語の対を翻訳に渡さない (採点は対で行う)")
+    parser.add_argument("--memory", help="アプリにそのまま渡す: 訳の記憶 (translation-memory.json)。"
+                                         "問題の行と同じ文は、記憶から抜いて測る")
+    parser.add_argument("--save-baseline", metavar="NAME",
+                        help="結果を tools/translation-eval/baselines/<NAME>/ に写す (--from のフォルダ、"
+                             "無ければこの測り・採点し直しの結果)。もう在る名前には上書きしない")
+    parser.add_argument("--from", dest="from_folder", help="--save-baseline で写す結果のフォルダ")
     args = parser.parse_args()
+
+    # 基準を写すだけ (アプリは使わない)
+    if args.save_baseline and args.from_folder:
+        save_baseline(args.save_baseline, args.from_folder)
+        return 0
+    if args.save_baseline and not (args.model or args.rescore):
+        fail("--save-baseline には、写す結果のフォルダを --from で指定してください。")
+    if args.save_baseline and (BASELINES / args.save_baseline).exists():
+        fail(f"{BASELINES / args.save_baseline} はもう在ります。上書きしないので、別の名前にしてください。")
 
     app = Path(args.app).expanduser()
     baseline = Path(args.baseline).expanduser() if args.baseline else None
@@ -300,7 +437,12 @@ def main():
     if args.gate:
         return gate(args, app)
     if args.rescore:
-        return rescore(args, app, baseline)
+        code = rescore(args, app, baseline)
+        if args.save_baseline and code == 0:
+            source = Path(args.rescore).expanduser().resolve()
+            save_baseline(args.save_baseline, Path(args.out).expanduser() if args.out
+                          else source.parent / f"{source.name}-rescored")
+        return code
 
     if not args.model:
         fail("--model を指定してください (採点し直すだけなら --rescore)。")
@@ -349,6 +491,8 @@ def main():
             command.append("--no-split-retry")
         if args.no_terms:
             command.append("--no-terms")
+        if args.memory:
+            command += ["--memory", str(Path(args.memory).expanduser())]
         print(f"  [{number}/{len(chosen)}] {path.name} (→ {target})", flush=True)
         if not_comparable:
             print(f"      前の結果と比べません: {not_comparable}", flush=True)
@@ -370,7 +514,8 @@ def main():
     finished = datetime.datetime.now()
     summary = {
         "model": model.name, "adapter": Path(args.adapter).name if args.adapter else None,
-        "ledger": bool(args.ledger), "splitRetry": not args.no_split_retry, "terms": not args.no_terms, "started": started.isoformat(timespec="seconds"),
+        "ledger": bool(args.ledger), "splitRetry": not args.no_split_retry, "terms": not args.no_terms,
+        "memory": bool(args.memory), "started": started.isoformat(timespec="seconds"),
         "finished": finished.isoformat(timespec="seconds"), "sets": len(chosen), "data": about,
         "baseline": str(baseline) if baseline else None, "rows": rows, "failures": failures,
     }
@@ -383,13 +528,19 @@ def main():
         info.append("- 文に分けた訳し直し: 切 (--no-split-retry)")
     if args.no_terms:
         info.append("- 訳語の対: 翻訳に渡さない (--no-terms)")
+    if args.memory:
+        reused = sum(r.get("reused", 0) for r in rows)
+        info.append(f"- 訳の記憶: 使った (問題の行と同じ文は抜いた。記憶に当たった行 {reused})")
     info.append(f"- 問題の数: {len(chosen)}")
     if about:
         info.append(f"- データ: WMT24++ ({about.get('dataset')}, {about.get('license')})、領域 {', '.join(about.get('domains', []))}、"
                     f"1 言語 {about.get('lines')} 行 (領域ごとに {about.get('perDomain')} 行、種 {about.get('seed')})")
     if baseline:
         info.append(f"- 比べた前の結果: {baseline}")
-    return write_summary(out, f"翻訳の評価: {model.name}", info, summary, rows, failures, baseline)
+    code = write_summary(out, f"翻訳の評価: {model.name}", info, summary, rows, failures, baseline)
+    if args.save_baseline and code == 0:
+        save_baseline(args.save_baseline, out)
+    return code
 
 
 if __name__ == "__main__":

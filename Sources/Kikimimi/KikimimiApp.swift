@@ -7,7 +7,8 @@ import SwiftUI
 /// LLM / 文字起こしの動作確認だけをして終わる (診断・CI 用)。
 /// `--selftest-launch` は、ふつうに起動して、数秒後にウインドウができたかを確かめて終わる (起動しないときの診断用)。
 /// `--selftest-ui-load` は、ふつうに起動して、数千行の結果を出したまま再生や文字起こしと同じ変化を起こし、画面が固まらないかを測る。
-/// `--eval-llm` は、決まった場面で監査役・翻訳役を動かして成績を数える (評価ハーネス)
+/// `--eval-llm` は、決まった場面で監査役・翻訳役を動かして成績を数える (評価ハーネス)。
+/// `--export-translation-eval` は、訳の記憶の取り分けた直しを、評価の問題に書き出す
 @main
 enum KikimimiMain {
     static func main() {
@@ -24,6 +25,10 @@ enum KikimimiMain {
         }
         if args.contains("--eval-llm") {
             exit(LLMEvalRunner.run(arguments: args))
+        }
+        // 訳の記憶の取り分けた直しを、翻訳の評価の問題に書き出す (LLM は使わない)
+        if args.contains("--export-translation-eval") {
+            exit(LLMEvalRunner.exportEval(arguments: args))
         }
         if args.contains("--export-training") {
             exit(TrainingExport.run(arguments: args))

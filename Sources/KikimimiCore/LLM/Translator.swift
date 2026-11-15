@@ -423,6 +423,9 @@ public enum Translator {
         }
         // 訳語の対 (訳す先が同じ写しの物だけ)。送る行・関門には、その原文に出る物だけを使う
         let termPairs = memory.map { $0.target == TranslationMemory.normalizedTarget(target) ? $0.terms : [] } ?? []
+        // 利用者の判定から学んで止める検査 (訳す先が同じ写しの物だけ)。外すのは覚えに残す印だけで、
+        // 訳し直しの引き金 (short) は、外す前の関門の判定で決める
+        let suppressed = memory.map { $0.target == TranslationMemory.normalizedTarget(target) ? $0.suppressedChecks : [] } ?? []
         func unitTerms(_ u: Int) -> [(source: String, translation: String)] {
             TermPair.matching(termPairs, in: sources[u]).map { (source: $0.source, translation: $0.translation) }
         }
@@ -514,6 +517,7 @@ public enum Translator {
                             }
                         }
                     }
+                    if !suppressed.isEmpty { finding = finding.removing(suppressed) }
                     if !finding.flags.isEmpty { summary.flagged += 1 }
                     batch.append(TranslationResult(head: head, covers: covers, text: t, flags: finding.flags,
                                                    detail: finding.detail))

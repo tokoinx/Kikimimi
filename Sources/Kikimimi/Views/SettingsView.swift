@@ -355,7 +355,8 @@ struct AdapterSection: View {
 
 /// 設定の「覚えた訳」: 対訳の行で利用者が直した訳の記憶。次の翻訳に使うかの入・切、一覧・削除。
 /// 消すのは記憶だけ (結果に残っている直した訳は、そのまま)。
-/// 下に「訳語」(訳語の対) の小さな一覧を置く: 訳す先の言語・原文の語・訳語。足す行と、1 件ずつ消すボタン
+/// 下に「訳語」(訳語の対) の小さな一覧を置く: 訳す先の言語・原文の語・訳語。足す行と、1 件ずつ消すボタン。
+/// その下に、利用者の判定から学んで「印を出さなくなった検査」の一覧を置く (1 つも無い時は出さない)
 struct RememberedTranslationsSection: View {
     @Environment(AppModel.self) private var model
     @State private var newTermSource = ""
@@ -397,6 +398,45 @@ struct RememberedTranslationsSection: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             terms
+            suppressedChecks
+        }
+    }
+
+    /// 印を出さなくなった検査の一覧 (訳す先の言語・検査の名前・判定の数)。1 件ずつ [元に戻す]。1 つも無ければ何も出さない
+    @ViewBuilder private var suppressedChecks: some View {
+        let counts = model.translationMemory.suppressedGate
+        if !counts.isEmpty {
+            Text(L("Checks that no longer mark lines"))
+                .font(.callout.weight(.semibold))
+            ForEach(counts, id: \.self) { count in
+                HStack {
+                    Text(TranslationTarget.displayName(for: count.target))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(Self.checkName(count.check))
+                    Text(L("Marked fine %1$d times / edited %2$d times", count.confirmed, count.edited))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(L("Undo")) { model.resetGateCheck(count.check, target: count.target) }
+                }
+            }
+            Text(L("When you mark most lines flagged by a check as fine, that check stops marking lines in that language. “Undo” turns it back on."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 検査の符号の、短い名前 (知らない符号は、符号のまま)
+    static func checkName(_ check: String) -> String {
+        switch check {
+        case TranslationGate.number: return L("Missing number")
+        case TranslationGate.language: return L("Wrong language")
+        case TranslationGate.copied: return L("Same as the original")
+        case TranslationGate.repeated: return L("Repeated words")
+        case TranslationGate.short: return L("Too short")
+        case TranslationGate.term: return L("Missing term")
+        default: return check
         }
     }
 

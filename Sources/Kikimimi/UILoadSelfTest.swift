@@ -1650,6 +1650,14 @@ extension LoadRun {
                     && note?.flags == [TranslationGate.number] && left == flaggedHeads.count - 1,
                  "confirmed \(confirmed), note \(note?.origin ?? "none"), flags \(note?.flags ?? []), "
                     + "left \(left) (expected \(flaggedHeads.count - 1))")
+            // 「この訳でよい」は、その印の検査の「誤りの印」の数に 1 つ足す (保存先が無いので、数は記憶の中だけ)
+            let counted = job.transcript.map { t in
+                model.translationMemory.gate.first {
+                    $0.check == TranslationGate.number && $0.target == model.translationTarget(for: t)
+                }?.confirmed ?? 0
+            } ?? 0
+            step("count “this translation is fine” for the check", counted >= 1 && note?.vote == TranslationNote.confirmed,
+                 "confirmed count \(counted), vote \(note?.vote ?? "none") (expected 1 or more, confirmed)")
         } else {
             step("confirm a flagged translation through the model", false,
                  "\(flaggedHeads.count) flagged rows (expected 2 or more)")
@@ -1697,6 +1705,28 @@ extension LoadRun {
                  "restored \(restored == target.translation), memory \(after.count) (expected 0)")
         } else {
             step("edit a translation through the model", false, "no translated row without a note")
+        }
+        // 関門が判定から学ぶ: 「この訳でよい」を 5 回数えると、その検査 (数の抜け) が、その訳す先で止まる。
+        // [元に戻す] で数を 0 に戻すと、また印を出す (一時の記憶のファイルで。結果の一覧には触らない)
+        if let transcript = job.transcript {
+            let gateTarget = model.translationTarget(for: transcript)
+            for _ in 0..<TranslationMemory.gateMinimumJudgements {
+                model.countGateVote(flags: [TranslationGate.number], target: gateTarget, confirmed: 1)
+            }
+            let stopped = model.translationMemory.suppressedChecks(target: gateTarget)
+            let lookup = model.translationMemory.lookup(target: gateTarget, reuse: false)
+            step("a check stops after five “this translation is fine”",
+                 stopped == [TranslationGate.number] && lookup?.suppressedChecks == [TranslationGate.number]
+                    && model.translationMemory.suppressedGate.count == 1,
+                 "suppressed \(stopped.sorted()), lookup \(lookup?.suppressedChecks.sorted() ?? []), "
+                    + "listed \(model.translationMemory.suppressedGate.count) (expected number, number, 1)")
+            model.resetGateCheck(TranslationGate.number, target: gateTarget)
+            let saved = TranslationMemory.load(from: memoryURL)
+            step("undo a stopped check",
+                 model.translationMemory.suppressedChecks(target: gateTarget).isEmpty && saved.gate.isEmpty
+                    && model.translationMemory.lookup(target: gateTarget, reuse: false) == nil,
+                 "suppressed \(model.translationMemory.suppressedChecks(target: gateTarget).sorted()), "
+                    + "saved counts \(saved.gate.count) (expected none)")
         }
         model.useTranslationMemory(at: nil)
         try? fm.removeItem(at: memoryURL)

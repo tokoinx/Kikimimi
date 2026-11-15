@@ -34,6 +34,10 @@ public enum TranslationGate {
     /// (「No.」→「No.」、名前だけの行、歌の繰り返しは、正しい訳の事が在る)
     public static let severe: Set<String> = [failed, script, long]
 
+    /// 利用者の判定から学んで、訳す先ごとに止めてよい検査 (印だけの検査)。重い印 (`severe`) は止めない
+    /// (訳を出さない検査なので、止めると壊れた訳がそのまま出る)。学び方は `TranslationMemory.suppressedChecks(target:)`
+    public static let learnable: Set<String> = [number, language, copied, repeated, short, term]
+
     /// 短い文の重さの上限 (`weight` がこれより小さい文を「短い文」と見る)。2 つの所で使う:
     /// - 写しの印 (`copied`) を付けない: 名前だけの行・相づち (「No.」「Roblox Studio」) は、写しが正しい訳の事が多い
     /// - 訳の記憶を引かない (`TranslationMemoryLookup.minimumSourceWeight`): 短い文は、場面で訳が変わる
@@ -61,6 +65,18 @@ public enum TranslationGate {
 
         /// 重い印が在るか
         public var isSevere: Bool { flags.contains(where: TranslationGate.severe.contains) }
+
+        /// 検査 checks の印 (と、その説明の部分 "符号: …") を外した結果。外すのは `learnable` の検査だけ
+        /// (重い印は、checks に在っても残す)
+        public func removing(_ checks: Set<String>) -> Finding {
+            let drop = checks.intersection(TranslationGate.learnable)
+            guard !drop.isEmpty, flags.contains(where: drop.contains) else { return self }
+            let parts = (detail ?? "").components(separatedBy: "; ").filter { part in
+                !part.isEmpty && !drop.contains(where: { part.hasPrefix($0 + ": ") })
+            }
+            return Finding(flags: flags.filter { !drop.contains($0) },
+                           detail: parts.isEmpty ? nil : parts.joined(separator: "; "))
+        }
     }
 
     /// 文の重さ: 文字と数字の数。漢字・かな・ハングルは `wideCharacterWeight` と数える (記号・空白は数えない)

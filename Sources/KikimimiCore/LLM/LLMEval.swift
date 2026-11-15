@@ -176,12 +176,14 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
     /// 古い結果には無い (0 と読む)
     public var retried = 0
     public var retryFixed = 0
+    /// 訳の記憶 (`--memory`) に当たって、LLM を呼ばずに記憶の訳を置いた行の数。古い結果には無い (0 と読む)
+    public var reused = 0
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case cases, lines, translated, inTarget, numbersKept, numbersChecked, termsKept, termsChecked
-        case copied, repeated, chrFStatistics, chrF, seconds, retried, retryFixed
+        case copied, repeated, chrFStatistics, chrF, seconds, retried, retryFixed, reused
     }
 
     /// 日本語だけを採点していた頃の項目の名前
@@ -208,6 +210,7 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
         seconds = try c.decodeIfPresent(Double.self, forKey: .seconds) ?? 0
         retried = try c.decodeIfPresent(Int.self, forKey: .retried) ?? 0
         retryFixed = try c.decodeIfPresent(Int.self, forKey: .retryFixed) ?? 0
+        reused = try c.decodeIfPresent(Int.self, forKey: .reused) ?? 0
     }
 
     public mutating func add(_ other: TranslationEvalScore) {
@@ -230,6 +233,7 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
         seconds += other.seconds
         retried += other.retried
         retryFixed += other.retryFixed
+        reused += other.reused
     }
 
     public var summary: String {
@@ -238,6 +242,7 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
                       + "terms kept %d/%d, copied %d, repeated %d, ",
                       cases, lines, translated, inTarget, numbersKept, numbersChecked, termsKept, termsChecked, copied, repeated)
             + "chrF \(points), " + String(format: "split retries %d (used %d), %.1f s", retried, retryFixed, seconds)
+            + (reused > 0 ? ", from memory \(reused) lines" : "")
     }
 }
 
@@ -526,6 +531,8 @@ public enum LLMEval {
         /// 文に分けて訳し直したまとまりの数と、そのうち入れ替えた数 (採点し直しても、そのまま使う。古い結果には無い)
         public var retried: Int?
         public var retryFixed: Int?
+        /// 訳の記憶に当たった行の数 (採点し直しても、そのまま使う。古い結果・`--memory` の無い測りには無い)
+        public var reused: Int?
         /// 問題の訳語の対 (古い結果・対の無い問題には無い)
         public var terms: [TranslationEvalTerm]?
 
@@ -585,6 +592,7 @@ public enum LLMEval {
         score.seconds = o.seconds ?? 0
         score.retried = o.retried ?? 0
         score.retryFixed = o.retryFixed ?? 0
+        score.reused = o.reused ?? 0
         var details: [String] = []
         var chrF: ChrF.Statistics?
         var texts: [String] = []
@@ -679,9 +687,12 @@ public enum LLMEval {
     /// 翻訳の場面をひと通り動かして採点する。場面ごとの訳す先 (`target`) で訳し、訳す先ごとにも集計する。
     /// アプリと同じ `Translator.translateSummarizing` を通す (訳の後ろが抜けた時の訳し直しも同じに働く)。
     /// splitRetry が false なら、訳し直しを切る (`--no-split-retry`)。
-    /// useTerms が false なら、問題の訳語の対を翻訳に渡さない (`--no-terms`。採点は対で行う)
+    /// useTerms が false なら、問題の訳語の対を翻訳に渡さない (`--no-terms`。採点は対で行う)。
+    /// memory を渡すと (`--memory`)、その記憶 (覚えた文・訳語の対・止める検査) を翻訳に渡す (`caseLookup`)。
+    /// ただし問題の行と同じ文 (そろえた原文が同じ) は記憶から抜く (答えを見て訳す事になるため。`memoryExclusions`)
     public static func runTranslation(_ cases: [TranslationEvalCase], generator: any TextGenerating,
                                       ledger: CorrectionLedger? = nil, splitRetry: Bool = true, useTerms: Bool = true,
+                                      memory: TranslationMemory? = nil,
                                       detector: LanguageDetector? = LLMEval.defaultLanguageDetector,
                                       shouldCancel: () -> Bool = { false },
                                       onCase: (_ done: Int, _ total: Int) -> Void = { _, _ in })
@@ -696,13 +707,17 @@ public enum LLMEval {
             let segments = segments(c.lines, language: c.language)
             var byHead: [UUID: TranslationResult] = [:]
             let glossary = ledger?.glossary(adding: c.glossary) ?? c.glossary
+            let lookup = caseLookup(c, memory: memory, useTerms: useTerms)
+            let excluded = lookup.map { memoryExclusions(segments, memory: $0) } ?? []
             let run = try Translator.translateSummarizing(segments, language: c.language, target: c.targetLanguage,
                                                           options: TranslationOptions(glossary: glossary,
                                                                                       splitRetry: splitRetry),
-                                                          memory: useTerms ? termLookup(c) : nil,
+                                                          memory: lookup, memoryExcluding: excluded,
                                                           generator: generator, shouldCancel: shouldCancel) { batch, _, _ in
                 for result in batch { byHead[result.head] = result }
             }
+            // 記憶に当たった行 (まとまりの先頭と、まとめた後ろの区間)
+            let reused = byHead.values.filter(\.fromMemory).reduce(0) { $0 + 1 + $1.covers.count }
             // 文ごとの訳は、先頭の区間に付く。まとめられた後ろの区間も、その訳の行として数える
             let position = Dictionary(segments.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
             var units: [TranslationUnit] = []
@@ -728,9 +743,11 @@ public enum LLMEval {
             result.score.seconds = seconds
             result.score.retried = run.retried
             result.score.retryFixed = run.retryFixed
+            result.score.reused = reused
             var saved = output(c, units: units, seconds: seconds)
             saved.retried = run.retried
             saved.retryFixed = run.retryFixed
+            if memory != nil { saved.reused = reused }
             outputs.append(saved)
             total.add(result.score)
             byTarget[c.targetLanguage, default: TranslationEvalScore()].add(result.score)
@@ -738,6 +755,29 @@ public enum LLMEval {
             onCase(done + 1, cases.count)
         }
         return (total, byTarget, details, outputs)
+    }
+
+    /// 問題 c の翻訳に渡す写し。memory が無ければ `termLookup` と同じ (useTerms が false なら nil)。
+    /// memory が在れば、その訳す先の覚えた文・止める検査と、訳語の対 (問題の対 + 記憶の対。同じ原語は問題の対を使う。
+    /// useTerms が false なら記憶の対だけ) を持つ写し
+    static func caseLookup(_ c: TranslationEvalCase, memory: TranslationMemory?, useTerms: Bool) -> TranslationMemoryLookup? {
+        let own = useTerms ? termLookup(c) : nil
+        guard let memory else { return own }
+        let target = c.targetLanguage
+        let base = memory.lookup(target: target)
+        let ownTerms = own?.terms ?? []
+        let ownSources = Set(ownTerms.map { $0.source.lowercased() })
+        let terms = ownTerms + base.terms.filter { !ownSources.contains($0.source.lowercased()) }
+        let sentences = memory.sentences.filter { TranslationMemory.normalizedTarget($0.target) == base.target }
+        return TranslationMemoryLookup(target: target, sentences: sentences, terms: terms,
+                                       suppressedChecks: base.suppressedChecks)
+    }
+
+    /// 記憶から抜く区間: 問題の行のうち、記憶に同じ文 (そろえた原文が同じ) が在る行。
+    /// その行を含む文のまとまりは、記憶を引かずに LLM に送る (`Translator.translateSummarizing` の memoryExcluding)
+    static func memoryExclusions(_ segments: [TranscriptSegment], memory: TranslationMemoryLookup) -> Set<UUID> {
+        guard !memory.isEmpty else { return [] }
+        return Set(segments.filter { memory.translations[TranslationMemory.normalizedSource($0.text)] != nil }.map(\.id))
     }
 
     /// 問題の訳語の対だけを持つ写し (覚えた文は持たない)。対が無ければ nil (アプリの「記憶が無い」時と同じに訳す)

@@ -92,6 +92,16 @@ extension JA {
         "%d remembered translation": "覚えた訳 %d 件",
         "%d remembered translations": "覚えた訳 %d 件",
         "When the same sentence comes up again in a translation into the same language, your translation is used without asking the LLM. Short sentences are always translated again, because their meaning depends on the scene. “Translate this sentence again” always asks the LLM. Deleting here removes only the remembered translation; translations in your results stay as they are. They are saved only on this Mac.": "同じ言語へ訳す時に、同じ文がまた出たら、LLM に頼まずに自分で直した訳を置きます。短い文は場面で訳が変わるので、いつも訳し直します。「この文を訳し直す」は、いつも LLM に頼みます。ここで消すのは覚えた訳だけで、結果に残っている訳はそのままです。保存先はこの Mac の中だけです。",
+        // 印を出さなくなった検査 (U6)
+        "Checks that no longer mark lines": "印を出さなくなった検査",
+        "Marked fine %1$d times / edited %2$d times": "この訳でよい %1$d 回 / 直した %2$d 回",
+        "When you mark most lines flagged by a check as fine, that check stops marking lines in that language. “Undo” turns it back on.": "印の付いた行の多くを「この訳でよい」とした検査は、その言語では印を出さなくなります。「元に戻す」で、また印を出します。",
+        "Missing number": "数の抜け",
+        "Wrong language": "言語の違い",
+        "Same as the original": "原文の写し",
+        "Repeated words": "繰り返し",
+        "Too short": "短すぎる訳",
+        "Missing term": "訳語の抜け",
         // 学習した直し (LearnedCorrectionsSection)
         "Learned corrections": "学習した直し",
         "Remember the fixes decided in the audit list and use them from next time": "監査の一覧で決めた直しを覚えて、次から使う",

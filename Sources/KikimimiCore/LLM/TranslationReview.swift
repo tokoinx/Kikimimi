@@ -22,6 +22,9 @@ public struct TranslationNote: Codable, Hashable, Sendable {
     public var origin: String
     /// 利用者が直す前の機械の訳 (訳が無い行に、利用者が自分で書いた時・記憶から置いた時は nil)
     public var machine: String?
+    /// 訳の関門の判定の数 (`TranslationMemory.gate`) に、この訳で足した判定 ("confirmed" か "edited")。
+    /// 足していなければ nil。同じ訳に 2 度足さないため、また「機械の訳に戻す」で足した分を引くために持つ
+    public var vote: String?
 
     /// 利用者が直した訳の符号
     public static let edited = "edited"
@@ -34,17 +37,18 @@ public struct TranslationNote: Codable, Hashable, Sendable {
     public static let confirmed = "confirmed"
 
     public init(head: UUID, signature: String, flags: [String] = [], detail: String? = nil, origin: String,
-                machine: String? = nil) {
+                machine: String? = nil, vote: String? = nil) {
         self.head = head
         self.signature = signature
         self.flags = flags
         self.detail = detail
         self.origin = origin
         self.machine = machine
+        self.vote = vote
     }
 
     enum CodingKeys: String, CodingKey {
-        case head, signature, flags, detail, origin, machine
+        case head, signature, flags, detail, origin, machine, vote
     }
 
     /// 欠けている項目は補って読む (印の理由が無い・出どころが無い覚えも読める)
@@ -56,6 +60,7 @@ public struct TranslationNote: Codable, Hashable, Sendable {
         detail = try? c.decodeIfPresent(String.self, forKey: .detail)
         origin = (try? c.decodeIfPresent(String.self, forKey: .origin)) ?? ""
         machine = try? c.decodeIfPresent(String.self, forKey: .machine)
+        vote = try? c.decodeIfPresent(String.self, forKey: .vote)
     }
 
     /// 利用者が直した訳の覚えか
@@ -162,11 +167,14 @@ extension Transcript {
         // 直す前の機械の訳: もう直してあれば、初めに直した時の機械の訳を残す
         let machine = existing?.isEdited == true ? existing?.machine : current
         segments[index].translation = cleaned
-        // 関門の印 (と説明) は残す: 後で「検査が当たった数」を数えるため (印の出し方は "edited" のまま)
+        // 関門の印 (と説明) は残す: 後で「検査が当たった数」を数えるため (印の出し方は "edited" のまま)。
+        // 判定の印 (vote): 印の付いた機械の訳 ("llm") をまだ数えずに直した時は "edited" (呼ぶ側が数を足す)。
+        // ほか (もう直してある・「この訳でよい」の後に直した) は、前の覚えの物をそのまま持つ
+        let vote = existing?.isFlagged == true && existing?.vote == nil ? TranslationNote.edited : existing?.vote
         let note = TranslationNote(head: head,
                                    signature: Self.reviewSignature(source: translationSource(at: index), translation: cleaned),
                                    flags: existing?.flags ?? [], detail: existing?.detail,
-                                   origin: TranslationNote.edited, machine: machine)
+                                   origin: TranslationNote.edited, machine: machine, vote: vote)
         var notes = (translationReview ?? []).filter { $0.head != head }
         notes.append(note)
         translationReview = notes
@@ -184,12 +192,14 @@ extension Transcript {
         segments[index].translation = note.machine
         if note.machine == nil { segments[index].translationCovers = nil }
         var notes = (translationReview ?? []).filter { $0.head != head }
-        // 印の付いた機械の訳を直していた時は、戻した機械の訳に「要確認」の印を戻す
+        // 印の付いた機械の訳を直していた時は、戻した機械の訳に「要確認」の印を戻す。
+        // 直して足した判定 ("edited") は、呼ぶ側が引くので外す。「この訳でよい」で足した判定は残す (2 度足さない)
         if let machine = note.machine, !note.flags.isEmpty {
             notes.append(TranslationNote(head: head,
                                          signature: Self.reviewSignature(source: translationSource(at: index),
                                                                          translation: machine),
-                                         flags: note.flags, detail: note.detail, origin: TranslationNote.llm))
+                                         flags: note.flags, detail: note.detail, origin: TranslationNote.llm,
+                                         vote: note.vote == TranslationNote.edited ? nil : note.vote))
         }
         translationReview = notes
         pruneTranslationReview()
@@ -197,6 +207,8 @@ extension Transcript {
     }
 
     /// 印の付いた機械の訳を「この訳でよい」とする (覚えの出どころを "confirmed" に変える。印と説明は残す)。
+    /// まだ判定を数えていない訳なら、判定の印 (vote) を "confirmed" にする (返した覚えの vote を見て、呼ぶ側が数を足す。
+    /// 前から vote が在る覚えは、そのまま)。
     /// id は、その行のどの区間でもよい。変えたら、その覚えを返す。印の付いた訳でなければ nil (何も変えない)
     @discardableResult
     public mutating func confirmTranslation(of id: UUID) -> TranslationNote? {
@@ -204,6 +216,7 @@ extension Transcript {
               let index = segments.firstIndex(where: { $0.id == head }), segments[index].translation != nil,
               var note = translationNote(for: head), note.isFlagged else { return nil }
         note.origin = TranslationNote.confirmed
+        if note.vote == nil { note.vote = TranslationNote.confirmed }
         var notes = (translationReview ?? []).filter { $0.head != head }
         notes.append(note)
         translationReview = notes

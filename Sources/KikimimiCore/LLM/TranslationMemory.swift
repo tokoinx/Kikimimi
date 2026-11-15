@@ -59,24 +59,28 @@ public struct RememberedTranslation: Codable, Hashable, Identifiable, Sendable {
 ///
 /// 監査の台帳 (`CorrectionLedger`、`learned-corrections.json`) とは別のファイル。読み書きの作りは台帳と同じ:
 /// 壊れた 1 件は飛ばし、読めないファイルは別の名前でよけ、書く時は原子的に書く。
-/// 形は `{ "version": 1, "sentences": [...], "terms": [...] }`。`terms` の無い古いファイルも読める。知らない項目は読み飛ばす
+/// 形は `{ "version": 1, "sentences": [...], "terms": [...], "gate": [...] }`。`terms`・`gate` の無い古いファイルも読める。
+/// 知らない項目は読み飛ばす
 public struct TranslationMemory: Codable, Hashable, Sendable {
     public var version: Int
     public var sentences: [RememberedTranslation]
     /// 訳語の対 (利用者が決めた「この語は、こう訳す」)。訳す先の言語ごとに持つ
     public var terms: [TermPair]
+    /// 訳の関門の検査ごとの、利用者の判定の数 (検査 × 訳す先ごとに 1 件)。`suppressedChecks(target:)` が使う
+    public var gate: [GateCount]
 
     /// 保存するファイルの名前 (学習した直しの台帳と同じフォルダに置く)
     public static let fileName = "translation-memory.json"
 
-    public init(sentences: [RememberedTranslation] = [], terms: [TermPair] = []) {
+    public init(sentences: [RememberedTranslation] = [], terms: [TermPair] = [], gate: [GateCount] = []) {
         self.version = 1
         self.sentences = sentences
         self.terms = terms
+        self.gate = gate
     }
 
     enum CodingKeys: String, CodingKey {
-        case version, sentences, terms
+        case version, sentences, terms, gate
     }
 
     /// 読めない 1 件があっても、ほかは読む (その 1 件だけを飛ばす)。原文・訳が空の物も飛ばす
@@ -100,12 +104,21 @@ public struct TranslationMemory: Codable, Hashable, Sendable {
         }
         terms = ((try? c.decodeIfPresent([TermEntry].self, forKey: .terms)) ?? []).compactMap { $0.value }
             .filter { !$0.source.isEmpty && !$0.translation.isEmpty && !$0.target.isEmpty }
+        // 検査の判定の数も、壊れた 1 件だけを飛ばす (検査・訳す先が空の物も飛ばす)
+        struct GateEntry: Decodable {
+            var value: GateCount?
+            init(from decoder: any Decoder) throws {
+                value = try? GateCount(from: decoder)
+            }
+        }
+        gate = ((try? c.decodeIfPresent([GateEntry].self, forKey: .gate)) ?? []).compactMap { $0.value }
+            .filter { !$0.check.isEmpty && !$0.target.isEmpty }
     }
 
     /// 覚えた文が無いか (訳語の対は数えない。対も無いかは `hasNothing`)
     public var isEmpty: Bool { sentences.isEmpty }
 
-    /// 覚えた文も、訳語の対も無いか
+    /// 覚えた文も、訳語の対も無いか (検査の判定の数は数えない)
     public var hasNothing: Bool { sentences.isEmpty && terms.isEmpty }
 
     // MARK: そろえる
@@ -222,6 +235,91 @@ public struct TranslationMemory: Codable, Hashable, Sendable {
             .sorted { ($0.target, $0.source.lowercased()) < ($1.target, $1.source.lowercased()) }
     }
 
+    // MARK: 関門が、利用者の判定から学ぶ (U6)
+
+    /// 検査を止めるかを決める、判定の数の下限。これより少ない時は決めない (数回の判定では、たまたまの偏りと見分けられない)
+    public static let gateMinimumJudgements = 5
+    /// 検査を止める「誤りの印」の割合の下限。判定のうち、この割合以上が「この訳でよい」(印が誤り) だった検査は、
+    /// その言語では役に立っていないと見て止める (5 回のうち 4 回以上が誤りの印、など)
+    public static let gateFalseAlarmRatio = 0.8
+
+    func gateIndex(check: String, target: String) -> Int? {
+        let t = Self.normalizedTarget(target)
+        return gate.firstIndex { $0.check == check && Self.normalizedTarget($0.target) == t }
+    }
+
+    /// 印の付いた訳への利用者の判定を数える。flags の検査のうち、止めてよい検査 (`TranslationGate.learnable`) の 1 つずつに、
+    /// confirmed (「この訳でよい」= 検査の誤り) と edited (直した = 検査が当たった) を足す (負の数で引く。0 より下げない)。
+    /// 数を変えたら true
+    @discardableResult
+    public mutating func countGate(flags: [String], target: String, confirmed: Int = 0, edited: Int = 0,
+                                   date: Date = Date()) -> Bool {
+        let t = Self.normalizedTarget(target)
+        guard !t.isEmpty, confirmed != 0 || edited != 0 else { return false }
+        var changed = false
+        for check in Set(flags) where TranslationGate.learnable.contains(check) {
+            if let i = gateIndex(check: check, target: t) {
+                gate[i].confirmed = max(0, gate[i].confirmed + confirmed)
+                gate[i].edited = max(0, gate[i].edited + edited)
+                gate[i].updated = date
+                changed = true
+            } else if confirmed > 0 || edited > 0 {
+                gate.append(GateCount(check: check, target: t, confirmed: max(0, confirmed), edited: max(0, edited),
+                                      updated: date))
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    /// 判定の数から、検査を止めるか (数が `gateMinimumJudgements` 以上で、「この訳でよい」の割合が `gateFalseAlarmRatio` 以上)。
+    /// 重い印の検査は止めない
+    public static func isSuppressed(_ count: GateCount) -> Bool {
+        let total = count.confirmed + count.edited
+        guard TranslationGate.learnable.contains(count.check), total >= gateMinimumJudgements else { return false }
+        return Double(count.confirmed) / Double(total) >= gateFalseAlarmRatio
+    }
+
+    /// 訳す先 target で止める検査 (印を出さない検査)
+    public func suppressedChecks(target: String) -> Set<String> {
+        let t = Self.normalizedTarget(target)
+        return Set(gate.filter { Self.normalizedTarget($0.target) == t && Self.isSuppressed($0) }.map(\.check))
+    }
+
+    /// 止めている検査の一覧 (設定の画面に出す)。訳す先・検査の順 (検査は `TranslationGate.all` の順)
+    public var suppressedGate: [GateCount] {
+        gate.filter(Self.isSuppressed).sorted { a, b in
+            if a.target != b.target { return a.target < b.target }
+            return (TranslationGate.all.firstIndex(of: a.check) ?? 99) < (TranslationGate.all.firstIndex(of: b.check) ?? 99)
+        }
+    }
+
+    /// 検査 check × 訳す先 target の数を 0 に戻す (その 1 件を消す。設定の「元に戻す」)。戻したら true
+    @discardableResult
+    public mutating func resetGate(check: String, target: String) -> Bool {
+        guard let i = gateIndex(check: check, target: target) else { return false }
+        gate.remove(at: i)
+        return true
+    }
+
+    // MARK: 評価の問題にする (U6)
+
+    /// 取り分けた直し (`heldOut`) だけを、翻訳の評価の問題にする。1 件 = 1 場面 (行は原文 1 つ、人の訳は直した訳)。
+    /// id は記憶の id から決まる ("memory-<訳す先>-<id の頭 8 字>")。並びは訳す先・原文の順。
+    /// 原文の言語は、記憶の `sourceLanguage`。無ければ detector で決め、それでも分からなければ "en"
+    public func evaluationCases(detector: LanguageDetector? = LLMEval.defaultLanguageDetector) -> [TranslationEvalCase] {
+        sentences.filter(\.heldOut)
+            .sorted { ($0.target, $0.source) < ($1.target, $1.source) }
+            .map { entry in
+                let target = Self.normalizedTarget(entry.target)
+                let short = String(entry.id.uuidString.lowercased().prefix(8))
+                let language = entry.sourceLanguage.flatMap { $0.isEmpty ? nil : $0 } ?? detector?(entry.source) ?? "en"
+                return TranslationEvalCase(id: "memory-\(target)-\(short)", language: language,
+                                           lines: [entry.source], target: target, references: [entry.translation],
+                                           domain: "memory")
+            }
+    }
+
     // MARK: 保存
 
     public static func load(from url: URL) -> TranslationMemory {
@@ -282,10 +380,15 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
     let translations: [String: String]
     /// この訳す先の訳語の対 (原文に出る物だけを指示文と関門に使う: `terms(in:)`)
     public let terms: [TermPair]
+    /// この訳す先で止める検査 (利用者の判定から学んだ物。`TranslationMemory.suppressedChecks(target:)`)。
+    /// 翻訳は、覚えに残す印から、この検査の印を外す (訳し直しの引き金は、外す前の印で決める)
+    public let suppressedChecks: Set<String>
 
-    public init(target: String, sentences: [RememberedTranslation], terms: [TermPair] = []) {
+    public init(target: String, sentences: [RememberedTranslation], terms: [TermPair] = [],
+                suppressedChecks: Set<String> = []) {
         let t = TranslationMemory.normalizedTarget(target)
         self.target = t
+        self.suppressedChecks = suppressedChecks.intersection(TranslationGate.learnable)
         var map: [String: String] = [:]
         // 同じ文が 2 つ在れば、新しく直した方を使う
         for entry in sentences.sorted(by: { $0.updated < $1.updated })
@@ -326,17 +429,61 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
 }
 
 extension TranslationMemory {
-    /// 訳す先 target の記憶の写し (次の翻訳に渡す)
+    /// 訳す先 target の記憶の写し (次の翻訳に渡す。覚えた文・訳語の対・止める検査)
     public func lookup(target: String) -> TranslationMemoryLookup {
-        TranslationMemoryLookup(target: target, sentences: sentences, terms: terms)
+        TranslationMemoryLookup(target: target, sentences: sentences, terms: terms,
+                                suppressedChecks: suppressedChecks(target: target))
     }
 
-    /// 次の翻訳に渡す写し。reuse (設定「覚えた訳を、次の翻訳に使う」) が切なら nil (覚えた文も訳語の対も渡さない)。
-    /// 訳す先 target の文も対も無ければ nil
+    /// 次の翻訳に渡す写し。reuse (設定「覚えた訳を、次の翻訳に使う」) が切なら、覚えた文も訳語の対も渡さない。
+    /// 止める検査は、reuse に関わらず渡す (記憶の入・切とは別の働き)。
+    /// 訳す先 target の文も対も止める検査も無ければ nil
     public func lookup(target: String, reuse: Bool) -> TranslationMemoryLookup? {
-        guard reuse, !hasNothing else { return nil }
+        let suppressed = suppressedChecks(target: target)
+        guard reuse, !hasNothing else {
+            return suppressed.isEmpty ? nil
+                : TranslationMemoryLookup(target: target, sentences: [], terms: [], suppressedChecks: suppressed)
+        }
         let lookup = lookup(target: target)
-        return lookup.isEmpty && lookup.terms.isEmpty ? nil : lookup
+        return lookup.isEmpty && lookup.terms.isEmpty && lookup.suppressedChecks.isEmpty ? nil : lookup
+    }
+}
+
+/// 訳の関門の検査 1 つ × 訳す先 1 つの、利用者の判定の数 (`TranslationMemory.gate`)。
+///
+/// 印の付いた機械の訳に、利用者が「この訳でよい」とした数 (検査の誤り) と、直した数 (検査が当たった) を持つ。
+/// 数がたまると、誤りの多い検査を、その訳す先では止める (`TranslationMemory.isSuppressed(_:)`)
+public struct GateCount: Codable, Hashable, Sendable {
+    /// 検査の符号 (`TranslationGate` の number・language など)
+    public var check: String
+    /// 訳す先の言語のコード (そろえた物)
+    public var target: String
+    /// 「この訳でよい」とした数
+    public var confirmed: Int
+    /// 直した数
+    public var edited: Int
+    public var updated: Date
+
+    public init(check: String, target: String, confirmed: Int = 0, edited: Int = 0, updated: Date = Date()) {
+        self.check = check
+        self.target = target
+        self.confirmed = confirmed
+        self.edited = edited
+        self.updated = updated
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case check, target, confirmed, edited, updated
+    }
+
+    /// 欠けている項目は補って読む (検査・訳す先は無いと読めない)。負の数は 0 と読む
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        check = try c.decode(String.self, forKey: .check)
+        target = TranslationMemory.normalizedTarget(try c.decode(String.self, forKey: .target))
+        confirmed = max(0, (try? c.decodeIfPresent(Int.self, forKey: .confirmed)) ?? 0)
+        edited = max(0, (try? c.decodeIfPresent(Int.self, forKey: .edited)) ?? 0)
+        updated = (try? c.decodeIfPresent(Date.self, forKey: .updated)) ?? Date()
     }
 }
 

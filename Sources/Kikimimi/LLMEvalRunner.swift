@@ -15,6 +15,11 @@ import KikimimiLLM
 /// (`TranslationGate`) を LLM なしで測る (問題なら人の訳と壊した訳に、結果なら残した LLM の訳に掛ける)
 /// `--no-split-retry` は、訳の後ろが抜けた時の、文に分けた訳し直し (`TranslationOptions.splitRetry`) を切る (入・切を比べる)
 /// `--no-terms` は、問題の訳語の対 (`terms`) を翻訳に渡さずに訳す (採点は対で行う。渡した時と `termsKept` を比べる)
+/// `--memory <記憶.json>` は、訳の記憶 (覚えた文・訳語の対・止める検査) を翻訳に渡す。問題の行と同じ文は記憶から抜いて測る
+/// (`LLMEval.runTranslation`)。記憶に当たった行の数は、結果の `reused` に残る
+///
+/// `Kikimimi --export-translation-eval <出力.json> [--memory <記憶.json>]` は、訳の記憶の取り分けた直し (`heldOut`) だけを、
+/// 翻訳の評価の問題 (`LLMEvalSet`) に書き出す (LLM は使わない。`--memory` が無ければ、アプリの今の記憶のファイル)
 enum LLMEvalRunner {
     /// 結果の JSON (中身と、古い結果の読み方・採点し直しは KikimimiCore の `LLMEvalReport`)
     typealias Report = LLMEvalReport
@@ -128,6 +133,69 @@ enum LLMEvalRunner {
         return 0
     }
 
+    /// アプリの今の訳の記憶のファイル (学習した直しの台帳と同じフォルダの translation-memory.json)
+    static var defaultMemoryURL: URL {
+        TrainingExport.defaultLedgerURL.deletingLastPathComponent().appendingPathComponent(TranslationMemory.fileName)
+    }
+
+    /// `--export-translation-eval`: 取り分けた直しを、評価の問題に書き出す。0 件でも、空の問題のファイルを作って 0 を返す
+    static func exportEval(arguments args: [String]) -> Int32 {
+        func value(_ name: String) -> String? {
+            guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
+            return args[i + 1]
+        }
+        guard let output = value("--export-translation-eval"), !output.hasPrefix("--") else {
+            log("usage: Kikimimi --export-translation-eval <out.json> [--memory <translation-memory.json>]")
+            return 2
+        }
+        let url = value("--memory").map { URL(fileURLWithPath: expand($0)) } ?? defaultMemoryURL
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            // ファイルが無い時は、記憶が空と見る (直しがまだ 1 つも無い)
+            if !FileManager.default.fileExists(atPath: url.path) {
+                data = Data()
+            } else {
+                log("EXPORT FAILED: could not read \(url.path): \(error.localizedDescription)")
+                return 1
+            }
+        }
+        let memory: TranslationMemory
+        if data.isEmpty {
+            memory = TranslationMemory()
+        } else {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            do {
+                memory = try decoder.decode(TranslationMemory.self, from: data)
+            } catch {
+                log("EXPORT FAILED: \(url.path) is not a translation memory: \(error.localizedDescription)")
+                return 1
+            }
+        }
+        let cases = memory.evaluationCases()
+        let set = LLMEvalSet(name: "translation-memory-heldout", translation: cases)
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(set).write(to: URL(fileURLWithPath: expand(output)), options: .atomic)
+        } catch {
+            log("EXPORT FAILED: \(error.localizedDescription)")
+            return 1
+        }
+        log("memory: \(url.path) (\(memory.sentences.count) sentences, \(memory.sentences.filter(\.heldOut).count) held out)")
+        if cases.isEmpty {
+            log("no held-out corrections yet: wrote an empty set to \(output)")
+            return 0
+        }
+        var byTarget: [String: Int] = [:]
+        for c in cases { byTarget[c.targetLanguage, default: 0] += 1 }
+        for target in byTarget.keys.sorted() { log("  \(target): \(byTarget[target] ?? 0) cases") }
+        log("wrote \(cases.count) cases to \(output)")
+        return 0
+    }
+
     static func run(arguments args: [String]) -> Int32 {
         func value(_ name: String) -> String? {
             guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
@@ -158,6 +226,7 @@ enum LLMEvalRunner {
         }
         guard !setPaths.isEmpty, rulesOnly || FileManager.default.fileExists(atPath: modelPath) else {
             log("usage: Kikimimi --eval-llm <model.gguf> --set <cases.json> [--set …] [--adapter <lora.gguf>] [--ledger <ledger.json>]"
+                + " [--memory <translation-memory.json>]"
                 + " [--rules-only] [--cpu] [--no-split-retry] [--no-terms] [--report <out.json>] [--baseline <earlier report.json>]")
             log("       Kikimimi --eval-llm none --rescore <report.json> [--report <out.json>] [--baseline <earlier report.json>]")
             log("       Kikimimi --eval-llm none --gate <cases.json or report.json> [--gate …] [--report <out.json>]")
@@ -172,6 +241,13 @@ enum LLMEvalRunner {
                 translation += set.translation
             }
             let ledger = value("--ledger").map { CorrectionLedger.load(from: URL(fileURLWithPath: expand($0))) }
+            // 訳の記憶 (--memory)。読めないファイルは、空の記憶で黙って測らずに止める (測りの条件が違ってしまうため)
+            var memory: TranslationMemory?
+            if let path = value("--memory") {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                memory = try decoder.decode(TranslationMemory.self, from: Data(contentsOf: URL(fileURLWithPath: expand(path))))
+            }
             let adapter = value("--adapter").map(expand)
             var report = Report(model: rulesOnly ? "(rules only)" : (modelPath as NSString).lastPathComponent,
                                 adapter: adapter.map { ($0 as NSString).lastPathComponent },
@@ -198,8 +274,14 @@ enum LLMEvalRunner {
                 if !splitRetry { log("split retry: off (--no-split-retry)") }
                 let useTerms = !args.contains("--no-terms")
                 if !useTerms { log("terms: not given to the translator (--no-terms)") }
+                if let memory {
+                    let suppressed = memory.suppressedGate.map { "\($0.target):\($0.check)" }
+                    log("memory: \(memory.sentences.count) sentences, \(memory.terms.count) terms, suppressed checks "
+                        + (suppressed.isEmpty ? "none" : suppressed.joined(separator: ", "))
+                        + " (sentences equal to a case line are left out)")
+                }
                 let translated = try LLMEval.runTranslation(translation, generator: engine, ledger: ledger,
-                                                            splitRetry: splitRetry, useTerms: useTerms,
+                                                            splitRetry: splitRetry, useTerms: useTerms, memory: memory,
                                                             onCase: { done, total in log("  translation \(done)/\(total)") })
                 report.translation = translated.score
                 report.translationByTarget = translated.byTarget
