@@ -32,7 +32,7 @@ struct ContentView: View {
                                   style: StrokeStyle(lineWidth: 3, dash: [10, 6]))
                     .padding(8)
                     .overlay {
-                        Label(model.isRecording ? "録音中は読み込めません。録音を止めてから落としてください" : "ここに落として文字起こし",
+                        Label(model.isRecording ? L("You can’t add files while recording. Stop recording, then drop them.") : L("Drop here to transcribe"),
                               systemImage: model.isRecording ? "nosign" : "waveform.badge.plus")
                             .font(.title2.weight(.semibold))
                             .padding(20)
@@ -41,7 +41,7 @@ struct ContentView: View {
                     .allowsHitTesting(false)
             }
         }
-        .alert("お知らせ", isPresented: Binding(
+        .alert(L("Notice"), isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
         )) {
@@ -69,18 +69,18 @@ struct ContentView: View {
             Button {
                 model.presentOpenPanel()
             } label: {
-                Label("開く", systemImage: "folder.badge.plus")
+                Label(L("Open"), systemImage: "folder.badge.plus")
             }
-            .help("音声・動画ファイルを開く (⌘O)。ファイルをウインドウに落としても読み込めます")
+            .help(L("Open audio or video files (⌘O). You can also drop files on the window."))
             .disabled(model.isRecording)
         }
         ToolbarItem(placement: .navigation) {
             Button {
                 model.requestDelete(model.selectedJob)
             } label: {
-                Label("ゴミ箱に入れる", systemImage: "trash")
+                Label(L("Move to Trash"), systemImage: "trash")
             }
-            .help("選んでいる結果をゴミ箱に入れる (一覧では delete キーでも)")
+            .help(L("Move the selected result to the Trash (or press Delete in the list)"))
             .disabled(model.selectedJob == nil || model.isRecording)
         }
         ToolbarItem(placement: .principal) {
@@ -121,16 +121,16 @@ struct ModelBar: View {
     var body: some View {
         @Bindable var model = model
         HStack(spacing: 10) {
-            Picker("言語", selection: $model.languageCode) {
+            Picker(L("Spoken language"), selection: $model.languageCode) {
                 ForEach(Languages.all) { language in
                     Text(language.name).tag(language.code)
                 }
             }
             .labelsHidden()
             .frame(width: 120)
-            .help("話されている言語。分かっているなら指定すると精度が上がります。日本語と英語が入れ替わる録音は「日本語＋英語」")
+            .help(L("The spoken language. Choosing it, if you know it, makes the result more accurate. For recordings that switch between Japanese and English, choose “Japanese + English”."))
 
-            Picker("モデル", selection: modelSelection) {
+            Picker(L("Model"), selection: modelSelection) {
                 ForEach(ModelCatalog.all) { spec in
                     Text(menuLabel(spec)).tag(spec.id)
                 }
@@ -141,10 +141,10 @@ struct ModelBar: View {
 
             switch model.availability(of: model.currentModel) {
             case .installed:
-                Label("準備完了", systemImage: "checkmark.circle.fill")
+                Label(L("Ready"), systemImage: "checkmark.circle.fill")
                     .labelStyle(.iconOnly)
                     .foregroundStyle(.green)
-                    .help("モデルは取得済みです。音声は Mac の外に出ません")
+                    .help(L("The model is downloaded. Audio never leaves your Mac."))
             case .notInstalled:
                 Button {
                     model.download(model.currentModel)
@@ -156,10 +156,10 @@ struct ModelBar: View {
                         .font(.title2)
                         .foregroundStyle(.blue)
                         .contentShape(Circle())
-                        .accessibilityLabel("モデルをダウンロード")
+                        .accessibilityLabel(L("Download model"))
                 }
                 .buttonStyle(.plain)
-                .help("モデルをダウンロードしてください (約 \(currentModelSize)。初回のみ)。Hugging Face から取得します")
+                .help(L("Download the model (about %@, first time only). It is downloaded from Hugging Face.", currentModelSize))
                 .popover(isPresented: $showDownloadHint, arrowEdge: .bottom) {
                     downloadHint
                 }
@@ -181,24 +181,24 @@ struct ModelBar: View {
     /// 入れていないモデルを選んだ時の案内
     private var downloadHint: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("モデルをダウンロードしてください")
+            Text(L("Please download the model"))
                 .font(.headline)
-            Text("「\(model.currentModel.displayName)」は、まだダウンロードしていません (約 \(currentModelSize))。ダウンロードが済むと、文字起こしに使えます。")
+            Text(L("“%1$@” is not downloaded yet (about %2$@). Once it is downloaded, you can use it for transcription.", model.currentModel.displayName, currentModelSize))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("ダウンロードしないままファイルを開いた時は、文字起こしの始めに自動でダウンロードします。")
+            Text(L("If you open a file without downloading it, it is downloaded automatically when transcription starts."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
-                Button("あとで") {
+                Button(L("Later")) {
                     showDownloadHint = false
                 }
                 Button {
                     model.download(model.currentModel)
                     showDownloadHint = false
                 } label: {
-                    Label("ダウンロード", systemImage: "arrow.down.circle.fill")
+                    Label(L("Download"), systemImage: "arrow.down.circle.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.blue)
@@ -211,8 +211,7 @@ struct ModelBar: View {
     private func menuLabel(_ spec: WhisperModelSpec) -> String {
         // チェックの印は、選んでいるモデルにだけ付く (メニューが自分で付ける)。
         // 入れてあるモデルにも「✓」を付けていたが、2 つ選んでいるように見えるので、やめた
-        let rec = spec.recommended ? " (おすすめ)" : ""
-        return "\(spec.displayName)\(rec)"
+        spec.recommended ? L("%@ (recommended)", spec.displayName) : spec.displayName
     }
 }
 
@@ -224,14 +223,14 @@ struct RecordButton: View {
             Task { await model.toggleRecording() }
         } label: {
             if model.isRecording {
-                Label("停止して文字起こし", systemImage: "stop.circle.fill")
+                Label(L("Stop and transcribe"), systemImage: "stop.circle.fill")
                     .foregroundStyle(.red)
                     .symbolEffect(.pulse)
             } else {
-                Label("録音", systemImage: "mic.circle")
+                Label(L("Record"), systemImage: "mic.circle")
             }
         }
-        .help(model.isRecording ? "録音を止めて、全体を文字起こし (⌘R)" : "マイクで録音して文字起こし (⌘R)")
+        .help(model.isRecording ? L("Stop recording and transcribe all of it (⌘R)") : L("Record with the microphone and transcribe (⌘R)"))
     }
 }
 
@@ -246,7 +245,7 @@ struct RecordingView: View {
                 Circle()
                     .fill(Color.red)
                     .frame(width: 12, height: 12)
-                Text("録音中")
+                Text(L("Recording"))
                     .font(.title3.weight(.semibold))
             }
             TimelineView(.periodic(from: .now, by: 0.5)) { context in
@@ -269,7 +268,7 @@ struct RecordingView: View {
                 }
                 .frame(height: 120)
             } label: {
-                Text("直近の内容 (プレビュー)")
+                Text(L("Latest speech (preview)"))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: 640)
@@ -277,14 +276,14 @@ struct RecordingView: View {
             Button {
                 Task { await model.toggleRecording() }
             } label: {
-                Label("停止して文字起こし", systemImage: "stop.circle.fill")
+                Label(L("Stop and transcribe"), systemImage: "stop.circle.fill")
                     .padding(.horizontal, 8)
             }
             .buttonStyle(.borderedProminent)
             .tint(.red)
             .controlSize(.large)
 
-            Text("止めると、録音全体をもう一度ていねいに文字起こしします。録音は自動で保存されます。")
+            Text(L("When you stop, the whole recording is transcribed again carefully. The recording is saved automatically."))
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 20)
@@ -295,11 +294,11 @@ struct RecordingView: View {
 
     private var previewText: String {
         if !model.livePreviewText.isEmpty { return model.livePreviewText }
-        if !model.livePreview { return "プレビューはオフです (設定で切り替えられます)" }
+        if !model.livePreview { return L("Preview is off (you can turn it on in Settings)") }
         if model.availability(of: model.currentModel) != .installed {
-            return "モデルが未取得のため、プレビューは出ません。停止後にモデルを取得してから文字起こしします。"
+            return L("The model is not downloaded, so there is no preview. After you stop, the model is downloaded and then the recording is transcribed.")
         }
-        return "話し始めると、数秒ごとにここへ直近の内容が出ます。"
+        return L("When you start speaking, the latest speech appears here every few seconds.")
     }
 }
 
@@ -330,9 +329,9 @@ struct EmptyStateView: View {
                     Image(systemName: "waveform.and.mic")
                         .font(.system(size: 60, weight: .light))
                         .foregroundStyle(Color.accentColor)
-                    Text("ききみみ")
+                    Text(L("Kikimimi"))
                         .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text("音声や動画をここに落とすと、Mac の中だけで文字に起こします。\nマイクで録音して起こすこともできます。")
+                    Text(L("Drop audio or video here to transcribe it, entirely on your Mac.\nYou can also record with the microphone and transcribe it."))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
 
@@ -340,14 +339,14 @@ struct EmptyStateView: View {
                     // 1 つでも入っていれば、入れていないモデルを選んだ時の案内は、ツールバーの印と、その下の案内に任せる
                     if model.installedModelIDs.isEmpty, model.availability(of: model.currentModel) == .notInstalled {
                         VStack(spacing: 8) {
-                            Text("モデルをダウンロードしてください")
+                            Text(L("Please download the model"))
                                 .font(.headline)
-                            Text("最初に音声認識モデル「\(model.currentModel.displayName)」(約 \(model.currentModel.approxMB) MB) を一度だけダウンロードします。")
+                            Text(L("First, download the speech recognition model “%1$@” (about %2$d MB) once.", model.currentModel.displayName, model.currentModel.approxMB))
                                 .font(.callout)
                             Button {
                                 model.download(model.currentModel)
                             } label: {
-                                Label("モデルをダウンロード", systemImage: "arrow.down.circle")
+                                Label(L("Download model"), systemImage: "arrow.down.circle")
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(.blue)
@@ -358,7 +357,7 @@ struct EmptyStateView: View {
                         VStack(spacing: 6) {
                             ProgressView(value: fraction)
                                 .frame(width: 280)
-                            Text("モデルをダウンロード中 \(Int(fraction * 100))%")
+                            Text(L("Downloading the model %d%%", Int(fraction * 100)))
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
@@ -368,12 +367,12 @@ struct EmptyStateView: View {
                         Button {
                             model.presentOpenPanel()
                         } label: {
-                            Label("ファイルを開く", systemImage: "folder")
+                            Label(L("Open a file…"), systemImage: "folder")
                         }
                         Button {
                             Task { await model.toggleRecording() }
                         } label: {
-                            Label("マイクで録音", systemImage: "mic")
+                            Label(L("Record with microphone"), systemImage: "mic")
                         }
                     }
                     .controlSize(.large)
@@ -385,7 +384,7 @@ struct EmptyStateView: View {
                         && !model.llmSetupCardDismissed && !model.llmBannerDismissed {
                         LLMSetupCard()
                     } else if model.isLLMInstalled {
-                        Label("監査・翻訳: \(model.currentLLM.name)", systemImage: "checkmark.circle")
+                        Label(L("Audit & translation: %@", model.currentLLM.name), systemImage: "checkmark.circle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -404,15 +403,18 @@ struct LLMSetupCard: View {
 
     var body: some View {
         let selection = model.currentLLM
-        let size = selection.spec.map { "(約 \(TimeFormat.bytes(Int64($0.approxMB) * 1_000_000))) " } ?? ""
+        let detail = selection.spec.map {
+            L("Both use the LLM “%1$@” (about %2$@), which runs on your Mac, and the translation is shown side by side with the original. You can transcribe without it, so you can download it later. The transcription never leaves your Mac.",
+              selection.name, TimeFormat.bytes(Int64($0.approxMB) * 1_000_000))
+        } ?? L("Both use the LLM “%@”, which runs on your Mac, and the translation is shown side by side with the original. You can transcribe without it, so you can download it later. The transcription never leaves your Mac.", selection.name)
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "character.bubble")
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 6) {
-                Text("聞き取りミスの監査と、英語から日本語への翻訳もできます")
+                Text(L("You can also audit for mishearings and translate from English to Japanese"))
                     .font(.callout.weight(.semibold))
-                Text("どちらも Mac の中で動く LLM「\(selection.name)」\(size)を使い、訳は原文と左右に並べて表示します。なくても文字起こしはできるので、ダウンロードはあとからでも構いません。文字起こしの内容は Mac の外に出ません。")
+                Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 8) {
@@ -429,7 +431,7 @@ struct LLMSetupCard: View {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.borderless)
-            .help("閉じる (設定の「監査・翻訳」タブから、いつでも取得できます)")
+            .help(L("Close (you can download it any time in the “Audit & translation” tab of Settings)"))
         }
         .padding(12)
         .frame(maxWidth: 560)

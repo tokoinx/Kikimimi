@@ -12,9 +12,9 @@ struct HistoryButton: View {
         Button {
             model.historyJobID = job.id
         } label: {
-            Label("履歴", systemImage: "clock.arrow.circlepath")
+            Label(L("History"), systemImage: "clock.arrow.circlepath")
         }
-        .help(available ? "いまの状態を版として残す・前の版に戻す (⌘S)" : "文字起こしが終わって保存した結果だけ、版を残せます")
+        .help(available ? L("Keep the current state as a version, or go back to an earlier version (⌘S)") : L("Only finished, saved transcription results can have versions"))
         .disabled(!available)
     }
 }
@@ -37,18 +37,18 @@ struct HistorySheet: View {
         // 自分で残した版が無いときは、上書きを選べない (新しい版になる)
         let effective: VersionSaveMode = mode == .overwriteLatest && latest != nil ? .overwriteLatest : .new
         VStack(alignment: .leading, spacing: 14) {
-            Text("履歴: " + job.name)
+            Text(L("History: %@", job.name))
                 .font(.headline)
                 .lineLimit(1)
                 .truncationMode(.middle)
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    TextField("名前 (なくてもよい)", text: $label)
+                    TextField(L("Name (optional)"), text: $label)
                         .textFieldStyle(.roundedBorder)
-                    choice(.new, title: "新しい版として保存", selected: effective == .new, enabled: true)
+                    choice(.new, title: L("Save as a new version"), selected: effective == .new, enabled: true)
                     choice(.overwriteLatest,
-                           title: latest.map { "いちばん新しい版に上書き (「" + HistorySheet.title(of: $0) + "」)" }
-                               ?? "いちばん新しい版に上書き (上書きできる版がありません)",
+                           title: latest.map { L("Overwrite the newest version (“%@”)", HistorySheet.title(of: $0)) }
+                               ?? L("Overwrite the newest version (there is no version to overwrite)"),
                            selected: effective == .overwriteLatest, enabled: latest != nil)
                     HStack {
                         if let blocked {
@@ -57,24 +57,24 @@ struct HistorySheet: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("保存") { save() }
+                        Button(L("Save")) { save() }
                             .keyboardShortcut(.defaultAction)
                             .disabled(blocked != nil)
                     }
                 }
                 .padding(6)
             } label: {
-                Text("いまの状態を版として残す")
+                Text(L("Keep the current state as a version"))
                     .font(.callout.weight(.semibold))
             }
             versionList(blocked: blocked)
-            Text("文字起こし・訳・メモは、変えるたびに自動で保存されます。版は、その時点の写しです。")
+            Text(L("The transcription, translation, and notes are saved automatically every time they change. A version is a copy of one moment."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack {
-                Button("Finder で表示") { model.revealInLibrary(job) }
+                Button(L("Show in Finder")) { model.revealInLibrary(job) }
                 Spacer()
-                Button("閉じる") { model.historyJobID = nil }
+                Button(L("Close")) { model.historyJobID = nil }
                     .keyboardShortcut(.cancelAction)
             }
         }
@@ -84,19 +84,19 @@ struct HistorySheet: View {
             RestoreVersionConfirm(job: job, version: version) { restoreTarget = nil }
                 .environment(model)
         }
-        .alert("この版を消しますか？", isPresented: Binding(
+        .alert(L("Delete this version?"), isPresented: Binding(
             get: { deleteTarget != nil },
             set: { if !$0 { deleteTarget = nil } }
         ), presenting: deleteTarget) { version in
-            Button("消す", role: .destructive) {
+            Button(L("Delete version"), role: .destructive) {
                 deleteTarget = nil
                 Task { await model.deleteVersion(job, versionID: version.id) }
             }
-            Button("キャンセル", role: .cancel) {
+            Button(L("Cancel"), role: .cancel) {
                 deleteTarget = nil
             }
         } message: { version in
-            Text("「" + HistorySheet.title(of: version) + "」を消します。元には戻せません。")
+            Text(L("“%@” will be deleted. This cannot be undone.", HistorySheet.title(of: version)))
         }
     }
 
@@ -123,7 +123,7 @@ struct HistorySheet: View {
         if job.versions.isEmpty {
             VStack {
                 Spacer()
-                Text("まだ版はありません。")
+                Text(L("No versions yet."))
                     .foregroundStyle(.secondary)
                 Spacer()
             }
@@ -133,12 +133,12 @@ struct HistorySheet: View {
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Text(version.label.isEmpty ? "名前なし" : version.label)
+                            Text(version.label.isEmpty ? L("No name") : version.label)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(version.label.isEmpty ? Color.secondary : Color.primary)
                                 .lineLimit(1)
                             if version.origin == .beforeRestore {
-                                Text("自動 (戻す前)")
+                                Text(L("Automatic (before going back)"))
                                     .font(.caption2.weight(.semibold))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 1)
@@ -146,16 +146,17 @@ struct HistorySheet: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        Text(HistorySheet.dateText(version.savedAt)
-                             + "　\(version.segmentCount) 区間・メモ \(version.noteLength) 文字")
+                        Text(L("%1$@  %2$@, notes %3$@", HistorySheet.dateText(version.savedAt),
+                               LPlural(version.segmentCount, one: "%d segment", other: "%d segments"),
+                               LPlural(version.noteLength, one: "%d character", other: "%d characters")))
                             .font(.caption)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("この版に戻す…") { restoreTarget = version }
+                    Button(L("Go back to this version…")) { restoreTarget = version }
                         .disabled(blocked != nil)
-                        .help(blocked ?? "この版の中身に戻す (いまの状態は、版として自動で残す)")
+                        .help(blocked ?? L("Go back to the contents of this version (the current state is kept as a version automatically)"))
                     Button {
                         deleteTarget = version
                     } label: {
@@ -163,7 +164,7 @@ struct HistorySheet: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(blocked != nil)
-                    .help(blocked ?? "この版を消す")
+                    .help(blocked ?? L("Delete this version"))
                 }
                 .padding(.vertical, 3)
             }
@@ -210,26 +211,26 @@ private struct RestoreVersionConfirm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("「" + HistorySheet.title(of: version) + "」に戻しますか？")
+            Text(L("Go back to “%@”?", HistorySheet.title(of: version)))
                 .font(.headline)
                 .lineLimit(2)
             VStack(alignment: .leading, spacing: 6) {
                 // 両方を外すことはできない (最後の 1 つは外せない)
-                Toggle("文字起こしと訳", isOn: $transcript)
+                Toggle(L("Transcription and translation"), isOn: $transcript)
                     .toggleStyle(.checkbox)
                     .disabled(transcript && !notes)
-                Toggle("メモ", isOn: $notes)
+                Toggle(L("Notes"), isOn: $notes)
                     .toggleStyle(.checkbox)
                     .disabled(notes && !transcript)
             }
-            Text("いまの状態は、版として自動で残します。")
+            Text(L("The current state is kept as a version automatically."))
                 .font(.callout)
                 .foregroundStyle(.secondary)
             HStack {
                 Spacer()
-                Button("キャンセル") { close() }
+                Button(L("Cancel")) { close() }
                     .keyboardShortcut(.cancelAction)
-                Button("戻す") {
+                Button(L("Go back")) {
                     let restoreTranscript = transcript
                     let restoreNotes = notes
                     close()

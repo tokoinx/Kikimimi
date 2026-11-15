@@ -12,35 +12,35 @@ struct DeleteConfirmSheet: View {
         let plan = model.deletionPlan(for: job)
         VStack(alignment: .leading, spacing: 14) {
             // 保存していない結果は、ディスクから何も消えないので、「一覧から外す」と言う
-            Text("「" + job.name + "」を" + (plan.isEmpty ? "一覧から外しますか？" : "ゴミ箱に入れますか？"))
+            Text(plan.isEmpty ? L("Remove “%@” from the list?", job.name) : L("Move “%@” to the Trash?", job.name))
                 .font(.headline)
                 .lineLimit(2)
                 .truncationMode(.middle)
             if plan.stopsWork {
-                Text(workText + "の途中です。作業を止めてから、" + (plan.isEmpty ? "一覧から外します。" : "ゴミ箱に入れます。"))
+                Text(workText(removesFromListOnly: plan.isEmpty))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if plan.isEmpty {
-                Text("この結果は、まだ保存されていません。一覧から外すだけで、ファイルは消えません。")
+                Text(L("This result is not saved yet. It is only removed from the list, and no files are deleted."))
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                section("ゴミ箱に入れるもの") {
+                section(L("What goes to the Trash")) {
                     if let folder = plan.libraryFolder {
-                        item("保存した結果 (文字起こし・訳・メモ・履歴)", url: folder) { model.revealInLibrary(job) }
+                        item(L("The saved result (transcription, translation, notes, history)"), url: folder) { model.revealInLibrary(job) }
                     }
                     if let recording = plan.recording {
-                        item("マイクの録音", url: recording) { reveal(recording) }
+                        item(L("The microphone recording"), url: recording) { reveal(recording) }
                     }
                 }
             }
             if let kept = plan.keptAudio {
-                section("残るもの") {
+                section(L("What stays")) {
                     item(keptTitle(plan.keptAudioReason), url: kept, note: keptNote(plan.keptAudioReason)) { reveal(kept) }
                 }
             }
             if !plan.isEmpty {
-                Text("macOS のゴミ箱に入ります。ゴミ箱を空にするまでは、Finder で取り出せます。")
+                Text(L("They go to the macOS Trash. Until you empty the Trash, you can take them back out in Finder."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -48,9 +48,9 @@ struct DeleteConfirmSheet: View {
             HStack {
                 Spacer()
                 // Return で押されるのは「キャンセル」(消すほうは、押した時だけ)
-                Button("キャンセル") { close() }
+                Button(L("Cancel")) { close() }
                     .keyboardShortcut(.defaultAction)
-                Button(plan.isEmpty ? "一覧から外す" : "ゴミ箱に入れる", role: .destructive) {
+                Button(plan.isEmpty ? L("Remove from list") : L("Move to Trash"), role: .destructive) {
                     close()
                     model.delete(job)
                 }
@@ -60,7 +60,7 @@ struct DeleteConfirmSheet: View {
         .padding(20)
         // esc でも閉じる (見えないボタン。「キャンセル」には Return を当てているので、esc はこちらで受ける)
         .background {
-            Button("閉じる") { close() }
+            Button(L("Close")) { close() }
                 .keyboardShortcut(.cancelAction)
                 .opacity(0)
                 .accessibilityHidden(true)
@@ -68,9 +68,13 @@ struct DeleteConfirmSheet: View {
         .frame(width: 500)
     }
 
-    /// 止める作業の名前
-    private var workText: String {
-        if job.isActive { return "文字起こし" }
+    /// 止める作業の知らせ (作業の名前ごと、一覧から外すかゴミ箱に入れるかごとに、文全体を 1 つの鍵にする)
+    private func workText(removesFromListOnly: Bool) -> String {
+        if job.isActive {
+            return removesFromListOnly
+                ? L("Transcription is in progress. It will be stopped, then the result is removed from the list.")
+                : L("Transcription is in progress. It will be stopped, then the result is moved to the Trash.")
+        }
         let task: PostTask?
         if case .running(let running, _, _) = job.postState {
             task = running
@@ -78,25 +82,34 @@ struct DeleteConfirmSheet: View {
             task = job.postQueue.first
         }
         switch task {
-        case .audit: return "監査"
-        case .translate, .translateLines: return "翻訳"
-        case nil: return "監査・翻訳"
+        case .audit:
+            return removesFromListOnly
+                ? L("An audit is in progress. It will be stopped, then the result is removed from the list.")
+                : L("An audit is in progress. It will be stopped, then the result is moved to the Trash.")
+        case .translate, .translateLines:
+            return removesFromListOnly
+                ? L("A translation is in progress. It will be stopped, then the result is removed from the list.")
+                : L("A translation is in progress. It will be stopped, then the result is moved to the Trash.")
+        case nil:
+            return removesFromListOnly
+                ? L("An audit or translation is in progress. It will be stopped, then the result is removed from the list.")
+                : L("An audit or translation is in progress. It will be stopped, then the result is moved to the Trash.")
         }
     }
 
     private func keptTitle(_ reason: DeletionPlan.KeptAudioReason?) -> String {
         switch reason {
-        case .original, nil: return "元の音声ファイル (消しません)"
-        case .sharedRecording, .recordingOutsideAppFolder, .notSaved: return "マイクの録音 (消しません)"
+        case .original, nil: return L("The original audio file (not deleted)")
+        case .sharedRecording, .recordingOutsideAppFolder, .notSaved: return L("The microphone recording (not deleted)")
         }
     }
 
     private func keptNote(_ reason: DeletionPlan.KeptAudioReason?) -> String? {
         switch reason {
         case .original, nil: return nil
-        case .sharedRecording: return "ほかの結果も、この録音を使っています。"
-        case .recordingOutsideAppFolder: return "この録音は、アプリの録音フォルダの外に在ります。"
-        case .notSaved: return "この結果は、まだ保存されていないので、録音も残します。"
+        case .sharedRecording: return L("Other results also use this recording.")
+        case .recordingOutsideAppFolder: return L("This recording is outside the app’s recordings folder.")
+        case .notSaved: return L("This result is not saved yet, so the recording is kept too.")
         }
     }
 
@@ -119,7 +132,7 @@ struct DeleteConfirmSheet: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Button("Finder で表示", action: reveal)
+                Button(L("Show in Finder"), action: reveal)
                     .controlSize(.small)
             }
             if let note {

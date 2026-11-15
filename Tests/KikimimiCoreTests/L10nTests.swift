@@ -221,8 +221,6 @@ struct SourceScan {
 
     /// 日本語のリテラルを見ない物 (理由つき)。パスは Sources からの相対
     static let keepFiles: [(path: String, reason: String)] = [
-        // 第 2 段 (Views の文を L にする) が終わるまで。第 2 段の担当が、この行を消す
-        ("Kikimimi/Views/", "the Views are translated in stage 2"),
         // 漢字の表・誤認識の語の一覧・数の語の一覧 (判定に使う語なので訳さない)
         ("KikimimiCore/LLM/JapaneseKanji.swift", "kanji table"),
         ("KikimimiCore/HallucinationFilter.swift", "list of common misrecognitions"),

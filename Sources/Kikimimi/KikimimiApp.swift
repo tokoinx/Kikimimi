@@ -111,7 +111,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 終了の前に: 待っている保存を書き終え、途中の作業があれば確かめる
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         flushLibrary()
-        guard !keepRunningWithoutWindows, isBusy() else { return .terminateNow }
+        // 開き直す時は、作業の途中でない事を確かめてあるので、確認を出さずに終える
+        guard !reopening, !keepRunningWithoutWindows, isBusy() else { return .terminateNow }
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = L("Work is in progress")
@@ -123,6 +124,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 確かめているあいだに監査・翻訳が進んで変わった分も、書き終えてから終わる
         flushLibrary()
         return .terminateNow
+    }
+
+    /// 開き直している (終了の前の確認を出さない)
+    private var reopening = false
+
+    /// アプリを開き直す (画面の言語を変えた後、macOS が出す決まりのメニューも今の言語にするため)。
+    /// 順: 作業の途中でない事を確かめる → 待っている保存を書き終える → 「このアプリが終わってから開く」小さな命令を外に出す → 終える。
+    /// 新しいアプリは、今のアプリが終わってから開くので、ライブラリを読むのは、保存を全部書き終えた後になる
+    func reopenApp() {
+        guard !reopening, !isBusy() else { return }
+        flushLibrary()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        // 今のアプリが終わるまで待ち (長くて 10 秒)、少し置いてから開く
+        process.arguments = [
+            "-c",
+            "i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done; sleep 0.3; /usr/bin/open \"$2\"",
+            "sh",
+            String(ProcessInfo.processInfo.processIdentifier),
+            Bundle.main.bundleURL.path
+        ]
+        do {
+            try process.run()
+        } catch {
+            LaunchLog.note("reopen: could not start /bin/sh: \(error.localizedDescription)")
+            return
+        }
+        LaunchLog.note("reopen: quitting to reopen")
+        reopening = true
+        NSApplication.shared.terminate(nil)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

@@ -11,7 +11,7 @@ struct JobListView: View {
             set: { id in model.select(model.jobs.first { $0.id == id }) }
         )) {
             if model.jobs.isEmpty {
-                Text("まだ何もありません")
+                Text(L("Nothing here yet"))
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
             }
@@ -20,13 +20,13 @@ struct JobListView: View {
                     .tag(job.id)
                     .contextMenu {
                         if job.isActive || job.isPostActive {
-                            Button("中止") { model.cancel(job) }
+                            Button(L("Cancel task")) { model.cancel(job) }
                         }
                         if let url = job.url {
-                            Button("Finder で表示") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                            Button(L("Show in Finder")) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                         }
                         // どの結果も (保存していない・作業中の結果も)、確かめの画面を通す
-                        Button("ゴミ箱に入れる…", role: .destructive) {
+                        Button(L("Move to Trash…"), role: .destructive) {
                             model.requestDelete(job)
                         }
                         .disabled(model.isRecording)
@@ -37,7 +37,7 @@ struct JobListView: View {
         .listStyle(.sidebar)
         // 結果が在る時も、落として読み込める事が分かるように、一覧の下に案内を出す
         .safeAreaInset(edge: .bottom) {
-            Label("音声・動画のファイルを、ここに落としても読み込めます", systemImage: "arrow.down.doc")
+            Label(L("You can also drop audio or video files here"), systemImage: "arrow.down.doc")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -45,7 +45,7 @@ struct JobListView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
         }
-        .navigationTitle("ききみみ")
+        .navigationTitle(L("Kikimimi"))
         // ゴミ箱に入れるかを確かめる画面 (右クリック・ツールバー・メニュー・Delete キー)
         .sheet(isPresented: Binding(
             get: { model.pendingDeleteJobID != nil },
@@ -114,20 +114,20 @@ struct JobRow: View {
 
     private var statusText: String {
         switch job.status {
-        case .queued: return "順番待ち"
+        case .queued: return L("Waiting")
         case .running: return job.message
         case .done:
             if case .running(_, let message, _) = job.postState { return message }
             if let t = job.transcript {
-                var parts = ["\(TimeFormat.short(t.duration))", "\(t.segments.count) 区間"]
-                if t.hasTranslation { parts.append("対訳") }
-                if t.audit != nil { parts.append("監査済み") }
-                if job.hasNotes { parts.append("メモ") }
+                var parts = ["\(TimeFormat.short(t.duration))", LPlural(t.segments.count, one: "%d segment", other: "%d segments")]
+                if t.hasTranslation { parts.append(L("Bilingual")) }
+                if t.audit != nil { parts.append(L("Audited")) }
+                if job.hasNotes { parts.append(L("Notes")) }
                 return parts.joined(separator: " · ")
             }
-            return "完了"
-        case .failed: return "エラー"
-        case .cancelled: return "中止"
+            return L("Done")
+        case .failed: return L("Error")
+        case .cancelled: return L("Stopped")
         }
     }
 }

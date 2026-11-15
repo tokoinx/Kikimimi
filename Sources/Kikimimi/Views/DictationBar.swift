@@ -28,7 +28,7 @@ struct DictationBar: View {
         let canPlay = model.canPlayLines(of: job)
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("書き取り")
+                Text(L("Dictation"))
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(.secondary)
                 if let start = practice.currentLineStart {
@@ -37,35 +37,35 @@ struct DictationBar: View {
                         .font(.callout)
                         .foregroundStyle(Color.accentColor)
                 } else {
-                    Text("行を再生すると、その行をここで書き取れます。")
+                    Text(L("When you play a line, you can write it down here."))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
                 if practice.hideMode == .nothing {
-                    Button("原文を隠す") {
+                    Button(L("Hide the original")) {
                         practice.settings.hide = .source
                     }
                     .controlSize(.small)
-                    .help("日本語でない行の原文を隠す (行の目のボタンで、1 行ずつ見られます)")
+                    .help(L("Hide the original text of lines that are not Japanese (the eye button on a line shows it one line at a time)"))
                 }
-                Button("もう一度聞く") {
+                Button(L("Listen again")) {
                     practice.replay()
                 }
                 .keyboardShortcut("l")
-                .help("いまの行をもう一度流す (⌘L)")
+                .help(L("Play the current line again (⌘L)"))
                 .disabled(!canPlay)
-                Button("前の行") {
+                Button(L("Previous line")) {
                     practice.previous()
                 }
                 .disabled(!canPlay)
-                Button("次の行") {
+                Button(L("Next line")) {
                     practice.next()
                 }
                 .disabled(!canPlay)
             }
-            TextField("聞こえたとおりに打つ", text: $dictation.typed)
+            TextField(L("Type what you hear"), text: $dictation.typed)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit {
                     practice.submitDictation()

@@ -233,7 +233,24 @@ final class AppModel {
             guard UILanguageSetting.startup.persists else { return }
             save(uiLanguage.rawValue, UILanguageSetting.defaultsKey)
             save([uiLanguage.localeIdentifier], "AppleLanguages")
+            // 開き直しの案内を、作り直した設定の画面に出す (作り直しの後に出すので、少し後にする)。
+            // 起動した時の言語に戻した時は出さない
+            showsLanguageChangedAlert = false
+            guard needsReopenForLanguage else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.showsLanguageChangedAlert = self.needsReopenForLanguage
+            }
         }
+    }
+    /// 起動した時の画面の言語 (macOS が出す決まりのメニューは、この言語のまま。開き直すと今の言語になる)
+    let launchUILanguage = UILanguageSetting.startup.language
+    /// 画面の言語を変えた時の、開き直しの案内 (設定の画面のアラート) を出している
+    var showsLanguageChangedAlert = false
+    /// 画面の言語を変えてから、まだ開き直していない (設定の「一般」に、開き直しの案内を出す)。
+    /// 設定を保存しない起動 (確認用の起動・--ui-language) では、出さない
+    var needsReopenForLanguage: Bool {
+        UILanguageSetting.startup.persists && uiLanguage != launchUILanguage
     }
     var languageCode: String { didSet { save(languageCode, "languageCode") } }
     var modelID: String { didSet { save(modelID, "modelID") } }
@@ -1452,7 +1469,7 @@ final class AppModel {
                 }
                 apply(all)
                 if failed > 0 {
-                    job.postNote = LPlural(failed, one: "%d segment of the selected sentences could not be translated. Click the line’s “Translate” again to retry.", other: "%d segments of the selected sentences could not be translated. Click the line’s “Translate” again to retry.")
+                    job.postNote = LPlural(failed, one: "%d segment of the selected sentences could not be translated. Click “Translate line” on that line to retry.", other: "%d segments of the selected sentences could not be translated. Click “Translate line” on that line to retry.")
                 }
                 job.postNote = adapterNote(job.postNote)
             }
