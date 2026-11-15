@@ -78,6 +78,12 @@ jobs:
           otool -L "$APP/Contents/MacOS/Kikimimi" | grep llama.framework
           codesign --verify --strict --verbose=2 "$APP"
 
+      # whisper.cpp / llama.cpp は、初めて使う時に Metal のシェーダーを作る (新しい実行環境では 40 秒ほど)。
+      # 先に 1 度済ませて、macOS のキャッシュに残しておく。済ませておかないと、下の起動の確認 (5 秒で終わる) の結果に、
+      # 2 つの情報が「(not ready after N s)」と出る
+      - name: Prepare the Metal shaders (first use of whisper.cpp / llama.cpp)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --version
+
       # 起動そのものの確認: ふつうに起動して、数秒後にウインドウができているかを確かめる
       # (--selftest-llm / --selftest-whisper は画面を出さないので、起動時に落ちる不具合を見つけられない)
       - name: Launch self-test (started from the shell)
@@ -271,8 +277,10 @@ jobs:
           sleep 3
           pgrep -fl Kikimimi || true
           lsappinfo list | grep -i -A6 kikimimi || echo "(the self-test is not registered as an application)"
-          # 参考: Metal のキャッシュの置き場。同じアプリが同時に 2 つ動くと、2 つ目は別のファイル (libraries1.data) を使い、
-          # そこが空だとシェーダーの作り直しになる (手元で確かめた)。open の前と、待った後の中身を出す
+          # Metal のキャッシュは、同じアプリが同時に 2 つ動くと、2 つ目が別のファイル (libraries1.data) を使う。
+          # そこが空だとシェーダーの作り直しになり、起動の確認の結果に 2 つの情報が「(not ready after N s)」と出る。
+          # open の前に、2 つ目として 1 度済ませておく。置き場の中身は、open の前と、待った後に出す (参考)
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --version
           metal_cache="$(getconf DARWIN_USER_CACHE_DIR)local.kikimimi.app/com.apple.metal"
           echo "-- Metal cache before open --"
           ls -lT "$metal_cache"/*/ || true
