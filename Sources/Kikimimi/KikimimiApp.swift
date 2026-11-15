@@ -1,13 +1,335 @@
+import AppKit
+import Foundation
 import KikimimiCore
 import SwiftUI
 
+/// 起動の入り口。`--selftest-llm <GGUF>` / `--selftest-whisper <音声>` のときは画面を出さずに、
+/// LLM / 文字起こしの動作確認だけをして終わる (診断・CI 用)。
+/// `--selftest-launch` は、ふつうに起動して、数秒後にウインドウができたかを確かめて終わる (起動しないときの診断用)。
+/// `--selftest-ui-load` は、ふつうに起動して、数千行の結果を出したまま再生や文字起こしと同じ変化を起こし、画面が固まらないかを測る。
+/// `--eval-llm` は、決まった場面で監査役・翻訳役を動かして成績を数える (評価ハーネス)
 @main
+enum KikimimiMain {
+    static func main() {
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--selftest-llm") {
+            let path = i + 1 < args.count ? args[i + 1] : ""
+            exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu"), strict: args.contains("--strict")))
+        }
+        if args.contains("--selftest-whisper") {
+            exit(WhisperSelfTest.run(arguments: args))
+        }
+        if args.contains("--eval-llm") {
+            exit(LLMEvalRunner.run(arguments: args))
+        }
+        if args.contains("--export-training") {
+            exit(TrainingExport.run(arguments: args))
+        }
+        // 版と、同梱した whisper.cpp / llama.cpp を読み込めるかだけを表示して終わる (組み立ての最後に、この Mac で動くかを確かめる)
+        if args.contains("--version") {
+            print(LaunchLog.versionLine)
+            print("whisper.cpp: " + LaunchLog.whisperInfo)
+            print("llama.cpp:   " + LaunchLog.llamaInfo)
+            exit(0)
+        }
+        if args.contains("--selftest-launch") {
+            LaunchSelfTest.arm(arguments: args)
+        }
+        if args.contains("--selftest-ui-load") {
+            UILoadSelfTest.arm(arguments: args)
+        }
+        LaunchLog.note("launch: \(LaunchLog.versionLine); \(LaunchLog.environmentLine); other instances: \(LaunchLog.otherInstances())")
+        // 前回のウインドウの状態を復元しない。強制終了の後 (make run は前のアプリを終了させてから起動する) の起動では、
+        // macOS が復元しようとして、ウインドウが 1 つも無いまま動いていることがあった (CI で、3 回目の起動で再現)。
+        // ウインドウの状態は復元しなくてよい (文字起こしの結果・メモ・履歴はライブラリに保存してあり、
+        // 次の起動で一覧に戻る) ので、いつも新しいウインドウで始める
+        if !args.contains("--restore-windows") {
+            UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
+            UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+            // 前の版が残した状態も消す (残っていると、無視する設定にしても、最初の起動でウインドウが出ないことがあった)
+            if let id = Bundle.main.bundleIdentifier,
+               let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
+                try? FileManager.default.removeItem(
+                    at: library.appendingPathComponent("Saved Application State/\(id).savedState"))
+            }
+        } else {
+            // 確認用: これまでの動き (復元する) に戻す
+            UserDefaults.standard.removeObject(forKey: "ApplePersistenceIgnoreState")
+            UserDefaults.standard.removeObject(forKey: "NSQuitAlwaysKeepsWindows")
+        }
+        KikimimiApp.main()
+    }
+}
+
+/// アプリ全体の出来事: ウインドウを全部閉じたとき、Dock や `open` から呼ばれたとき。
+/// ウインドウの無いまま動き続けると、`open` しても何も起きないように見える (メニューから開き直す手段も要る)。
+/// そこで、作業中でなければ最後のウインドウを閉じたときに終了し、呼ばれたときは必ずウインドウを出す
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private(set) static weak var shared: AppDelegate?
+    /// 作業中か (文字起こし・録音・監査・翻訳・モデルの取得)。作業中は、ウインドウを閉じても終了しない
+    var isBusy: @MainActor () -> Bool = { false }
+    /// 待っている保存を書き終える (終了の前に)
+    var flushLibrary: @MainActor () -> Void = {}
+    /// メインのウインドウを新しく開く (SwiftUI の openWindow)
+    var openMainWindow: (@MainActor () -> Void)?
+    /// 起動の確認 (`--selftest-launch --reopen`) のあいだは、ウインドウを閉じても終了しない
+    var keepRunningWithoutWindows = false
+    /// ウインドウの中のモデル (画面の重さの確認 `--selftest-ui-load` が、結果を入れるのに使う)
+    weak var model: AppModel?
+    /// 呼ばれたときに、こちらでウインドウを開き直した回数 (確認用)
+    private(set) var windowsReopened = 0
+
+    /// メニューの「メインウインドウを表示」の名前 (ウインドウが 1 つも無いときは、このメニューの動作で開く)
+    static let showMainWindowTitle = "メインウインドウを表示"
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared = self
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // 起動したのにウインドウが出ていなければ、開く (復元の失敗など、理由を問わない)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard let self, !self.keepRunningWithoutWindows else { return }
+            if MainWindow.all().isEmpty {
+                LaunchLog.note("no main window 1.5 s after launch")
+                self.showMainWindow(openIfMissing: true)
+            }
+        }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        !keepRunningWithoutWindows && !isBusy()
+    }
+
+    /// 終了の前に: 待っている保存を書き終え、途中の作業があれば確かめる
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        flushLibrary()
+        guard !keepRunningWithoutWindows, isBusy() else { return .terminateNow }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "作業の途中です"
+        alert.informativeText = "終わった文字起こし・訳・メモは保存してあり、次に開いたときも一覧に出ます。"
+            + "途中の作業 (文字起こし・監査・翻訳・ダウンロード) は止まり、文字起こしの途中の結果は残りません。"
+        alert.addButton(withTitle: "終了する")
+        alert.addButton(withTitle: "キャンセル")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+        // 確かめているあいだに監査・翻訳が進んで変わった分も、書き終えてから終わる
+        flushLibrary()
+        return .terminateNow
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            // SwiftUI が自分で開き直すのを少し待ち、それでも無ければこちらで開く
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                self?.showMainWindow(openIfMissing: true)
+            }
+        }
+        return true
+    }
+
+    /// メインのウインドウを前に出す。しまってあれば戻し、無ければ開く
+    func showMainWindow(openIfMissing: Bool) {
+        let windows = MainWindow.all()
+        if let window = windows.first(where: { $0.isVisible }) ?? windows.first(where: { $0.isMiniaturized }) {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+        } else if openIfMissing {
+            windowsReopened += 1
+            if let openMainWindow {
+                LaunchLog.note("no main window: opening one")
+                openMainWindow()
+            } else if performShowMainWindowMenuItem() {
+                // まだ 1 度もウインドウが出ていない (開き方を受け取っていない) ときは、メニューの動作を使う
+                LaunchLog.note("no main window: opened one through the menu command")
+            } else {
+                LaunchLog.note("no main window, and no way to open one was found")
+            }
+        }
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    /// メニューの「メインウインドウを表示」を実行する (SwiftUI の openWindow は画面の部品の中でしか使えないため)
+    private func performShowMainWindowMenuItem() -> Bool {
+        guard let main = NSApplication.shared.mainMenu else { return false }
+        for top in main.items {
+            guard let menu = top.submenu else { continue }
+            menu.update()
+            let index = menu.indexOfItem(withTitle: Self.showMainWindowTitle)
+            if index >= 0 {
+                menuOpening = true
+                defer { menuOpening = false }
+                menu.performActionForItem(at: index)
+                return true
+            }
+        }
+        return false
+    }
+
+    /// メニューの動作をこちらから実行しているあいだ (メニューの側で、もう一度ここへ戻ってこないように)
+    private(set) var menuOpening = false
+}
+
+/// メインのウインドウ (設定のウインドウなどを除く)
+enum MainWindow {
+    static let id = "main"
+
+    /// SwiftUI は、WindowGroup(id:) のウインドウに「<id>-AppWindow-<番号>」という名前を付ける
+    @MainActor
+    static func all() -> [NSWindow] {
+        NSApplication.shared.windows.filter { $0.identifier?.rawValue.hasPrefix(id + "-") == true }
+    }
+}
+
+/// ウインドウの中から、アプリ全体の出来事の受け口 (AppDelegate) に、作業中かどうかとウインドウの開き方を教える
+private struct AppLifecycleHook: View {
+    let delegate: AppDelegate
+    @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onAppear {
+                let model = model
+                let openWindow = openWindow
+                delegate.isBusy = { model.isBusy }
+                delegate.flushLibrary = { model.flushLibrary() }
+                delegate.openMainWindow = { openWindow(id: MainWindow.id) }
+                delegate.model = model
+                PlaybackKeys.install(model: model)
+                LaunchLog.note("window appeared")
+            }
+    }
+}
+
+/// PlaybackKeys が見るキー
+enum PlaybackKey {
+    case space
+    case down
+    case up
+    case left
+}
+
+/// スペースキーで再生 / 一時停止 (1 行だけの再生と、練習で続けて流しているのも止まる)。
+/// 下の矢印で次の行、上の矢印で前の行、左の矢印でいまの行をもう一度 (練習: 繰り返し・間・自動で次へ が効く)。
+/// メニューの key equivalent にすると、検索欄で空白や矢印を使えなくなるので、メインのウインドウに届くキーを見て決める。
+/// 文字を入力している欄や、フォーカスのあるボタンでは、ふつうにキーを渡す。使ったキーだけを止める
+@MainActor
+enum PlaybackKeys {
+    private static var monitor: Any?
+
+    static func install(model: AppModel) {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: handler(model: model))
+    }
+
+    nonisolated private static func handler(model: AppModel) -> (NSEvent) -> NSEvent? {
+        return { event in
+            guard !event.isARepeat, let window = event.window else { return event }
+            if isDeleteKey(event) {
+                let used = MainActor.assumeIsolated { handleDelete(in: window, model: model) }
+                return used ? nil : event
+            }
+            guard let key = playbackKey(of: event) else { return event }
+            let used = MainActor.assumeIsolated { handle(key, in: window, model: model) }
+            return used ? nil : event
+        }
+    }
+
+    /// 修飾キーなしで押した、delete (⌫ 51)・前へ消す delete (⌦ 117)。
+    /// ⌦ には、押しただけで function の印が付くので、それは除いて見る
+    nonisolated private static func isDeleteKey(_ event: NSEvent) -> Bool {
+        guard event.keyCode == 51 || event.keyCode == 117 else { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
+        return flags.subtracting([.numericPad, .function]).isEmpty
+    }
+
+    /// 左の結果の一覧を触っているあいだの delete キー: 選んでいる結果を、ゴミ箱に入れるかの確かめの画面に出す。
+    /// (一覧に付けた onDeleteCommand・onKeyPress は、実機で効かなかったので、ここで受ける。)
+    /// 文字を入力している欄では、ふつうにキーを渡す
+    private static func handleDelete(in window: NSWindow, model: AppModel) -> Bool {
+        guard window.attachedSheet == nil,
+              MainWindow.all().contains(where: { $0 === window }),
+              window.firstResponder is NSTableView,
+              let job = model.selectedJob, !model.isRecording else { return false }
+        model.requestDelete(job)
+        return true
+    }
+
+    /// 修飾キーなしで押した、スペース (49)・下 (125)・上 (126)・左 (123) の矢印。
+    /// 矢印のキーには、押しただけで numericPad と function の印が付くので、それは除いて見る
+    nonisolated private static func playbackKey(of event: NSEvent) -> PlaybackKey? {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
+        switch event.keyCode {
+        case 49:
+            return flags.isEmpty ? .space : nil
+        case 123, 125, 126:
+            guard flags.subtracting([.numericPad, .function]).isEmpty else { return nil }
+            return event.keyCode == 125 ? .down : (event.keyCode == 126 ? .up : .left)
+        default:
+            return nil
+        }
+    }
+
+    private static func handle(_ key: PlaybackKey, in window: NSWindow, model: AppModel) -> Bool {
+        guard window.attachedSheet == nil,
+              MainWindow.all().contains(where: { $0 === window }),
+              model.player.url != nil else { return false }
+        if let responder = window.firstResponder {
+            if responder is NSText { return false }
+            if responder is NSControl, !(responder is NSTableView) { return false }
+        }
+        if key == .space {
+            model.practice.togglePlay()
+            return true
+        }
+        // 矢印は、選んでいる結果の音声を開いているときだけ。左の結果の一覧を触っているあいだは、一覧の上下に使う
+        // (行を押すと、一覧から手が離れる: PlayableRow)
+        if window.firstResponder is NSTableView { return false }
+        guard let job = model.selectedJob, model.canPlayLines(of: job) else { return false }
+        switch key {
+        case .down: model.practice.next()
+        case .up: model.practice.previous()
+        case .left: model.practice.replay()
+        case .space: break
+        }
+        return true
+    }
+}
+
+/// メニューの「メインウインドウを表示」(ウインドウを閉じたまま作業が続いているときに、開き直す)
+private struct ShowMainWindowButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button(AppDelegate.showMainWindowTitle) {
+            guard let delegate = AppDelegate.shared, !delegate.menuOpening else {
+                openWindow(id: MainWindow.id)
+                return
+            }
+            if delegate.openMainWindow == nil {
+                let openWindow = openWindow
+                delegate.openMainWindow = { openWindow(id: MainWindow.id) }
+            }
+            delegate.showMainWindow(openIfMissing: true)
+        }
+        .keyboardShortcut("0")
+    }
+}
+
 struct KikimimiApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup("ききみみ") {
+        WindowGroup("ききみみ", id: MainWindow.id) {
             ContentView()
+                .background(AppLifecycleHook(delegate: appDelegate))
                 .environment(model)
                 .frame(minWidth: 880, minHeight: 560)
                 // Finder の「このアプリケーションで開く」/ Dock アイコンへのドロップ
@@ -17,6 +339,11 @@ struct KikimimiApp: App {
                 }
                 // 開くたびに新しいウインドウを作らず、今のウインドウで受け取る
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
+                // アプリに戻ったら LLM のフォルダを見直す (Finder で GGUF を置いた・消したときに、
+                // 置いた LLM に「ダウンロード」を出して数 GB を取り直させたり、消えた LLM を取得済みと出したりしない)
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    model.refreshLLMInstalled()
+                }
         }
         .defaultSize(width: 1120, height: 740)
         .commands {
@@ -31,23 +358,73 @@ struct KikimimiApp: App {
                     if let job = model.selectedJob { model.cancel(job) }
                 }
                 .keyboardShortcut(".")
-                .disabled(model.selectedJob?.isActive != true)
+                .disabled(!(model.selectedJob.map { $0.isActive || $0.isPostActive } ?? false))
+                // ⌘⌫ は付けない (メニューのショートカットは、文字の欄より先に受けるので、メモの欄などで
+                // 「行の初めまで消す」が使えなくなる)。一覧では delete キーで同じ画面が出る
+                Button("ゴミ箱に入れる…") { model.requestDelete(model.selectedJob) }
+                    .disabled(model.selectedJob == nil || model.isRecording)
+                Divider()
+                ShowMainWindowButton()
             }
             CommandGroup(after: .saveItem) {
                 Menu("書き出す") {
-                    ForEach(ExportFormat.allCases) { format in
-                        Button(format.displayName) { model.export(as: format) }
-                    }
+                    // 文字起こしの最中は数えない (区間が増えるたびにメニューを作り直すので、区間を全部見ることになる)
+                    ExportMenuItems(hasTranslation: model.selectedJob.map {
+                        $0.status == .done && ($0.transcript?.hasTranslation ?? false)
+                    } ?? false, hasNotes: model.selectedJob?.hasNotes ?? false)
+                        .environment(model)
                 }
                 .disabled(model.selectedJob?.status != .done)
                 Button("本文をコピー") { model.copySelectedText() }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                     .disabled(model.selectedJob?.transcript == nil)
+                Divider()
+                // どちらも、選んでいる結果の履歴の画面を開く (保存した、終わった結果のときだけ)
+                Button("版として保存…") {
+                    if let job = model.selectedJob { model.historyJobID = job.id }
+                }
+                .keyboardShortcut("s")
+                .disabled(!(model.selectedJob.map { $0.inLibrary && $0.status == .done } ?? false))
+                Button("履歴…") {
+                    if let job = model.selectedJob { model.historyJobID = job.id }
+                }
+                .disabled(!(model.selectedJob.map { $0.inLibrary && $0.status == .done } ?? false))
+                Divider()
+                Button("監査する (繰り返し・聞き取りミス)") {
+                    if let job = model.selectedJob { model.audit(job) }
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+                .disabled(model.selectedJob?.status != .done || model.selectedJob?.isPostActive == true)
+                Button("日本語に翻訳") {
+                    if let job = model.selectedJob { model.translate(job) }
+                }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+                .disabled(model.selectedJob?.status != .done || model.selectedJob?.isPostActive == true
+                          || (model.selectedJob?.transcript?.untranslatedCount ?? 0) == 0)
+            }
+            CommandMenu("再生") {
+                // ショートカットはスペースキーと矢印 (PlaybackKeys。メニューに付けると、検索欄で空白や矢印を使えなくなる)
+                Button(model.player.isPlaying || model.practice.isWaiting ? "一時停止 (スペースキー)" : "再生 (スペースキー)") {
+                    model.practice.togglePlay()
+                }
+                .disabled(model.player.url == nil)
+                Divider()
+                let canPlayLines = model.selectedJob.map { model.canPlayLines(of: $0) } ?? false
+                Button("次の行を再生 (↓)") { model.practice.next() }
+                    .disabled(!canPlayLines)
+                Button("前の行を再生 (↑)") { model.practice.previous() }
+                    .disabled(!canPlayLines)
+                Button("この行をもう一度 (←)") { model.practice.replay() }
+                    .disabled(!canPlayLines)
             }
         }
         Settings {
             SettingsView()
                 .environment(model)
+                // メインのウインドウを閉じて設定だけを開いているときも、アプリに戻ったら見直す
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    model.refreshLLMInstalled()
+                }
         }
     }
 }

@@ -4,9 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIG="${CONFIG:-release}"
-APP="build/Kikimimi.app"
+FINAL="build/Kikimimi.app"
+# 途中で失敗しても前のアプリを壊さないよう、別の名前で組み立てて、最後に入れ替える
+APP="build/Kikimimi.app.new"
 
-echo "▸ swift build -c $CONFIG (初回は whisper.cpp の取得と依存のビルドで数分かかります)"
+echo "▸ swift build -c $CONFIG (初回は whisper.cpp / llama.cpp の取得と依存のビルドで数分かかります)"
 swift build -c "$CONFIG" --product Kikimimi
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
 
@@ -15,17 +17,26 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 cp "$BIN_DIR/Kikimimi" "$APP/Contents/MacOS/Kikimimi"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
+# どのコミットから組み立てたかを残す (古いアプリを開いていないかを確かめられるように)
+COMMIT="$(git rev-parse --short HEAD 2>/dev/null || true)"
+if [ -n "$COMMIT" ]; then
+  [ -z "$(git status --porcelain --untracked-files=no 2>/dev/null)" ] || COMMIT="$COMMIT+"
+  /usr/libexec/PlistBuddy -c "Add :KikimimiCommit string $COMMIT" "$APP/Contents/Info.plist" >/dev/null 2>&1 || true
+fi
 
-# whisper.framework を同梱する (ビルド先にコピーされていればそれを、無ければ展開済みの XCFramework から)
-FW="$BIN_DIR/whisper.framework"
-if [ ! -d "$FW" ]; then
-  FW="$(find .build/artifacts -type d -path '*whisper.xcframework/macos-*/whisper.framework' -print -quit 2>/dev/null || true)"
-fi
-if [ -z "$FW" ] || [ ! -d "$FW" ]; then
-  echo "✗ whisper.framework が見つかりません。'swift package reset' のあと、もう一度 make run を試してください。" >&2
-  exit 1
-fi
-ditto "$FW" "$APP/Contents/Frameworks/whisper.framework"
+# whisper.framework (音声認識) と llama.framework (監査・翻訳の LLM) を同梱する
+# (ビルド先にコピーされていればそれを、無ければ展開済みの XCFramework から)
+for NAME in whisper llama; do
+  FW="$BIN_DIR/$NAME.framework"
+  if [ ! -d "$FW" ]; then
+    FW="$(find .build/artifacts -type d -path "*$NAME.xcframework/macos-*/$NAME.framework" -print -quit 2>/dev/null || true)"
+  fi
+  if [ -z "$FW" ] || [ ! -d "$FW" ]; then
+    echo "✗ $NAME.framework が見つかりません。'swift package reset' のあと、もう一度 make run を試してください。" >&2
+    exit 1
+  fi
+  ditto "$FW" "$APP/Contents/Frameworks/$NAME.framework"
+done
 
 # 実行ファイルが Contents/Frameworks を探せるようにする (通常は Package.swift の設定で入っている)
 LOAD_COMMANDS="$(otool -l "$APP/Contents/MacOS/Kikimimi")"
@@ -43,5 +54,28 @@ fi
 
 # ad-hoc 署名 (中のフレームワーク → アプリ本体の順)。マイク許可を macOS に覚えてもらうために必要。
 codesign --force --sign - "$APP/Contents/Frameworks/whisper.framework"
-codesign --force --sign - "$APP"
-echo "✓ $APP"
+codesign --force --sign - "$APP/Contents/Frameworks/llama.framework"
+codesign --force --sign - "$APP" \
+  || { echo "✗ 署名できませんでした。iCloud や Dropbox で同期しているフォルダの中では失敗することがあります (xattr -cr build を試すか、フォルダを移してください)。" >&2; exit 1; }
+codesign --verify --deep --strict "$APP"
+
+# この Mac で読み込めるかを確かめる (同梱したフレームワークを読み込めないと、ここで止まる)。
+# 確かめは、入れ替えた後の名前で走らせる。whisper.cpp / llama.cpp は、初めて使う時に Metal のシェーダーを作り
+# (30〜40 秒)、macOS はその結果を、アプリのフォルダの名前ごとに覚える。別の名前 (.new) のまま走らせると、その準備は
+# 入れ替えた後のアプリには効かず、最初の起動でもう一度かかる (2026-11-15 に、フォルダの名前を変えて確かめた)。
+# 前のアプリは別の名前によけておき、読み込めなかった時は元の場所へ戻す
+PREVIOUS="build/Kikimimi.app.previous"
+rm -rf "$PREVIOUS"
+if [ -d "$FINAL" ]; then mv "$FINAL" "$PREVIOUS"; fi
+mv "$APP" "$FINAL"
+if ! VERSION="$("$FINAL/Contents/MacOS/Kikimimi" --version 2>&1)"; then
+  echo "$VERSION" >&2
+  mv "$FINAL" "$APP"
+  if [ -d "$PREVIOUS" ]; then mv "$PREVIOUS" "$FINAL"; fi
+  echo "✗ 組み立てたアプリを、この Mac で読み込めません。上のメッセージを報告してください (前のアプリはそのままです。読み込めなかった物は $APP に在ります)。" >&2
+  exit 1
+fi
+rm -rf "$PREVIOUS"
+
+# 版の行 (「Kikimimi 1.1.0 (…)」) を出す。--version の出力には、ggml の記録の行も混ざっている
+echo "✓ $FINAL — $(printf '%s\n' "$VERSION" | grep -m 1 '^Kikimimi ' || true)"

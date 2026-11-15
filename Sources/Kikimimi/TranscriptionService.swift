@@ -16,14 +16,15 @@ final class TranscriptionService: @unchecked Sendable {
     func isReady(modelPath: String, vad: Bool) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        return context?.modelPath == modelPath && (vad || !contextHasVADMap)
+        return context?.modelPath == modelPath && context?.isUsable == true && (vad || !contextHasVADMap)
     }
 
     /// `queue` の上でだけ呼ぶ (読み込みは同時に 1 本)。数秒かかる読み込みの間はロックを持たない。
     /// - Parameter vad: これから VAD あり (true) / なし (false) で認識する。nil は時刻を使わない先読み。
     private func loadedContext(_ modelPath: String, vad: Bool?) throws -> WhisperContext {
         lock.lock()
-        if let context, context.modelPath == modelPath, !(vad == false && contextHasVADMap) {
+        // 使えなくなったコンテキスト (whisper.cpp が内部の状態を解放した) は読み込み直す
+        if let context, context.modelPath == modelPath, context.isUsable, !(vad == false && contextHasVADMap) {
             if vad == true { contextHasVADMap = true }
             lock.unlock()
             return context
@@ -39,6 +40,16 @@ final class TranscriptionService: @unchecked Sendable {
         contextHasVADMap = (vad == true)
         lock.unlock()
         return loaded
+    }
+
+    /// 読み込んだモデルを手放す (メモリの少ない Mac で、LLM を動かす前に空ける)
+    func unload() {
+        queue.async {
+            self.lock.lock()
+            self.context = nil
+            self.contextHasVADMap = false
+            self.lock.unlock()
+        }
     }
 
     /// モデルを先に読み込んでおく (録音中のプレビュー用)
@@ -60,13 +71,15 @@ final class TranscriptionService: @unchecked Sendable {
                     options: WhisperOptions,
                     onProgress: @escaping @Sendable (Double) -> Void,
                     onSegment: @escaping @Sendable (TranscriptSegment) -> Void,
+                    onRestart: @escaping @Sendable () -> Void = {},
+                    onStage: @escaping @Sendable (TranscriptionStage) -> Void = { _ in },
                     shouldCancel: @escaping @Sendable () -> Bool) async throws -> WhisperOutput {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<WhisperOutput, Error>) in
             queue.async {
                 do {
                     let output = try self.run(samples: samples, modelPath: modelPath, options: options,
-                                              onProgress: onProgress, onSegment: onSegment,
-                                              shouldCancel: shouldCancel)
+                                              onProgress: onProgress, onSegment: onSegment, onRestart: onRestart,
+                                              onStage: onStage, shouldCancel: shouldCancel)
                     cont.resume(returning: output)
                 } catch {
                     cont.resume(throwing: error)
@@ -80,21 +93,32 @@ final class TranscriptionService: @unchecked Sendable {
                      options: WhisperOptions,
                      onProgress: @escaping @Sendable (Double) -> Void,
                      onSegment: @escaping @Sendable (TranscriptSegment) -> Void,
+                     onRestart: @escaping @Sendable () -> Void,
+                     onStage: @escaping @Sendable (TranscriptionStage) -> Void,
                      shouldCancel: @escaping @Sendable () -> Bool) throws -> WhisperOutput {
         // WhisperContext と同じ条件 (パスがあり、ファイルが存在する) で VAD を使う
         let usesVAD = options.vadModelPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
         let ctx = try loadedContext(modelPath, vad: usesVAD)
         do {
             return try ctx.transcribe(samples: samples, options: options,
-                                      onProgress: onProgress, onSegment: onSegment,
+                                      onProgress: onProgress, onSegment: onSegment, onStage: onStage,
                                       shouldCancel: shouldCancel)
+        } catch WhisperError.failed(let code) where code == -7 && !shouldCancel() {
+            // whisper.cpp が内部の状態を解放した (メモリ不足で KV キャッシュを作り直せなかった)。VAD とは関係ないので、
+            // 読み込み直して同じ設定で 1 回だけやり直す (使えなくなったコンテキストは loadedContext が読み込み直す)
+            let fresh = try loadedContext(modelPath, vad: usesVAD)
+            onRestart() // そこまでに出した区間は、やり直しでもう一度出る
+            return try fresh.transcribe(samples: samples, options: options,
+                                        onProgress: onProgress, onSegment: onSegment, onStage: onStage,
+                                        shouldCancel: shouldCancel)
         } catch WhisperError.failed where usesVAD && !shouldCancel() {
             // VAD モデルが読めない等。VAD なしでやり直す
             var plainOptions = options
             plainOptions.vadModelPath = nil
             let plain = try loadedContext(modelPath, vad: false)
+            onRestart()
             return try plain.transcribe(samples: samples, options: plainOptions,
-                                        onProgress: onProgress, onSegment: onSegment,
+                                        onProgress: onProgress, onSegment: onSegment, onStage: onStage,
                                         shouldCancel: shouldCancel)
         }
     }

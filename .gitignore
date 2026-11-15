@@ -3,3 +3,5 @@ build/
 *.xcodeproj
 .swiftpm/
 .DS_Store
+.venv-finetune/
+__pycache__/

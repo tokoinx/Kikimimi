@@ -1,0 +1,241 @@
+{
+ "name": "seed",
+ "audit": [
+  {
+   "id": "en-roblox",
+   "language": "en",
+   "glossary": "Roblox Studio",
+   "lines": [
+    "Welcome to today's session about building games in Roblocks Studio.",
+    "First, we will open a new place and add a part.",
+    "First, we will open a new place and add a part.",
+    "Then we press the play button to test it."
+   ],
+   "expected": [
+    "Welcome to today's session about building games in Roblox Studio.",
+    "First, we will open a new place and add a part.",
+    "",
+    "Then we press the play button to test it."
+   ]
+  },
+  {
+   "id": "en-homophones",
+   "language": "en",
+   "lines": [
+    "The whole whirled is watching this launch.",
+    "Please step on the break before the corner.",
+    "We had a great time at the beach.",
+    "Their going to announce the results tomorrow."
+   ],
+   "expected": [
+    "The whole world is watching this launch.",
+    "Please step on the brake before the corner.",
+    "We had a great time at the beach.",
+    "They're going to announce the results tomorrow."
+   ]
+  },
+  {
+   "id": "en-clean-talk",
+   "language": "en",
+   "lines": [
+    "Good morning, everyone, and thank you for coming.",
+    "Today I want to talk about three ideas.",
+    "The first idea is that habits shape who we become.",
+    "The second is that goals need a clear picture.",
+    "And the third is that we move toward what we think about."
+   ],
+   "expected": [
+    "Good morning, everyone, and thank you for coming.",
+    "Today I want to talk about three ideas.",
+    "The first idea is that habits shape who we become.",
+    "The second is that goals need a clear picture.",
+    "And the third is that we move toward what we think about."
+   ]
+  },
+  {
+   "id": "en-numbers",
+   "language": "en",
+   "lines": [
+    "The meeting starts at 15 minutes past 9.",
+    "We sold 1,500 units in the first week.",
+    "That is not what the report says.",
+    "The price went from 20 to 25 dollars."
+   ],
+   "expected": [
+    "The meeting starts at 15 minutes past 9.",
+    "We sold 1,500 units in the first week.",
+    "That is not what the report says.",
+    "The price went from 20 to 25 dollars."
+   ]
+  },
+  {
+   "id": "en-names",
+   "language": "en",
+   "glossary": "Lou Tice, TPIE",
+   "lines": [
+    "This program was created by Lou Tyce more than forty years ago.",
+    "TPIE stands for the Tice Principles in Excellence.",
+    "He believed that people can change their self-image.",
+    "Thank you for watching."
+   ],
+   "expected": [
+    "This program was created by Lou Tice more than forty years ago.",
+    "TPIE stands for the Tice Principles in Excellence.",
+    "He believed that people can change their self-image.",
+    "Thank you for watching."
+   ]
+  },
+  {
+   "id": "en-tech",
+   "language": "en",
+   "lines": [
+    "Open the terminal and type get status to see the changes.",
+    "Then commit your work with a short message.",
+    "The sever returned an error when we sent the request.",
+    "So we checked the logs on the server."
+   ],
+   "expected": [
+    "Open the terminal and type git status to see the changes.",
+    "Then commit your work with a short message.",
+    "The server returned an error when we sent the request.",
+    "So we checked the logs on the server."
+   ]
+  },
+  {
+   "id": "ja-kikai",
+   "language": "ja",
+   "lines": [
+    "この機会は、毎朝七時に自動で動き始めます。",
+    "部品の交換は、年に一度で十分です。",
+    "今日はこのような機会をいただき、ありがとうございます。",
+    "故障したときは、すぐに電源を切ってください。"
+   ],
+   "expected": [
+    "この機械は、毎朝七時に自動で動き始めます。",
+    "部品の交換は、年に一度で十分です。",
+    "今日はこのような機会をいただき、ありがとうございます。",
+    "故障したときは、すぐに電源を切ってください。"
+   ]
+  },
+  {
+   "id": "ja-koen",
+   "language": "ja",
+   "lines": [
+    "先生の公園を聞いて、考え方が変わりました。",
+    "子どもたちは公園で遊んでいます。",
+    "来週も同じ会場で講演があります。",
+    "ご清聴ありがとうございました。"
+   ],
+   "expected": [
+    "先生の講演を聞いて、考え方が変わりました。",
+    "子どもたちは公園で遊んでいます。",
+    "来週も同じ会場で講演があります。",
+    "ご清聴ありがとうございました。"
+   ]
+  },
+  {
+   "id": "ja-clean",
+   "language": "ja",
+   "lines": [
+    "皆さん、おはようございます。",
+    "今日は目標の立て方についてお話しします。",
+    "まず、なりたい自分をはっきり思い描きます。",
+    "次に、それを言葉にして毎日読み返します。",
+    "最後に、小さな一歩を今日のうちに踏み出します。"
+   ],
+   "expected": [
+    "皆さん、おはようございます。",
+    "今日は目標の立て方についてお話しします。",
+    "まず、なりたい自分をはっきり思い描きます。",
+    "次に、それを言葉にして毎日読み返します。",
+    "最後に、小さな一歩を今日のうちに踏み出します。"
+   ]
+  },
+  {
+   "id": "ja-roblox",
+   "language": "ja",
+   "glossary": "ロブロックス, Roblox Studio",
+   "lines": [
+    "今日はロブロックスタジオの使い方を説明します。",
+    "まず新しいプレースを開いて、パーツを置きます。",
+    "まず新しいプレースを開いて、パーツを置きます。",
+    "そのあと再生ボタンを押して動きを確かめます。"
+   ],
+   "expected": [
+    "今日はロブロックススタジオの使い方を説明します。",
+    "まず新しいプレースを開いて、パーツを置きます。",
+    "",
+    "そのあと再生ボタンを押して動きを確かめます。"
+   ]
+  },
+  {
+   "id": "ja-ijo",
+   "language": "ja",
+   "lines": [
+    "検査の結果、以上は見つかりませんでした。",
+    "参加者は百人以上でした。",
+    "私からの報告は以上です。",
+    "気温は三十度を超えました。"
+   ],
+   "expected": [
+    "検査の結果、異常は見つかりませんでした。",
+    "参加者は百人以上でした。",
+    "私からの報告は以上です。",
+    "気温は三十度を超えました。"
+   ]
+  },
+  {
+   "id": "ja-hosho",
+   "language": "ja",
+   "lines": [
+    "この製品には一年間の保障が付いています。",
+    "社会保障の制度について学びます。",
+    "品質は私たちが保証します。",
+    "明日は会議がありません。"
+   ],
+   "expected": [
+    "この製品には一年間の保証が付いています。",
+    "社会保障の制度について学びます。",
+    "品質は私たちが保証します。",
+    "明日は会議がありません。"
+   ]
+  }
+ ],
+ "translation": [
+  {
+   "id": "tr-roblox",
+   "language": "en",
+   "glossary": "Roblox Studio",
+   "keep": [
+    "Roblox"
+   ],
+   "lines": [
+    "Welcome to today's session about building games in Roblox Studio.",
+    "First, we will open a new place and add a part.",
+    "Then we press the play button to test it."
+   ]
+  },
+  {
+   "id": "tr-numbers",
+   "language": "en",
+   "lines": [
+    "The meeting starts at 9:15 on March 25.",
+    "We sold 1500 units in the first week.",
+    "That is about 30 percent more than last year."
+   ]
+  },
+  {
+   "id": "tr-talk",
+   "language": "en",
+   "keep": [
+    "TPIE"
+   ],
+   "lines": [
+    "TPIE is a program about how the mind works.",
+    "You move toward what you think about,",
+    "so it matters which pictures you hold in your mind.",
+    "Change the picture, and your behavior follows."
+   ]
+  }
+ ]
+}

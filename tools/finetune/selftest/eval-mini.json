@@ -1,0 +1,54 @@
+{
+ "name": "finetune-selftest",
+ "translation": [],
+ "audit": [
+  {
+   "id": "en-2",
+   "language": "en",
+   "lines": [
+    "This is the main menu.",
+    "My children build games in Roblocks every weekend.",
+    "Now we look at the next step.",
+    "Please save your work often."
+   ],
+   "expected": [
+    "This is the main menu.",
+    "My children build games in Roblox every weekend.",
+    "Now we look at the next step.",
+    "Please save your work often."
+   ]
+  },
+  {
+   "id": "en-3",
+   "language": "en",
+   "lines": [
+    "We will come back to it later.",
+    "Lou Tyce started teaching in Seattle.",
+    "Please save your work often.",
+    "This is the main menu."
+   ],
+   "expected": [
+    "We will come back to it later.",
+    "Lou Tice started teaching in Seattle.",
+    "Please save your work often.",
+    "This is the main menu."
+   ]
+  },
+  {
+   "id": "ja-2",
+   "language": "ja",
+   "lines": [
+    "大事な点をもう一度言います。",
+    "誰にでもスコトームがあります。",
+    "では、次に進みます。",
+    "ここまでで質問はありますか。"
+   ],
+   "expected": [
+    "大事な点をもう一度言います。",
+    "誰にでもスコトーマがあります。",
+    "では、次に進みます。",
+    "ここまでで質問はありますか。"
+   ]
+  }
+ ]
+}

@@ -19,18 +19,43 @@ struct JobListView: View {
                 JobRow(job: job)
                     .tag(job.id)
                     .contextMenu {
-                        if job.isActive {
+                        if job.isActive || job.isPostActive {
                             Button("中止") { model.cancel(job) }
                         }
                         if let url = job.url {
                             Button("Finder で表示") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                         }
-                        Button("リストから削除", role: .destructive) { model.remove(job) }
+                        // どの結果も (保存していない・作業中の結果も)、確かめの画面を通す
+                        Button("ゴミ箱に入れる…", role: .destructive) {
+                            model.requestDelete(job)
+                        }
+                        .disabled(model.isRecording)
                     }
             }
         }
+        // 一覧での delete キーは、PlaybackKeys (KikimimiApp.swift) が受ける
         .listStyle(.sidebar)
+        // 結果が在る時も、落として読み込める事が分かるように、一覧の下に案内を出す
+        .safeAreaInset(edge: .bottom) {
+            Label("音声・動画のファイルを、ここに落としても読み込めます", systemImage: "arrow.down.doc")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+        }
         .navigationTitle("ききみみ")
+        // ゴミ箱に入れるかを確かめる画面 (右クリック・ツールバー・メニュー・Delete キー)
+        .sheet(isPresented: Binding(
+            get: { model.pendingDeleteJobID != nil },
+            set: { if !$0 { model.pendingDeleteJobID = nil } }
+        )) {
+            if let job = model.jobs.first(where: { $0.id == model.pendingDeleteJobID }) {
+                DeleteConfirmSheet(job: job)
+                    .environment(model)
+            }
+        }
     }
 }
 
@@ -54,6 +79,9 @@ struct JobRow: View {
                     if job.status == .running {
                         ProgressView(value: job.progress)
                             .controlSize(.mini)
+                    } else if case .running(_, _, let progress?) = job.postState {
+                        ProgressView(value: progress)
+                            .controlSize(.mini)
                     }
                 }
             }
@@ -65,7 +93,9 @@ struct JobRow: View {
         switch job.status {
         case .queued: return "clock"
         case .running: return "waveform"
-        case .done: return job.isRecording ? "mic.fill" : "doc.text"
+        case .done:
+            if let task = job.postState.task { return task == .audit ? "checkmark.seal" : "character.bubble" }
+            return job.isRecording ? "mic.fill" : "doc.text"
         case .failed: return "exclamationmark.triangle.fill"
         case .cancelled: return "xmark.circle"
         }
@@ -85,8 +115,13 @@ struct JobRow: View {
         case .queued: return "順番待ち"
         case .running: return job.message
         case .done:
+            if case .running(_, let message, _) = job.postState { return message }
             if let t = job.transcript {
-                return "\(TimeFormat.short(t.duration)) · \(t.segments.count) 区間"
+                var parts = ["\(TimeFormat.short(t.duration))", "\(t.segments.count) 区間"]
+                if t.hasTranslation { parts.append("対訳") }
+                if t.audit != nil { parts.append("監査済み") }
+                if job.hasNotes { parts.append("メモ") }
+                return parts.joined(separator: " · ")
             }
             return "完了"
         case .failed: return "エラー"

@@ -2,24 +2,31 @@ name: build
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# 新しい push が来たら、同じブランチの古い実行は止める (続けて push したときに、Mac の実行枠が古い実行で埋まらないように)
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   macos:
-    name: macOS 15 / Xcode ${{ matrix.xcode }}
-    runs-on: macos-15
-    timeout-minutes: 40
+    name: ${{ matrix.os }} / Xcode ${{ matrix.xcode }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        # 16.2: Swift 6.0。macOS 14 Sonoma で動く最後の Xcode (利用者の環境に合わせる)
-        # 26.3: 最新の Xcode / Swift
-        xcode: ["16.2", "26.3"]
+        include:
+          # 16.2: Swift 6.0。macOS 14 Sonoma で動く最後の Xcode (利用者の環境に合わせる)。26.3: 最新の Xcode / Swift。
+          # macOS 14 の実行環境 (macos-14) は GitHub が 2026 年に提供をやめたので、macOS 14 そのものでは確かめられない
+          - { os: macos-15, xcode: "16.2" }
+          - { os: macos-15, xcode: "26.3" }
     steps:
       - uses: actions/checkout@v7
 
@@ -29,10 +36,29 @@ jobs:
           if [ -d "$XCODE" ]; then
             sudo xcode-select -s "$XCODE"
           else
+            # 16.2 (Swift 6.0) の列は、Swift 6.0 で通ることを確かめるための列。その Xcode が無いのに既定の Xcode で進むと、
+            # 新しい Swift でしか通らない書き方 (引数の末尾のカンマなど) を見逃すので、ここで止める
+            if [ "${{ matrix.xcode }}" = "16.2" ]; then
+              echo "::error::$XCODE is not on this runner image; the Swift 6.0 build cannot be checked"
+              exit 1
+            fi
             echo "::warning::$XCODE is not on this runner image; using the default Xcode"
           fi
           xcodebuild -version
           swift --version
+
+      # GitHub のリリースの取得は、ときどき 504 (92 バイトの応答) で失敗する (2026-11-09 に llama.cpp・whisper.cpp で起きた)。
+      # SwiftPM はやり直さず、失敗した応答をキャッシュに残すので、次も「already exists in file system」で止まる。
+      # そこで、取得だけを先に行い、失敗したら残りを消して間を空けてやり直す
+      - name: Fetch the XCFrameworks
+        run: |
+          for attempt in 1 2 3 4; do
+            if swift package resolve; then exit 0; fi
+            echo "::warning::fetching the XCFrameworks failed (attempt $attempt); retrying"
+            rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts .build/artifacts
+            sleep $((attempt * 30))
+          done
+          exit 1
 
       - name: Unit tests (KikimimiCore)
         run: swift test
@@ -45,16 +71,250 @@ jobs:
           APP=build/Kikimimi.app
           test -x "$APP/Contents/MacOS/Kikimimi"
           test -d "$APP/Contents/Frameworks/whisper.framework"
+          test -d "$APP/Contents/Frameworks/llama.framework"
           plutil -lint "$APP/Contents/Info.plist"
           otool -l "$APP/Contents/MacOS/Kikimimi" | grep -A2 LC_RPATH
           otool -L "$APP/Contents/MacOS/Kikimimi" | grep whisper.framework
+          otool -L "$APP/Contents/MacOS/Kikimimi" | grep llama.framework
           codesign --verify --strict --verbose=2 "$APP"
 
+      # whisper.cpp / llama.cpp は、初めて使う時に Metal のシェーダーを作る (新しい実行環境では 40 秒ほど)。
+      # 済ませておかないと、下の起動の確認 (5 秒で終わる) の結果に、2 つの情報が「(not ready after N s)」と出る。
+      # アプリを作る台本 (build-app.sh) が、入れ替えた後の置き場から --version を走らせて済ませているので、ここはすぐ終わる。
+      # 台本を変えた時にも結果に情報が出るよう、この段は残してある
+      - name: Prepare the Metal shaders (first use of whisper.cpp / llama.cpp)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --version
+
+      # 起動そのものの確認: ふつうに起動して、数秒後にウインドウができているかを確かめる
+      # (--selftest-llm / --selftest-whisper は画面を出さないので、起動時に落ちる不具合を見つけられない)
+      - name: Launch self-test (started from the shell)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --report build/launch-direct.txt
+
+      - name: Launch self-test (started with open, as make run does)
+        run: |
+          open -n -W build/Kikimimi.app --args --selftest-launch 5 --report "$PWD/build/launch-open.txt"
+          cat build/launch-open.txt
+          grep -q "LAUNCH SELFTEST OK" build/launch-open.txt
+
+      # ウインドウを全部閉じたまま動いているアプリが、呼ばれたとき (Dock・open) にウインドウを出し直すこと
+      - name: Launch self-test (the window comes back on a reopen request)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --reopen --report build/launch-reopen.txt
+
+      - name: Launch self-test (the window comes back through the menu command)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --reopen-menu --report build/launch-menu.txt
+
+      # 強制終了をくり返した後の起動 (make run は前のアプリを終了させてから起動する) でも、ウインドウが出ること
+      - name: Launch self-test (after the app was killed several times)
+        run: |
+          for i in 1 2 3; do
+            open -n build/Kikimimi.app
+            sleep 4
+            pkill -KILL -x Kikimimi || true
+            sleep 1
+          done
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --report build/launch-after-kill.txt
+
+      # 参考: 前回のウインドウの状態を復元させると (これまでの動き)、ウインドウが出るかどうか
+      - name: Launch self-test (with window restoration, for reference)
+        continue-on-error: true
+        run: |
+          for i in 1 2; do
+            open -n build/Kikimimi.app --args --restore-windows
+            sleep 4
+            pkill -KILL -x Kikimimi || true
+            sleep 1
+          done
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 5 --restore-windows --report build/launch-restore.txt
+          tail -5 ~/Library/Logs/Kikimimi/launch.log
+
+      - name: Launch self-test (plain open while a copy without windows is running)
+        run: |
+          rm -f build/launch-external.txt
+          open -n build/Kikimimi.app --args --selftest-launch 5 --reopen-external --report "$PWD/build/launch-external.txt"
+          sleep 9
+          open build/Kikimimi.app
+          for i in $(seq 1 40); do [ -f build/launch-external.txt ] && break; sleep 1; done
+          cat build/launch-external.txt
+          grep -q "LAUNCH SELFTEST OK" build/launch-external.txt
+
+      # 数千行の結果で、画面が固まらないこと (再生位置・1 行だけの再生・文字起こしの続きを起こし、メインスレッドの待ちを測る)。
+      # 3000 行では、47 秒の録音で 1 行を本当に再生し、行の終わりで止まるかも確かめる (音を出せない Mac では飛ばす)。
+      # そのあと、練習 (速さ・繰り返し・間・自動で次へ・キー) の確認 (PRACTICE CHECK、30 秒ほど) も行う
+      # 目安 (UILoadSelfTest.Limits) を超えたら失敗にするのは、この 3000 行だけ。ウインドウの絵は build/ui-shots に残す
+      - name: UI load self-test (3000 lines, one line played from a recording, practice check)
+        timeout-minutes: 7
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000.txt --screenshots build/ui-shots
+
+      # 画面の重さの確認が残したウインドウの絵。確認が失敗しても残す
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ui-shots-${{ matrix.os }}-xcode${{ matrix.xcode }}
+          path: build/ui-shots
+          if-no-files-found: warn
+          retention-days: 14
+
+      # ウインドウの絵を、小さくしてログにも出す (成果物を取り出せない所からでも、ログから絵に戻して見られるように)。
+      # 1 枚が「UI SHOT BEGIN <名前>」と「UI SHOT END」のあいだの base64 (JPEG)
+      - name: UI screenshots into the log (small JPEG, base64)
+        if: always()
+        continue-on-error: true
+        run: |
+          for f in build/ui-shots/*.png; do
+            [ -f "$f" ] || continue
+            sips -s format jpeg -s formatOptions 60 "$f" --out "$f.jpg" >/dev/null 2>&1 || continue
+            echo "UI SHOT BEGIN $f"
+            base64 -i "$f.jpg" | fold -w 4000
+            echo "UI SHOT END"
+            rm -f "$f.jpg"
+          done
+
+      # 8000 行は参考に測るだけ (失敗にしない)。2 時間の録音の本当の文字起こしは 2000〜4000 行ほどなので、
+      # 目安は 3000 行で決めている。8000 行で目安を超えても、この段は止めずに先へ進む
+      - name: UI load self-test (8000 lines, informational, does not fail the build)
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 8000 --report build/ui-load-8000.txt
+
+      - name: Version line
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --version
+          otool -l build/Kikimimi.app/Contents/MacOS/Kikimimi | grep -A4 LC_BUILD_VERSION
+
+      - name: Doctor script
+        run: Scripts/doctor.sh
+
+      - name: Crash reports (when a launch step failed)
+        if: failure()
+        run: |
+          sleep 5
+          ls -la ~/Library/Logs/DiagnosticReports/ || true
+          for f in ~/Library/Logs/DiagnosticReports/Kikimimi*; do
+            [ -f "$f" ] || continue
+            echo "== $f"
+            head -c 30000 "$f"
+          done
+
+      # 乱数の重みの小さな GGUF (本物の Qwen2 の語彙) で、組み立てたアプリの LLM 部分をひと通り動かす。
+      # whisper.framework と llama.framework を同じプロセスで使えることの確認も兼ねる。
+      - name: Make a tiny test GGUF
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet gguf numpy
+          curl -fsSL -o build/ggml-vocab-qwen2.gguf \
+            https://raw.githubusercontent.com/ggml-org/llama.cpp/b12211/models/ggml-vocab-qwen2.gguf
+          .venv/bin/python Scripts/make-tiny-gguf.py build/ggml-vocab-qwen2.gguf build/tiny.gguf chatml-think
+
+      - name: LLM self-test (CPU)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm build/tiny.gguf --cpu
+
+      - name: LLM self-test (Metal)
+        # GitHub の Mac は仮想 GPU なので、Metal が使えないことがある (結果は参考)
+        continue-on-error: true
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm build/tiny.gguf
+
+      # 評価ハーネス (LLM なしで動く所): 練習用の場面を、規則だけ → 学習した直しの台帳つき、で採点して比べる。
+      # 台帳は、覚えた語をすべて直し、正しい行を 1 つも壊さない。学習データの書き出しも、ここで動かす
+      - name: Evaluation harness (rules only, then with learned corrections) and training-data export
+        run: |
+          APP=build/Kikimimi.app/Contents/MacOS/Kikimimi
+          SET=tools/finetune/selftest
+          $APP --eval-llm none --rules-only --set $SET/eval.json --report build/eval-rules.json
+          $APP --eval-llm none --rules-only --ledger $SET/ledger.json --set $SET/eval.json \
+            --report build/eval-ledger.json --baseline build/eval-rules.json
+          python3 - <<'PY'
+          import json
+          rules, ledger = (json.load(open(f"build/eval-{n}.json"))["audit"] for n in ("rules", "ledger"))
+          assert rules["harmed"] == 0 and rules["fixedAutomatically"] == 0, rules
+          assert ledger["fixedAutomatically"] == ledger["errorLines"] == 10, ledger
+          assert ledger["harmed"] == 0 and ledger["wrongFixes"] == 0 and ledger["falseSuggestions"] == 0, ledger
+          print("learned corrections: fixed", ledger["fixedAutomatically"], "of", ledger["errorLines"], "- harmed 0")
+          PY
+          $APP --export-training build/training.jsonl --ledger $SET/ledger.json --clean $SET/clean.txt
+          test "$(wc -l < build/training.jsonl)" -ge 40
+
+      # 「日本語＋英語」: 英語と日本語が入れ替わる 47 秒の録音 (FLEURS の朗読) を、いちばん小さな whisper のモデル (tiny) で
+      # 文字にし、区間ごとの言語が合っているか (間を空けずに入れ替わるところも) を確かめる。1 つの言語の設定でも動かす
+      - name: Fetch the whisper test models
+        run: |
+          mkdir -p build/whisper-models
+          for attempt in 1 2 3 4; do
+            if curl -fsSL -o build/whisper-models/ggml-tiny.bin \
+                 https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin \
+               && curl -fsSL -o build/whisper-models/ggml-silero-v6.2.0.bin \
+                 https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin; then
+              break
+            fi
+            echo "::warning::fetching the whisper test models failed (attempt $attempt); retrying"
+            sleep $((attempt * 15))
+          done
+          cd build/whisper-models
+          echo "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21  ggml-tiny.bin" | shasum -a 256 -c
+          echo "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987  ggml-silero-v6.2.0.bin" | shasum -a 256 -c
+
+      - name: Whisper self-test (日本語＋英語, CPU)
+        run: >-
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper Tests/Fixtures/mixed-en-ja.wav
+          --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin
+          --languages ja,en --cpu --expect Tests/Fixtures/mixed-en-ja.expect.json --report build/selftest-whisper.json
+
+      # 1 つの言語の設定の通り道だけを確かめる (whisper.cpp の中の VAD は 4 スレッド決め打ちで、3 コアの実行環境では
+      # とても遅いので、先頭の 16 秒だけにする)
+      - name: Whisper self-test (日本語, CPU)
+        run: >-
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper Tests/Fixtures/mixed-en-ja.wav
+          --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin
+          --languages ja --cpu --to 16
+
+      # 確認用の実行 (--selftest-whisper) が動いているあいだに、ふつうに open しても起動できるか (参考)
+      - name: Launch while a self-test is running
+        continue-on-error: true
+        run: |
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper Tests/Fixtures/mixed-en-ja.wav \
+            --model build/whisper-models/ggml-tiny.bin --vad build/whisper-models/ggml-silero-v6.2.0.bin \
+            --languages ja,en --cpu > build/selftest-background.log 2>&1 &
+          sleep 3
+          pgrep -fl Kikimimi || true
+          lsappinfo list | grep -i -A6 kikimimi || echo "(the self-test is not registered as an application)"
+          # Metal のキャッシュは、同じアプリが同時に 2 つ動くと、2 つ目が別のファイル (libraries1.data) を使う。
+          # そこが空だとシェーダーの作り直しになり、起動の確認の結果に 2 つの情報が「(not ready after N s)」と出る。
+          # open の前に、2 つ目として 1 度済ませておく。置き場の中身は、open の前と、待った後に出す (参考)
+          build/Kikimimi.app/Contents/MacOS/Kikimimi --version
+          metal_cache="$(getconf DARWIN_USER_CACHE_DIR)local.kikimimi.app/com.apple.metal"
+          echo "-- Metal cache before open --"
+          ls -lT "$metal_cache"/*/ || true
+          rm -f build/launch-busy.txt
+          open build/Kikimimi.app --args --selftest-launch 5 --report "$PWD/build/launch-busy.txt"
+          for i in $(seq 1 30); do [ -f build/launch-busy.txt ] && break; sleep 1; done
+          # 合否は、30 秒待ったこの時点で結果ができていたかで決める (下の記録を出す数秒の間にできた分は、数えない)
+          ready=no; [ -f build/launch-busy.txt ] && ready=yes
+          # 結果ができない時に理由を決められるよう、待った後の様子を出す (起動したか・どこまで進んだか・どこで待っているか)
+          echo "-- after the wait: processes --"
+          pgrep -fl Kikimimi || true
+          echo "-- after the wait: launch log --"
+          tail -5 ~/Library/Logs/Kikimimi/launch.log || true
+          echo "-- after the wait: Metal cache --"
+          ls -lT "$metal_cache"/*/ || true
+          echo "-- after the wait: the background self-test --"
+          tail -3 build/selftest-background.log || true
+          pid=$(pgrep -f 'selftest-launch' | head -1)
+          if [ -n "$pid" ]; then
+            echo "-- after the wait: where the launched app is (sample, first lines) --"
+            sample "$pid" 1 -file build/launch-busy-sample.txt || true
+            head -60 build/launch-busy-sample.txt || true
+          fi
+          if [ "$ready" = no ]; then echo "no report 30 s after open"; exit 1; fi
+          cat build/launch-busy.txt
+          grep -q "LAUNCH SELFTEST OK" build/launch-busy.txt
+          wait
+
       - name: Zip the app
-        run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-xcode${{ matrix.xcode }}.zip"
+        run: ditto -c -k --keepParent build/Kikimimi.app "build/Kikimimi-${{ matrix.os }}-xcode${{ matrix.xcode }}.zip"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: Kikimimi-xcode${{ matrix.xcode }}
-          path: build/Kikimimi-xcode${{ matrix.xcode }}.zip
+          name: Kikimimi-${{ matrix.os }}-xcode${{ matrix.xcode }}
+          path: build/Kikimimi-${{ matrix.os }}-xcode${{ matrix.xcode }}.zip
           retention-days: 14
