@@ -337,7 +337,7 @@ def gate(args, app):
              f"- 日付: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
              f"- 読んだファイル: {', '.join(result.get('files') or [])}",
              f"- short の比: {result.get('shortRatio')} (原文の重さ {result.get('shortMinimumSourceWeight')} 以上の時だけ見る)",
-             f"- 重い印 (訳し直す物): {', '.join(result.get('severe') or [])}",
+             f"- 重い印 (訳を出さない物): {', '.join(result.get('severe') or [])}",
              f"- 細かい所 (原文・訳・符号): {report}"]
     references = result.get("references") or {}
     if references:

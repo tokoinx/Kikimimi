@@ -1,0 +1,658 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-vi.json"
+  ],
+  "translation" : {
+    "cases" : 28,
+    "chrF" : 52.425811764396116,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        5199,
+        5169,
+        5139,
+        5109,
+        5079,
+        5049
+      ],
+      "matches" : [
+        4443,
+        3380,
+        2742,
+        2326,
+        2011,
+        1741
+      ],
+      "reference" : [
+        5388,
+        5358,
+        5328,
+        5298,
+        5268,
+        5238
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 30,
+    "lines" : 30,
+    "numbersChecked" : 5,
+    "numbersKept" : 5,
+    "repeated" : 0,
+    "retried" : 1,
+    "retryFixed" : 1,
+    "seconds" : 364.2640428543091,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 30
+  },
+  "translationByTarget" : {
+    "vi" : {
+      "cases" : 28,
+      "chrF" : 52.425811764396116,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          5199,
+          5169,
+          5139,
+          5109,
+          5079,
+          5049
+        ],
+        "matches" : [
+          4443,
+          3380,
+          2742,
+          2326,
+          2011,
+          1741
+        ],
+        "reference" : [
+          5388,
+          5358,
+          5328,
+          5298,
+          5268,
+          5238
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 30,
+      "lines" : 30,
+      "numbersChecked" : 5,
+      "numbersKept" : 5,
+      "repeated" : 0,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 364.2640428543091,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 30
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_111975537143453440",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.923521995544434,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Nhìn chung, tôi thực sự thích sự liên kết giữa hai trò chơi. Lợi ích của cốt truyện ngắn là bạn có thể \"bỏ qua những chi tiết vụn vặt để đến thẳng phần gay cấn\", chúng có thể đem lại cảm giác hấp dẫn và thỏa mãn ngay tức thời. Ưu điểm của các cốt truyện dài là bạn có thể gặm nhấm từng chi tiết cho đến khi bùng nổ cảm xúc, sự hứng thú của bạn tích lũy cho tới cuối cùng có được phần thưởng lớn hơn.",
+          "source" : "In general I really like the interplay between the two games. The advantage of shortform stories is that you can \"skip to the good part\", they can be more immediately engrossing and satisfying. The advantage of longform stories is that you can imbue whatever happens with way more emotional weight, you lose the immediacy in exchange for stronger payoffs.",
+          "text" : "Nhìn chung, tôi thực sự thích sự tương tác giữa hai thể loại này. Ưu điểm của các câu chuyện ngắn là bạn có thể \"nhảy thẳng vào phần hay\", chúng có thể cuốn hút và thỏa mãn ngay lập tức. Ưu điểm của các câu chuyện dài là bạn có thể gán cho mọi thứ xảy ra một trọng lượng cảm xúc lớn hơn nhiều, bạn hy sinh tính tức thời để đổi lấy những kết quả mạnh mẽ hơn."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_111976249663909024",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.1315460205078125,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Trang trạng thái của AT&T báo rằng không có mất mạng...cho dù trên các bản tin đang đưa tin mất mạng",
+          "source" : "the AT&T status site claims there's no outages...even though the news is reporting an outage 😠",
+          "text" : "Trang web trạng thái của AT&T tuyên bố không có sự cố gián đoạn... mặc dù tin tức đang báo cáo một sự cố gián đoạn 😠."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.3342310190200806,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Tôi ghét nham thạch #firetemple",
+          "source" : "I hate lava #firetemple",
+          "text" : "Tôi ghét lava #firetemple."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_111977766001055104",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.961925983428955,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Tin trực tiếp cho biết họ có tín hiệu",
+          "source" : "Live feed says that they have a signal",
+          "text" : "Tín hiệu trực tiếp cho biết họ đã có tín hiệu."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.716807007789612,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Tôi đã làm hỏng lớp niêm phong của nó vài lần khi cử động khuôn mặt, tôi đoán vật, và mũi tôi bắt đầu chảy nước do bất cứ cái gì trôi nổi xung quanh đó.",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "Tôi đã vỡ niêm phong trên nó vài lần chỉ bằng cách di chuyển khuôn mặt, tôi đoán vậy, và mũi tôi bắt đầu chảy nước từ thứ gì đó đang bay lượn ở trên cao."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.006417989730835,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "cái gì cơ? tại sao tọa độ GPS lại được làm tròn đến độ gần nhất chứ, điều đó thực sự là vô ích",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "text" : "Tại sao các tọa độ GPS lại được làm tròn đến số nguyên gần nhất? Điều đó hoàn toàn vô giá trị."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.580694913864136,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ồ đúng vậy, đây là bài luận mới nhất của Sally Rooney",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "Ồ đúng rồi, đây là bài luận mới nhất của Sally Rooney."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 3,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.450589060783386,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Chiếc chuồng đã có tổ bên trong đang hút hết wifi ở trong nhà.",
+          "source" : "The box that has already a nest in it is leeching off the wifi in the house.",
+          "text" : "Cái hộp đã có tổ bên trong đang trói wifi trong nhà."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Nhìn chung thì một vài cảm biến nữa sẽ có ích, tôi đoán vậy.",
+          "source" : "A few more sensors in general would be nice I guess.",
+          "text" : "Có lẽ sẽ tốt hơn nếu thêm một vài cảm biến nữa."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Đoán xem: trời hôm nay nhiều mây cực. Vậy nên tôi không chắc liệu tấm pin năng lượng mặt trời (có lẽ đã bị hỏng) có đủ sức tạo ra đủ điện để chạy bất cứ cái gì hay không.",
+          "source" : "Guess what: It's cloudy today. So I'm not sure if that (probably broken) solar panel is able to generate enough juice to achieve anything.",
+          "text" : "Bạn đoán sao: Hôm nay trời u ám. Vì vậy tôi không chắc tấm pin mặt trời (có thể bị hỏng) này có thể tạo ra đủ năng lượng để đạt được điều gì đó không."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.810827016830444,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Nếu tôi mà đi dự sự kiện, tôi sẽ mang theo chúng. Những sự kiện sắp tới duy nhất trong lịch của tôi hiện tại là:",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "text" : "Nếu tôi ở tại một sự kiện, tôi mang theo họ. Các sự kiện sắp tới duy nhất trong lịch trình của tôi hiện tại là:"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112121157211696272",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.9119709730148315,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Tôi đã chuyển MX của mình đến Proton và hiện có đầy đủ SPF, DKIM và DMARC mà không phải trả phí cho Google để xác minh email cơ bản.",
+          "source" : "I transferred my MX to Proton and have now full SPF, DKIM and DMARC without having to pay Google for basic email validation.",
+          "text" : "Tôi đã chuyển MX của mình sang Proton và giờ đã có đầy đủ SPF, DKIM và DMARC mà không cần trả phí cho Google để xác minh email cơ bản."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112132847725764752",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.247496008872986,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Tôi vừa gặp một hệ thống nhận dạng khuôn mặt trong khi lên chuyến bay quốc tế từ IAH Houston. Rõ ràng là nó liên quan đến hải quan nhỉ??",
+          "source" : "Just encountered a facial recognition system while boarding an intl flight from Houston's IAH. Apparently it's for some customs-related thing??",
+          "text" : "Vừa mới gặp một hệ thống nhận diện khuôn mặt khi lên máy bay quốc tế từ IAH, Houston. Có vẻ như nó phục vụ cho một vấn đề liên quan đến hải quan??"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.3453099727630615,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Chúc các bạn thứ Bảy vui vẻ. Chào mừng đến với độ cao 4.000 feet.",
+          "source" : "Happy Saturday lovelies. Welcome to 4000ft.",
+          "text" : "Chúc mừng thứ Bảy các bạn yêu quý. Chào mừng đến với 4000ft."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.61441695690155,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user20 vậy là mỗi ngày bạn chèo thuyền ít nhất 2,8 km? Trên máy chèo thuyền hay trên nước thế?",
+          "source" : "@user20 so every day you row at least 2.8km? Is that on the erg or on the water?",
+          "text" : "@user20 vậy mỗi ngày bạn chèo ít nhất 2,8km? Đó là trên máy erg hay trên mặt nước?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 18.772890090942383,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Đây là thước phim cũ chân thật về một người khổng lồ đúng nghĩa đến từ Nhật Bản, đang rảo bước trong một cuộc diễu hành quân sự. Điều gây sốc là kích thước thật của anh ta. Anh ta có dáng người cao ít nhất là 4 mét, ít nhất là 13 feet. Nên là, anh ta thật sự là cao và to lớn hơn tất cả các cầu thủ giải NBA ban đầu khác, chẳng hạn như Shaquille O'Neal hoặc",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "Đây là một đoạn phim cổ thật sự và chân thực của một cá nhân khổng lồ xác định từ Nhật Bản, đang tham gia một cuộc duyệt binh quân sự. Điều gây sốc ở đây là kích thước thực tế của anh ấy. Anh ấy có chiều cao ít nhất 4 mét, tức là tối thiểu 13 feet. Do đó, anh ấy thực sự cao hơn và to lớn hơn bất kỳ cầu thủ NBA gốc nào khác, ví dụ như Shaquille O'Neal, hoặc"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.625774025917053,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Câu hỏi đặt ra là, như cơ man các di tích thời kỳ Đồ đá mới khác đã tuyên bố, họ đã thực hiện những kỳ công đó bằng cách nào? Họ đã nâng những khối đá khổng lồ như vậy bằng cách nào? Liệu đó có phải là tàn dư của một nền văn minh cổ đại tiên tiến  nhưng đã bị diệt vong như chúng ta từng khẳng định rất nhiều lần trước đây hay không? Chúng tôi nhận thấy những khả năng đó có sức thuyết phục rất lớn, đặc biệt là người ở Agra này.",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "Câu hỏi là, giống như vô số di tích thời kỳ đồ đá mới khác được tuyên bố, họ đã đạt được những thành tựu như vậy như thế nào? Họ đã nâng những tảng đá khổng lồ ấy như thế nào? Liệu họ có phải, như chúng tôi đã đề xuất nhiều lần trước đây, là tàn dư của một nền văn minh cổ đại từng phát triển cao nhưng sau đó bị hủy diệt? Chúng ta tìm thấy những khả năng này, đặc biệt là những người đàn ông ở Agra, rất thuyết phục."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.464912056922913,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Vậy, tôi đã hoạt động trong ngành âm nhạc hơn 20 năm, và đã phát hành hai album trong suốt thời gian đó và đi lưu diễn quanh Đức và Ba Lan, và đương nhiên cả Thụy Điển. Vậy anh đã là nghệ sĩ biểu diễn từ lúc còn rất trẻ? Vâng, đúng vậy. Và hồi trẻ, anh có biểu diễn tại địa điểm nào mang tính biểu tượng không?",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "Vậy nên, tôi đã làm việc với âm nhạc hơn 20 năm, phát hành hai album trong thời gian đó, và đi biểu diễn khắp Đức, Ba Lan, và Thụy Điển, tất nhiên. Vậy bạn đã luôn là một nghệ sĩ từ rất sớm? Đúng vậy, tôi đã vậy. Và có bất kỳ địa điểm nào mang tính biểu tượng mà bạn từng biểu diễn khi còn trẻ không?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.532060980796814,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kiểm tra. Kiểm tra đi. Búa thắng kéo, kéo thắng bao và bao thắng búa. Bạn thắng rồi. Người thua sẽ mất 1 sao. Vào cuối mỗi ván, trọng tài sẽ đặt các lá bài trở lại hộp tái chế. Nếu cả hai người chơi chọn cùng một lá bài thì tất nhiên, ván đó sẽ hòa và không ai mất sao cả.",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "Kiểm tra. Kiểm tra. Đá thắng kéo, kéo thắng giấy, và giấy thắng đá. Bạn chiến thắng. Người thua sẽ mất một ngôi sao. Cuối mỗi ván chơi, trọng tài sẽ bỏ thẻ lại vào hộp tái chế. Tất nhiên, nếu cả hai người chơi chọn cùng một thẻ, trận đấu hòa và không ai mất ngôi sao."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.79934000968933,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Đây là toàn bộ câu chuyện về Danny và Sam. Sẵn sàng chưa nào? Sẵn sàng. Danny Fenton và Sam Manson là bạn thân, dành hầu hết thời gian bên nhau cùng với một người bạn nữa là Tucker. Ngay từ đầu, Sam là lý do khiến Danny có sức mạnh ma quái. Đi nào, Danny, đây có phải là khu vực ma quái không nhỉ? Bạn kiểm tra đi. Bạn biết gì không? Đúng rồi đó.",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "Đây là câu chuyện đầy đủ của Danny và Sam. Sẵn sàng chưa? Sẵn sàng rồi. Danny Fenton và Sam Manson là những người bạn thân thiết, và cùng với Tucker, họ hầu như dành toàn bộ thời gian của mình bên nhau. Chính Sam mới là lý do khiến Danny có khả năng hóa thành ma quỷ từ đầu tiên. Đưa ra thôi nào, Danny, một vùng ma? Bạn phải thử xem. Thế thì sao? Bạn đúng rồi."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.843183040618896,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Đã nhiều tháng trôi qua, nhưng tôi cảm giác như mình vẫn đang đứng bên mộ anh ấy. Tôi không thể rời xa anh ấy. Anh ấy đi rồi, nhưng tôi vẫn không thể nào buông tay. Tôi thấy hình ảnh của anh trong mọi người lính mặc quân phục mà tôi gặp. Họ xuất hiện ở khắp nơi sau khi vụ đánh bom xảy ra.",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "Đã qua nhiều tháng, và tôi vẫn cảm thấy như mình vẫn đứng trước mộ của anh ấy. Tôi không thể rời bỏ anh ấy. Anh ấy đã mất, nhưng tôi vẫn không thể rời bỏ anh ấy. Tôi thấy anh ấy trong từng quân nhân mặc đồng phục mà tôi gặp, và họ có mặt khắp nơi kể từ khi xảy ra vụ bom."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.828054904937744,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Anh đúng là đồ khốn, Tom. Nghe này, Celia, chúng ta phải theo đuổi đam mê của mình. Cô thích nghiên cứu rô-bốt, còn tôi chỉ muốn thành công trong lĩnh vực không gian. Sao anh không thẳng thắn thừa nhận là anh sợ cánh tay rô-bốt của tôi đi? Tôi không sợ, nó... Thôi, được rồi. Tôi sợ. Tôi gặp ác mộng về việc bị móng vuốt rô-bốt khổng lồ truy đuổi. Ôi, kệ anh, Tom!",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "Bạn là một kẻ ngốc, Tom. Nhìn đi, Celia, chúng ta phải theo đuổi đam mê của mình. Cô có robot học thuật của mình còn tôi chỉ muốn trở nên xuất sắc trong không gian. Tại sao cô không thừa nhận rằng cô bị ám ảnh bởi tay robot của tôi? Tôi không bị ám ảnh bởi điều đó, mà là... Được rồi, tốt thôi. Tôi bị ám ảnh. Tôi đang mơ thấy mình bị đuổi bởi một cái vuốt robot khổng lồ. Ồ, làm gì có, Tom!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 29.739221930503845,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Chào mừng. Chào mừng các bạn. Tôi chỉ muốn đảm bảo rằng tất cả chỗ này đều hoạt động thôi. Mất một phút thôi. Tôi đã vào sớm một chút chỉ để đảm bảo chắc chắn. Tôi vừa rửa tay xong và đã sẵn sàng vào việc. Tôi mới thiết lập xong. Tôi nghĩ chúng ta ổn rồi. Tôi sẽ mắc lỗi. Tôi cảm nhận được. Có những ngày như thế. Tôi sẽ đợi cho đến khi mọi người tham gia, rồi chúng ta sẽ bắt đầu.",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "Xin chào. Xin chào mọi người. Tôi chỉ muốn đảm bảo rằng tất cả mọi thứ đều hoạt động tốt. Chỉ mất một phút thôi. Vì vậy tôi đến sớm một chút để chắc chắn. Vừa rửa tay và chuẩn bị đi. Vậy nên tôi đang hoàn tất việc thiết lập. Tôi nghĩ chúng ta đã sẵn sàng. Tôi sẽ mắc lỗi. Tôi cảm thấy điều đó. Đó là một trong những ngày như thế. Vì vậy tôi sẽ đợi cho đến khi mọi người tham gia, sau đó chúng ta sẽ bắt đầu."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.379616975784302,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hơn 4,5 tỉ năm trước, Dải Ngân Hà đã va chạm với một thiên hà lùn gần đó. Vụ va chạm này đã thúc đẩy sự hình thành của các vì sao. Hệ mặt trời của chúng ta thuộc về Dải Ngân Hà. Trong hệ mặt trời, quá trình tuần hoàn vật chất đã diễn ra.",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "Hơn 4,5 tỷ năm trước, Dải Ngân hà va chạm với một thiên hà lùn gần đó. Sự gặp gỡ này đã thúc đẩy quá trình hình thành các ngôi sao. Hệ Mặt trời của chúng ta là một phần của Dải Ngân hà. Trong hệ Mặt trời, sự lưu chuyển vật chất đã đang diễn ra."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.3077290058136,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Trong khi Lực lượng Cứu hộ đi tuần tra thành phố, chúng ta sẽ lo canh gác bảo tàng thật nghiêm ngặt. Lũ người xấu muốn đánh cắp viên kim cương Cabbonita khi chúng ta đang đợi bên trong thì không phải là ý kiến sáng suốt. Chúng ta cạn túi rồi! Chúng ta sẽ phải trộm viên kim cương đó và bán nó! Nếu không, chúng ta sẽ phải làm thử nghiệm với nước ngọt! Chúng ta sẽ đưa rô-bốt vào trong kiểu gì? Mọi chuyện đã được lo liệu cả rồi.",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "Trong khi Lực lượng Cứu hộ tuần tra thành phố, chúng ta sẽ đảm bảo giám sát bảo tàng trong hộp. Sẽ không phải là ý tưởng hay cho các phản diện cố gắng trộm Cabbonita khi chúng ta đang chờ bên trong. Chúng ta đã hết tiền! Chúng ta sẽ phải trộm viên kim cương đó và bán nó! Nếu không, chúng ta sẽ phải thực hiện các thí nghiệm với nước ngọt! Làm thế nào để đưa các bot vào bên trong? Tất cả đều đã được sắp xếp."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.3405259847641,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Được rồi, hãy để tôi giải thích. Vấn đề là nếu bạn nhìn vào bên trong đó... Bạn thấy lớp ván gỗ đúng không? Có lớp ván gỗ cũ và nó tỳ chặt vào các ván lợp ở đó. Sau đó, tôi sẽ đặt cái này lên trên nó. Kết quả là bụi bẩn sẽ gom lại đó, chỗ tấm che khe mái đó.",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "Được rồi, vậy để tôi giải thích. Được rồi, vấn đề là nếu bạn nhìn vào bên trong... Bạn thấy lớp gỗ bên ngoài không? Đó là lớp cũ, và nó tiếp giáp với mái ngói ở đó. Sau đó tôi đặt cái này lên trên. Và điều xảy ra là bụi bẩn tích tụ ở đó, tại chỗ lợp kim loại."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.123347997665405,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Chúng ta sẽ để cho thực phẩm đó ngâm và thủy hóa lại trong vài phút. Với cách nấu ăn bằng siêu ánh sáng, chúng ta không thực sự nấu trên bếp lò mà chủ yếu đun sôi nước để có thể thủy hóa lại thức ăn. Đó cũng là một trong những lý do tại sao chúng ta dùng gạo tấm ăn liền. Thời gian nấu nướng, nhiên liệu và cân nặng đều giảm đi. Thật tuyệt phải không nào. Do đó, đây là những gì chúng ta đang có được. Sự nhất quán hoàn hảo.",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "Chúng ta chỉ để nó nghỉ và tái thủy hóa trong vài phút. Với nấu ăn siêu nhẹ, chúng ta thực sự không nấu trên bếp. Chúng ta chủ yếu đun sôi nước để tái thủy hóa thực phẩm của mình. Đây cũng là một trong những lý do tại sao chúng ta sử dụng ngũ cốc tinh bột nhanh. Thời gian nấu ít hơn, nhiên liệu ít hơn và trọng lượng ít hơn. Ồ đúng rồi. Vậy đây là những gì chúng ta đang có ở đây. Độ nhất quán hoàn hảo."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.733404994010925,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hãy cưỡi lên chiếc vòng quay ở đằng kia. Chao ôi, cậu mới to lớn làm sao! Cậu hơi vạm vỡ một chút so với chiếc vòng quay này. An toàn là trên hết, đúng không nào? Hoá đơn 30! Thật quá chặt chém. Tôi đã nói với cậu rồi. Hãy để ý đến bước đi của mình!",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "Hãy đi chiếc xe ở phía kia. Ồ, ồ, ồ, cậu bé lớn! Cậu hơi quá nặng cho chuyến đi này. An toàn là trên hết, à? 30 tờ tiền? Thật là lừa đảo. Tôi đã nói rồi. Chú ý bước chân!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 21.516801953315735,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Xin chào, chào mừng các bạn đến với cuộc thí điểm các loại chương trình dài tập mới. Cuộc thí điểm này sẽ nghiên cứu sâu về lịch sử của một số vụ bê bối tồi tệ nhất thế giới – một số vụ bạn có thể biết và một số thì có thể không. Một chương trình RTE có tên Scannál đã truyền cảm hứng một phần cho cuộc thí điểm này. Mặc dù vậy, thay vì tập trung vào các sự kiện liên quan đến Ireland, tôi dự định sẽ mở rộng quy mô về những gì mình sẽ đề cập. Vâng, không để các bạn phải chờ lâu thêm nữa, chúng ta hãy bắt đầu thôi nào.",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "Xin chào và chào mừng đến với một phần thử nghiệm của một loạt chương mới. Chúng ta sẽ đi sâu vào lịch sử của một số scandal lớn nhất thế giới -- những cái mà bạn có thể đã biết, và những cái mà bạn chưa từng biết. Chương trình này được lấy cảm hứng một phần từ một chương trình của RTE mang tên Scannál. Mặc dù, thay vì tập trung vào các sự kiện liên quan đến Ireland, tôi dự định sẽ mở rộng phạm vi những gì mình sẽ trình bày. Tốt rồi, không cần thêm lời nói nữa, hãy bắt đầu ngay."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-vi-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.221423983573914,
+      "target" : "vi",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Đối với Bob Anderson, Chuyên gia về khủng long săn mồi, thái độ của người đi đầu đơn thuần là ngạo mạn và ngu dốt. Tất cả các loài chim săn mồi đều chỉ được coi là chim hại. Ý tôi là tất cả chúng đều là diều hâu săn gà. Chúng là những loài chim xấu xa, là một con chim Đại bàng đàu trắng, Đại bàng lông vàng, Đại bàng đuôi đỏ. Tất cả chúng đều đã bị bắn.",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "Đối với Bob Anderson, chuyên gia về chim ưng, thái độ của người tiên phong đơn giản là kiêu ngạo và thiếu hiểu biết. Tất cả các loài chim săn mồi đều chỉ được xem là chuột nhắt. Tôi có nghĩa, chúng đều là chim ăn thịt gà. Chúng đều là những con chim xấu, bất kể là Chim ưng trắng, Chim ưng vàng hay Chim ưng đuôi đỏ. Chúng đều bị bắn."
+        }
+      ]
+    }
+  ]
+}

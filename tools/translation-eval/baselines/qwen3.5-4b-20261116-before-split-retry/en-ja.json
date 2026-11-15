@@ -1,0 +1,598 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-ja.json"
+  ],
+  "translation" : {
+    "cases" : 28,
+    "chrF" : 25.66325730417802,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        2378,
+        2348,
+        2318,
+        2288,
+        2258,
+        2228
+      ],
+      "matches" : [
+        1493,
+        865,
+        599,
+        436,
+        317,
+        231
+      ],
+      "reference" : [
+        2661,
+        2631,
+        2601,
+        2571,
+        2541,
+        2511
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 30,
+    "lines" : 30,
+    "numbersChecked" : 5,
+    "numbersKept" : 5,
+    "repeated" : 0,
+    "seconds" : 291.42858815193176,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 30
+  },
+  "translationByTarget" : {
+    "ja" : {
+      "cases" : 28,
+      "chrF" : 25.66325730417802,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          2378,
+          2348,
+          2318,
+          2288,
+          2258,
+          2228
+        ],
+        "matches" : [
+          1493,
+          865,
+          599,
+          436,
+          317,
+          231
+        ],
+        "reference" : [
+          2661,
+          2631,
+          2601,
+          2571,
+          2541,
+          2511
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 30,
+      "lines" : 30,
+      "numbersChecked" : 5,
+      "numbersKept" : 5,
+      "repeated" : 0,
+      "seconds" : 291.42858815193176,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 30
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_111975537143453440",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 17.851605892181396,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "大体自分は二つのゲームの相互作用が大好きなんだ。短編ストーリーは「面白いとこまでスキップ自在」というのがいいところで、より一瞬でハマれて満足度が高い。長編ストーリーだとエモさが桁違いで事象全てにハマり込める。瞬発性はなくなるけど、代わりにもっとクライマックスに没頭できる。",
+          "source" : "In general I really like the interplay between the two games. The advantage of shortform stories is that you can \"skip to the good part\", they can be more immediately engrossing and satisfying. The advantage of longform stories is that you can imbue whatever happens with way more emotional weight, you lose the immediacy in exchange for stronger payoffs.",
+          "text" : "一般的に、この 2 つのゲーム間の相互作用を本当に気に入っています。短編ストーリーの利点は、「良い部分へスキップできる」ことです。それらはより直感的に没入感と満足感を与えます。一方、長編ストーリーの利点は、起こるあらゆる出来事に対してはるかに大きな感情的重みを持たせることができることです。即時性は失われますが、その代わりとしてより強力な報酬が得られます。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_111976249663909024",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.801922082901001,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "AT&Tの障害情報サイトではサービス停止はないって言ってる...ニュースで落ちてるって報道してるのに😠",
+          "source" : "the AT&T status site claims there's no outages...even though the news is reporting an outage 😠",
+          "text" : "AT&T のステータスサイトには障害がないと主張していますが、ニュースでは障害が報告されています 😠"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.0262908935546875,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "溶岩憎し #firetemple",
+          "source" : "I hate lava #firetemple",
+          "text" : "私はラバ #firetemple を嫌いです。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_111977766001055104",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.203698039054871,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ライブ中継を見ると、向こうが信号を受信してることがわかる",
+          "source" : "Live feed says that they have a signal",
+          "text" : "ライブ配信によると、彼らは信号を持っているようです。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 6.5026750564575195,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ちょっと顔を動かしたかなんかで、何回かすき間ができちゃったんだけど、何か知らないけどあそこを漂ってた物のせいで鼻水が出だしたんだよね。",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "それを数回顔で触って、鼻水が出始めたのは、上空に漂っている何かが原因だと思われます。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.547429919242859,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ちょ、なんでGPSの座標が整数の度までで四捨五入されちゃうわけ、それって全く意味ないじゃん。",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "text" : "なぜ GPS の座標が最も近い整数度丸めされているのか、それは完全に価値がない。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.1567230224609375,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "あ、そうだ、これがサリー・ルーニーの最新エッセイ",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "ああ、そうか。サリー・ルーニーの最新のエッセイです。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 3,
+      "seconds" : 13.917442917823792,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "巣ができてるほうの巣箱は、ちゃっかりうちのWi-Fiを使ってる。",
+          "source" : "The box that has already a nest in it is leeching off the wifi in the house.",
+          "text" : "すでに巣がある箱は、家の Wi-Fi を吸い上げている。"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "普通はセンサーの数がもう少しあるといい。",
+          "source" : "A few more sensors in general would be nice I guess.",
+          "text" : "いくつかのセンサーを追加するのがいいかもしれないね。"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "ちょっと聞いて。今日は曇り。だから、あの（たぶん壊れてる）ソーラーパネルが何かを動かすだけの電力を生成できるかどうかわからない。",
+          "source" : "Guess what: It's cloudy today. So I'm not sure if that (probably broken) solar panel is able to generate enough juice to achieve anything.",
+          "text" : "予想してみてください：今日は曇りです。そのため、（おそらく壊れている）太陽電池パネルが十分な電力を生成して何かを達成できるか、まだわかりません。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 6.159909963607788,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "もし僕がイベントに参加するときは、ステッカーを持ってる。今、僕の予定表で唯一のイベントはというと。",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "text" : "イベントに参加する際は、常に持ち歩いています。現在、私のカレンダーに予定されている今後のイベントは以下の通りです："
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112121157211696272",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 8.24697995185852,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "メール交換をプロトンに移行したので、今ではGoogleに基本的な送信ドメイン認証の料金を払うことなく、SPFやDKIM、DMARCが全部使える。",
+          "source" : "I transferred my MX to Proton and have now full SPF, DKIM and DMARC without having to pay Google for basic email validation.",
+          "text" : "私は MX を Proton に移行し、Google に基本のメール検証料金を支払うことなく、今や SPF、DKIM、DMARC をすべて完備しています。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112132847725764752",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 7.409298896789551,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ヒューストンのインターコンチネンタル空港から国際線に搭乗手続き中、顔認証システムに出くわしたところ。何か税関関係かしらね？？",
+          "source" : "Just encountered a facial recognition system while boarding an intl flight from Houston's IAH. Apparently it's for some customs-related thing??",
+          "text" : "ヒューストンの IAH から国際線に乗船中に、顔認識システムに遭遇しました。おそらく何か関税関連の業務のためでしょうか？？"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.2854379415512085,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "みんな、楽しい土曜日を。4000フィートへようこそ。",
+          "source" : "Happy Saturday lovelies. Welcome to 4000ft.",
+          "text" : "土曜日、お疲れ様です。4000 フィートへようこそ。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 7.101390957832336,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user20 で、毎日、少なくとも2.8キロ漕いでるの？それはエルゴメーターでの記録、それとも水上？",
+          "source" : "@user20 so every day you row at least 2.8km? Is that on the erg or on the water?",
+          "text" : "@user20 毎日少なくとも 2.8km は漕っていますか？それはエッグマシンで、それとも水中ですか。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.28220796585083,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "これは日本に実在したある巨人の本物の古い映像で、軍事パレードで歩いています。衝撃的なのは、その実際のサイズです。その背丈は少なくとも4メートルはあり、フィートにすると低くとも13フィートになります。ということは、実に、現役のNBA選手、例えばシャキール・オニールや他のどの選手よりも背が高く大柄だということになります。",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "これは、日本出身の特定の巨人が軍行進に参加している、本物で本物の古い映像です。驚くべきことは彼の実際のサイズです。彼は少なくとも 4 メートルの高さ、つまり最小で 13 フィートの身長を持っています。したがって、彼はシャクィル・オニールなどの他のすべての元 NBA プレイヤーよりも本物に高く、巨大です。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 10.924355030059814,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "疑問なのは、数えられないほどの、他の新石器時代の遺跡と言われているものと同じように、どうやってこんな偉業を成し遂げたのか、ということです。どうやってそんな巨大な石を持ち上げたのでしょうか？それは、私たちが以前から何度もそう仮定しているように、かつて発展し、すでに滅亡した古代文明の遺物なのでしょうか。私たちはそのような可能性、とりわけ、ここアグラの人々に高い信憑性があるとみています。",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "問題は、無数の他のネオリチク遺跡の主張と同様に、彼らはどのようにそのような壮麗な業績を成し遂げたのか、そしてどのように巨大な石を上げられたのかという点です。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 13.886733889579773,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "音楽の仕事を20年以上続けていて、その間に２つのアルバムをリリースしました。ドイツやポーランド、スウェーデンもツアーで巡りました。 とても若いときからずっとパフォーマーだったんですね？ ええ、そうです。 若いときに公演を行った代表的な場所はありますか？",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "では、音楽には 20 年以上携わっており、その間に 2 アルバムをリリースし、ドイツ、ポーランド、スウェーデンを巡回してきました。つまり、あなたは非常に若いうちから常にパフォーマンスを行っていたのでしょうか？はい、そうです。そして、若い頃に演奏した代表的な場所はあるでしょうか？"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 18.112048983573914,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "確認しましょう。石はハサミに勝ち、ハサミは紙に勝ち、紙は石に勝ちます。あなたの勝ちです。負けた方は1つスターを失います。各ゲームの終了時に、審判はカードを再利用ボックスに戻します。もちろん、両方のプレイヤーが同じカードを選んだ場合はゲームは引き分けとなり、誰もスターを失いません。",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "チェック。チェック。ロックがスカルプを破り、スカルプがペーパーを破り、ペーパーがロックを破る。あなたは勝ちです。負けた人は 1 つの星を失います。各ゲーム終了後、審判はカードをリサイクルボックスに戻します。もちろん、両プレイヤーが同じカードを選んだ場合、ゲームは引き分けとなり、誰も星を失いません。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 15.774265050888062,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "これからダニーとサムについて詳しく教えるよ。 準備はいい？ 準備OK。 ダニー・フェントンとサム・マンソンは親友で、タッカーと一緒にほとんどの時間を過ごしてる。ダニーはゴーストパワーを持つきっかけはサムだった。 ダニー、ゴーストゾーンだって？チェックしてみなきゃ。 そうだね、君の言う通りだ。",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "ダニーとサムの全話です。準備はいい？いい。ダニー・フェントンとサム・マンスンは親友で、トッカーと一緒にほとんどすべての時間を一緒に過ごしています。サミーが、ダニーに幽霊の力を最初から与えたのです。おい、ダニー、幽霊ゾーン？見てみるべきだ。どう思う？お前正解だ。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 13.224483013153076,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "何ヶ月も経つのに、まだ彼の墓前に立っているような気がする。彼はいなくなってしまったのに、彼から離れられない。爆撃以来、制服姿の兵士を見るたびに彼を思い出してしまう。",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "すでに数ヶ月が経ちますが、私はまだ彼の墓の前で立っているように感じます。私は彼を去れません。彼は去ってしまいましたが、私はまだ彼を去れません。私が通りかかる制服を着た兵士たちの顔に彼を見かけ、爆撃以降、彼らはどこにでもいます。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 17.75023102760315,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "最低ね、トム。 セリア、僕たちは情熱に従うべきだ。君にはロボット工学があるし、僕は宇宙で活躍したいだけなんだ。 なぜ私のロボットハンドにビビってるって認めないの？ ビビッてなんかないさ、ただ... そうさ、ビビってる。巨大なロボットの爪に追われる悪夢を見てるんだ。 もうどうでもいいわ、トム！",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "トム、君は馬鹿だ。見ろ、セリア。私たちは自分の情熱に従わなければならない。君はロボット工学をやり、私は宇宙で素晴らしい存在になりたいだけだ。なぜ、自分のロボットの手が怖くて仕方ないことを認めないの？ 私は怖くないんだ、それは……いいよ、仕方ない。怖いだろ。この巨大なロボットの手で追われる悪夢を見るのだ。ああ、どうでもいいよ、トム！"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.644161939620972,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ようこそ。ようこそ、皆さん。設定がうまくできているか確認しますね。少し時間がかかるので、早めに来ました。手を洗って、準備も整えて、設定完了。これで大丈夫だと思います。ミスをしそうな気がしますが、そういう日もありますね。それでは、皆さんの準備ができたら、始めましょう。",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "ようこそ。みなさん、ようこそ。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 11.190058946609497,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "45億年以上前、天の川銀河は近くの矮小銀河と衝突しました。この衝突で星の形成が早まりました。我々の太陽系は、天の川銀河の一部です。太陽系内では、物質循環が進行していました。",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "45 億年以上前に、銀河系は近傍の矮小銀河と衝突しました。この遭遇は星の形成を促進しました。私たちの太陽系は銀河系の一部です。太陽系内では物質循環が進んでいました。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 17.57479691505432,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "レスキュー隊が街を巡回している間、俺たちは箱の中で美術館を監視しよう。 僕たちが待ちかまえているからには、悪党がカボニータを盗むのは得策じゃないからね。 金は全部使っちまった！あのダイヤモンドを盗んで売らなければ！そうしないと、サイダーで実験する羽目になる！ どうやってロボットを中に入れる？ それはもう片がついてる。",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "レスキューフォースが街をパトロールしている間、箱の中の博物館の警備は任せてください。私たちが中に待機している状態でカボンитаを悪役が盗もうとすることは、よくないことです。お金を使い果たしました！そのダイヤモンドを盗んで売らなければなりません。それ以外では、ソーダで実験を続けるしかありません。ボットをどうやって中に入れるのでしょうか？すべて準備はできています。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 3.932332992553711,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "では説明します。問題は、この中を見てみると、木の羽目板が見えますか？ 古い羽目板があって、屋根板と接合しています。そしてこれを上に被せてみます。どうなるかというと、泥がこの雨押えに溜まります。",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "はい、では説明しますね。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 17.33960795402527,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "数分間そのままにして、水で戻します。この手間いらずな料理は、コンロ調理が不要です。食材を戻すために水を沸かすだけ。それがインスタントグリッツを使う理由でもあります。調理時間も燃料も節約できて、軽い。いいね。 さて、こんな感じになってきました。完璧なとろみです。",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "数分間、そのまま放置して水分を戻します。ウルトラライト料理では、実際にはストーブで調理しません。私たちは主に水を沸騰させ、それを食材に水分を戻すために使います。これは、インスタントグリツスを採用する理由の一つでもあります。調理時間が短く、燃料も少なくて済み、重量も軽くなります。はい、そうです。ここにあるのが現状です。完璧な食感です。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 11.195003986358643,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "あっちのに乗ろうよ。 おい、君！この乗り物にはちょっと重た過ぎるな。安全第一だろ？ 30ドル？ぼったくりだ。 言っただろ？ 足元にご注意を！",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "そこにある乗り物に乗ろう。わあ、わあ、わあ、お兄さん！この乗り物はちょっと重すぎるよ。安全第一だろ？30 ドル？詐欺だ。お前には言っていたぞ。足元を見守れ！"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.779534935951233,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "どうも、新シリーズのパイロット版へようこそ。世界最悪レベルのスキャンダルの歴史を掘り下げていきますが、中には知っているものもあれば、知らないものもあるでしょう。この新シリーズはScannálというRTEの番組から一部着想を得ています。ただし、アイルランドに関連する事件だけでなく、より広範囲の事件を扱う予定です。では早速始めましょう。",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "こんにちは。新しいシリーズの試みとして、ようこそ。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ja-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 17.607959985733032,
+      "target" : "ja",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "猛禽類の専門家、ボブ・アンダーソンには、開拓者の態度はやや横柄で無知に思えました。 猛禽類はすべて害鳥とされていました。家禽の敵だと思われていたんです。ハゲワシもイヌワシもアカオノスリもすべて悪い鳥として撃たれていました。",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "猛禽専門家のボブ・アンダーソンにとって、先駆者の態度は単に傲慢で無知なものだった。すべての猛禽類はただの害獣と見なされていたのだ。つまり、彼らはいずれも「チキンハック」だった。アメリカオオカモメ、ゴールデンイーグル、レッドテールハクタキなど、いずれも悪い鳥だった。彼らはすべて撃たれたのだ。"
+        }
+      ]
+    }
+  ]
+}

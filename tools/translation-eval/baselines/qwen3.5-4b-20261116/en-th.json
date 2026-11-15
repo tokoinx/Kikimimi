@@ -1,0 +1,657 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-th.json"
+  ],
+  "translation" : {
+    "cases" : 28,
+    "chrF" : 39.94305887777744,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        4731,
+        4702,
+        4673,
+        4644,
+        4615,
+        4586
+      ],
+      "matches" : [
+        3879,
+        2700,
+        2067,
+        1653,
+        1367,
+        1159
+      ],
+      "reference" : [
+        5574,
+        5544,
+        5514,
+        5484,
+        5454,
+        5424
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 29,
+    "lines" : 30,
+    "numbersChecked" : 5,
+    "numbersKept" : 5,
+    "repeated" : 0,
+    "retried" : 2,
+    "retryFixed" : 2,
+    "seconds" : 314.45438301563263,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 29
+  },
+  "translationByTarget" : {
+    "th" : {
+      "cases" : 28,
+      "chrF" : 39.94305887777744,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          4731,
+          4702,
+          4673,
+          4644,
+          4615,
+          4586
+        ],
+        "matches" : [
+          3879,
+          2700,
+          2067,
+          1653,
+          1367,
+          1159
+        ],
+        "reference" : [
+          5574,
+          5544,
+          5514,
+          5484,
+          5454,
+          5424
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 29,
+      "lines" : 30,
+      "numbersChecked" : 5,
+      "numbersKept" : 5,
+      "repeated" : 0,
+      "retried" : 2,
+      "retryFixed" : 2,
+      "seconds" : 314.45438301563263,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 29
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-th-test-en-social_111975537143453440",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.023746013641357,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "โดยทั่วไปแล้วฉันชอบผลกระทบต่อกันระหว่างทั้งสองเกมนะ ข้อดีของเรื่องราวแบบสั้นก็คือคุณสามารถ \"ข้ามไปยังส่วนที่ดีได้\" ซึ่งดึงดูดความสนใจและทำให้เราพึงพอใจได้ทันที ส่วนข้อดีของเรื่องราวแบบยาวก็คือคุณสามารถดื่มด่ำสิ่งที่เกิดขึ้นโดยมีอารมณ์ร่วมมากขึ้นได้ แต่ก็ต้องสูญเสียความฉับไวเพื่อแลกกับความคุ้มค่าที่มากขึ้น",
+          "source" : "In general I really like the interplay between the two games. The advantage of shortform stories is that you can \"skip to the good part\", they can be more immediately engrossing and satisfying. The advantage of longform stories is that you can imbue whatever happens with way more emotional weight, you lose the immediacy in exchange for stronger payoffs.",
+          "text" : "โดยทั่วไปฉันชอบการผสมผสานระหว่างเกมทั้งสองอย่างมาก จุดเด่นของนิยายสั้นคือคุณสามารถ \"ข้ามไปส่วนที่ดี\" ได้เลย เพราะมันดึงดูดและทำให้พึงพอใจได้ทันที ในขณะที่จุดเด่นของนิยายยาวคือคุณสามารถใส่ความสำคัญทางอารมณ์ให้กับสิ่งที่เกิดขึ้นได้มากกว่า แม้จะเสียความรวดเร็วไปบ้าง แต่แลกมาด้วยผลตอบแทนที่แข็งแกร่งขึ้น"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_111976249663909024",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.784938931465149,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เว็บไซต์สถานะ AT&T อ้างว่าไม่เกิดเครือข่ายล่มใดๆ แม้ว่าข่าวจะรายงานเครือข่ายล่ม 😠",
+          "source" : "the AT&T status site claims there's no outages...even though the news is reporting an outage 😠",
+          "text" : "เว็บไซต์สถานะของ AT&T อ้างว่าไม่มีปัญหาการขัดข้อง... แม้ข่าวจะรายงานว่ามีปัญหาขัดข้อง 😠"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.4993929862976074,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉันไม่ชอบลาวา #วิหารเพลิง",
+          "source" : "I hate lava #firetemple",
+          "text" : "ฉันเกลียดลาวา #firetemple"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_111977766001055104",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.7388120889663696,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฟีดสดระบุว่าพวกเขามีสัญญาณแล้ว",
+          "source" : "Live feed says that they have a signal",
+          "text" : "สัญญาณถ่ายทอดสดระบุว่าพวกเขาได้รับสัญญาณแล้ว"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.423735976219177,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉันน่าจะทำซีลพังไปสองสามครั้งแค่เพราะขยับหน้าไปมา และเริ่มมีน้ำมูกเพราะอะไรสักอย่างที่ลอยอยู่ในอากาศเนี่ยแหละ",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "ผมเปิดผนึกมันไปหลายครั้งแค่ขยับหน้าตามันไปมา ผมคิดว่าแล้วจมูกผมก็เริ่มไหลจาก Whatever ที่ลอยอยู่รอบๆ ขึ้นไปนั่นแหละครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.016934037208557,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "อะไรวะ ทำไมพิกัด GPS ถูกปัดเศษเป็นองศาจำนวนเต็มที่ใกล้ที่สุดที่ไม่มีค่าอะไรเลย",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "text" : "ทำไมพิกัด GPS ถึงถูกปัดเศษเป็นองศาเต็มเท่านั้น มันไร้ค่าจริงๆ ครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.542088031768799,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "อ้าใช่ นี่เป็นเรียงความชิ้นใหม่ของ Sally Rooney",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "อ๋อ ใช่แล้ว นี่คือบทความล่าสุดของซาลี่ รูนี"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 3,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.151311039924622,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "กล่องที่มีรังอยู่แล้วดึงสัญญาณไวไฟมาจากในบ้าน",
+          "source" : "The box that has already a nest in it is leeching off the wifi in the house.",
+          "text" : "กล่องที่มีรังอยู่แล้วกำลังดูดพลังงานจาก WiFi ในบ้าน"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "มีเซ็นเซอร์เพิ่มอีกสองสามตัวก็อาจจะดีนะ",
+          "source" : "A few more sensors in general would be nice I guess.",
+          "text" : "น่าจะดีถ้ามีเซนเซอร์เพิ่มเติมอีกสักหน่อย ผมเดาว่าคงเป็นเช่นนั้น"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "ลองเดาสิ วันนี้มีเมฆปกคลุม ฉันเลยไม่แน่ใจว่าแผงพลังงานแสงอาทิตย์ (อาจจะเสียหาย) สามารถสร้างพลังงานได้เพียงพอที่จะทำให้อุปกรณ์ใช้งานอะไรได้ไหม",
+          "source" : "Guess what: It's cloudy today. So I'm not sure if that (probably broken) solar panel is able to generate enough juice to achieve anything.",
+          "text" : "ลองเดาดูสิ: วันนี้เมฆมาก ดังนั้นผมไม่แน่ใจว่าแผงโซลาร์เซลล์ที่ (น่าจะเป็น) เสียหายนั้นสามารถผลิตไฟเพียงพอที่จะทำอะไรได้เลยไหมครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.618008017539978,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ถ้าผมไปงานอีเวนท์ผมก็จะพกไปด้วย งานอีเวนท์ที่กำลังจะจัดขึ้นที่ผมจะไปก็คือ",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "text" : "ถ้าฉันอยู่ที่งาน ฉันจะพกพวกเขาไปด้วย เหตุการณ์เดียวที่เหลืออยู่ในปฏิทินของฉันตอนนี้คือ:"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112121157211696272",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.30774998664856,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ผมถ่ายโอน MX ของผมไปยัง Proton และตอนนี้ก็มีการรองรับ SPF, DKIM และ DMARC อย่างสมบูรณ์โดยที่ไม่ต้องจ่ายให้กับ Google สำหรับการตรวจสอบยืนยันอีเมลขั้นพื้นฐาน",
+          "source" : "I transferred my MX to Proton and have now full SPF, DKIM and DMARC without having to pay Google for basic email validation.",
+          "text" : "ฉันย้าย MX ของฉันไป Proton และตอนนี้มี SPF, DKIM และ DMARC ครบถ้วนโดยไม่ต้องจ่ายให้ Google สำหรับการตรวจสอบอีเมลพื้นฐาน"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112132847725764752",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.771124005317688,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เพิ่งเจอกับระบบจดจำใบหน้าขณะขึ้นเครื่องเที่ยวบินต่างประเทศจากสนามบินจอร์จบุชอินเตอร์คอนติเนนตัลในฮิวสตัน ดูเหมือนว่าจะเป็นระบบเกี่ยวกับศุลกากรหรือเปล่านะ",
+          "source" : "Just encountered a facial recognition system while boarding an intl flight from Houston's IAH. Apparently it's for some customs-related thing??",
+          "text" : "เพิ่งเจอระบบจดจำใบหน้าตอนขึ้นเครื่องบินระหว่างประเทศจาก IAH ของฮูสตัน ดูเหมือนจะเป็นสำหรับเรื่องศุลกากรสักอย่าง??"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.858896970748901,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สวัสดีวันเสาร์ค่ะเพื่อนๆ ที่น่ารัก ขอต้อนรับสู่ความสูง 4000 ฟุต",
+          "source" : "Happy Saturday lovelies. Welcome to 4000ft.",
+          "text" : "วันเสาร์ที่สดใสครับ ยินดีต้อนรับสู่ระดับความสูง 4,000 ฟุต"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.900668978691101,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user20 ก็คือคุณกรรเชียงอย่างน้อยวันละ 2.8 กม. เหรอ คุณเล่นเครื่องกรรเชียงบกหรือกรรเชียงในน้ำ",
+          "source" : "@user20 so every day you row at least 2.8km? Is that on the erg or on the water?",
+          "text" : "@user20 ดังนั้นทุกวันคุณพายอย่างน้อย 2.8 กิโลเมตร ใช่ไหม? เป็นการพายบนเครื่องวัดแรงต้านหรือบนน้ำ?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.317829012870789,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "นี่เป็นฟุตเทจเก่าของจริงที่แสดงภาพคนร่างยักษ์ตัวจริงจากญี่ปุ่นที่กำลังเดินอยู่ในขบวนของทหาร สิ่งที่น่าทึ่งเกี่ยวกับฟุตเทจนี้ก็คือขนาดร่างกายของเขา เขามีความสูงอย่างน้อย 4 เมตร ซึ่งก็คืออย่างน้อย 13 ฟุต ดังนั้น เขาจึงมีรูปร่างสูงใหญ่กว่านักบาสเกตบอล NBA ทุกๆ คน ตัวอย่างเช่น Shaquille O'Neal หรือ",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "นี่คือภาพเก่าที่แท้จริงและจริงใจของบุคคลยักษ์จากญี่ปุ่นที่แน่นอนคนหนึ่งกำลังเดินในขบวนทหาร สิ่งที่น่าตกใจคือขนาดจริงของเขา เขาสูงอย่างน้อย 4 เมตร ซึ่งเท่ากับอย่างน้อย 13 ฟุต ดังนั้นเขาจึงสูงและหนักกว่าผู้เล่น NBA ต้นฉบับทุกคน เช่น ชากิล โอนีล หรือ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.128131985664368,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "คำถามก็แบบเดียวกันกับซากปรักหักพังในยุคหินใหม่อื่นๆ ที่มีการอ้างสิทธิ์ ก็คือพวกเขาสร้างสิ่งน่าอัศจรรย์นี้ขึ้นมาได้ยังไง ยกก้อนหินขนาดมหึมาได้ยังไง ซากเหล่านี้เป็นเศษเสี้ยวที่หลงเหลือของอารยธรรมที่ครั้งหนึ่งเคยก้าวหน้าแต่กลับถูกทำลายอย่างที่เราเคยสันนิษฐานมาแล้วหลายครั้งหรือไม่ เราคิดว่าความเป็นไปได้เหล่านี้มีความน่าดึงดูดอย่างมาก โดยเฉพาะผู้คนในเมือง Agra แห่งนี้",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.49127197265625,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉันทำงานกับดนตรีมาเป็นเวลากว่า 20 ปีแล้ว และได้ออกอัลบั้ม 2 อัลบั้มในช่วงเวลานั้น รวมถึงทัวร์คอนเสิร์ตในเยอรมนีและโปแลนด์ และแน่นอนว่าสวีเดนด้วย ก็คือคุณเป็นนักดนตรีมาตั้งแต่ตอนอายุน้อยๆ เลยใช่ไหม ใช่แล้ว แล้วมีสถานที่ไหนที่คุณไปแสดงตอนเด็กๆ ที่คุณรู้สึกว่าโดดเด่นและเป็นที่จดจำบ้างไหม",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "ดังนั้น ฉันจึงทำงานกับดนตรีมาเกิน 20 ปีแล้ว และได้ออกอัลบั้มสองชุดในช่วงเวลานั้น รวมถึงการทัวร์ในเยอรมนี โปแลนด์ และสวีเดน แน่นอน ดังนั้นคุณเคยเป็นนักแสดงตั้งแต่ยังเด็กเสมอใช่ไหม ใช่ ฉันเคยทำมา และเคยมีสถานที่ที่เป็นตำนานที่คุณเคยแสดงเมื่อตอนยังเด็กไหมบ้าง?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.235782027244568,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ตรวจสอบ ตรวจสอบ ค้อนชนะกรรไกร กรรไกรชนะกระดาษ และกระดาษชนะค้อน คุณเป็นฝ่ายชนะ ฝ่ายที่แพ้จะเสียดาวไปหนึ่งดวง เมื่อจบแต่ละเกม กรรมการจะเอาการ์ดใส่กลับเข้าไปในกล่องรีไซเคิล แน่นอนว่าหากทั้งสองฝ่ายออกการ์ดหน้าเดียวกัน ก็จะถือว่าเสมอ และไม่มีใครต้องเสียดาวไป",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "ตรวจสอบ ตรวจสอบ ร็อคชนะสกินเนอร์ สกินเนอร์ชนะกระดาษ และกระดาษชนะร็อค คุณชนะ ผู้แพ้จะเสียดาวหนึ่งดวง ในแต่ละเกม เมื่อผู้ตัดสินเสร็จสิ้น เขาจะใส่การ์ดกลับลงในกล่องรีไซเคิล แน่นอนว่าหากผู้เล่นทั้งสองเลือกการ์ดเดียวกัน เกมจะเป็นเสมอ และไม่มีใครเสียดาว"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 21.062322974205017,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "และนี่คือเรื่องราวทั้งหมดของ Danny กับ Sam พร้อมมั้ย พร้อมแล้ว Danny Fenton กับ Sam Manson เป็นเพื่อนรักกัน ทั้งสองคนและ Tucker ใช้เวลาอยู่ด้วยกันบ่อยๆ และ Sam ก็คือต้นเหตุที่ทำให้ Danny ได้รับพลังวิญญาณมา เดี๋ยวนะ Danny พื้นที่วิญญาณอย่างนั้นหรอ นายต้องเข้าไปสำรวจนะ จะว่าไปเธอก็พูดถูกนะ",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "นี่คือเรื่องราวทั้งหมดของแดนนี่และแซม พร้อมหรือยัง? พร้อม แดนนี่เฟอนตันและแซมแมนสันเป็นเพื่อนสนิท และพร้อมกับทักเกอร์ พวกเขาใช้เวลาส่วนใหญ่ร่วมกัน แซมคือเหตุผลที่ทำให้แดนนี่มีพลังวิญญาณตั้งแต่แรก มาเลย แดนนี่ โซนวิญญาณ? คุณต้องลองดู คุณรู้ไหม? คุณถูกต้องครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.724629998207092,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ตอนนี้ก็ผ่านมาหลายเดือนแล้ว แต่ฉันรู้สึกว่าตัวเองยังคงยืนอยู่หน้าหลุมศพของเขา ฉันยังปล่อยเขาไปไม่ได้ เขาจากไปแล้ว แต่ฉันยังไม่อาจปล่อยเขาไปได้ ฉันเห็นเขาสวมชุดเครื่องแบบทหารในทุกที่ที่ฉันผ่าน และทหารก็ปรากฏตัวอยู่ในทุกๆ ที่นับตั้งแต่เกิดเหตุระเบิดครั้งนั้น",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "ผ่านไปหลายเดือนแล้ว และฉันรู้สึกเหมือนยังยืนอยู่หน้าหลุมศพของเขา ฉันไม่สามารถละทิ้งเขาได้ เขาตายไปแล้ว แต่ฉันยังคงไม่สามารถละทิ้งเขาได้ ฉันเห็นเขาในทหารทุกคนที่สวมเครื่องแบบที่ฉันพบ และพวกเขาอยู่ทุกหนทุกแห่งนับตั้งแต่เกิดระเบิดขึ้น"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.238012075424194,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ทอม นายมันคนห่วยแตก นี่ ซีเลีย เราต้องทำตามสิ่งที่หัวใจบอกเรานะ เธอก็มีหุ่นยนต์ของเธอ ส่วนฉันก็อยากแค่อยากจะเป็นคนที่สุดยอดในอวกาศ ทำไมนายถึงไม่กล้ายอมรับล่ะว่านายกลัวแขนกลของฉัน ฉันไม่กลัวเจ้า... เอ่อ ก็ได้ ฉันกลัว ฉันฝันร้ายว่าถูกกรงเล็บหุ่นยนต์ขนาดใหญ่นี่ไล่ล่า โอ้ย อะไรกันเนี่ยทอม!",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "คุณเป็นคนที่แย่จริงๆ ทอม ดูสิ เซลิ娅 เราต้องทำตามสิ่งที่เราหลงใหล เธอมีหุ่นยนต์ของเธอ而我แค่อยากเป็นสุดยอดในอวกาศ ทำไมไม่ยอมรับเลยว่าคุณกลัวมือหุ่นยนต์ของฉัน? ฉันไม่ได้กลัวหรอก มันคือ... โอเค ได้แล้ว ฉันกลัวจริงๆ ฉันฝันร้ายว่าฉันกำลังถูกไล่ล่าโดยกรงเล็บหุ่นยนต์ยักษ์นั้น โอ้ ไร้ความหมาย ทอม!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.200945973396301,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ยินดีต้อนรับค่ะ ยินดีต้อนรับทุกคนค่ะ ฉันขอดูก่อนว่าทั้งหมดนี้ใช้ได้หรือเปล่า ขอเวลานาทีนึงนะคะ วันนี้ฉันมาเร็วหน่อยจะได้แน่ใจค่ะ เพิ่งล้างมือไปแล้วก็พร้อมเริ่มแล้วค่ะ ฉันเพิ่งเตรียมอะไรต่างๆ เสร็จเลยค่ะ ฉันคิดว่าเราน่าจะพร้อมแล้ว ฉันรู้สึกได้ว่าวันนี้ต้องทำอะไรพลาดแน่ๆ เลย เหมือนไม่ใช่วันของฉันเลยค่ะ เอาล่ะ ฉันจะรอให้คนเข้ามาก่อนนะคะ แล้วเราจะได้เริ่มกันเลย",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "ยินดีต้อนรับ ยินดีต้อนรับทุกคน ผมจะตรวจสอบให้แน่ใจว่าทุกอย่างทำงานได้ปกติ ใช้เวลาแค่ไม่กี่นาที ผมจึงมาล่วงหน้าเล็กน้อยเพื่อตรวจสอบให้แน่ใจ ล้างมือและเตรียมตัวเรียบร้อยแล้ว ตอนนี้กำลังจัดเตรียมเสร็จสิ้นแล้ว ผมคิดว่าพร้อมแล้ว ผมอาจจะทำผิดพลาดได้ ผมรู้สึกถึงมัน นั่นเป็นวันที่หนึ่งแบบนี้ ดังนั้นผมจะรอให้ผู้คนเข้าระบบก่อน แล้วเราจะเริ่มงาน"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.346150994300842,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "กว่า 4,500 ล้านปีก่อน กาแล็กซีทางช้างเผือกได้ชนเข้ากับกาแล็กซีแคระใกล้ๆ การชนกันครั้งนี้ส่งผลให้เกิดดวงดาวต่างๆ เร็วขึ้น ระบบสุริยะของเราก็เป็นส่วนหนึ่งของกาแล็กซีทางช้างเผือก ภายในระบบสุริยะนี้ องค์ประกอบต่างๆ มีการหมุนเวียนอยู่ตลอด",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "ก่อน 4.5 พันล้านปี กาแล็กซีทางช้างเผือกชนกับกาแล็กซีแคระใกล้เคียง การพบกันนี้เร่งการก่อตัวของดาวฤกษ์ ระบบสุริยะของเราเป็นส่วนหนึ่งของกาแล็กซีทางช้างเผือก ภายในระบบสุริยะวัฏจักรของสสารดำเนินมาอย่างต่อเนื่อง"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.20629596710205,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ตอนที่ Rescue Force ออกไปตรวจตราในเมือง เราจะคอยดูแลเพชรในกล่องให้กับพิพิธภัณฑ์ พวกคนร้ายคงไม่คิดจะพยายามขโมย Cabbonita ทั้งๆ ที่เรารออยู่ในพิพิธภัณฑ์หรอกนะ เราไม่มีเงินแล้ว! เราต้องขโมยเพชรเอาไปขายให้ได้! ไม่อย่างนั้น เราคงจะต้องไปทำการทดลองกับโซดาป๊อบแน่! แล้วเราจะเอาบอทเข้ามาในนี้ได้ยังไง ฉันเตรียมการทุกอย่างไว้หมดแล้ว",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "ในขณะที่กำลัง Force การกู้ภัยลาดตระเวนในเมือง เราจะดูแลพิพิธภัณฑ์ในกล่องให้ มันจะไม่เป็นความคิดที่ดีสำหรับตัวร้ายที่จะพยายามขโมย Cabbonita ในขณะที่เรารออยู่ข้างใน เราไม่มีเงินแล้ว! เราจะต้องขโมย那颗เพชรและขายมัน! มิฉะนั้น เราจะต้องทำการทดลองกับน้ำอัดลม! เราจะเอาบอทเข้าไปได้อย่างไร? เรื่องทั้งหมดจัดการเรียบร้อยแล้วครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.827441930770874,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "โอเค ให้ผมอธิบายนะ เอาล่ะ ปัญหาก็คือ ถ้าคุณดูข้างในนั่น... คุณเห็นผนังไม้ไหม ตรงนั้นคือผนังเก่า และมันไปติดกับแผ่นมุงหลังคาตรงนั้น จากนั้นผมใส่สิ่งนี้ทับลงไป และสิ่งที่เกิดขึ้นก็คือสิ่งสกปรกจะไปสะสมกันอยู่ตรงนั้น ตรงแผ่นมุงข้อต่อของหลังคานั้น",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "ได้แล้ว ดังนั้นให้ผมอธิบายหน่อยครับ ถูกต้องแล้ว ปัญหาคือ ถ้าคุณมองเข้าไปข้างใน... คุณเห็นผนังไม้ด้านนอกไหม? นั่นคือผนังไม้เก่า และมันสัมผัสกับกระเบื้องหลังคานั้นๆ ตรงนั้น จากนั้นผมจึงวางสิ่งนี้ทับลงไป และสิ่งที่เกิดขึ้นคือฝุ่นดินจะสะสมอยู่ที่นั่น ที่รอยต่อระหว่างผนังไม้กับกระเบื้องหลังคา"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 24.290482997894287,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เราจะปล่อยทิ้งไว้และดูดความชื้นสักสองสามนาที เมื่อทำอาหารแบบใช้อุปกรณ์น้อยเป็นพิเศษ เราจะไม่ทำอาหารบนเตาไฟกันจริงๆ ส่วนมากเราจะต้มน้ำ เพื่อให้เราสามารถเติมความชื้นให้กับอาหารของเราได้ ซึ่งก็เป็นอีกเหตุผลหนึ่งที่เราใช้โจ๊กสำเร็จรูป Instant Grits ด้วย เวลาทำอาหารน้อยลง เชื้อเพลิงน้อยลง และน้ำหนักน้อยลง ใช่เลย สิ่งที่เราทำกันก็มีประมาณนี้ กลมกลืนกันอย่างสมบูรณ์แบบ",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "เราจะปล่อยให้มันพักและดูดซึมน้ำไว้สักสองสามนาที ในการทำอาหารแบบเบา เราไม่ได้ใช้เตาจริง เราต้มน้ำเป็นหลักเพื่อให้สามารถนำอาหารกลับมาเป็นสภาพเดิมได้ นี่ก็เป็นหนึ่งในเหตุผลที่เราใช้ข้าวโพดผงสำเร็จรูป เวลาทำอาหารน้อยลง เชื้อเพลิงน้อยลง และน้ำหนักน้อยลง โอเคครับ ดังนั้นนี่คือสิ่งที่เรามีอยู่ที่นี่ ความสม่ำเสมอที่สมบูรณ์แบบครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.26724100112915,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ไปขี่คันนั้นตรงนั้นกัน โว้ โว้ โว้ พ่อหนุ่มตัวโต! นายหนักเกินไปหน่อยไหมที่จะขี่คันนี้ ความปลอดภัยต้องมาก่อนไหม 30 ร่างกฎหมายเหรอ โกงกันชัดๆ บอกแล้วไง ระวังด้วย!",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "มาขี่คันนั้นกันเถอะ ว้าว ว้าว ว้าว เด็กน้อย! คุณหนักไปหน่อยสำหรับรถคันนี้ ความปลอดภัยมาก่อนนะใช่หรือไม่? 30 บิล? นี่เป็นการฉ้อโกงจริงๆ ฉันบอกไปแล้ว ให้ระวังทางนะ!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.411021947860718,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สวัสดีและยินดีต้อนรับสู่บทนำร่องของซีรีส์ใหม่ ซึ่งจะเจาะลึกเกี่ยวกับประวัติเรื่องอื้อฉาวที่เลวร้ายที่สุดในโลกบางส่วน พวกคุณบางคนอาจรู้จัก และบางคนก็อาจจะไม่ โดยได้รับแรงบันดาลใจบางส่วนจากโปรแกรม RTE ชื่อว่า Scannál แม้ว่าผมจะวางแผนขยายขอบเขตสิ่งที่จะกล่าวถึงมากกว่ามุ่งเน้นไปที่เหตุการณ์ที่เชื่อมโยงกับไอร์แลนด์ก็ตาม เอาล่ะ เพื่อไม่ให้เป็นการเสียเวลา มาเริ่มกันเลย",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "สวัสดีและยินดีต้อนรับสู่การทดลองของซีรีส์ใหม่这将深入探讨一些世界上最糟糕的丑闻的历史--有些您可能听说过，有些则不然。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.06941509246826,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สำหรับผู้เชี่ยวชาญด้านแรปเตอร์อย่าง Bob Anderson ทัศนคติของผู้ริเริ่มรายนี้ยโสโอหังและขาดความรู้เลยก็ว่าได้ นกล่าเหยื่อทั้งหมดถูกพิจารณาว่าเป็นเพียงสัตว์ที่เป็นภัย คือว่า พวกมันทั้งหมดก็เป็นไก่ฮอว์ก พวกมันทั้งหมดเป็นนกที่ไม่ดี ไม่ว่าจะเป็นอินทรีหัวขาว อินทรีทอง เหยี่ยวหางแดง ทั้งหมดล้วนโดนยิง",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "สำหรับบ็อบ แอนเดอร์สัน นักเชี่ยวชาญเรื่องแรปเตอร์ ความเห็นของนักบุกเบิกคนนั้นคือเขาสงสัยและไร้ความรู้อย่างสิ้นเชิง นกนักล่าทุกชนิดถูกมองว่าเป็นสัตว์รบกวน ฉันหมายถึง พวกมันทั้งหมดเป็นนกฮอกไก่ พวกมันทั้งหมดเป็นนกที่แย่ไม่ว่าจะเป็นเหยี่ยวขาว เหยี่ยวทอง หรือเหยี่ยวหางแดง พวกมันถูกยิงหมดแล้ว"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,658 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-zh.json"
+  ],
+  "translation" : {
+    "cases" : 28,
+    "chrF" : 35.450166713144704,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        2044,
+        2014,
+        1984,
+        1954,
+        1924,
+        1894
+      ],
+      "matches" : [
+        1449,
+        968,
+        683,
+        496,
+        369,
+        286
+      ],
+      "reference" : [
+        2048,
+        2018,
+        1988,
+        1958,
+        1928,
+        1898
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 30,
+    "lines" : 30,
+    "numbersChecked" : 5,
+    "numbersKept" : 5,
+    "repeated" : 0,
+    "retried" : 1,
+    "retryFixed" : 1,
+    "seconds" : 278.08865320682526,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 30
+  },
+  "translationByTarget" : {
+    "zh" : {
+      "cases" : 28,
+      "chrF" : 35.450166713144704,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          2044,
+          2014,
+          1984,
+          1954,
+          1924,
+          1894
+        ],
+        "matches" : [
+          1449,
+          968,
+          683,
+          496,
+          369,
+          286
+        ],
+        "reference" : [
+          2048,
+          2018,
+          1988,
+          1958,
+          1928,
+          1898
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 30,
+      "lines" : 30,
+      "numbersChecked" : 5,
+      "numbersKept" : 5,
+      "repeated" : 0,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 278.08865320682526,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 30
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_111975537143453440",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.112933039665222,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "总的来说，我很喜欢这两款游戏之间的互动。短篇故事的优势在于可以“跳到精彩的部分”，玩家更容易沉浸其中，获得满足感。长篇故事的优势在于无论发生什么，玩家都可以注入更多的情感，牺牲即时性来换取更大的回报。",
+          "source" : "In general I really like the interplay between the two games. The advantage of shortform stories is that you can \"skip to the good part\", they can be more immediately engrossing and satisfying. The advantage of longform stories is that you can imbue whatever happens with way more emotional weight, you lose the immediacy in exchange for stronger payoffs.",
+          "text" : "总体而言，我非常喜欢这两部作品之间的互动。短篇故事的优势在于你可以“直奔精彩部分”，它们能更直接地引人入胜并带来满足感。长篇故事的优势则在于，你可以为发生的一切赋予更深的情感分量，虽然牺牲了即时性，但换来了更强烈的回报。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_111976249663909024",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.575310111045837,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "AT&T 的状态页面显示一切正常，没有发生任何故障……可新闻里都在报道断网的事儿😠",
+          "source" : "the AT&T status site claims there's no outages...even though the news is reporting an outage 😠",
+          "text" : "AT&T 状态网站声称没有故障……尽管新闻报道了故障 😠"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.4837570190429688,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "岩浆真是烦死人了 #火之神殿",
+          "source" : "I hate lava #firetemple",
+          "text" : "我讨厌熔岩 #火神殿。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_111977766001055104",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.672389030456543,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "直播消息说他们已经收到信号了",
+          "source" : "Live feed says that they have a signal",
+          "text" : "实时画面显示他们已收到信号。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.705363035202026,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "我想我只是稍微动了一下脸，就不小心把密封条弄破了，然后也不知上面飘着什么怪东西，我的鼻子就开始流鼻涕。",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "我几次把它封条弄破，大概只是我的脸动了动，结果鼻子就开始流鼻涕，不知道上面飘来的是什么。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.3780059814453125,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "为什么GPS坐标要四舍五入到最近的整度数？这完全没有用。",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "text" : "为什么 GPS 坐标会被四舍五入到最近的整度？这简直毫无价值。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.424129009246826,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "哦，对了，这是莎莉·鲁尼最新的文章。",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "哦，对了，这是萨莉·鲁尼的最新随笔。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 3,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.412117004394531,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "现在有一个巢箱，已经连上了家里的无线网络。",
+          "source" : "The box that has already a nest in it is leeching off the wifi in the house.",
+          "text" : "那个已经筑好巢的盒子正在吸走家里的 Wi-Fi 信号。"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "我想，如果能多几个传感器就好了。",
+          "source" : "A few more sensors in general would be nice I guess.",
+          "text" : "我想再加几个传感器也不错。"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "猜猜怎么着：今天阴天！所以我不确定那块（可能已经坏掉的）太阳能板能不能产生足够的电力来干活儿。",
+          "source" : "Guess what: It's cloudy today. So I'm not sure if that (probably broken) solar panel is able to generate enough juice to achieve anything.",
+          "text" : "猜猜看：今天多云，所以我不确定那块（可能坏了）太阳能板能否产生足够的电量来实现任何功能。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.399505019187927,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "如果我去参加活动，我就会带上贴纸。目前，我的日程表上即将参加的活动只有：",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "text" : "如果我在某个活动上，我会随身携带它们。我目前日历上即将举行的活动只有："
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112121157211696272",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.493670105934143,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "我把 MX 记录转移到了 Proton，现在有了完整的 SPF、DKIM 和 DMARC，而不用再为了基本的电子邮件验证向谷歌付费。",
+          "source" : "I transferred my MX to Proton and have now full SPF, DKIM and DMARC without having to pay Google for basic email validation.",
+          "text" : "我已将 MX 迁移至 Proton，现在无需向 Google 支付基础邮件验证费用，即可拥有完整的 SPF、DKIM 和 DMARC。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112132847725764752",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.006415963172913,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "刚刚在休斯顿的乔治·布什洲际机场 (IAH) 登机时碰到了面部识别系统。看来是跟海关手续有关？",
+          "source" : "Just encountered a facial recognition system while boarding an intl flight from Houston's IAH. Apparently it's for some customs-related thing??",
+          "text" : "在从休斯顿 IAH 乘坐国际航班登机时，刚好遇到一个面部识别系统。看来这是为了某些海关相关的事情？??"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.731459021568298,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "亲爱的朋友们，周六快乐。欢迎来到4000英尺的高空。",
+          "source" : "Happy Saturday lovelies. Welcome to 4000ft.",
+          "text" : "周六快乐，亲爱的们。欢迎来到 4000 英尺。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.966513991355896,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user20 所以你每天至少要划2.8公里？是在划船机上还是在水上？",
+          "source" : "@user20 so every day you row at least 2.8km? Is that on the erg or on the water?",
+          "text" : "@user20 所以每天你至少划行 2.8 公里？这是在水上划还是用划船机划的？"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.681535959243774,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "这是一段真实可靠的古老影像，记录了一位真正的日本巨人参加阅兵式的场景。最令人震惊的是他惊人的体型。他身高至少有4米，也就是13英尺。因此，他的确比任何一位NBA球员都要高大得多，比如沙奎尔·奥尼尔，或者……",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "这是日本一位真实存在的巨人参加军事阅兵的原始影像，令人震惊的是他的实际体型。他身高至少 4 米，也就是至少 13 英尺。因此，他确实比每一位真正的 NBA 球员都更高、更魁梧，比如沙奎尔·奥尼尔，或者……"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.561714887619019,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "问题是，就像无数其他声称是新石器时代的遗址一样，他们是如何做到这一点的？他们是如何举起这些巨大的石头的？他们是否像我们之前多次假设的那样，是一个曾经先进但已被摧毁的古代文明的遗迹？我们发现这种可能性非常大，尤其是对阿格拉人来说。",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "问题是，就像无数其他声称的新石器时代遗迹一样，他们是如何完成这些壮举的？他们是如何举起如此巨大的石头的？他们是否像我们之前多次推测的那样，是曾经先进却被摧毁的古代文明的遗存？我们发现，特别是这里提到的阿格拉人，这种可能性极具说服力。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.930646061897278,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "我从事音乐工作已经20多年了，期间发行了两张专辑，还在德国、波兰，当然还有瑞典等地巡回演出过。所以你很小的时候就开始登台表演了？是的，没错。你年轻的时候有没有在什么标志性的地方表演过？",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "所以，我从事音乐行业已超过 20 年，在此期间发行了两张专辑，并在德国、波兰以及当然还有瑞典进行了巡演。那么，你从很小的时候就一直是表演者吗？是的，我是。那么，在你年轻时是否曾在任何标志性地点进行过演出呢？"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.382532954216003,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "石头剪刀布！石头剪刀布！石头赢剪刀，剪刀赢布，布赢石头。你赢了。输的人将会失去一颗星。每轮游戏结束后，裁判会把卡片放回回收箱。当然，如果双方出的牌一样，那就是平局，谁也不会失去星星。",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "检查。检查。石头胜剪刀，剪刀胜纸张，纸张胜石头。你赢了。输家将失去一颗星。每局游戏结束时，裁判会将卡片放回回收箱。当然，如果两名玩家选择相同的卡片，则平局，没有人会失去星星。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.495537996292114,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "丹尼和萨姆的故事还要从头说起。准备好了吗？准备好了。丹尼·芬顿和萨姆·曼森是一对好朋友，他们和塔克几乎形影不离。丹尼之所以拥有幽灵的力量，都是因为萨姆。拜托，丹尼，幽灵区哎？你一定要去看看。你知道吗？你说得对。",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "这是丹尼和山姆的完整故事。准备好了吗？好了。丹尼·芬顿和山姆·曼森是形影不离的好朋友，再加上塔克，他们几乎把所有时间都花在一起了。正是山姆让丹尼拥有了鬼魂能力。来吧，丹尼，去鬼域看看？你得去看看。你知道吗？你说得对。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.999639987945557,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "已经过去好几个月了，但我感觉自己仍然站在他的墓前。我无法离开他。他已经走了，可我还是无法离开他。我在每一个路过的士兵身上都能看到他的影子，而在爆炸案发生后，到处都是士兵。",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "已经过了几个月，我依然感觉就站在他墓前。我无法离开他。他已经不在了，可我依然无法离开他。每当我经过身穿制服的士兵时，都会看见他，而自轰炸以来，他们无处不在。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.995428085327148,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "汤姆，你真是个混蛋。听着，西莉亚，我们都应该追随自己的梦想。你的梦想是机器人技术，而我的梦想是在太空中大展拳脚。你为什么不承认你就是被我的机械手吓坏了？我才没有被吓到呢，只是……好吧好吧，我承认。我是被吓到了。我总是做噩梦，梦见自己被一只巨大的机器爪子追赶。哦，随便吧，汤姆！",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "你是个混蛋，汤姆。听着，西莉亚，我们必须追随我们的激情。你有你的机器人，而我只是想成为太空中的英雄。你难道不承认自己被我的机械手吓到了吗？我并没有被……好吧，行吧。我被吓到了。我噩梦连连，梦见被这个巨大的机械爪子追赶。哦，随便你了，汤姆！"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 23.364206075668335,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "欢迎大家。我正在确认设备一切正常，可能需要一点时间。所以我提前了一会儿，确认一下。我刚洗完手，准备出发了。布置工作也做好了。一切准备就绪。我今天肯定会犯错的，我能感觉到。今天真是诸事不顺。我就等大家到齐了再开始。",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "欢迎。欢迎大家。我只是想确认一切都在正常运行。只需要一分钟。所以我提前一点来，就是为了确保万无一失。刚洗完手，正准备出发。我正在最后布置一下。我觉得我们准备好了。我会犯错的，我能感觉到。这就是那种日子。那我就等大家上线，然后我们就开始。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.049198031425476,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "45亿多年前，银河系与附近的一个矮星系发生了碰撞。这次碰撞加速了恒星的形成。我们的太阳系是银河系的一部分。在太阳系内，物质循环一直在进行。",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "45 亿多年前，银河系与一颗邻近的矮星系发生碰撞，这次相遇加速了恒星的形成。我们的太阳系是银河系的一部分。在太阳系内，物质循环一直在进行。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.001965999603271,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "救援部队在城市里巡逻的时候，我们负责看守箱子里的博物馆。如果有坏蛋想偷走卡博尼塔，那他们可要倒霉了，因为我们就在里面等着他们。我们没钱了！我们得把那颗钻石偷出来卖掉！否则，我们就只能用汽水来做实验了！我们怎么把机器人弄进去？都安排好了。",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "当救援部队在城市巡逻时，我们将负责看守盒子里的博物馆。如果反派趁我们待在里面时试图偷走卡波尼塔，那就不妙了。我们的钱用光了！我们必须偷那颗钻石并卖掉它！否则，我们就得用苏打水做实验了！我们该如何让机器人进入呢？一切都已经安排好了。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.37789499759674,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "好的，我来解释一下。问题是，你们看里面……看到木头墙板了吗？那是原来的墙板，紧挨着那边的瓦。然后我把这个盖在上面。结果灰尘就堆积在那儿，堆积到泛水板上。",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "好的，让我来解释一下。没问题，问题是，如果你往里面看……你看到木 siding 了吗？那是旧的 siding，它紧挨着那里的瓦片。然后我把这个盖在上面。发生的情况是，泥土会积聚在那里，积聚在那个防水层上。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.516174912452698,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "让它静置几分钟，让它吸收水分。超轻烹饪不是真的在炉子上做饭，主要是烧开水，然后给食物补水。这也是我们用速食粗玉米粉的原因之一。烹饪时间更短，用的燃料更少，重量更轻。哦耶。这就是我们在这里要做的。稠度刚刚好。",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "我们只是让它静置几分钟以重新吸水。在使用超轻烹饪时，我们实际上并不是在炉灶上做饭。我们主要是煮沸水，以便重新冲泡食物。这也是我们使用速食玉米糊的原因之一。烹饪时间更短、燃料更少、重量也更轻。哦，是的。所以这就是我们现在的情况。质地完美。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.676663994789124,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "我们去坐那边那个吧。吁，吁，吁，大个子！你有点太重了，不适合玩这个。安全第一，嗯？30美元？抢钱啊。我早就告诉过你了。小心点！",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "我们骑那个吧。哇，哇，哇，大男孩！你有点太胖了，这辆车载不动。安全第一，对吧？30 张钞票？真是宰客。我说过。小心脚下！"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.926459908485413,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "大家好，欢迎收看新系列节目的试播集。在本系列节目中，我们将深入探究世界上一些最恶劣的丑闻——有些你可能听说过，有些你可能闻所未闻。本系列节目的部分灵感来自于爱尔兰广播电视公司 (RTE) 的一档名为“丑闻”的节目。不过，我并不打算只关注与爱尔兰相关的事件，而是会将节目内容的范围进一步扩大。好了，闲话少说，我们马上开始。",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "大家好，欢迎来到这个新系列的首播。我们将深入探讨一些世界上最严重的丑闻的历史——有些您可能听说过，有些则不然。这一节目部分受到爱尔兰电视台（RTE）一档名为《Scannál》的节目的启发。不过，与以往不同，我计划扩大涵盖范围，不再局限于与爱尔兰相关的事件。好了，不拖延时间，我们开始吧。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-zh-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.76748502254486,
+      "target" : "zh",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "在猛禽专家鲍勃·安德森看来，这位拓荒者的态度既傲慢又无知。所有的猛禽都被视为害鸟。“它们都是鸡鹰。都是坏鸟，无论是白头海雕、金雕还是红尾鵟，统统都要猎杀。”",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "对于猛禽专家鲍勃·安德森来说，这位先驱的态度简直傲慢无知。所有猛禽都被视为害虫。我的意思是，它们都是“鸡鹰”。无论是白头海雕、金雕还是红尾鵟，都被认为是坏鸟，统统被射杀。"
+        }
+      ]
+    }
+  ]
+}
