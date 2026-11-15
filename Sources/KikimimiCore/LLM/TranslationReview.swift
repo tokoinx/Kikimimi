@@ -8,13 +8,16 @@ import Foundation
 public struct TranslationNote: Codable, Hashable, Sendable {
     /// 訳のまとまりの先頭の区間 (訳を持つ区間)
     public var head: UUID
-    /// 覚えた時の原文と訳 (原文 + U+0001 + 訳)。`Transcript.reviewSignature(source:translation:)` で作る
+    /// 覚えた時の原文と訳 (原文 + U+0001 + 訳)。`Transcript.reviewSignature(source:translation:)` で作る。
+    /// 訳せなかった行の覚えは、訳を空にして作る (原文 + U+0001)。後から訳が入れば合わなくなり、無い物になる
     public var signature: String
-    /// 印の理由の符号 (今は使わない。後で、訳の関門の印を入れる)
+    /// 訳の関門 (`TranslationGate`) の印の符号。"llm" なら、要確認の理由 (訳の無い行なら、訳せなかった理由)。
+    /// "confirmed"・"edited" でも残す (後で、検査の誤り・当たりの数を数えるため)
     public var flags: [String]
-    /// 印の説明 (今は使わない)
+    /// 印の説明 (消えた数など。`TranslationGate.Finding.detail`)
     public var detail: String?
-    /// 訳の出どころの符号 ("edited" = 利用者が直した、"memory" = 訳の記憶から置いた。後で "llm"・"confirmed" が増える)。
+    /// 訳の出どころの符号 ("edited" = 利用者が直した、"memory" = 訳の記憶から置いた、
+    /// "llm" = 関門の印が付いた機械の訳・訳せなかった行、"confirmed" = 印の付いた訳を、利用者が「この訳でよい」とした)。
     /// 知らない符号でも全体が読めるよう、enum にしない
     public var origin: String
     /// 利用者が直す前の機械の訳 (訳が無い行に、利用者が自分で書いた時・記憶から置いた時は nil)
@@ -25,6 +28,10 @@ public struct TranslationNote: Codable, Hashable, Sendable {
     /// 訳の記憶 (前に利用者が直した同じ文の訳) から、LLM を呼ばずに置いた訳の符号。
     /// 機械の訳の上書きからは守らない (守るのは "edited" だけ)
     public static let memory = "memory"
+    /// 関門の印が付いた機械の訳 (または、訳せなかった行の理由) の符号。機械の訳の上書きからは守らない
+    public static let llm = "llm"
+    /// 印の付いた訳を、利用者が「この訳でよい」とした符号。印は出さない。機械の訳の上書きからは守らない
+    public static let confirmed = "confirmed"
 
     public init(head: UUID, signature: String, flags: [String] = [], detail: String? = nil, origin: String,
                 machine: String? = nil) {
@@ -56,6 +63,12 @@ public struct TranslationNote: Codable, Hashable, Sendable {
 
     /// 訳の記憶から置いた訳の覚えか
     public var isRemembered: Bool { origin == Self.memory }
+
+    /// 関門の印が付いた、機械の訳 (または訳せなかった行) の覚えか。訳の在る行なら「要確認」
+    public var isFlagged: Bool { origin == Self.llm && !flags.isEmpty }
+
+    /// 利用者が「この訳でよい」とした覚えか
+    public var isConfirmed: Bool { origin == Self.confirmed }
 }
 
 extension Transcript {
@@ -84,10 +97,12 @@ extension Transcript {
         return Transcript.join(texts)
     }
 
-    /// 位置 index の区間 (訳を持つ区間) に対して、覚えが今も合うか
+    /// 位置 index の区間 (訳を持つ区間) に対して、覚えが今も合うか。
+    /// 訳の無い区間は、訳を空として比べる (訳せなかった行の理由の覚えだけが合う)
     func noteMatches(_ note: TranslationNote, at index: Int) -> Bool {
-        guard segments[index].id == note.head, let translation = segments[index].translation else { return false }
-        return note.signature == Self.reviewSignature(source: translationSource(at: index), translation: translation)
+        guard segments[index].id == note.head else { return false }
+        return note.signature == Self.reviewSignature(source: translationSource(at: index),
+                                                      translation: segments[index].translation ?? "")
     }
 
     /// 区間 head の今の覚え (原文と訳が、覚えた時と同じ物だけ)。無ければ nil
@@ -147,8 +162,10 @@ extension Transcript {
         // 直す前の機械の訳: もう直してあれば、初めに直した時の機械の訳を残す
         let machine = existing?.isEdited == true ? existing?.machine : current
         segments[index].translation = cleaned
+        // 関門の印 (と説明) は残す: 後で「検査が当たった数」を数えるため (印の出し方は "edited" のまま)
         let note = TranslationNote(head: head,
                                    signature: Self.reviewSignature(source: translationSource(at: index), translation: cleaned),
+                                   flags: existing?.flags ?? [], detail: existing?.detail,
                                    origin: TranslationNote.edited, machine: machine)
         var notes = (translationReview ?? []).filter { $0.head != head }
         notes.append(note)
@@ -166,9 +183,38 @@ extension Transcript {
               let note = translationNote(for: head), note.isEdited else { return nil }
         segments[index].translation = note.machine
         if note.machine == nil { segments[index].translationCovers = nil }
-        translationReview = (translationReview ?? []).filter { $0.head != head }
+        var notes = (translationReview ?? []).filter { $0.head != head }
+        // 印の付いた機械の訳を直していた時は、戻した機械の訳に「要確認」の印を戻す
+        if let machine = note.machine, !note.flags.isEmpty {
+            notes.append(TranslationNote(head: head,
+                                         signature: Self.reviewSignature(source: translationSource(at: index),
+                                                                         translation: machine),
+                                         flags: note.flags, detail: note.detail, origin: TranslationNote.llm))
+        }
+        translationReview = notes
         pruneTranslationReview()
         return note
+    }
+
+    /// 印の付いた機械の訳を「この訳でよい」とする (覚えの出どころを "confirmed" に変える。印と説明は残す)。
+    /// id は、その行のどの区間でもよい。変えたら、その覚えを返す。印の付いた訳でなければ nil (何も変えない)
+    @discardableResult
+    public mutating func confirmTranslation(of id: UUID) -> TranslationNote? {
+        guard let head = Translator.translationGroupIDs(of: id, in: segments).first,
+              let index = segments.firstIndex(where: { $0.id == head }), segments[index].translation != nil,
+              var note = translationNote(for: head), note.isFlagged else { return nil }
+        note.origin = TranslationNote.confirmed
+        var notes = (translationReview ?? []).filter { $0.head != head }
+        notes.append(note)
+        translationReview = notes
+        return note
+    }
+
+    /// 「要確認」の行の数 (訳の在る行で、今も合う "llm" の印の覚え)
+    public var flaggedTranslationCount: Int {
+        let valid = validTranslationNotes
+        guard !valid.isEmpty else { return 0 }
+        return segments.reduce(0) { $0 + ($1.translation != nil && valid[$1.id]?.isFlagged == true ? 1 : 0) }
     }
 
     /// 区間 ids を含む訳のまとまりの、利用者の訳の覚えを捨てる (利用者が自分で「この文を訳し直す」を押した時)。
@@ -194,5 +240,40 @@ extension Transcript {
         let valid = validTranslationNotes
         let kept = notes.filter { valid[$0.head] == $0 }
         translationReview = kept.isEmpty ? nil : kept
+    }
+}
+
+extension TranslationNote {
+    /// 印の理由を、画面の言語の文にした物 (印の符号の順に 1 つずつ)。知らない符号は出さない。
+    /// 数の抜けは、説明 (`detail` の "number: …") の数を文に入れる
+    public var reasonTexts: [String] {
+        flags.compactMap { Self.reasonText($0, detail: detail) }
+    }
+
+    /// 印の符号 1 つの理由の文 (知らない符号は nil)
+    public static func reasonText(_ flag: String, detail: String?) -> String? {
+        switch flag {
+        case TranslationGate.language: return L("The translation may not be in the target language.")
+        case TranslationGate.number:
+            let numbers = detailPart(TranslationGate.number, in: detail) ?? ""
+            return L("A number from the original is missing: %@", numbers)
+        case TranslationGate.copied: return L("The translation is the same as the original.")
+        case TranslationGate.repeated: return L("The same words repeat many times.")
+        case TranslationGate.short: return L("The translation is much shorter than the original. Part of it may be missing.")
+        case TranslationGate.script: return L("The translation used the wrong kind of letters, so it was not used.")
+        case TranslationGate.long: return L("The translation was far too long, so it was not used.")
+        case TranslationGate.failed: return L("The model returned no translation for this line.")
+        default: return nil
+        }
+    }
+
+    /// 説明 ("number: 4000, 15; term: Roblox") から、符号 flag の部分 ("4000, 15") を取り出す。無ければ nil
+    static func detailPart(_ flag: String, in detail: String?) -> String? {
+        guard let detail else { return nil }
+        let prefix = flag + ": "
+        for part in detail.components(separatedBy: "; ") where part.hasPrefix(prefix) {
+            return String(part.dropFirst(prefix.count))
+        }
+        return nil
     }
 }

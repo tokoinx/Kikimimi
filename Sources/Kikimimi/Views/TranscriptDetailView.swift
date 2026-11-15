@@ -114,7 +114,10 @@ struct TranscriptDetailView: View {
                 // 5〜21 秒。HSplitView の前は 0.13〜1.0 秒)
                 let space = notesSpace
                 HStack(spacing: 0) {
-                    transcriptColumn(items: items, bilingual: bilingual, languageLabel: summary.languageLabel, target: target)
+                    // 「要確認」の行 (行を作る時に 1 度だけ数えた物。ここでは数えない)
+                let flaggedIDs = cache.flaggedItemIDs
+                transcriptColumn(items: items, bilingual: bilingual, languageLabel: summary.languageLabel, target: target,
+                                 flaggedIDs: flaggedIDs)
                         .frame(minWidth: CGFloat(NotesSidebar.listMinWidth), maxWidth: .infinity, maxHeight: .infinity)
                     if model.showNotes {
                         NotesSidebar(job: job, space: space)
@@ -146,11 +149,11 @@ struct TranscriptDetailView: View {
     /// 対訳の見出しと一覧
     @ViewBuilder
     private func transcriptColumn(items: [TranscriptListItem], bilingual: Bool, languageLabel: String?,
-                                  target: String) -> some View {
+                                  target: String, flaggedIDs: [UUID]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if bilingual {
                 BilingualHeader(label: languageLabel, target: target, showTimestamp: model.showTimestamps,
-                                showPlayMark: model.canPlayLines(of: job))
+                                showPlayMark: model.canPlayLines(of: job), flaggedIDs: flaggedIDs)
                 Divider()
             }
             // 一覧はジョブごとに作り直す (.id): 別のジョブを選んだら、新しい ScrollView が一覧の始めから出て、
@@ -1176,6 +1179,8 @@ struct BilingualHeader: View {
     let showTimestamp: Bool
     /// 行の頭に再生の印がある (その幅だけ空ける)
     var showPlayMark = false
+    /// 「要確認」の行の id (一覧の順。空なら「要確認 N」を出さない)
+    var flaggedIDs: [UUID] = []
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1187,13 +1192,45 @@ struct BilingualHeader: View {
             }
             Label(label.map { L("Original (%@)", $0) } ?? L("Original"), systemImage: "text.quote")
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Label(L("%@ translation", TranslationTarget.displayName(for: target)), systemImage: "character.bubble")
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                Label(L("%@ translation", TranslationTarget.displayName(for: target)), systemImage: "character.bubble")
+                if !flaggedIDs.isEmpty {
+                    ReviewJumpButton(ids: flaggedIDs)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.callout.weight(.semibold))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 28)
         .padding(.vertical, 6)
+    }
+}
+
+/// 対訳の見出しの「要確認 N」。押すたびに、次の「要確認」の行へ一覧を動かす (最後の次は初めに戻る)。
+/// 一覧の外に在るので、一覧を動かすのは練習の口 (`PracticeController.requestListScroll`) を通す。
+/// どこまで跳んだかは、この部品の @State に持つ (一覧の body は見ない)
+struct ReviewJumpButton: View {
+    @Environment(AppModel.self) private var model
+    let ids: [UUID]
+    @State private var last: UUID?
+
+    var body: some View {
+        Button {
+            guard !ids.isEmpty else { return }
+            let next = last.flatMap { ids.firstIndex(of: $0) }.map { ($0 + 1) % ids.count } ?? 0
+            last = ids[next]
+            model.practice.requestListScroll(to: ids[next])
+        } label: {
+            Text(LPlural(ids.count, one: "%d needs review", other: "%d need review"))
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(Color.orange.opacity(0.15), in: Capsule())
+                .foregroundStyle(.orange)
+        }
+        .buttonStyle(.plain)
+        .help(L("Go to the next translation that needs review"))
     }
 }
 
@@ -1235,6 +1272,12 @@ struct BilingualRow: View {
                         Text(highlighted(japanese, highlight))
                             .foregroundStyle(item.isOriginalInTarget ? Color.secondary : Color.primary)
                             .redacted(reason: conceal.hidesTranslation ? .placeholder : [])
+                    } else if !isTranslating, !job.lineQueue.contains(item.id), item.hasUntranslatedReason {
+                        // 訳せなかった理由の覚えが在る行: 理由を、マウスを載せると出る文で添える (行の値を出すだけ)
+                        Text(L("Not translated"))
+                            .foregroundStyle(.tertiary)
+                            .italic()
+                            .help(item.review?.reasonTexts.joined(separator: "\n") ?? "")
                     } else {
                         Text(isTranslating || job.lineQueue.contains(item.id) ? L("Translating…") : L("Not translated"))
                             .foregroundStyle(.tertiary)
@@ -1245,6 +1288,11 @@ struct BilingualRow: View {
                 // 利用者が直した訳の印 (行の値を出すだけ。押すと、訳を直す画面を開く)
                 if item.isEditedTranslation {
                     EditedTranslationBadge(id: item.id, job: job)
+                } else if item.needsTranslationReview {
+                    // 訳の関門の印が付いた機械の訳 (同じ部品。橙色。押すと、理由を見て直す・「この訳でよい」を選べる)
+                    EditedTranslationBadge(id: item.id, job: job, title: L("Needs review"),
+                                           help: L("This translation may have a problem. Click to see why and check it."),
+                                           tint: .orange)
                 } else if item.isRememberedTranslation {
                     // 訳の記憶から置いた訳の印 (同じ部品。文と説明だけ違う)
                     EditedTranslationBadge(id: item.id, job: job, title: L("Remembered"),
@@ -1259,7 +1307,7 @@ struct BilingualRow: View {
 }
 
 /// 利用者が直した訳の行の、灰色の小さな印「直した」。押すと、訳を直す画面 (一覧の外のシート) を開く。
-/// 訳の記憶から置いた訳の行の印「覚えた訳」にも使う (title と help を渡す)
+/// 訳の記憶から置いた訳の行の印「覚えた訳」、関門の印が付いた訳の橙色の印「要確認」にも使う (title・help・tint を渡す)
 struct EditedTranslationBadge: View {
     @Environment(AppModel.self) private var model
     let id: UUID
@@ -1267,6 +1315,8 @@ struct EditedTranslationBadge: View {
     /// 印の文と説明 (nil なら「直した」の物)
     var title: String? = nil
     var help: String? = nil
+    /// 印の色 (nil なら灰色。「要確認」は橙色)
+    var tint: Color? = nil
 
     var body: some View {
         Button {
@@ -1276,8 +1326,8 @@ struct EditedTranslationBadge: View {
                 .font(.caption2.weight(.semibold))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Color.secondary.opacity(0.15), in: Capsule())
-                .foregroundStyle(.secondary)
+                .background((tint ?? Color.secondary).opacity(0.15), in: Capsule())
+                .foregroundStyle(tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.secondary))
         }
         .buttonStyle(.plain)
         .help(help ?? L("You edited this translation. Click to change it."))

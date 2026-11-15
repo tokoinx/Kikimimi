@@ -224,7 +224,8 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
     /// 引く原文の重さの下限 (`TranslationGate.weight`。漢字・かな・ハングルは 2 と数える)。
     /// これより短い文 (「Yes.」「はい。」など) は引かない: 短い文は、場面で訳が変わるため
     /// (ある場面で直した「Yes.」の訳を、ほかの場面の「Yes.」に置くと、かえって合わない事が多い)
-    public static let minimumSourceWeight = 16
+    /// 値は、訳の関門の「短い文」と 1 つにまとめてある (`TranslationGate.shortSentenceWeight`)
+    public static let minimumSourceWeight = TranslationGate.shortSentenceWeight
 
     /// 訳す先の言語のコード (そろえた物)
     public let target: String

@@ -22,7 +22,8 @@ final class TranslationMemoryReuseTests: XCTestCase {
         FakeGenerator { prompt in
             prompt.user.split(separator: "\n").compactMap { line -> String? in
                 guard line.hasPrefix("["), let close = line.firstIndex(of: "]") else { return nil }
-                return "\(line[...close]) 機械(\(line[line.index(close, offsetBy: 2)...]))"
+                // 訳の関門の印が付かない、ふつうの日本語の訳 (言語・短さの印が付くと、ここの試験の数が変わる)
+                return "\(line[...close]) 機械の訳です。この文は、機械がとても丁寧に訳しました。"
             }.joined(separator: "\n") + "\n"
         }
     }

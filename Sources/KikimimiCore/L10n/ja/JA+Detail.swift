@@ -67,6 +67,21 @@ extension JA {
         // 対訳
         "Original (%@)": "原文（%@）",
         "Not translated": "未翻訳",
+        // 訳の関門の印 (「要確認」の印・訳を直す画面の理由・対訳の見出し)
+        "Needs review": "要確認",
+        "This translation may have a problem. Click to see why and check it.": "この訳は、気になる所があります。押すと、理由を見て確かめられます。",
+        "This translation is fine": "この訳でよい",
+        "%d needs review": "要確認 %d",
+        "%d need review": "要確認 %d",
+        "Go to the next translation that needs review": "次の要確認の訳へ移る",
+        "The translation may not be in the target language.": "訳が、訳す先の言語でないようです。",
+        "A number from the original is missing: %@": "原文の数が、訳にありません: %@",
+        "The translation is the same as the original.": "訳が、原文と同じです。",
+        "The same words repeat many times.": "同じ言葉が、何度も繰り返されています。",
+        "The translation is much shorter than the original. Part of it may be missing.": "訳が、原文よりかなり短いです。一部が抜けているかもしれません。",
+        "The translation used the wrong kind of letters, so it was not used.": "訳の文字の種類が違ったので、使いませんでした。",
+        "The translation was far too long, so it was not used.": "訳が長すぎたので、使いませんでした。",
+        "The model returned no translation for this line.": "この行の訳が、返ってきませんでした。",
         // 練習で隠した行
         "Hide this line": "この行を隠す",
         "Show this line": "この行を見る",

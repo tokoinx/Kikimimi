@@ -4,7 +4,8 @@ import SwiftUI
 /// 訳を直す画面 (対訳の行の右クリックの「訳を直す…」・「直した」の印)。
 /// 一覧の外のシートに置く: 翻訳の途中は一覧の行が作り直されるので、行の中の入力欄では下書きが消える。
 /// 下書きはこの画面の @State に持ち、結果が変わっても (翻訳が進んでも) そのまま残す。
-/// 原文・直す前の機械の訳は、body の中で今の結果から読む
+/// 原文・直す前の機械の訳は、body の中で今の結果から読む。
+/// 訳の関門の印 (「要確認」・訳せなかった理由) が在る行は、上に理由を 1 行ずつ出す
 struct TranslationEditSheet: View {
     @Environment(AppModel.self) private var model
     let job: Job
@@ -20,6 +21,10 @@ struct TranslationEditSheet: View {
         var note: TranslationNote?
 
         var isEdited: Bool { note?.isEdited == true }
+        /// 「要確認」の訳 (印の付いた機械の訳が出ている。「この訳でよい」を出す)
+        var needsReview: Bool { translation != nil && note?.isFlagged == true }
+        /// 出す理由の文 (印の付いた機械の訳・訳せなかった行だけ)
+        var reasons: [String] { note?.isFlagged == true ? note?.reasonTexts ?? [] : [] }
         /// 直す前の機械の訳 (直した訳なら覚えの物、直していなければ今の訳)。
         /// 訳の記憶から置いた訳は、機械の訳ではないので出さない (nil)
         var machine: String? {
@@ -42,6 +47,16 @@ struct TranslationEditSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L("Edit translation"))
                 .font(.headline)
+            if let reasons = current?.reasons, !reasons.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(reasons, id: \.self) { reason in
+                        Label(reason, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .font(.callout)
+            }
             section(L("Original")) {
                 Text(current?.source ?? "")
                     .textSelection(.enabled)
@@ -74,6 +89,12 @@ struct TranslationEditSheet: View {
                     }
                 }
                 Spacer()
+                if let current, current.needsReview {
+                    Button(L("This translation is fine")) {
+                        model.confirmTranslation(head: segmentID, in: job)
+                        close()
+                    }
+                }
                 Button(L("Cancel")) { close() }
                     .keyboardShortcut(.cancelAction)
                 Button(L("Save")) {

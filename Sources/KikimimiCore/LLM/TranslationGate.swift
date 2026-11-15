@@ -2,7 +2,7 @@ import Foundation
 
 /// 訳の関門: 訳 1 つ (文のまとまり 1 つ) を点検して、気になる所に印を付ける。
 ///
-/// 小さな LLM の訳に「要確認」の印を付けるために使う (今は評価ハーネスで測るだけで、アプリの翻訳の動きは変えない)。
+/// 小さな LLM の訳に「要確認」の印を付けるために使う (翻訳の流れ `Translator.translateSummarizing` と、評価ハーネスの測り)。
 /// 印は文字列の符号で持つ。保存した後で符号を足したり外したりしても、知らない符号のせいで全体が読めなくならないように、
 /// enum にはしない。決まりは採点 (`LLMEval.score`) と翻訳役 (`Translator.isPlausible`) の物を、そのまま使う
 /// (決まりを 1 か所で直せば、採点と関門の両方が変わる)。
@@ -29,8 +29,15 @@ public enum TranslationGate {
     /// 全部の符号 (この順に並べて返す)
     public static let all: [String] = [failed, script, long, repeated, copied, language, number, term, short]
 
-    /// 重い印: この後、訳を出さずに訳し直す物。ほかの印は、訳を出したうえで印だけを付ける
-    public static let severe: Set<String> = [failed, script, long, repeated]
+    /// 重い印: 訳を出さない物 (`Translator.isPlausible` が落とす範囲と同じ。空・文字の種類・長すぎ)。
+    /// ほかの印は、訳を出したうえで印だけを付ける。繰り返し・写しは重い印にしない
+    /// (「No.」→「No.」、名前だけの行、歌の繰り返しは、正しい訳の事が在る)
+    public static let severe: Set<String> = [failed, script, long]
+
+    /// 短い文の重さの上限 (`weight` がこれより小さい文を「短い文」と見る)。2 つの所で使う:
+    /// - 写しの印 (`copied`) を付けない: 名前だけの行・相づち (「No.」「Roblox Studio」) は、写しが正しい訳の事が多い
+    /// - 訳の記憶を引かない (`TranslationMemoryLookup.minimumSourceWeight`): 短い文は、場面で訳が変わる
+    public static let shortSentenceWeight = 16
 
     /// 「短すぎる」の決まり: 訳の重さが、原文の重さのこの倍に届かない。
     /// 13 言語の問題の人の訳 (390 行) では、いちばん小さい比が 0.56 (en → zh) だったので、その半分ほどにした
@@ -92,7 +99,9 @@ public enum TranslationGate {
         if Translator.hasWrongScript(t, source: source, target: target) { flags.insert(script) }
         if Translator.isTooLong(t, source: source, target: target) { flags.insert(long) }
         if LLMEval.isRepetitive(t) { flags.insert(repeated) }
-        if LLMEval.isCopy(t, source: source, sourceLanguage: sourceLanguage, target: target) { flags.insert(copied) }
+        // 短い原文の写しには印を付けない (`shortSentenceWeight` を見る)
+        if weight(source) >= shortSentenceWeight,
+           LLMEval.isCopy(t, source: source, sourceLanguage: sourceLanguage, target: target) { flags.insert(copied) }
         if !LLMEval.isInTarget(t, target: target, detector: detector) { flags.insert(language) }
         let lost = LLMEval.numbersLost(sources: [source], translation: t).lost
         if !lost.isEmpty {

@@ -26,10 +26,14 @@ final class TranslationGateTests: XCTestCase {
         XCTAssertTrue(flags("皆さん、こんにちは。", "Hello everyone.", from: "ja", to: "ko").contains("script"))
         XCTAssertTrue(flags("This is Japanese.", "これは日本語です", to: "zh").contains("script"))
         XCTAssertFalse(flags("皆さん、こんにちは。", "여러분, 안녕하세요.", from: "ja", to: "ko").contains("script"))
-        // 名前だけの行を写した訳は、文字の検査では捨てない (写しの印は付く)
+        // 名前だけの行を写した訳は、文字の検査では捨てない (短い原文なので、写しの印も付かない)
         let copy = flags("Roblox Studio", "Roblox Studio", to: "ko")
         XCTAssertFalse(copy.contains("script"))
-        XCTAssertTrue(copy.contains("copied"))
+        XCTAssertFalse(copy.contains("copied"))
+        // 長い原文の写しには、写しの印が付く (文字の種類の検査では捨てない)
+        let longCopy = flags("Roblox Studio Developer Conference", "Roblox Studio Developer Conference", to: "ko")
+        XCTAssertFalse(longCopy.contains("script"))
+        XCTAssertTrue(longCopy.contains("copied"))
         // 関門の 2 つの検査と、翻訳役の受け取りの決まりは同じ
         for (t, s, target) in [("大家好，欢迎。", "Hi everyone.", "ja"), ("Hello", "Привет", "th"), ("大家好。", "Hi everyone.", "zh"),
                                (String(repeating: "あ", count: 53), "Hi.", "ja"), ("Всем привет.", "Hi everyone.", "ru")] {
@@ -46,12 +50,13 @@ final class TranslationGateTests: XCTestCase {
                                              sourceLanguage: "en", target: "ja", detector: nil).flags.contains("long"))
     }
 
-    func testRepeatedIsSevere() {
+    func testRepeatedIsOnlyAMark() {
         let f = TranslationGate.assess(source: "See you next time, everyone.",
                                        translation: "à bientôt à bientôt à bientôt à bientôt à bientôt",
                                        sourceLanguage: "en", target: "fr", detector: nil)
         XCTAssertTrue(f.flags.contains("repeated"))
-        XCTAssertTrue(f.isSevere)
+        // 繰り返しは印だけ (歌の繰り返しは、正しい訳の事が在る)
+        XCTAssertFalse(f.isSevere)
         XCTAssertFalse(flags("We sold 1500 toys today.", "Nous avons vendu 1500 jouets aujourd'hui.", to: "fr").contains("repeated"))
     }
 
@@ -62,6 +67,10 @@ final class TranslationGateTests: XCTestCase {
         XCTAssertTrue(f.flags.contains("copied"))
         XCTAssertFalse(f.isSevere)
         XCTAssertFalse(flags(source, source, from: "fr", to: "fr").contains("copied"))
+        // 短い原文 (重さ 16 未満) の写しには付けない (「No.」→「No.」は正しい訳)
+        XCTAssertLessThan(TranslationGate.weight("No."), TranslationGate.shortSentenceWeight)
+        XCTAssertFalse(flags("No.", "No.", to: "fr").contains("copied"))
+        XCTAssertEqual(TranslationGate.shortSentenceWeight, TranslationMemoryLookup.minimumSourceWeight)
         // 原文の言語が分からない時は、違う言語と見る
         XCTAssertTrue(flags(source, source, from: nil, to: "fr").contains("copied"))
     }
@@ -129,7 +138,7 @@ final class TranslationGateTests: XCTestCase {
         XCTAssertEqual(f.detail, "number: 15, 4000; term: Roblox")
         let decoded = try JSONDecoder().decode(TranslationGate.Finding.self, from: JSONEncoder().encode(f))
         XCTAssertEqual(decoded, f)
-        XCTAssertEqual(TranslationGate.severe, ["failed", "script", "long", "repeated"])
+        XCTAssertEqual(TranslationGate.severe, ["failed", "script", "long"])
         XCTAssertTrue(TranslationGate.severe.isSubset(of: Set(TranslationGate.all)))
     }
 

@@ -26,6 +26,24 @@ public struct TranslationResult: Sendable, Hashable {
     /// 訳の記憶 (前に利用者が直した同じ文の訳) から、LLM を呼ばずに置いた訳。
     /// 置く時に、覚え (`TranslationNote`、出どころ "memory") を残す (`Transcript.apply(_:sources:)`)
     public var fromMemory: Bool = false
+    /// 訳の関門 (`TranslationGate`) の印の符号。空でなければ、置く時に覚え (出どころ "llm") を残す。
+    /// text が空の結果は「訳せなかった理由」だけを運ぶ (`TranslationRunSummary.rejected`。訳は置かない)
+    public var flags: [String] = []
+    /// 印の説明 (消えた数など。`TranslationGate.Finding.detail`)
+    public var detail: String? = nil
+
+    public init(head: UUID, covers: [UUID], text: String, fromMemory: Bool = false, flags: [String] = [],
+                detail: String? = nil) {
+        self.head = head
+        self.covers = covers
+        self.text = text
+        self.fromMemory = fromMemory
+        self.flags = flags
+        self.detail = detail
+    }
+
+    /// 訳せなかった理由だけを運ぶ結果か (訳は置かず、理由の覚えだけを残す)
+    public var isRejection: Bool { text.isEmpty }
 }
 
 /// 1 回の翻訳で、どれだけを記憶から置き、どれだけを LLM に送ったか (行 = 文のまとまり 1 つ)
@@ -36,11 +54,19 @@ public struct TranslationRunSummary: Sendable, Hashable {
     public var fromMemory: Int
     /// LLM に送った行の数 (読めずに 1 行ずつ送り直した分は数えない)
     public var sentToLLM: Int
+    /// LLM の訳のうち、訳の関門の印が付いた行の数 (訳は置いた。「要確認」)
+    public var flagged: Int
+    /// LLM の訳を受け取らなかった行の理由 (text が空で、flags に理由の符号。訳せなかった行の覚えにする)。
+    /// onChunk には渡さない (訳の結果だけを受け取る今の呼び手を変えないため)。呼ぶ側が、終わりに `Transcript.apply` で置く
+    public var rejected: [TranslationResult]
 
-    public init(failed: Int = 0, fromMemory: Int = 0, sentToLLM: Int = 0) {
+    public init(failed: Int = 0, fromMemory: Int = 0, sentToLLM: Int = 0, flagged: Int = 0,
+                rejected: [TranslationResult] = []) {
         self.failed = failed
         self.fromMemory = fromMemory
         self.sentToLLM = sentToLLM
+        self.flagged = flagged
+        self.rejected = rejected
     }
 }
 
@@ -392,6 +418,8 @@ public enum Translator {
             onChunk(batch, done, pending.count)
         }
         // generator が無い時は、chunks は空 (LLM に送る行は、上で訳せなかった行と数えてある)
+        // 訳の関門の写しの検査に使う、原文の言語 (まとまりの先頭の区間の言語。無ければ全体の言語)
+        func unitLanguage(_ u: Int) -> String? { segments[units[u][0]].language ?? source }
         for chunk in chunks {
             guard let generator else { break }
             if shouldCancel() { throw LLMError.cancelled }
@@ -399,26 +427,35 @@ public enum Translator {
             let first = units[chunk[0]][0]
             let context = known.filter { $0.position < first }.suffix(options.contextLines)
                 .map { (source: $0.source, translation: $0.translation) }
-            var results = try translateLines(chunk.map { sources[$0] }, context: Array(context), language: source,
-                                             target: target, system: system, options: options, generator: generator,
-                                             shouldCancel: shouldCancel)
-            // 読めなかった行は 1 行ずつ訳し直す
-            if chunk.count > 1 {
-                for k in chunk.indices where results[k] == nil {
-                    if shouldCancel() { throw LLMError.cancelled }
-                    results[k] = try translateLines([sources[chunk[k]]], context: Array(context), language: source,
+            var results = try checkedTranslateLines(chunk.map { sources[$0] }, context: Array(context), language: source,
                                                     target: target, system: system, options: options, generator: generator,
-                                                    shouldCancel: shouldCancel)[0]
+                                                    shouldCancel: shouldCancel)
+            // 読めなかった行は 1 行ずつ訳し直す (理由は、最後に試した時の物)
+            if chunk.count > 1 {
+                for k in chunk.indices where results[k].text == nil {
+                    if shouldCancel() { throw LLMError.cancelled }
+                    results[k] = try checkedTranslateLines([sources[chunk[k]]], context: Array(context), language: source,
+                                                           target: target, system: system, options: options,
+                                                           generator: generator, shouldCancel: shouldCancel)[0]
                 }
             }
             var batch: [TranslationResult] = []
             for (k, u) in chunk.enumerated() {
                 let unit = units[u]
-                if let t = results[k] {
-                    batch.append(TranslationResult(head: segments[unit[0]].id, covers: unit.dropFirst().map { segments[$0].id }, text: t))
+                let head = segments[unit[0]].id
+                let covers = unit.dropFirst().map { segments[$0].id }
+                if let t = results[k].text {
+                    // 通った訳は、関門に掛けて印だけを付ける (訳は入れ替えない・訳し直さない)
+                    let finding = TranslationGate.assess(source: sources[u], translation: t, sourceLanguage: unitLanguage(u),
+                                                         target: target)
+                    if !finding.flags.isEmpty { summary.flagged += 1 }
+                    batch.append(TranslationResult(head: head, covers: covers, text: t, flags: finding.flags,
+                                                   detail: finding.detail))
                     known.append((unit[0], sources[u], t))
                 } else {
                     summary.failed += unit.count
+                    // 訳せなかった理由を残す (まとまりの先頭の区間に。訳が後から入れば、覚えは合わなくなって消える)
+                    summary.rejected.append(TranslationResult(head: head, covers: [], text: "", flags: results[k].rejection))
                 }
                 done += unit.count
             }
@@ -446,13 +483,39 @@ public enum Translator {
     static func translateLines(_ lines: [String], context: [(source: String, translation: String)], language: String?,
                                target: String = "ja", system: String, options: TranslationOptions,
                                generator: any TextGenerating, shouldCancel: () -> Bool) throws -> [String?] {
+        try checkedTranslateLines(lines, context: context, language: language, target: target, system: system,
+                                  options: options, generator: generator, shouldCancel: shouldCancel).map(\.text)
+    }
+
+    /// 1 行の訳の受け取りの結果: 受け取った訳、または受け取らなかった理由の符号 (`TranslationGate` の
+    /// failed・script・long。`isPlausible` が落とす範囲と同じ)
+    struct LineOutcome {
+        var text: String?
+        var rejection: [String]
+    }
+
+    /// 受け取らなかった理由の符号 (受け取れる訳なら空)。中の検査は `isPlausible` と同じ
+    static func rejectionFlags(_ translation: String?, source: String, target: String) -> [String] {
+        let t = (translation ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return [TranslationGate.failed] }
+        var flags: [String] = []
+        if hasWrongScript(t, source: source, target: target) { flags.append(TranslationGate.script) }
+        if isTooLong(t, source: source, target: target) { flags.append(TranslationGate.long) }
+        return flags
+    }
+
+    /// `translateLines` と同じく訳し、受け取らなかった行には理由を付けて返す
+    static func checkedTranslateLines(_ lines: [String], context: [(source: String, translation: String)],
+                                      language: String?, target: String = "ja", system: String,
+                                      options: TranslationOptions, generator: any TextGenerating,
+                                      shouldCancel: () -> Bool) throws -> [LineOutcome] {
         let user = userPrompt(lines: lines, context: context, glossary: options.glossary)
         let shots = TranslationExamples.examples(for: target)
         let sourceTokens = lines.reduce(0) { $0 + generator.tokenCount($1) }
         let exampleTokens = shots.reduce(0) { $0 + generator.tokenCount($1.user) + generator.tokenCount($1.assistant) + 16 }
         let promptTokens = generator.tokenCount(system) + generator.tokenCount(user) + exampleTokens + 32
         let budget = min(generator.contextLength - promptTokens - 8, 32 + sourceTokens * 4 + lines.count * 12)
-        guard budget > 8 else { return lines.map { _ in nil } }
+        guard budget > 8 else { return lines.map { _ in LineOutcome(text: nil, rejection: [TranslationGate.failed]) } }
         let longest = lines.map(\.utf8.count).max() ?? 0
         let output = try generator.generate(
             LLMPrompt(system: system, user: user, grammar: GBNF.numberedLines(count: lines.count), maxTokens: budget,
@@ -461,8 +524,11 @@ public enum Translator {
         )
         let parsed = parse(output, count: lines.count)
         return lines.indices.map { k in
-            guard let t = parsed[k + 1], isPlausible(t, source: lines[k], target: target) else { return nil }
-            return t
+            let t = parsed[k + 1]
+            if let t, isPlausible(t, source: lines[k], target: target) { return LineOutcome(text: t, rejection: []) }
+            // isPlausible が落とした訳は、必ず理由が 1 つ以上付く (付かなければ、訳が返らなかった物とする)
+            let flags = rejectionFlags(t, source: lines[k], target: target)
+            return LineOutcome(text: nil, rejection: flags.isEmpty ? [TranslationGate.failed] : flags)
         }
     }
 }
@@ -473,8 +539,12 @@ extension Transcript {
     /// 利用者が直した訳 (今も合う "edited" の覚え) のまとまりに当たる区間を含む訳も置かない: 翻訳の途中に利用者が直した訳が、
     /// 後から届いた機械の訳や、翻訳の終わりにもう 1 度置く訳 (AppModel) で、機械の訳に戻らないように。
     /// 利用者が自分で訳し直しを選んだ時は、呼ぶ側が先に覚えを捨てる (`dropUserTranslations(touching:)`・`removeAllTranslations()`)
+    ///
+    /// text が空の結果 (`TranslationResult.isRejection`) は、訳を置かずに「訳せなかった理由」の覚えだけを残す
+    /// (区間に訳がまだ無く、文が訳した時と同じ時だけ)
     @discardableResult
     public mutating func apply(_ result: TranslationResult, sources: [UUID: String]) -> Bool {
+        if result.isRejection { return recordRejection(result, sources: sources) }
         let ids = [result.head] + result.covers
         if translationReview?.isEmpty == false {
             let protected = userTranslatedIDs
@@ -491,18 +561,42 @@ extension Transcript {
             segments[i].translation = nil
             segments[i].translationCovers = nil
         }
-        // 訳の出どころの覚え: 記憶から置いた訳には "memory" を残す。機械の訳を置いた時は、このまとまりの古い覚えを捨てる
+        // 訳の出どころの覚え: 記憶から置いた訳には "memory"、関門の印が付いた機械の訳には "llm" (印と説明つき) を残す。
+        // 印の無い機械の訳を置いた時は、このまとまりの古い覚えを捨てる
         // (ここまで来たのは、守る "edited" の覚えが無いまとまりだけ。覚えが無い結果は、覚えを見ずに済ませる)
-        if result.fromMemory || translationReview?.isEmpty == false {
+        let flagged = !result.fromMemory && !result.flags.isEmpty
+        if result.fromMemory || flagged || translationReview?.isEmpty == false {
+            let signature = Self.reviewSignature(source: translationSource(at: index), translation: result.text)
+            // 同じ訳をもう 1 度置いた時 (翻訳の終わりに、もう 1 度置く) は、利用者の「この訳でよい」を残す
+            let kept = flagged ? translationReview?.last { $0.head == result.head && $0.signature == signature && $0.isConfirmed }
+                : nil
             var notes = (translationReview ?? []).filter { !ids.contains($0.head) }
-            if result.fromMemory {
-                notes.append(TranslationNote(head: result.head,
-                                             signature: Self.reviewSignature(source: translationSource(at: index),
-                                                                             translation: result.text),
-                                             origin: TranslationNote.memory))
+            if let kept {
+                notes.append(kept)
+            } else if result.fromMemory {
+                notes.append(TranslationNote(head: result.head, signature: signature, origin: TranslationNote.memory))
+            } else if flagged {
+                notes.append(TranslationNote(head: result.head, signature: signature, flags: result.flags,
+                                             detail: result.detail, origin: TranslationNote.llm))
             }
             translationReview = notes.isEmpty ? nil : notes
         }
+        return true
+    }
+
+    /// 訳せなかった理由の覚えを残す (訳は置かない)。区間に訳がまだ無い (ほかの訳にも含まれていない) 時、
+    /// 文が訳した時と同じ時だけ。残したら true
+    mutating func recordRejection(_ result: TranslationResult, sources: [UUID: String]) -> Bool {
+        guard !result.flags.isEmpty,
+              let index = segments.firstIndex(where: { $0.id == result.head }),
+              segments[index].text == sources[result.head],
+              segments[index].translation == nil,
+              !segments.contains(where: { ($0.translationCovers ?? []).contains(result.head) }) else { return false }
+        var notes = (translationReview ?? []).filter { $0.head != result.head }
+        notes.append(TranslationNote(head: result.head,
+                                     signature: Self.reviewSignature(source: translationSource(at: index), translation: ""),
+                                     flags: result.flags, detail: result.detail, origin: TranslationNote.llm))
+        translationReview = notes
         return true
     }
 }

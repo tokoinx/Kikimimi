@@ -413,14 +413,24 @@ enum UILoadSelfTest {
         }
     }
 
-    /// 訳のある行の 4 つに 1 つを、利用者が直した訳にする ("edited" の覚えを付ける)。印つきの行が在っても重さを測るため。
-    /// 区間は訳のまとまりを作らない (1 区間 1 訳) ので、原文はその区間の文だけ
+    /// 訳のある行の 4 つに 1 つを、利用者が直した訳にする ("edited" の覚えを付ける)。
+    /// 別の 4 つに 1 つには、訳の関門の印 ("llm" + 数の抜け) の覚えを付ける (「要確認」の橙の印が出る)。
+    /// 印つきの行が在っても重さを測るため。区間は訳のまとまりを作らない (1 区間 1 訳) ので、原文はその区間の文だけ
     fileprivate static func markEditedTranslations(_ transcript: inout Transcript) {
         var notes: [TranslationNote] = []
         var translated = 0
         for i in transcript.segments.indices {
             guard let machine = transcript.segments[i].translation else { continue }
             defer { translated += 1 }
+            if translated % 4 == 2 {
+                // 訳は変えない (機械の訳に、印だけを付ける)
+                let source = Transcript.join([transcript.segments[i].text])
+                notes.append(TranslationNote(head: transcript.segments[i].id,
+                                             signature: Transcript.reviewSignature(source: source, translation: machine),
+                                             flags: [TranslationGate.number], detail: "number: 2025",
+                                             origin: TranslationNote.llm))
+                continue
+            }
             guard translated % 4 == 0 else { continue }
             let edited = machine + "（直した訳）"
             transcript.segments[i].translation = edited
@@ -1613,10 +1623,37 @@ extension LoadRun {
 
         // 3b. 訳を直す・機械の訳に戻す (ふだんと同じ AppModel の関数で)。確認用の起動では、利用者の本物の訳の記憶を
         // 読まず・書かない (保存先が無い)。確かめる間だけ、記憶を一時のファイルにし、終わったら消して保存先を外す
-        let edited = job.transcript?.validTranslationNotes.values.filter(\.isEdited).count ?? 0
+        let valid = job.transcript?.validTranslationNotes.values
+        let edited = valid?.filter(\.isEdited).count ?? 0
+        let flagged = valid?.filter(\.isFlagged).count ?? 0
         let marked = job.transcript?.translationReview?.count ?? 0
-        step("rows with edited translations", edited > 0 && edited == marked,
-             "valid edited notes \(edited) of \(marked) (expected the same, more than 0)")
+        step("rows with edited and flagged translations", edited > 0 && flagged > 0 && edited + flagged == marked,
+             "valid edited notes \(edited), flagged \(flagged) of \(marked) (expected the sum, both more than 0)")
+        // 「要確認」の数は、行を作る時に数えた物 (一覧の見出しが出す数) と、結果の覚えの数が同じ
+        if let transcript = job.transcript {
+            let cache = TranscriptRowCache()
+            let counted = cache.items(of: transcript, job: job.id, done: true, bilingual: true, query: "",
+                                      target: model.translationTarget(for: transcript)).filter(\.needsTranslationReview).count
+            step("count rows that need review", cache.flaggedItemIDs.count == flagged && counted == flagged,
+                 "row cache \(cache.flaggedItemIDs.count), rows \(counted), notes \(flagged) (expected the same)")
+        }
+        // 印の付いた訳に「この訳でよい」: 印が消え、覚えの出どころが "confirmed" になる (印の符号は残る)。
+        // 絵 13 のために、印の付いた行を 1 つは残す (確かめるのは 2 つめの印の行)
+        let flaggedHeads = job.transcript.map { t in t.segments.map(\.id).filter { t.translationNote(for: $0)?.isFlagged == true } } ?? []
+        if flaggedHeads.count >= 2 {
+            let head = flaggedHeads[1]
+            let confirmed = model.confirmTranslation(head: head, in: job)
+            let note = job.transcript?.translationNote(for: head)
+            let left = job.transcript?.flaggedTranslationCount ?? -1
+            step("confirm a flagged translation through the model",
+                 confirmed && note?.origin == TranslationNote.confirmed && note?.isFlagged == false
+                    && note?.flags == [TranslationGate.number] && left == flaggedHeads.count - 1,
+                 "confirmed \(confirmed), note \(note?.origin ?? "none"), flags \(note?.flags ?? []), "
+                    + "left \(left) (expected \(flaggedHeads.count - 1))")
+        } else {
+            step("confirm a flagged translation through the model", false,
+                 "\(flaggedHeads.count) flagged rows (expected 2 or more)")
+        }
         step("the self-test does not use the real translation memory", model.translationMemoryURL == nil,
              "memory file \(model.translationMemoryURL?.path ?? "none") (expected none)")
         let memoryURL = root.deletingLastPathComponent()
@@ -1831,6 +1868,27 @@ extension LoadRun {
             await settle()
         } else {
             lines.append("UI LOAD: screenshot failed 12-translation-edit.png: no edited translation in the job")
+        }
+
+        // 13. 同じジョブの、「要確認」の行を開いた訳を直す画面 (上に理由の行と、「この訳でよい」が出る)。撮ったら閉じる
+        Self.live("scene 13: the translation edit sheet of a flagged row")
+        if let transcript = job.transcript,
+           let head = transcript.segments.first(where: { transcript.translationNote(for: $0.id)?.isFlagged == true })?.id {
+            model.requestTranslationEdit(head, in: job)
+            await settle()
+            await UILoadSelfTest.sleep(0.6)
+            await settle()
+            if let sheet = window.attachedSheet, model.translationEdit != nil {
+                lines.append(shot("13-translation-check", in: sheet, to: directory))
+            } else {
+                lines.append("UI LOAD: screenshot failed 13-translation-check.png: the translation edit sheet is not shown")
+            }
+            model.translationEdit = nil
+            await settle()
+            await UILoadSelfTest.sleep(0.6)
+            await settle()
+        } else {
+            lines.append("UI LOAD: screenshot failed 13-translation-check.png: no flagged translation in the job")
         }
 
         // 11. 同じジョブの、ゴミ箱に入れるかの確かめの画面 (保存した結果と、残る元の音声ファイル)。

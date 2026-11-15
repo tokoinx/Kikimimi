@@ -48,6 +48,14 @@ public struct TranscriptListItem: Identifiable, Hashable, Sendable {
 
     /// 訳の記憶から置いた訳の行か
     public var isRememberedTranslation: Bool { review?.isRemembered == true }
+
+    /// 「要確認」の行か (関門の印が付いた機械の訳が出ている)
+    public var needsTranslationReview: Bool {
+        translation != nil && !isOriginalInTarget && review?.isFlagged == true
+    }
+
+    /// 訳せなかった理由の覚えが在る、訳の無い行か (「未翻訳」に理由を添える)
+    public var hasUntranslatedReason: Bool { translation == nil && review?.isFlagged == true }
 }
 
 /// 行の言語の印
@@ -118,6 +126,9 @@ public final class TranscriptRowCache {
     /// 検索で絞る前の、最後の行の id
     private var itemsLastID: UUID?
     private var itemsValue: [TranscriptListItem] = []
+    /// 「要確認」の行の id (検索で絞る前の、一覧の順)。行を作る時に 1 度だけ数える (一覧の body が毎回数えないように)。
+    /// 対訳でない時は空 (訳の覚えは、対訳の行にだけ出す)
+    public private(set) var flaggedItemIDs: [UUID] = []
 
     /// 確かめる用: 前の summary / items で、足した区間の分だけを作ったか (作り直したら false、前のものを返したら変えない)
     public private(set) var lastSummaryWasAppend = false
@@ -199,6 +210,7 @@ public final class TranscriptRowCache {
             }
         }
         itemsLastID = items.last?.id
+        flaggedItemIDs = notes.isEmpty ? [] : items.filter(\.needsTranslationReview).map(\.id)
         if !q.isEmpty { items = items.filter { Self.matches($0, q) } }
         itemsValue = items
         itemsCondition = condition
@@ -240,6 +252,7 @@ public final class TranscriptRowCache {
             }
         }
         if let last = items.last { itemsLastID = last.id }
+        if !itemsNotes.isEmpty { flaggedItemIDs += items.filter(\.needsTranslationReview).map(\.id) }
         if !q.isEmpty { items = items.filter { Self.matches($0, q) } }
         itemsValue.append(contentsOf: items)
         itemsBase = transcript
@@ -286,7 +299,7 @@ public final class TranscriptRowCache {
                                   languageTag: tags ? LanguageTag.code(unit.language) : nil,
                                   canTranslate: done && unit.translation == nil && !covered.contains(unit.id),
                                   isTranslated: done && translated, language: unit.language ?? transcriptLanguage,
-                                  review: translated ? notes[unit.id] : nil)
+                                  review: notes[unit.id])
     }
 
     /// 検索語 (前後の空白を除いたもの) を含む行か

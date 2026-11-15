@@ -515,8 +515,8 @@ final class AppModel {
         let sourceLanguage = transcript.language(of: segment)
         let model = transcript.translationModel
         guard let note = transcript.setUserTranslation(text, for: head) else {
-            // 機械の訳と同じに書き直した: 機械の訳に戻した
-            guard before?.isEdited == true, transcript.translationNote(for: head) == nil else { return false }
+            // 機械の訳と同じに書き直した: 機械の訳に戻した (印の付いた機械の訳なら、"llm" の覚えが戻っている)
+            guard before?.isEdited == true, transcript.translationNote(for: head)?.isEdited != true else { return false }
             job.transcript = transcript
             if translationMemory.forget(source: source, target: target) { saveTranslationMemory() }
             return true
@@ -539,6 +539,16 @@ final class AppModel {
         guard transcript.revertUserTranslation(of: head) != nil else { return }
         job.transcript = transcript
         if let source, translationMemory.forget(source: source, target: target) { saveTranslationMemory() }
+    }
+
+    /// 印の付いた訳を「この訳でよい」とする (訳を直す画面のボタン)。印は消え、覚えの出どころは "confirmed" になる。
+    /// 訳の記憶には入れない (入れるのは、利用者が直した訳だけ)。変えたら true
+    @discardableResult
+    func confirmTranslation(head id: UUID, in job: Job) -> Bool {
+        guard job.status == .done, var transcript = job.transcript,
+              transcript.confirmTranslation(of: id) != nil else { return false }
+        job.transcript = transcript
+        return true
     }
 
     /// 語彙のヒント: 設定で書いたものに、学習した正しい語を足したもの (文字起こし・監査・翻訳で使う)
@@ -1631,6 +1641,11 @@ final class AppModel {
                                         shouldCancel: { flag.isSet }) { engine in try run(engine) }
                     : try run(nil)
                 apply(all)
+                // 訳せなかった行に、理由の覚えを残す (訳は置かない。訳の結果ではないので、訳した LLM の名前は変えない)
+                if !summary.rejected.isEmpty, var t = job.transcript {
+                    for result in summary.rejected { t.apply(result, sources: sources) }
+                    job.transcript = t
+                }
                 let failed = summary.failed
                 if failed > 0 {
                     job.postNote = LPlural(failed, one: "%d segment could not be translated. Click “Translate” again to translate only the rest.", other: "%d segments could not be translated. Click “Translate” again to translate only the rest.")
@@ -1704,6 +1719,11 @@ final class AppModel {
                                         shouldCancel: { flag.isSet }) { engine in try run(engine) }
                     : try run(nil)
                 apply(all)
+                // 訳せなかった行に、理由の覚えを残す (訳は置かない。訳の結果ではないので、訳した LLM の名前は変えない)
+                if !summary.rejected.isEmpty, var t = job.transcript {
+                    for result in summary.rejected { t.apply(result, sources: sources) }
+                    job.transcript = t
+                }
                 let failed = summary.failed
                 if failed > 0 {
                     job.postNote = LPlural(failed, one: "%d segment of the selected sentences could not be translated. Click “Translate line” on that line to retry.", other: "%d segments of the selected sentences could not be translated. Click “Translate line” on that line to retry.")

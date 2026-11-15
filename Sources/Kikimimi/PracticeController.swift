@@ -387,6 +387,12 @@ final class PracticeController {
         return max(0, to - from) / rate
     }
 
+    /// 練習の外から、一覧をその行へ動かしてもらう (対訳の見出しの「要確認 N」で、次の印の行へ跳ぶ)。
+    /// 一覧の外の部品から、一覧の ScrollViewProxy に届く口が、これ (CurrentLineTracker が見る) しか無いので使う
+    func requestListScroll(to id: UUID) {
+        requestScroll(id)
+    }
+
     private func requestScroll(_ id: UUID) {
         scrollSerial += 1
         scrollRequest = ScrollRequest(id: id, serial: scrollSerial)
