@@ -174,6 +174,7 @@ build/Kikimimi.app/Contents/MacOS/Kikimimi --eval-llm ~/Library/Application\ Sup
 `--baseline <前の結果.json>` を付けると前の結果と比べ、悪くなっていれば終了コード 3 で止まります (正しい行を壊した数が増えた・直せた行が減った)。`--adapter <差分.lora.gguf>` で追加学習の差分を重ね、`--ledger <台帳.json>` で学習した直しを使い、`--rules-only` で LLM なしの規則だけを測ります。
 
 **翻訳を 13 言語で測る**: 翻訳の場面に `target` (訳す先。無ければ日本語) と `references` (人の訳) を書くと、訳す先ごとに、訳せた行・その言語だった行 (日本語は文字の種類、ほかは macOS の言語の判定)・数と語が残ったか・原文の写し・同じ語句の繰り返し・chrF (人の訳との近さ、0〜100。コーパスの点) を数え、表に出します。`--baseline` は訳す先ごとに比べ、どれかが悪くなった (chrF は 1 点より大きく下がった) ら終了コード 3 です。公開の対訳データ WMT24++ から 13 の問題 (各 30 行) を作って、まとめて測る手順は `tools/translation-eval/README.md` に在ります。
+結果 (`--report`) には問題ごとの LLM の訳そのもの (`translationOutputs`) が残るので、採点の決まりを直した後は `--eval-llm none --rescore <結果.json>` (フォルダごとなら `evaluate.py --rescore <結果のフォルダ>`) で、LLM を回さずに採点し直せます。
 
 ```bash
 python3 tools/translation-eval/fetch_wmt24pp.py      # 問題を作る (build/translation-eval/sets/)

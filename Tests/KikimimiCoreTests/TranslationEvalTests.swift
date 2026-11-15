@@ -306,7 +306,178 @@ final class TranslationEvalTests: XCTestCase {
         XCTAssertTrue(seed.translation.allSatisfy { $0.targetLanguage == "ja" && $0.references == nil })
     }
 
+    // MARK: 見直しで見つかった不具合
+
+    /// chrF は、コードポイントで比べる (正準等価でも、コードポイントが違えば別の字。値は sacreBLEU の作りから手で出した)
+    func testChrFComparesCodePointsNotCanonicalEquivalence() {
+        XCTAssertEqual(ChrF.sentence(hypothesis: "\u{00C5}ngstr\u{00F6}m", reference: "\u{212B}ngstr\u{00F6}m"), 79.70, accuracy: 0.01)
+        XCTAssertEqual(ChrF.sentence(hypothesis: "a;b", reference: "a\u{037E}b"), 22.22, accuracy: 0.01)
+        XCTAssertEqual(ChrF.sentence(hypothesis: "\u{00C5}ngstr\u{00F6}m", reference: "\u{00C5}ngstr\u{00F6}m"), 100, accuracy: 1e-9)
+    }
+
+    /// 千の区切り (4,000・4.000・4 000) は、言語の書き方の違いなので、数が消えたと数えない
+    func testNumbersIgnoreThousandsSeparators() {
+        XCTAssertEqual(LLMEval.numbers(in: "4,000"), ["4000"])
+        XCTAssertEqual(LLMEval.numbers(in: "4.000 Fuß"), ["4000"])
+        XCTAssertEqual(LLMEval.numbers(in: "4\u{202F}000 pieds"), ["4000"])
+        XCTAssertEqual(LLMEval.numbers(in: "1,234,567"), ["1234567"])
+        // 小数や、区切りでない並びは、そのまま
+        XCTAssertEqual(LLMEval.numbers(in: "3.14"), ["14"])
+        XCTAssertEqual(LLMEval.numbers(in: "in 2024 100 people"), ["2024", "100"])
+        XCTAssertEqual(LLMEval.numbers(in: "1,5000"), ["5000"])
+        for (target, text) in [("th", "ระดับความสูง 4,000 ฟุต"), ("de", "4.000 Fuß hoch"), ("fr", "4\u{202F}000 pieds de haut")] {
+            let c = TranslationEvalCase(id: target, language: "en", lines: ["4000 feet high"], target: target)
+            let s = LLMEval.score(c, translations: [text]).score
+            XCTAssertEqual(s.numbersChecked, 1, target)
+            XCTAssertEqual(s.numbersKept, 1, target)
+        }
+        let reverse = TranslationEvalCase(id: "ja", language: "en", lines: ["2,500 people came."], target: "ja")
+        let s = LLMEval.score(reverse, translations: ["2500人が来た。"]).score
+        XCTAssertEqual(s.numbersKept, s.numbersChecked)
+        XCTAssertEqual(s.numbersChecked, 1)
+    }
+
+    /// ふつうの空白は、千の区切りの時も、2 つの数の間の時も在る。どちらの読み方でも、数が消えたと数えない
+    func testNumbersReadPlainSpacesBothWays() {
+        // 区切りと読む: 「15,200」→「15 200」(フランス語の書き方)
+        var c = TranslationEvalCase(id: "fr", language: "en", lines: ["15,200 people came."], target: "fr")
+        var s = LLMEval.score(c, translations: ["15 200 personnes sont venues."]).score
+        XCTAssertEqual(s.numbersChecked, 1)
+        XCTAssertEqual(s.numbersKept, 1)
+        // 2 つの数と読む: 「15 200」→「15 に 200」
+        c = TranslationEvalCase(id: "ja", language: "en", lines: ["Room 15 200 people came."], target: "ja")
+        s = LLMEval.score(c, translations: ["部屋15に200人が来た。"]).score
+        XCTAssertEqual(s.numbersKept, s.numbersChecked)
+        XCTAssertEqual(s.numbersChecked, 2)
+        // どちらの読み方でも無い数は、消えたと数える
+        let lost = LLMEval.numbersLost(sources: ["Room 15 200 people came."], translation: "部屋15に人が来た。")
+        XCTAssertEqual(lost.lost, ["15200"])
+        XCTAssertEqual(LLMEval.numbers(in: "15 200", joiningSpaces: false), ["15", "200"])
+    }
+
+    /// ko・ru・th・zh は、その言語の文字が在れば、判定を呼ぶ前に「合っている」とする
+    func testTargetScriptCountsBeforeTheDetector() {
+        XCTAssertTrue(LLMEval.isInTarget("Боб Андерсон, специалист фонда Раптор", target: "ru", detector: { _ in "kk" }))
+        XCTAssertTrue(LLMEval.isInTarget("용암이 싫어 #firetemple", target: "ko", detector: { _ in "en" }))
+        XCTAssertTrue(LLMEval.isInTarget("ขอบคุณทุกคนที่มาในวันนี้ Roblox Studio", target: "th", detector: { _ in "en" }))
+        XCTAssertTrue(LLMEval.isInTarget("史蒂夫・乔布斯发布了新产品", target: "zh", detector: { _ in "ja" }))
+        // その言語の文字が無ければ、今までどおり判定 (判定が無ければ外れ)
+        XCTAssertFalse(LLMEval.isInTarget("Hello everyone, welcome back", target: "ru", detector: { _ in "en" }))
+        XCTAssertFalse(LLMEval.isInTarget("Hello everyone, welcome back", target: "ko", detector: nil))
+        XCTAssertFalse(LLMEval.isInTarget("みなさん、ようこそ。こんにちは", target: "zh", detector: { _ in "ja" }))
+        // ラテン文字の言語は、文字では見分けないので判定に任せる
+        XCTAssertFalse(LLMEval.isInTarget("Hello everyone, welcome back", target: "fr", detector: { _ in "en" }))
+    }
+
+    /// 問題の数か行の数が違う結果どうしは比べない (「比べられない」の 1 行だけ)
+    func testDifferentSetsAreNotComparable() {
+        var before = TranslationEvalScore()
+        before.cases = 1
+        before.lines = 30
+        before.translated = 30
+        before.chrF = 50
+        var now = before
+        now.lines = 20
+        now.translated = 20
+        let out = LLMEval.translationRegressions(["fr": now], baseline: ["fr": before])
+        XCTAssertEqual(out.count, 1)
+        XCTAssertTrue(out[0].contains("not comparable"), out[0])
+        var moreCases = before
+        moreCases.cases = 2
+        XCTAssertEqual(LLMEval.translationRegressions(["fr": moreCases], baseline: ["fr": before]).count, 1)
+        XCTAssertEqual(LLMEval.translationRegressions(["fr": before], baseline: ["fr": before]), [])
+    }
+
+    /// 訳す必要が無い行 (文字の無い行・もう訳す先の言語の行) は、原文をそのまま訳として数え、写しには数えない
+    func testLinesThatNeedNoTranslationCountAsTranslated() throws {
+        let fr = TranslationEvalCase(id: "num", language: "en", lines: ["2024", "Hello everyone, welcome to the show."],
+                                     target: "fr", references: ["2024", "Bonjour à tous, bienvenue dans l'émission."])
+        let ja = TranslationEvalCase(id: "ja", language: "en", lines: ["皆さん、こんにちは。", "Thank you for coming."])
+        let generator = table(["Hello everyone, welcome to the show.": "Bonjour à tous, bienvenue dans l'émission.",
+                               "Thank you for coming.": "来てくれてありがとう。"])
+        let result = try LLMEval.runTranslation([fr, ja], generator: generator, detector: { _ in "fr" })
+        let f = try XCTUnwrap(result.byTarget["fr"])
+        XCTAssertEqual(f.translated, 2, result.details.joined(separator: "\n"))
+        XCTAssertEqual(f.inTarget, 2)
+        XCTAssertEqual(f.copied, 0)
+        XCTAssertEqual(f.chrF ?? -1, 100, accuracy: 1e-9)
+        let j = try XCTUnwrap(result.byTarget["ja"])
+        XCTAssertEqual(j.translated, 2, result.details.joined(separator: "\n"))
+        XCTAssertEqual(j.copied, 0)
+        // 残した訳にも、原文のまま訳とした印が付く
+        let unit = try XCTUnwrap(result.outputs.first { $0.id == "num" }?.units.first)
+        XCTAssertEqual(unit.asSource, true)
+        XCTAssertEqual(unit.text, "2024")
+    }
+
+    // MARK: 訳を残す・採点し直す
+
+    func testRescoringSavedOutputsGivesTheSameScore() throws {
+        let th = TranslationEvalCase(id: "th", language: "en", lines: ["Thank you all for coming today.", "First we open",
+                                                                        "a new place."],
+                                     target: "th", references: ["ขอบคุณทุกคนที่มาในวันนี้", "ก่อนอื่นเราเปิด", "สถานที่ใหม่"])
+        let generator = table([
+            "We sold 1500 units of Roblox toys today.": "Nous avons vendu 1500 jouets Roblox aujourd'hui.",
+            "That is thirty percent more than before.": "That is thirty percent more than before.",
+            "Thank you all for coming today.": "ขอบคุณทุกคนที่มาในวันนี้",
+            "First we open a new place.": "ก่อนอื่นเราเปิดสถานที่ใหม่",
+        ])
+        let result = try LLMEval.runTranslation([frCase, th], generator: generator, detector: fakeDetector)
+        XCTAssertEqual(result.outputs.map(\.id), ["fr", "th"])
+        let fr = try XCTUnwrap(result.outputs.first)
+        XCTAssertEqual(fr.target, "fr")
+        XCTAssertEqual(fr.language, "en")
+        XCTAssertEqual(fr.keep, ["Roblox"])
+        XCTAssertEqual(fr.units.first?.reference, frCase.references?.first)
+        XCTAssertEqual(fr.units.map(\.lines), [[0], [1], [2]])
+        XCTAssertEqual(fr.units.first?.text, "Nous avons vendu 1500 jouets Roblox aujourd'hui.")
+        XCTAssertEqual(result.outputs.last?.units.count, 2, "the two lines of one sentence are one unit")
+        XCTAssertEqual(result.outputs.last?.units.last?.lines, [1, 2])
+
+        let report = LLMEvalReport(model: "m", adapter: nil, ledgerEntries: 0, sets: ["s.json"], audit: AuditEvalScore(),
+                                   translation: result.score, translationByTarget: result.byTarget, details: result.details,
+                                   translationOutputs: result.outputs)
+        let decoded = try JSONDecoder().decode(LLMEvalReport.self, from: JSONEncoder().encode(report))
+        XCTAssertEqual(decoded.translationOutputs, result.outputs)
+        let again = try XCTUnwrap(decoded.rescored(from: "r.json", detector: fakeDetector))
+        XCTAssertEqual(again.translationByTarget, result.byTarget)
+        XCTAssertEqual(again.translation, result.score)
+        XCTAssertEqual(again.details, result.details)
+        XCTAssertEqual(again.rescoredFrom, "r.json")
+
+        // 採点の決まりを変えた想定 (判定を差し替える): 点が変わる。タイ語はタイ文字で決まるので変わらない
+        let changed = try XCTUnwrap(decoded.rescored(from: "r.json", detector: { _ in "en" }))
+        XCTAssertLessThan(changed.translationByTarget["fr"]?.inTarget ?? 99, result.byTarget["fr"]?.inTarget ?? 0)
+        XCTAssertEqual(changed.translationByTarget["th"], result.byTarget["th"])
+    }
+
+    func testOldReportsWithoutOutputsStillLoad() throws {
+        let audit = String(decoding: try JSONEncoder().encode(AuditEvalScore()), as: UTF8.self)
+        var score = TranslationEvalScore()
+        score.cases = 1
+        score.lines = 3
+        let translation = String(decoding: try JSONEncoder().encode(score), as: UTF8.self)
+        let old = #"{"model":"m","audit":"# + audit + #","translation":"# + translation + #","details":["[x 1] missed: a"]}"#
+        let report = try JSONDecoder().decode(LLMEvalReport.self, from: Data(old.utf8))
+        XCTAssertNil(report.translationOutputs)
+        XCTAssertNil(report.rescoredFrom)
+        XCTAssertEqual(report.translationByTarget["ja"]?.lines, 3, "an old report scored Japanese only")
+        XCTAssertNil(report.rescored(from: "old.json"))
+        // 残した訳の項目の、書かなくてよい物 (原文のまま・人の訳・秒・語・用語集) が無くても読める
+        let unit = #"{"id":"t","target":"fr","language":"en","lineCount":1,"units":[{"lines":[0],"source":"Hi.","text":"Salut."}]}"#
+        let output = try JSONDecoder().decode(LLMEval.TranslationOutput.self, from: Data(unit.utf8))
+        XCTAssertNil(output.units[0].asSource)
+        XCTAssertNil(output.units[0].reference)
+        XCTAssertNil(output.seconds)
+        XCTAssertEqual(LLMEval.score(output).score.translated, 1)
+    }
+
     #if canImport(NaturalLanguage)
+    func testSystemDetectorStaysWithinTheAppLanguages() {
+        // 候補をしぼる前は、カザフ語 (kk) と判定された訳
+        XCTAssertNotEqual(SystemLanguageDetector.detect("Боб Андерсон, специалист фонда Раптор, рассказал о проекте."), "kk")
+    }
+
     func testSystemDetectorNamesTheLanguages() {
         let samples: [(String, String)] = [
             ("Thank you very much for coming to the meeting today.", "en"),

@@ -73,17 +73,17 @@ public enum ChrF {
         scalar.properties.isWhitespace || (0x1C...0x1F).contains(scalar.value)
     }
 
-    /// 次数ごとの n-gram と、その数 (空白を除いてから作る)
-    private static func ngrams(_ text: String) -> [[String: Int]] {
-        let scalars: [Unicode.Scalar] = Array(text.unicodeScalars.filter { !isSpace($0) })
-        var out: [[String: Int]] = []
+    /// 次数ごとの n-gram と、その数 (空白を除いてから作る)。
+    /// 鍵はコードポイントの並び (String を鍵にすると、Swift は正準等価な別の並び (U+212B と U+00C5 など) を同じと数え、
+    /// コードポイントで比べる sacreBLEU と点が食い違う)
+    private static func ngrams(_ text: String) -> [[[UInt32]: Int]] {
+        let scalars: [UInt32] = text.unicodeScalars.filter { !isSpace($0) }.map(\.value)
+        var out: [[[UInt32]: Int]] = []
         for n in 1...characterOrder {
-            var counts: [String: Int] = [:]
+            var counts: [[UInt32]: Int] = [:]
             if scalars.count >= n {
                 for start in 0...(scalars.count - n) {
-                    var view = String.UnicodeScalarView()
-                    view.append(contentsOf: scalars[start..<(start + n)])
-                    counts[String(view), default: 0] += 1
+                    counts[Array(scalars[start..<(start + n)]), default: 0] += 1
                 }
             }
             out.append(counts)

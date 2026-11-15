@@ -4,55 +4,54 @@ import KikimimiLLM
 
 /// `Kikimimi --eval-llm <model.gguf> --set <場面.json> [--set …] [--adapter <lora.gguf>] [--ledger <台帳.json>]
 ///          [--rules-only] [--cpu] [--report <結果.json>] [--baseline <前の結果.json>]`
+/// `Kikimimi --eval-llm none --rescore <結果.json> [--report <結果.json>] [--baseline <前の結果.json>]`
 ///
 /// 評価ハーネス: 決まった場面 (聞き間違いを含む短い文字起こしと正解) で監査役・翻訳役を動かし、成績を数える。
 /// モデル・学習した直し・追加学習の差分 (LoRA) を変えたときに、同じ物差しで比べるために使う。
 /// `--baseline` を付けると前の結果と比べ、悪くなっていれば終了コード 3 を返す (差分を使う前の関門)。
+/// 結果には、翻訳の問題ごとの LLM の訳そのもの (`translationOutputs`) を残す。`--rescore` は、それを今の採点の決まりで
+/// 採点し直す (LLM は使わない。採点の決まりを直した時に、測り直さずに済む)
 enum LLMEvalRunner {
-    struct Report: Codable {
-        var model: String
-        var adapter: String?
-        var ledgerEntries: Int
-        var sets: [String]
-        var audit: AuditEvalScore
-        /// 翻訳の全体の合計
-        var translation: TranslationEvalScore
-        /// 翻訳の、訳す先ごとの成績 (鍵は言語のコード)
-        var translationByTarget: [String: TranslationEvalScore]
-        var details: [String]
+    /// 結果の JSON (中身と、古い結果の読み方・採点し直しは KikimimiCore の `LLMEvalReport`)
+    typealias Report = LLMEvalReport
 
-        init(model: String, adapter: String?, ledgerEntries: Int, sets: [String], audit: AuditEvalScore,
-             translation: TranslationEvalScore, translationByTarget: [String: TranslationEvalScore], details: [String]) {
-            self.model = model
-            self.adapter = adapter
-            self.ledgerEntries = ledgerEntries
-            self.sets = sets
-            self.audit = audit
-            self.translation = translation
-            self.translationByTarget = translationByTarget
-            self.details = details
-        }
+    private static func load(_ path: String) throws -> Report {
+        try JSONDecoder().decode(Report.self, from: Data(contentsOf: URL(fileURLWithPath: expand(path))))
+    }
 
-        private enum CodingKeys: String, CodingKey {
-            case model, adapter, ledgerEntries, sets, audit, translation, translationByTarget, details
-        }
+    private static func write(_ report: Report, to path: String) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(report).write(to: URL(fileURLWithPath: expand(path)), options: .atomic)
+        log("report: \(path)")
+    }
 
-        init(from decoder: Decoder) throws {
-            let c = try decoder.container(keyedBy: CodingKeys.self)
-            model = try c.decode(String.self, forKey: .model)
-            adapter = try c.decodeIfPresent(String.self, forKey: .adapter)
-            ledgerEntries = try c.decodeIfPresent(Int.self, forKey: .ledgerEntries) ?? 0
-            sets = try c.decodeIfPresent([String].self, forKey: .sets) ?? []
-            audit = try c.decode(AuditEvalScore.self, forKey: .audit)
-            translation = try c.decodeIfPresent(TranslationEvalScore.self, forKey: .translation) ?? TranslationEvalScore()
-            details = try c.decodeIfPresent([String].self, forKey: .details) ?? []
-            if let byTarget = try c.decodeIfPresent([String: TranslationEvalScore].self, forKey: .translationByTarget) {
-                translationByTarget = byTarget
-            } else {
-                // 訳す先ごとの成績が無い古い結果は、日本語へ訳す場合だけを採点していた
-                translationByTarget = translation.lines > 0 ? ["ja": translation] : [:]
-            }
+    /// `--rescore`: 残した訳を、今の採点の決まりで採点し直す (LLM は使わない)
+    private static func rescore(_ path: String, report reportPath: String?, baseline: Report?) -> Int32 {
+        let old: Report
+        do {
+            old = try load(path)
+        } catch {
+            log("RESCORE FAILED: could not read \(path): \(error.localizedDescription)")
+            return 1
         }
+        guard let report = old.rescored(from: (path as NSString).lastPathComponent) else {
+            log("RESCORE FAILED: \(path) has no translationOutputs (the LLM translations were not saved in this report). "
+                + "Run --eval-llm again with this version to save them.")
+            return 2
+        }
+        for line in report.details { log("  " + line) }
+        log("rescored \(report.translationOutputs?.count ?? 0) translation cases from \(path)")
+        log(report.translation.summary)
+        for line in LLMEval.translationTable(report.translationByTarget) { log("  " + line) }
+        do {
+            if let reportPath { try write(report, to: reportPath) }
+        } catch {
+            log("RESCORE FAILED: \(error.localizedDescription)")
+            return 1
+        }
+        if let baseline { return compare(report, with: baseline) ? 0 : 3 }
+        return 0
     }
 
     static func run(arguments args: [String]) -> Int32 {
@@ -66,9 +65,23 @@ enum LLMEvalRunner {
         let rulesOnly = args.contains("--rules-only")
         let modelPath = value("--eval-llm") ?? ""
         let setPaths = values("--set")
+        // 前の結果は、何かを書く前に読んでおく (--report と同じファイルでも、上書きする前の値と比べる)
+        var baseline: Report?
+        if let path = value("--baseline") {
+            do {
+                baseline = try load(path)
+            } catch {
+                log("EVAL FAILED: could not read the baseline \(path): \(error.localizedDescription)")
+                return 1
+            }
+        }
+        if let path = value("--rescore") {
+            return rescore(path, report: value("--report"), baseline: baseline)
+        }
         guard !setPaths.isEmpty, rulesOnly || FileManager.default.fileExists(atPath: modelPath) else {
             log("usage: Kikimimi --eval-llm <model.gguf> --set <cases.json> [--set …] [--adapter <lora.gguf>] [--ledger <ledger.json>]"
                 + " [--rules-only] [--cpu] [--report <out.json>] [--baseline <earlier report.json>]")
+            log("       Kikimimi --eval-llm none --rescore <report.json> [--report <out.json>] [--baseline <earlier report.json>]")
             return 2
         }
         do {
@@ -107,6 +120,7 @@ enum LLMEvalRunner {
                 report.translation = translated.score
                 report.translationByTarget = translated.byTarget
                 report.details += translated.details
+                report.translationOutputs = translated.outputs
             }
             for line in report.details { log("  " + line) }
             log(report.audit.summary)
@@ -116,16 +130,8 @@ enum LLMEvalRunner {
                     for line in LLMEval.translationTable(report.translationByTarget) { log("  " + line) }
                 }
             }
-            if let path = value("--report") {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                try encoder.encode(report).write(to: URL(fileURLWithPath: expand(path)), options: .atomic)
-                log("report: \(path)")
-            }
-            if let path = value("--baseline") {
-                let before = try JSONDecoder().decode(Report.self, from: Data(contentsOf: URL(fileURLWithPath: expand(path))))
-                return compare(report, with: before) ? 0 : 3
-            }
+            if let path = value("--report") { try write(report, to: path) }
+            if let baseline { return compare(report, with: baseline) ? 0 : 3 }
             return 0
         } catch {
             log("EVAL FAILED: \(error.localizedDescription)")

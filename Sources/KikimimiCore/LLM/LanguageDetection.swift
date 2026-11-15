@@ -12,9 +12,17 @@ public typealias LanguageDetector = @Sendable (String) -> String?
 /// `zh-Hans`・`zh-Hant` は "zh" にまとめる。ほかは NaturalLanguage のコードのまま返す
 /// (13 言語は、どれも訳す先のコードと同じ。13 に無い言語は、そのコードのまま)
 public enum SystemLanguageDetector {
+    /// 判定の候補にする言語 (アプリの 13 言語。中国語は簡体字と繁体字)。
+    /// 候補をしぼらないと、正しいロシア語の訳をカザフ語と判定するなど、近い言語へ外れる
+    static let candidates: [NLLanguage] = [
+        .english, .japanese, .simplifiedChinese, .traditionalChinese, .korean, .spanish, .french, .german,
+        .italian, .portuguese, .russian, .vietnamese, .thai, .indonesian
+    ]
+
     public static func detect(_ text: String) -> String? {
         // 呼ぶたびに作る (1 つの係を、いくつかのスレッドで使い回さないため)
         let recognizer = NLLanguageRecognizer()
+        recognizer.languageConstraints = candidates
         recognizer.processString(text)
         guard let language = recognizer.dominantLanguage, language != .undetermined else { return nil }
         let code = language.rawValue
