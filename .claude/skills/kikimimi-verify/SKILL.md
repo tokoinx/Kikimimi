@@ -24,6 +24,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - `make` を通すので、アプリの終了コード N は `make: *** [check-ui] Error N` の行に出る (`make` 自身は 2 を返す)。この行が無く `make` が 0 で終われば、アプリの終了コードは 0。
 - 結果の行は標準エラーへ、終わりにまとめて出る。途中では `UI LOAD (live): …` の行だけが出る。
 - `--selftest-…` の時は、ふだんのライブラリに保存しない (確認は一時フォルダで行い、終わりに消す)。
+- `--selftest-…` の時の画面の言語は、引数 `--ui-language <コード>` で決まる (無ければ日本語。設定は読まず・書かない)。下の「絵の見方」は日本語の画面の文で書いてある。ほかの言語の見た目 (字が切れていないか) を見る時は、`build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 300 --audio Tests/Fixtures/mixed-en-ja.wav --ui-language de --screenshots <置き場>` のように、言語と絵の置き場を変えて走らせる (ドイツ語は語が長いので、切れを見つけやすい)。
 - `make app` が `PCH was compiled with module cache path '…'` で失敗した時は、フォルダの名前が変わる前の release の成果物が残っている。`.build/arm64-apple-macosx/release` を、まだ無い別の名前へ `mv` でよけて (`rm -r` は門で拒まれる) から、もう一度 `make app`。よけた物を消すのは利用者に頼む。
 
 ## 3. 出力の読み方
