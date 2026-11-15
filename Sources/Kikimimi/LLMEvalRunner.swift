@@ -3,7 +3,7 @@ import KikimimiCore
 import KikimimiLLM
 
 /// `Kikimimi --eval-llm <model.gguf> --set <場面.json> [--set …] [--adapter <lora.gguf>] [--ledger <台帳.json>]
-///          [--rules-only] [--cpu] [--report <結果.json>] [--baseline <前の結果.json>]`
+///          [--rules-only] [--cpu] [--no-split-retry] [--report <結果.json>] [--baseline <前の結果.json>]`
 /// `Kikimimi --eval-llm none --rescore <結果.json> [--report <結果.json>] [--baseline <前の結果.json>]`
 ///
 /// 評価ハーネス: 決まった場面 (聞き間違いを含む短い文字起こしと正解) で監査役・翻訳役を動かし、成績を数える。
@@ -13,6 +13,7 @@ import KikimimiLLM
 /// 採点し直す (LLM は使わない。採点の決まりを直した時に、測り直さずに済む)
 /// `Kikimimi --eval-llm none --gate <問題.json か 結果.json> [--gate …] [--report <出力.json>]` は、訳の関門
 /// (`TranslationGate`) を LLM なしで測る (問題なら人の訳と壊した訳に、結果なら残した LLM の訳に掛ける)
+/// `--no-split-retry` は、訳の後ろが抜けた時の、文に分けた訳し直し (`TranslationOptions.splitRetry`) を切る (入・切を比べる)
 enum LLMEvalRunner {
     /// 結果の JSON (中身と、古い結果の読み方・採点し直しは KikimimiCore の `LLMEvalReport`)
     typealias Report = LLMEvalReport
@@ -156,7 +157,7 @@ enum LLMEvalRunner {
         }
         guard !setPaths.isEmpty, rulesOnly || FileManager.default.fileExists(atPath: modelPath) else {
             log("usage: Kikimimi --eval-llm <model.gguf> --set <cases.json> [--set …] [--adapter <lora.gguf>] [--ledger <ledger.json>]"
-                + " [--rules-only] [--cpu] [--report <out.json>] [--baseline <earlier report.json>]")
+                + " [--rules-only] [--cpu] [--no-split-retry] [--report <out.json>] [--baseline <earlier report.json>]")
             log("       Kikimimi --eval-llm none --rescore <report.json> [--report <out.json>] [--baseline <earlier report.json>]")
             log("       Kikimimi --eval-llm none --gate <cases.json or report.json> [--gate …] [--report <out.json>]")
             return 2
@@ -192,7 +193,10 @@ enum LLMEvalRunner {
             report.audit = audited.score
             report.details = audited.details
             if let engine {
+                let splitRetry = !args.contains("--no-split-retry")
+                if !splitRetry { log("split retry: off (--no-split-retry)") }
                 let translated = try LLMEval.runTranslation(translation, generator: engine, ledger: ledger,
+                                                            splitRetry: splitRetry,
                                                             onCase: { done, total in log("  translation \(done)/\(total)") })
                 report.translation = translated.score
                 report.translationByTarget = translated.byTarget

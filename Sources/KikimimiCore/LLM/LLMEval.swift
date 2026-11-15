@@ -157,12 +157,16 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
     /// chrF (コーパスの点、0〜100)。人の訳が無ければ nil
     public var chrF: Double?
     public var seconds = 0.0
+    /// 訳の後ろが抜けて (関門の `short`)、文に分けて訳し直したまとまりの数と、そのうち入れ替えた数。
+    /// 古い結果には無い (0 と読む)
+    public var retried = 0
+    public var retryFixed = 0
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case cases, lines, translated, inTarget, numbersKept, numbersChecked, termsKept, termsChecked
-        case copied, repeated, chrFStatistics, chrF, seconds
+        case copied, repeated, chrFStatistics, chrF, seconds, retried, retryFixed
     }
 
     /// 日本語だけを採点していた頃の項目の名前
@@ -187,6 +191,8 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
         chrFStatistics = try c.decodeIfPresent(ChrF.Statistics.self, forKey: .chrFStatistics)
         chrF = try c.decodeIfPresent(Double.self, forKey: .chrF)
         seconds = try c.decodeIfPresent(Double.self, forKey: .seconds) ?? 0
+        retried = try c.decodeIfPresent(Int.self, forKey: .retried) ?? 0
+        retryFixed = try c.decodeIfPresent(Int.self, forKey: .retryFixed) ?? 0
     }
 
     public mutating func add(_ other: TranslationEvalScore) {
@@ -207,6 +213,8 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
             chrF = sum.score
         }
         seconds += other.seconds
+        retried += other.retried
+        retryFixed += other.retryFixed
     }
 
     public var summary: String {
@@ -214,7 +222,7 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
         return String(format: "translation: %d cases, %d lines: translated %d, in the target language %d, numbers kept %d/%d, "
                       + "terms kept %d/%d, copied %d, repeated %d, ",
                       cases, lines, translated, inTarget, numbersKept, numbersChecked, termsKept, termsChecked, copied, repeated)
-            + "chrF \(points), " + String(format: "%.1f s", seconds)
+            + "chrF \(points), " + String(format: "split retries %d (used %d), %.1f s", retried, retryFixed, seconds)
     }
 }
 
@@ -500,6 +508,9 @@ public enum LLMEval {
         public var glossary: String?
         /// 訳すのにかかった秒 (採点し直しても、そのまま使う)
         public var seconds: Double?
+        /// 文に分けて訳し直したまとまりの数と、そのうち入れ替えた数 (採点し直しても、そのまま使う。古い結果には無い)
+        public var retried: Int?
+        public var retryFixed: Int?
 
         public init(id: String, target: String, language: String, lineCount: Int, units: [Unit], keep: [String]? = nil,
                     glossary: String? = nil, seconds: Double? = nil) {
@@ -554,6 +565,8 @@ public enum LLMEval {
         score.cases = 1
         score.lines = o.lineCount
         score.seconds = o.seconds ?? 0
+        score.retried = o.retried ?? 0
+        score.retryFixed = o.retryFixed ?? 0
         var details: [String] = []
         var chrF: ChrF.Statistics?
         var texts: [String] = []
@@ -631,9 +644,11 @@ public enum LLMEval {
         return (total, byTarget, details)
     }
 
-    /// 翻訳の場面をひと通り動かして採点する。場面ごとの訳す先 (`target`) で訳し、訳す先ごとにも集計する
+    /// 翻訳の場面をひと通り動かして採点する。場面ごとの訳す先 (`target`) で訳し、訳す先ごとにも集計する。
+    /// アプリと同じ `Translator.translateSummarizing` を通す (訳の後ろが抜けた時の訳し直しも同じに働く)。
+    /// splitRetry が false なら、訳し直しを切る (`--no-split-retry`)
     public static func runTranslation(_ cases: [TranslationEvalCase], generator: any TextGenerating,
-                                      ledger: CorrectionLedger? = nil,
+                                      ledger: CorrectionLedger? = nil, splitRetry: Bool = true,
                                       detector: LanguageDetector? = LLMEval.defaultLanguageDetector,
                                       shouldCancel: () -> Bool = { false },
                                       onCase: (_ done: Int, _ total: Int) -> Void = { _, _ in })
@@ -648,9 +663,10 @@ public enum LLMEval {
             let segments = segments(c.lines, language: c.language)
             var byHead: [UUID: TranslationResult] = [:]
             let glossary = ledger?.glossary(adding: c.glossary) ?? c.glossary
-            _ = try Translator.translate(segments, language: c.language, target: c.targetLanguage,
-                                         options: TranslationOptions(glossary: glossary),
-                                         generator: generator, shouldCancel: shouldCancel) { batch, _, _ in
+            let run = try Translator.translateSummarizing(segments, language: c.language, target: c.targetLanguage,
+                                                          options: TranslationOptions(glossary: glossary,
+                                                                                      splitRetry: splitRetry),
+                                                          generator: generator, shouldCancel: shouldCancel) { batch, _, _ in
                 for result in batch { byHead[result.head] = result }
             }
             // 文ごとの訳は、先頭の区間に付く。まとめられた後ろの区間も、その訳の行として数える
@@ -676,7 +692,12 @@ public enum LLMEval {
             var result = score(c, units: units, detector: detector)
             let seconds = Date().timeIntervalSince(started)
             result.score.seconds = seconds
-            outputs.append(output(c, units: units, seconds: seconds))
+            result.score.retried = run.retried
+            result.score.retryFixed = run.retryFixed
+            var saved = output(c, units: units, seconds: seconds)
+            saved.retried = run.retried
+            saved.retryFixed = run.retryFixed
+            outputs.append(saved)
             total.add(result.score)
             byTarget[c.targetLanguage, default: TranslationEvalScore()].add(result.score)
             details += result.details
@@ -713,18 +734,21 @@ public enum LLMEval {
         return out
     }
 
-    /// 訳す先ごとの表 (1 行目は見出し)。訳す先・行・訳せた・その言語だった・数・語・写し・繰り返し・chrF・1 行あたりの秒
+    /// 訳す先ごとの表 (1 行目は見出し)。訳す先・行・訳せた・その言語だった・数・語・写し・繰り返し・chrF・1 行あたりの秒・
+    /// 訳し直した数 (入れ替えた数 / 訳し直した数)
     public static func translationTable(_ byTarget: [String: TranslationEvalScore]) -> [String] {
         func pad(_ s: String, _ width: Int) -> String { s.count >= width ? s : s + String(repeating: " ", count: width - s.count) }
-        let widths = [6, 6, 10, 9, 9, 9, 6, 8, 7, 7]
+        let widths = [6, 6, 10, 9, 9, 9, 6, 8, 7, 7, 7]
         func row(_ cells: [String]) -> String { zip(cells, widths).map { pad($0, $1) }.joined(separator: " ") }
-        var out = [row(["target", "lines", "translated", "inTarget", "numbers", "terms", "copied", "repeated", "chrF", "s/line"])]
+        var out = [row(["target", "lines", "translated", "inTarget", "numbers", "terms", "copied", "repeated", "chrF", "s/line",
+                        "retry"])]
         for target in byTarget.keys.sorted() {
             guard let s = byTarget[target] else { continue }
             out.append(row([target, "\(s.lines)", "\(s.translated)", "\(s.inTarget)", "\(s.numbersKept)/\(s.numbersChecked)",
                             "\(s.termsKept)/\(s.termsChecked)", "\(s.copied)", "\(s.repeated)",
                             s.chrF.map { String(format: "%.2f", $0) } ?? "-",
-                            String(format: "%.2f", s.lines > 0 ? s.seconds / Double(s.lines) : 0)]))
+                            String(format: "%.2f", s.lines > 0 ? s.seconds / Double(s.lines) : 0),
+                            "\(s.retryFixed)/\(s.retried)"]))
         }
         return out
     }

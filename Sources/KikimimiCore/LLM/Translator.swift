@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(NaturalLanguage)
+import NaturalLanguage
+#endif
 
 /// 翻訳の設定
 public struct TranslationOptions: Sendable {
@@ -9,12 +12,17 @@ public struct TranslationOptions: Sendable {
     public var maxTokensPerChunk: Int
     /// 文脈として見せる、直前の訳済みの行の数
     public var contextLines: Int
+    /// 訳の後ろが抜けた (関門の `short` の印が付いた) 訳を、文に分けて 1 回だけ訳し直すか (既定は入)。
+    /// 評価で入・切を比べるための口 (`--eval-llm … --no-split-retry`)
+    public var splitRetry: Bool
 
-    public init(glossary: String? = nil, maxLinesPerChunk: Int = 10, maxTokensPerChunk: Int = 500, contextLines: Int = 3) {
+    public init(glossary: String? = nil, maxLinesPerChunk: Int = 10, maxTokensPerChunk: Int = 500, contextLines: Int = 3,
+                splitRetry: Bool = true) {
         self.glossary = glossary
         self.maxLinesPerChunk = maxLinesPerChunk
         self.maxTokensPerChunk = maxTokensPerChunk
         self.contextLines = contextLines
+        self.splitRetry = splitRetry
     }
 }
 
@@ -59,14 +67,26 @@ public struct TranslationRunSummary: Sendable, Hashable {
     /// LLM の訳を受け取らなかった行の理由 (text が空で、flags に理由の符号。訳せなかった行の覚えにする)。
     /// onChunk には渡さない (訳の結果だけを受け取る今の呼び手を変えないため)。呼ぶ側が、終わりに `Transcript.apply` で置く
     public var rejected: [TranslationResult]
+    /// 訳の後ろが抜けて (`short`)、文に分けて訳し直したまとまりの数
+    public var retried: Int
+    /// そのうち、訳し直した訳に入れ替えたまとまりの数
+    public var retryFixed: Int
+    /// 訳し直しで増えた LLM の呼び出しの数と、送った行 (文のかけら) の数 (sentToLLM には足さない)
+    public var retryCalls: Int
+    public var retryLines: Int
 
     public init(failed: Int = 0, fromMemory: Int = 0, sentToLLM: Int = 0, flagged: Int = 0,
-                rejected: [TranslationResult] = []) {
+                rejected: [TranslationResult] = [], retried: Int = 0, retryFixed: Int = 0, retryCalls: Int = 0,
+                retryLines: Int = 0) {
         self.failed = failed
         self.fromMemory = fromMemory
         self.sentToLLM = sentToLLM
         self.flagged = flagged
         self.rejected = rejected
+        self.retried = retried
+        self.retryFixed = retryFixed
+        self.retryCalls = retryCalls
+        self.retryLines = retryLines
     }
 }
 
@@ -444,10 +464,29 @@ public enum Translator {
                 let unit = units[u]
                 let head = segments[unit[0]].id
                 let covers = unit.dropFirst().map { segments[$0].id }
-                if let t = results[k].text {
-                    // 通った訳は、関門に掛けて印だけを付ける (訳は入れ替えない・訳し直さない)
-                    let finding = TranslationGate.assess(source: sources[u], translation: t, sourceLanguage: unitLanguage(u),
+                if var t = results[k].text {
+                    // 通った訳は、関門に掛けて印を付ける。訳の後ろが抜けた (short) 時だけ、文に分けて 1 回訳し直す
+                    var finding = TranslationGate.assess(source: sources[u], translation: t, sourceLanguage: unitLanguage(u),
                                                          target: target)
+                    if options.splitRetry, finding.flags.contains(TranslationGate.short) {
+                        if shouldCancel() { throw LLMError.cancelled }
+                        // 文脈は、このまとまりの前の物 (同じまとまりの初めの訳と同じ決め方)
+                        let before = known.filter { $0.position < unit[0] }.sorted { $0.position < $1.position }
+                            .suffix(options.contextLines).map { (source: $0.source, translation: $0.translation) }
+                        if let retry = try splitRetry(source: sources[u], sourceLanguage: unitLanguage(u),
+                                                      promptLanguage: source, target: target, system: system,
+                                                      context: Array(before), options: options, generator: generator,
+                                                      shouldCancel: shouldCancel) {
+                            summary.retried += 1
+                            summary.retryCalls += retry.calls
+                            summary.retryLines += retry.lines
+                            if let fixed = retry.text {
+                                t = fixed
+                                finding = retry.finding
+                                summary.retryFixed += 1
+                            }
+                        }
+                    }
                     if !finding.flags.isEmpty { summary.flagged += 1 }
                     batch.append(TranslationResult(head: head, covers: covers, text: t, flags: finding.flags,
                                                    detail: finding.detail))
@@ -463,6 +502,109 @@ public enum Translator {
             onChunk(batch, done, pending.count)
         }
         return summary
+    }
+
+    // MARK: 訳の後ろが抜けた時の、文に分けた訳し直し
+
+    /// 文に分けて訳し直す時、1 行に送る原文の重さ (`TranslationGate.weight`) の下限。
+    /// これより軽いかけら (「Oh yeah.」など) は、前の文 (前が無ければ次の文) にまとめる
+    static let splitRetryMinimumPieceWeight = 12
+
+    /// 文に分けた訳し直しの結果
+    struct SplitRetry {
+        /// つないだ訳 (採る条件に合わなかった時は nil。初めの訳を残す)
+        var text: String?
+        /// つないだ訳を関門に掛けた結果 (text が nil の時は使わない)
+        var finding: TranslationGate.Finding
+        /// 増えた LLM の呼び出しの数と、送った行の数
+        var calls: Int
+        var lines: Int
+    }
+
+    /// 原文を文に分けて、文 1 つを番号つきの 1 行として送り直し、訳を原文の順につなぐ。
+    /// 文が 2 つ以上に分かれない時は、送らずに nil を返す。
+    /// つないだ訳を関門に掛け、重い印が無く `short` が消えた時だけ text を返す。
+    /// かけらの 1 つでも訳せなかった (受け取れなかった・返らなかった) 時は、text は nil
+    static func splitRetry(source: String, sourceLanguage: String?, promptLanguage: String?, target: String,
+                           system: String, context: [(source: String, translation: String)],
+                           options: TranslationOptions, generator: any TextGenerating,
+                           shouldCancel: () -> Bool) throws -> SplitRetry? {
+        let pieces = sentencePieces(source, language: sourceLanguage)
+        guard pieces.count >= 2 else { return nil }
+        // 初めの訳と同じ決め方で、数行ずつに分ける (行の数と長さの上限)
+        let chunks = LLMChunker.chunks(Array(pieces.indices), cost: { generator.tokenCount(pieces[$0]) + 4 },
+                                       maxLines: options.maxLinesPerChunk, maxCost: options.maxTokensPerChunk)
+        var texts: [String?] = []
+        for chunk in chunks {
+            if shouldCancel() { throw LLMError.cancelled }
+            let outcomes = try checkedTranslateLines(chunk.map { pieces[$0] }, context: context, language: promptLanguage,
+                                                     target: target, system: system, options: options,
+                                                     generator: generator, shouldCancel: shouldCancel)
+            texts += outcomes.map(\.text)
+        }
+        var result = SplitRetry(text: nil, finding: TranslationGate.Finding(), calls: chunks.count, lines: pieces.count)
+        let parts = texts.compactMap { $0 }
+        guard parts.count == pieces.count else { return result }
+        let joined = joinTranslations(parts, target: target)
+        let finding = TranslationGate.assess(source: source, translation: joined, sourceLanguage: sourceLanguage,
+                                             target: target)
+        guard !finding.isSevere, !finding.flags.contains(TranslationGate.short) else { return result }
+        result.text = joined
+        result.finding = finding
+        return result
+    }
+
+    /// 文ごとの訳をつなぐ。訳す先が ja・zh の時は間に何も入れない。ほかは空白 1 つ
+    /// (タイ語は、語の間は詰めるが、文の間には空白を置く書き方なので、空白でつなぐ)
+    static func joinTranslations(_ parts: [String], target: String) -> String {
+        let separator = ["ja", "zh"].contains(TranslationTarget.normalized(target)) ? "" : " "
+        return parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            .joined(separator: separator)
+    }
+
+    /// 訳し直しに送る文のかけら。split で文に分け、重さが minimumWeight に届かないかけらは前の文にまとめる
+    /// (先頭のかけらは、次の文にまとめる。全部が軽ければ 1 つ)。まとめる時のつなぎ方は `Transcript.join`
+    static func sentencePieces(_ text: String, language: String?,
+                               minimumWeight: Int = splitRetryMinimumPieceWeight,
+                               split: (String, String?) -> [String] = splitSentences) -> [String] {
+        var out: [String] = []
+        var lead: [String] = []
+        for raw in split(text, language) {
+            let piece = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !piece.isEmpty else { continue }
+            if TranslationGate.weight(piece) < minimumWeight {
+                if let last = out.popLast() {
+                    out.append(Transcript.join([last, piece]))
+                } else {
+                    lead.append(piece)
+                }
+            } else {
+                out.append(Transcript.join(lead + [piece]))
+                lead = []
+            }
+        }
+        if !lead.isEmpty { out.append(Transcript.join(lead)) }
+        return out
+    }
+
+    /// 文に分ける (NaturalLanguage の `NLTokenizer`。原文の言語が分かる時は、その言語として分ける)。
+    /// NaturalLanguage の無い環境では、分けない
+    static func splitSentences(_ text: String, language: String?) -> [String] {
+        #if canImport(NaturalLanguage)
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = text
+        if let language, !language.isEmpty {
+            tokenizer.setLanguage(NLLanguage(rawValue: language.lowercased() == "zh" ? "zh-Hans" : language))
+        }
+        var out: [String] = []
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            out.append(String(text[range]))
+            return true
+        }
+        return out.isEmpty ? [text] : out
+        #else
+        return [text]
+        #endif
     }
 
     /// 区間に付いた言語のうち、いちばん多いもの (区間に言語が無ければ nil。同じ数なら先に出てきたもの)
