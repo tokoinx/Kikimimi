@@ -86,6 +86,8 @@ extension L10nTables {
         "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "Для перевода (язык перевода: %1$@) нужна локальная LLM «%2$@». Загрузите её на вкладке «Проверка и перевод» в настройках.",
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "Не удалось прочитать файл усвоенных исправлений, поэтому он начат с пустого. Исходный файл сохранён в той же папке, что и «%@».",
         "Could not save the learned corrections: %@": "Не удалось сохранить усвоенные исправления: %@",
+        "Could not save the translation memory: %@": "Не удалось сохранить память переводов: %@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "Не удалось прочитать файл памяти переводов, поэтому он начат с пустого. Исходный файл сохранён в той же папке, что и «%@».",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "Не удалось загрузить %1$@: %2$@\n\nЕсли нет соединения с Hugging Face (huggingface.co), добавьте файл .bin через «Добавить локальный файл…» в настройках.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "Не удалось загрузить %1$@: %2$@\n\nЕсли нет соединения с Hugging Face (huggingface.co), добавьте его через «Добавить локальный GGUF…» на вкладке «Проверка и перевод» в настройках.",
         "Could not delete: %@": "Не удалось удалить: %@",
@@ -253,6 +255,14 @@ extension L10nTables {
 
     private static let ruPart3: [String: String] = [
         "Translate this sentence again": "Перевести это предложение заново",
+        "Edit translation…": "Изменить перевод…",
+        "Edit translation": "Изменить перевод",
+        "Edited": "Изменено",
+        "You edited this translation. Click to change it.": "Вы изменили этот перевод. Нажмите, чтобы изменить его.",
+        "Machine translation": "Машинный перевод",
+        "Your translation": "Ваш перевод",
+        "Restore machine translation": "Вернуть машинный перевод",
+        "Remove your translation": "Удалить ваш перевод",
         "Translate only this sentence into %@": "Перевести только это предложение (%@)",
         "%1$@. %2$@": "%1$@. %2$@",
         "Click to stop": "Нажмите, чтобы остановить",

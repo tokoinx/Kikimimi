@@ -140,6 +140,12 @@ final class Job: Identifiable {
     var isPostActive: Bool { !postQueue.isEmpty || postState != .idle }
 }
 
+/// 訳を直す画面で直している行 (結果のジョブと、その行の区間。区間は、行のどの区間でもよい)
+struct TranslationEditRequest: Equatable {
+    let jobID: UUID
+    let segmentID: UUID
+}
+
 /// 文字起こしのあとに行う仕事
 enum PostTask: Equatable {
     case audit
@@ -314,6 +320,14 @@ final class AppModel {
     var ledger = CorrectionLedger()
     /// 学習した直しを使う (監査の前に当てる・断った直しを出さない・正しい語を語彙のヒントに足す)
     var useLedger: Bool { didSet { save(useLedger, "useLedger") } }
+    /// 訳の記憶 (利用者が直した訳。Mac の中だけに保存する)。今はためるだけで、次の翻訳には使わない。
+    /// 画面には出さないので、見張らない
+    @ObservationIgnored var translationMemory = TranslationMemory()
+    /// 訳の記憶の保存先 (学習した直しの台帳と同じフォルダの translation-memory.json)。
+    /// 確認用の起動 (--selftest-…) では nil (利用者の本物の記憶を読まず・書かない。確認は useTranslationMemory(at:) で一時のファイルにする)
+    @ObservationIgnored private(set) var translationMemoryURL: URL?
+    /// 訳を直す画面 (対訳の行の「訳を直す…」) を開いている行 (nil なら閉じている)
+    var translationEdit: TranslationEditRequest?
     /// 追加学習の差分 (LoRA) を使う (選んでいる LLM 用の差分が入っているときだけ効く)
     var useAdapter: Bool { didSet { save(useAdapter, "useAdapter") } }
     /// 選んでいる LLM 用の差分が入っている
@@ -383,6 +397,15 @@ final class AppModel {
         if let aside = loaded.setAside {
             errorMessage = L("Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.", aside.lastPathComponent)
         }
+        if !Self.isSelfTestLaunch {
+            let memoryURL = ledgerURL.deletingLastPathComponent().appendingPathComponent(TranslationMemory.fileName)
+            translationMemoryURL = memoryURL
+            let memory = TranslationMemory.loadKeepingUnreadable(from: memoryURL)
+            translationMemory = memory.memory
+            if let aside = memory.setAside {
+                errorMessage = L("Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.", aside.lastPathComponent)
+            }
+        }
         if !Languages.isKnown(languageCode) { languageCode = "ja" }
         refreshInstalled()
         refreshLLMInstalled()
@@ -427,6 +450,71 @@ final class AppModel {
     func removeCorrection(_ id: UUID) {
         ledger.remove(id)
         saveLedger()
+    }
+
+    // MARK: 訳を直す・訳の記憶
+
+    /// 訳の記憶を、このファイルで読み書きする (確認用の起動が、一時のファイルにするのに使う)。
+    /// nil なら保存しない (記憶は空にする)
+    func useTranslationMemory(at url: URL?) {
+        translationMemoryURL = url
+        translationMemory = url.map { TranslationMemory.load(from: $0) } ?? TranslationMemory()
+    }
+
+    private func saveTranslationMemory() {
+        guard let url = translationMemoryURL else { return }
+        do {
+            try translationMemory.save(to: url)
+        } catch {
+            errorMessage = L("Could not save the translation memory: %@", error.localizedDescription)
+        }
+    }
+
+    /// 対訳の行の「訳を直す…」・「直した」の印: 訳を直す画面を開く (文字起こしが終わった結果だけ)
+    func requestTranslationEdit(_ id: UUID, in job: Job) {
+        guard job.status == .done, job.transcript != nil else { return }
+        translationEdit = TranslationEditRequest(jobID: job.id, segmentID: id)
+    }
+
+    /// 利用者の訳を置く (訳を直す画面の「保存」)。id は、その行のどの区間でもよい (その区間を含む訳のまとまりに置く)。
+    /// 結果に残し (後から来る機械の訳は、この訳を上書きしない: `Transcript.apply`)、訳の記憶に入れる。
+    /// 機械の訳と同じに書き直した時は、機械の訳に戻す (記憶からも外す)。何か変えたら true
+    @discardableResult
+    func setTranslation(_ text: String, head id: UUID, in job: Job) -> Bool {
+        guard job.status == .done, var transcript = job.transcript,
+              let head = Translator.translationGroupIDs(of: id, in: transcript.segments).first,
+              let segment = transcript.segments.first(where: { $0.id == head }) else { return false }
+        // 訳す先は、訳を置く前に決める (訳が 1 つも無い結果は、置くと「日本語に訳した結果」に見えてしまうので、言語も残す)
+        let target = translationTarget(for: transcript)
+        let before = transcript.translationNote(for: head)
+        let source = transcript.translationSource(ofHead: head) ?? segment.text
+        let sourceLanguage = transcript.language(of: segment)
+        let model = transcript.translationModel
+        guard let note = transcript.setUserTranslation(text, for: head) else {
+            // 機械の訳と同じに書き直した: 機械の訳に戻した
+            guard before?.isEdited == true, transcript.translationNote(for: head) == nil else { return false }
+            job.transcript = transcript
+            if translationMemory.forget(source: source, target: target) { saveTranslationMemory() }
+            return true
+        }
+        if transcript.translationLanguage == nil { transcript.translationLanguage = target }
+        job.transcript = transcript
+        let translation = transcript.segments.first { $0.id == head }?.translation ?? text
+        translationMemory.remember(source: source, sourceLanguage: sourceLanguage, target: target, translation: translation,
+                                   machine: note.machine, model: note.machine == nil ? nil : model)
+        saveTranslationMemory()
+        return true
+    }
+
+    /// 利用者が直した訳を、機械の訳に戻す (訳を直す画面の「機械の訳に戻す」)。訳の記憶からも、その 1 件を消す
+    func revertTranslation(head id: UUID, in job: Job) {
+        guard var transcript = job.transcript,
+              let head = Translator.translationGroupIDs(of: id, in: transcript.segments).first else { return }
+        let target = translationTarget(for: transcript)
+        let source = transcript.translationSource(ofHead: head)
+        guard transcript.revertUserTranslation(of: head) != nil else { return }
+        job.transcript = transcript
+        if let source, translationMemory.forget(source: source, target: target) { saveTranslationMemory() }
     }
 
     /// 語彙のヒント: 設定で書いたものに、学習した正しい語を足したもの (文字起こし・監査・翻訳で使う)
@@ -976,6 +1064,7 @@ final class AppModel {
         if selectedJobID == job.id { select(jobs.first) }
         if historyJobID == job.id { historyJobID = nil }
         if pendingDeleteJobID == job.id { pendingDeleteJobID = nil }
+        if translationEdit?.jobID == job.id { translationEdit = nil }
     }
 
     private enum Work {
@@ -1313,6 +1402,11 @@ final class AppModel {
         // 同じ文の別の行がもう頼まれていれば、もう一度は訳さない
         let added = unit.filter { !job.lineQueue.contains($0) }
         guard !added.isEmpty else { return }
+        // 利用者が自分で「この文を訳し直す」を押した: その文の、利用者が直した訳の覚えを捨てる
+        // (捨てないと、訳し直した機械の訳を置けない。訳し終えるまで、画面には今の訳を残す。訳の記憶には残す)
+        if redo, var t = job.transcript, t.dropUserTranslations(touching: Set(unit)) {
+            job.transcript = t
+        }
         job.lineQueue += added
         if redo { job.lineRedo.insert(id) }
         // 訳した行が見えるように、このジョブだけ対訳で表示する (対訳の設定は変えない)

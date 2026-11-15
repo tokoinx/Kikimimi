@@ -86,6 +86,8 @@ extension L10nTables {
         "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "翻译为%1$@需要本地 LLM“%2$@”。请在“设置”的“审核与翻译”标签页中下载。",
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "无法读取已学习的修正文件，因此从空白开始。原文件保留在“%@”所在的文件夹中。",
         "Could not save the learned corrections: %@": "无法保存已学习的修正：%@",
+        "Could not save the translation memory: %@": "无法保存翻译记忆：%@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "无法读取翻译记忆文件，因此从空白开始。原文件保留在“%@”所在的文件夹中。",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "无法下载 %1$@：%2$@\n\n如果无法连接 Hugging Face（huggingface.co），可以在“设置”中用“添加本地文件…”添加 .bin 文件。",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "无法下载 %1$@：%2$@\n\n如果无法连接 Hugging Face（huggingface.co），可以在“设置”的“审核与翻译”标签页中用“添加本地 GGUF…”添加。",
         "Could not delete: %@": "无法删除：%@",
@@ -253,6 +255,14 @@ extension L10nTables {
 
     private static let zhPart3: [String: String] = [
         "Translate this sentence again": "重新翻译这句",
+        "Edit translation…": "编辑译文…",
+        "Edit translation": "编辑译文",
+        "Edited": "已编辑",
+        "You edited this translation. Click to change it.": "这是你编辑过的译文。点按可修改。",
+        "Machine translation": "机器译文",
+        "Your translation": "你的译文",
+        "Restore machine translation": "恢复机器译文",
+        "Remove your translation": "移除你的译文",
         "Translate only this sentence into %@": "只把这句翻译成%@",
         "%1$@. %2$@": "%1$@。%2$@",
         "Click to stop": "点按以停止",

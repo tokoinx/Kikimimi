@@ -15,6 +15,20 @@ struct ContentView: View {
                 RecordingView()
             } else if let job = model.selectedJob {
                 TranscriptDetailView(job: job)
+                    // 訳を直す画面 (対訳の行の右クリックの「訳を直す…」・「直した」の印)。一覧の外に置く
+                    // (翻訳の途中は行が作り直されるので、行の中に置くと書きかけが消える)
+                    .sheet(isPresented: Binding(
+                        get: { model.translationEdit != nil },
+                        set: { if !$0 { model.translationEdit = nil } }
+                    )) {
+                        if let request = model.translationEdit,
+                           let edited = model.jobs.first(where: { $0.id == request.jobID }) {
+                            TranslationEditSheet(job: edited, segmentID: request.segmentID)
+                                .environment(model)
+                                // 画面の言語を変えたら作り直す
+                                .id(model.uiLanguage)
+                        }
+                    }
             } else {
                 EmptyStateView()
             }

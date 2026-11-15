@@ -86,6 +86,8 @@ extension L10nTables {
         "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "การแปลเป็นภาษา%1$@ต้องใช้ LLM ในเครื่อง “%2$@” ดาวน์โหลดได้ในแท็บ “ตรวจสอบและแปล” ของการตั้งค่า",
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "อ่านไฟล์การแก้ไขที่เรียนรู้ไม่ได้ จึงเริ่มจากว่างเปล่า ไฟล์เดิมถูกเก็บไว้ในโฟลเดอร์เดียวกันในชื่อ “%@”",
         "Could not save the learned corrections: %@": "บันทึกการแก้ไขที่เรียนรู้ไม่ได้: %@",
+        "Could not save the translation memory: %@": "บันทึกหน่วยความจำการแปลไม่ได้: %@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "อ่านไฟล์หน่วยความจำการแปลไม่ได้ จึงเริ่มจากว่างเปล่า ไฟล์เดิมถูกเก็บไว้ในโฟลเดอร์เดียวกันในชื่อ “%@”",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "ดาวน์โหลด %1$@ ไม่ได้: %2$@\n\nหากเชื่อมต่อ Hugging Face (huggingface.co) ไม่ได้ คุณสามารถเพิ่มไฟล์ .bin ได้ด้วย “เพิ่มไฟล์ในเครื่อง…” ในการตั้งค่า",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "ดาวน์โหลด %1$@ ไม่ได้: %2$@\n\nหากเชื่อมต่อ Hugging Face (huggingface.co) ไม่ได้ คุณสามารถเพิ่มได้ด้วย “เพิ่ม GGUF ในเครื่อง…” ในแท็บ “ตรวจสอบและแปล” ของการตั้งค่า",
         "Could not delete: %@": "ลบไม่ได้: %@",
@@ -253,6 +255,14 @@ extension L10nTables {
 
     private static let thPart3: [String: String] = [
         "Translate this sentence again": "แปลประโยคนี้อีกครั้ง",
+        "Edit translation…": "แก้ไขคำแปล…",
+        "Edit translation": "แก้ไขคำแปล",
+        "Edited": "แก้ไขแล้ว",
+        "You edited this translation. Click to change it.": "คุณแก้ไขคำแปลนี้แล้ว คลิกเพื่อเปลี่ยน",
+        "Machine translation": "คำแปลของเครื่อง",
+        "Your translation": "คำแปลของคุณ",
+        "Restore machine translation": "คืนค่าคำแปลของเครื่อง",
+        "Remove your translation": "ลบคำแปลของคุณ",
         "Translate only this sentence into %@": "แปลเฉพาะประโยคนี้เป็นภาษา%@",
         "%1$@. %2$@": "%1$@ %2$@",
         "Click to stop": "คลิกเพื่อหยุด",

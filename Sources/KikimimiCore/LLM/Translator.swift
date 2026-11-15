@@ -363,10 +363,17 @@ public enum Translator {
 
 extension Transcript {
     /// 訳を 1 つ置く。訳したあいだに監査で文が変わっていた区間 (sources と違う) には置かない。
-    /// 訳した言語 (`translationLanguage`) は、ここでは変えない (訳した後に、呼ぶ側が `translationModel` と並べて入れる)
+    /// 訳した言語 (`translationLanguage`) は、ここでは変えない (訳した後に、呼ぶ側が `translationModel` と並べて入れる)。
+    /// 利用者が直した訳 (今も合う "edited" の覚え) のまとまりに当たる区間を含む訳も置かない: 翻訳の途中に利用者が直した訳が、
+    /// 後から届いた機械の訳や、翻訳の終わりにもう 1 度置く訳 (AppModel) で、機械の訳に戻らないように。
+    /// 利用者が自分で訳し直しを選んだ時は、呼ぶ側が先に覚えを捨てる (`dropUserTranslations(touching:)`・`removeAllTranslations()`)
     @discardableResult
     public mutating func apply(_ result: TranslationResult, sources: [UUID: String]) -> Bool {
         let ids = [result.head] + result.covers
+        if translationReview?.isEmpty == false {
+            let protected = userTranslatedIDs
+            if ids.contains(where: protected.contains) { return false }
+        }
         guard ids.allSatisfy({ id in segments.first { $0.id == id }?.text == sources[id] }),
               let index = segments.firstIndex(where: { $0.id == result.head }) else { return false }
         // まとめた区間が、いまも訳の区間のすぐ後ろに順に並んでいるときだけ (訳しているあいだに削除を元に戻した、など)

@@ -44,10 +44,14 @@ public struct Transcript: Codable, Hashable, Sendable {
     /// 訳した言語のコード (ja・en など)。訳す先を選べるようになる前の結果は nil (その訳は日本語)。
     /// 読み書きは `translationTarget(default:)` を通す
     public var translationLanguage: String?
+    /// 訳の覚え (利用者が直した訳など。訳のまとまりの先頭の区間ごと)。今の原文・訳と合わない覚えは、無い物と扱う。
+    /// 中身と読み書きは `TranslationReview.swift`。この項目の無い古い document.json も読める
+    public var translationReview: [TranslationNote]?
 
     public init(sourceName: String, segments: [TranscriptSegment] = [], language: String? = nil,
                 model: String? = nil, duration: TimeInterval = 0, elapsed: TimeInterval = 0,
-                audit: AuditReport? = nil, translationModel: String? = nil, translationLanguage: String? = nil) {
+                audit: AuditReport? = nil, translationModel: String? = nil, translationLanguage: String? = nil,
+                translationReview: [TranslationNote]? = nil) {
         self.sourceName = sourceName
         self.segments = segments
         self.language = language
@@ -57,6 +61,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.audit = audit
         self.translationModel = translationModel
         self.translationLanguage = translationLanguage
+        self.translationReview = translationReview
     }
 
     /// 本文 (1 区間 1 行)
@@ -117,7 +122,8 @@ public struct Transcript: Codable, Hashable, Sendable {
     }
 
     /// 訳を全部外す (訳す先を変えて訳し直す時に使う)。訳したモデルと言語の記録も消す。
-    /// 監査の直しが覚えている直す前の区間の訳も外す (直しを元に戻した時に、前の言語の訳が戻らないように)
+    /// 監査の直しが覚えている直す前の区間の訳も外す (直しを元に戻した時に、前の言語の訳が戻らないように)。
+    /// 訳の覚え (利用者が直した訳) も捨てる (利用者が自分で「〇〇語で訳し直す」を選んだので)
     public mutating func removeAllTranslations() {
         for i in segments.indices {
             segments[i].translation = nil
@@ -132,6 +138,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         }
         translationModel = nil
         translationLanguage = nil
+        translationReview = nil
     }
 
     /// 訳が 1 つも無いのに残っている、訳す先の記録を外す (「〇〇語で訳し直す」を中止した・失敗した時。

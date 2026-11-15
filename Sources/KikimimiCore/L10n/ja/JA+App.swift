@@ -96,6 +96,9 @@ extension JA {
         // errorMessage
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "学習した直しのファイルを読めなかったので、空の状態から始めます。元のファイルは「%@」という名前で、同じフォルダにとってあります。",
         "Could not save the learned corrections: %@": "学習した直しを保存できませんでした: %@",
+        // 訳の記憶 (translation-memory.json)
+        "Could not save the translation memory: %@": "訳の記憶を保存できませんでした: %@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "訳の記憶のファイルを読めなかったので、空の状態から始めます。元のファイルは「%@」という名前で、同じフォルダにとってあります。",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "%1$@ を取得できませんでした: %2$@\n\nHugging Face (huggingface.co) に接続できない場合は、設定の「手元のファイルを追加」から .bin を取り込めます。",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "%1$@ を取得できませんでした: %2$@\n\nHugging Face (huggingface.co) に接続できない場合は、設定の「監査・翻訳」タブの「手元の GGUF を追加…」から取り込めます。",
         "Could not delete: %@": "削除できませんでした: %@",

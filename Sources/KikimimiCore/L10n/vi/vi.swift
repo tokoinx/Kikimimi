@@ -86,6 +86,8 @@ extension L10nTables {
         "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "Dịch sang %1$@ cần LLM cục bộ “%2$@”. Hãy tải nó trong thẻ “Rà soát & dịch” của Cài đặt.",
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "Không đọc được tệp chỉnh sửa đã học nên bắt đầu với danh sách trống. Tệp gốc được giữ trong cùng thư mục với “%@”.",
         "Could not save the learned corrections: %@": "Không lưu được các chỉnh sửa đã học: %@",
+        "Could not save the translation memory: %@": "Không lưu được bộ nhớ dịch: %@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "Không đọc được tệp bộ nhớ dịch nên bắt đầu với danh sách trống. Tệp gốc được giữ trong cùng thư mục với “%@”.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "Không tải được %1$@: %2$@\n\nNếu không kết nối được với Hugging Face (huggingface.co), bạn có thể thêm tệp .bin bằng “Thêm tệp cục bộ…” trong Cài đặt.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "Không tải được %1$@: %2$@\n\nNếu không kết nối được với Hugging Face (huggingface.co), bạn có thể thêm bằng “Thêm GGUF cục bộ…” trong thẻ “Rà soát & dịch” của Cài đặt.",
         "Could not delete: %@": "Không xóa được: %@",
@@ -253,6 +255,14 @@ extension L10nTables {
 
     private static let viPart3: [String: String] = [
         "Translate this sentence again": "Dịch lại câu này",
+        "Edit translation…": "Sửa bản dịch…",
+        "Edit translation": "Sửa bản dịch",
+        "Edited": "Đã sửa",
+        "You edited this translation. Click to change it.": "Bạn đã sửa bản dịch này. Bấm để thay đổi.",
+        "Machine translation": "Bản dịch máy",
+        "Your translation": "Bản dịch của bạn",
+        "Restore machine translation": "Khôi phục bản dịch máy",
+        "Remove your translation": "Xóa bản dịch của bạn",
         "Translate only this sentence into %@": "Chỉ dịch câu này sang %@",
         "%1$@. %2$@": "%1$@. %2$@",
         "Click to stop": "Bấm để dừng",

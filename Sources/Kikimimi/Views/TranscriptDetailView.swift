@@ -602,7 +602,8 @@ private struct TranscriptRows: View {
         ForEach(items) { item in
             // 行と、その下の区切りの線 (行の背景の外に、行の余白と同じだけ内側へ寄せて引く。最後の行の下には引かない)
             VStack(alignment: .leading, spacing: 0) {
-                PlayableRow(item: item, job: job, canPlay: canPlay, highlight: highlight, targetName: targetName) {
+                PlayableRow(item: item, job: job, canPlay: canPlay, highlight: highlight, targetName: targetName,
+                            bilingual: bilingual) {
                     if bilingual {
                         BilingualRow(item: item, isTranslating: translating, showTimestamp: showTimestamps,
                                      highlight: highlightText, job: job, targetName: targetName)
@@ -969,17 +970,20 @@ struct PlayableRow<Content: View>: View {
     let highlight: RowHighlight
     /// 訳す先の言語の名前 (右クリックの「この文だけ〇〇語に訳す」)
     let targetName: String
+    /// 対訳の行 (右クリックに「訳を直す…」を出す)
+    let bilingual: Bool
     let content: Content
     @State private var hovering = false
 
     @MainActor
     init(item: TranscriptListItem, job: Job, canPlay: Bool, highlight: RowHighlight, targetName: String,
-         @ViewBuilder content: () -> Content) {
+         bilingual: Bool = false, @ViewBuilder content: () -> Content) {
         self.item = item
         self.job = job
         self.canPlay = canPlay
         self.highlight = highlight
         self.targetName = targetName
+        self.bilingual = bilingual
         self.content = content()
         // 画面の重さの確認が、一覧が作った行の数を数える (ふだんは Bool を 1 つ見るだけ)。一覧が終わりへ飛ぶと、
         // LazyVStack はすべての行を作るが (1 つ 0.1 ms ほど)、並べるのは見える分だけなので、重さは body の数 (下) で見る
@@ -1037,6 +1041,14 @@ struct PlayableRow<Content: View>: View {
                 }
                 .disabled(job.lineQueue.contains(item.id) || job.postState.task == .translate
                           || job.postQueue.contains(.translate))
+            }
+            // 対訳の行の訳を、利用者が直す (訳がまだ無い行でも、自分で書ける)。直す画面は一覧の外のシート
+            // (翻訳の途中は行が作り直されるので、行の中の入力欄では下書きが消える)。もともと訳す先の言語の行には出さない
+            if bilingual && !item.isOriginalInTarget && job.status == .done {
+                if !(item.canTranslate || item.isTranslated) { Divider() }
+                Button(L("Edit translation…")) {
+                    model.requestTranslationEdit(item.id, in: job)
+                }
             }
         }
         .accessibilityElement(children: .combine)
@@ -1230,11 +1242,37 @@ struct BilingualRow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // 利用者が直した訳の印 (行の値を出すだけ。押すと、訳を直す画面を開く)
+                if item.isEditedTranslation {
+                    EditedTranslationBadge(id: item.id, job: job)
+                }
                 TranslateLineButton(item: item, job: job, targetName: targetName)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 3)
+    }
+}
+
+/// 利用者が直した訳の行の、灰色の小さな印「直した」。押すと、訳を直す画面 (一覧の外のシート) を開く
+struct EditedTranslationBadge: View {
+    @Environment(AppModel.self) private var model
+    let id: UUID
+    let job: Job
+
+    var body: some View {
+        Button {
+            model.requestTranslationEdit(id, in: job)
+        } label: {
+            Text(L("Edited"))
+                .font(.caption2.weight(.semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.secondary.opacity(0.15), in: Capsule())
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(L("You edited this translation. Click to change it."))
     }
 }
 

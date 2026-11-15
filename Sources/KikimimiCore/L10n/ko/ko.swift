@@ -86,6 +86,8 @@ extension L10nTables {
         "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "%1$@(으)로 번역하려면 로컬 LLM “%2$@”이(가) 필요합니다. 설정의 “점검 및 번역” 탭에서 다운로드해 주세요.",
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "학습한 수정 파일을 읽을 수 없어 비어 있는 상태로 시작합니다. 원래 파일은 “%@”과(와) 같은 폴더에 남아 있습니다.",
         "Could not save the learned corrections: %@": "학습한 수정을 저장하지 못했습니다: %@",
+        "Could not save the translation memory: %@": "번역 메모리를 저장하지 못했습니다: %@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "번역 메모리 파일을 읽을 수 없어 비어 있는 상태로 시작합니다. 원래 파일은 “%@”과(와) 같은 폴더에 남아 있습니다.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "%1$@을(를) 다운로드하지 못했습니다: %2$@\n\nHugging Face(huggingface.co)에 연결할 수 없다면 설정의 “로컬 파일 추가…”로 .bin 파일을 추가할 수 있습니다.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "%1$@을(를) 다운로드하지 못했습니다: %2$@\n\nHugging Face(huggingface.co)에 연결할 수 없다면 설정의 “점검 및 번역” 탭에서 “로컬 GGUF 추가…”로 추가할 수 있습니다.",
         "Could not delete: %@": "삭제하지 못했습니다: %@",
@@ -253,6 +255,14 @@ extension L10nTables {
 
     private static let koPart3: [String: String] = [
         "Translate this sentence again": "이 문장 다시 번역",
+        "Edit translation…": "번역 편집…",
+        "Edit translation": "번역 편집",
+        "Edited": "편집됨",
+        "You edited this translation. Click to change it.": "직접 편집한 번역입니다. 클릭하면 수정할 수 있습니다.",
+        "Machine translation": "기계 번역",
+        "Your translation": "내 번역",
+        "Restore machine translation": "기계 번역으로 되돌리기",
+        "Remove your translation": "내 번역 제거",
         "Translate only this sentence into %@": "이 문장만 %@(으)로 번역합니다",
         "%1$@. %2$@": "%1$@. %2$@",
         "Click to stop": "클릭하여 중지",

@@ -86,6 +86,8 @@ extension L10nTables {
         "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "Menerjemahkan ke bahasa %1$@ memerlukan LLM lokal “%2$@”. Unduh di tab “Audit & terjemahan” di Pengaturan.",
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "Tidak dapat membaca berkas koreksi yang dipelajari, jadi dimulai dari kosong. Berkas aslinya disimpan di folder yang sama dengan “%@”.",
         "Could not save the learned corrections: %@": "Tidak dapat menyimpan koreksi yang dipelajari: %@",
+        "Could not save the translation memory: %@": "Tidak dapat menyimpan memori terjemahan: %@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "Tidak dapat membaca berkas memori terjemahan, jadi dimulai dari kosong. Berkas aslinya disimpan di folder yang sama dengan “%@”.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "Tidak dapat mengunduh %1$@: %2$@\n\nJika Anda tidak dapat terhubung ke Hugging Face (huggingface.co), Anda dapat menambahkan berkas .bin dengan “Tambah berkas lokal…” di Pengaturan.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "Tidak dapat mengunduh %1$@: %2$@\n\nJika Anda tidak dapat terhubung ke Hugging Face (huggingface.co), Anda dapat menambahkannya dengan “Tambah GGUF lokal…” di tab “Audit & terjemahan” di Pengaturan.",
         "Could not delete: %@": "Tidak dapat menghapus: %@",
@@ -253,6 +255,14 @@ extension L10nTables {
 
     private static let idPart3: [String: String] = [
         "Translate this sentence again": "Terjemahkan kalimat ini lagi",
+        "Edit translation…": "Edit terjemahan…",
+        "Edit translation": "Edit terjemahan",
+        "Edited": "Diedit",
+        "You edited this translation. Click to change it.": "Anda telah mengedit terjemahan ini. Klik untuk mengubahnya.",
+        "Machine translation": "Terjemahan mesin",
+        "Your translation": "Terjemahan Anda",
+        "Restore machine translation": "Pulihkan terjemahan mesin",
+        "Remove your translation": "Hapus terjemahan Anda",
         "Translate only this sentence into %@": "Terjemahkan kalimat ini saja ke bahasa %@",
         "%1$@. %2$@": "%1$@. %2$@",
         "Click to stop": "Klik untuk berhenti",

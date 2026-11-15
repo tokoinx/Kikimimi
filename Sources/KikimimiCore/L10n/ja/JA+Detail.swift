@@ -45,6 +45,15 @@ extension JA {
         "Copy this line": "この行をコピー",
         "Quote in notes": "メモに引用",
         "Translate this sentence again": "この文を訳し直す",
+        // 訳を直す (対訳の行の右クリック・「直した」の印・訳を直す画面)
+        "Edit translation…": "訳を直す…",
+        "Edit translation": "訳を直す",
+        "Edited": "直した",
+        "You edited this translation. Click to change it.": "この訳は、自分で直した訳です。押すと、直せます。",
+        "Machine translation": "機械の訳",
+        "Your translation": "自分の訳",
+        "Restore machine translation": "機械の訳に戻す",
+        "Remove your translation": "自分の訳を外す",
         // %@ は、その結果の訳す先の言語の名前
         "Translate only this sentence into %@": "この文だけ%@に訳す",
         "%1$@. %2$@": "%1$@。%2$@",

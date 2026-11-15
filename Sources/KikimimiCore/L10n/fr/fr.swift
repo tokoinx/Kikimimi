@@ -86,6 +86,8 @@ extension L10nTables {
         "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "La traduction (langue cible : %1$@) nécessite le LLM local « %2$@ ». Téléchargez-le dans l’onglet « Vérification et traduction » des Réglages.",
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "Impossible de lire le fichier des corrections apprises ; démarrage à vide. Le fichier d’origine est conservé dans le même dossier que « %@ ».",
         "Could not save the learned corrections: %@": "Impossible d’enregistrer les corrections apprises : %@",
+        "Could not save the translation memory: %@": "Impossible d’enregistrer la mémoire de traduction : %@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "Impossible de lire le fichier de mémoire de traduction ; démarrage à vide. Le fichier d’origine est conservé dans le même dossier que « %@ ».",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "Impossible de télécharger %1$@ : %2$@\n\nSi vous ne pouvez pas vous connecter à Hugging Face (huggingface.co), vous pouvez ajouter un fichier .bin avec « Ajouter un fichier local… » dans les Réglages.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "Impossible de télécharger %1$@ : %2$@\n\nSi vous ne pouvez pas vous connecter à Hugging Face (huggingface.co), vous pouvez l’ajouter avec « Ajouter un GGUF local… » dans l’onglet « Vérification et traduction » des Réglages.",
         "Could not delete: %@": "Impossible de supprimer : %@",
@@ -253,6 +255,14 @@ extension L10nTables {
 
     private static let frPart3: [String: String] = [
         "Translate this sentence again": "Traduire à nouveau cette phrase",
+        "Edit translation…": "Modifier la traduction…",
+        "Edit translation": "Modifier la traduction",
+        "Edited": "Modifiée",
+        "You edited this translation. Click to change it.": "Vous avez modifié cette traduction. Cliquez pour la changer.",
+        "Machine translation": "Traduction automatique",
+        "Your translation": "Votre traduction",
+        "Restore machine translation": "Rétablir la traduction automatique",
+        "Remove your translation": "Supprimer votre traduction",
         "Translate only this sentence into %@": "Traduire uniquement cette phrase (%@)",
         "%1$@. %2$@": "%1$@. %2$@",
         "Click to stop": "Cliquez pour arrêter",

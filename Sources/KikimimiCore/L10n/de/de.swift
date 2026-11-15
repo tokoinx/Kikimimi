@@ -86,6 +86,8 @@ extension L10nTables {
         "Translating to %1$@ needs the local LLM “%2$@”. Download it in the “Audit & translation” tab of Settings.": "Für die Übersetzung (Zielsprache: %1$@) wird das lokale LLM „%2$@“ benötigt. Laden Sie es im Tab „Prüfung & Übersetzung“ der Einstellungen herunter.",
         "Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.": "Die Datei mit den gelernten Korrekturen konnte nicht gelesen werden, daher wird mit einer leeren Liste begonnen. Die Originaldatei liegt unter dem Namen „%@“ im selben Ordner.",
         "Could not save the learned corrections: %@": "Die gelernten Korrekturen konnten nicht gespeichert werden: %@",
+        "Could not save the translation memory: %@": "Der Übersetzungsspeicher konnte nicht gespeichert werden: %@",
+        "Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.": "Die Datei des Übersetzungsspeichers konnte nicht gelesen werden, daher wird leer begonnen. Die Originaldatei liegt unter dem Namen „%@“ im selben Ordner.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.": "%1$@ konnte nicht heruntergeladen werden: %2$@\n\nWenn keine Verbindung zu Hugging Face (huggingface.co) möglich ist, können Sie in den Einstellungen über „Lokale Datei hinzufügen…“ eine .bin-Datei hinzufügen.",
         "Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.": "%1$@ konnte nicht heruntergeladen werden: %2$@\n\nWenn keine Verbindung zu Hugging Face (huggingface.co) möglich ist, können Sie es im Tab „Prüfung & Übersetzung“ der Einstellungen über „Lokale GGUF-Datei hinzufügen…“ hinzufügen.",
         "Could not delete: %@": "Löschen nicht möglich: %@",
@@ -253,6 +255,14 @@ extension L10nTables {
 
     private static let dePart3: [String: String] = [
         "Translate this sentence again": "Diesen Satz erneut übersetzen",
+        "Edit translation…": "Übersetzung bearbeiten…",
+        "Edit translation": "Übersetzung bearbeiten",
+        "Edited": "Bearbeitet",
+        "You edited this translation. Click to change it.": "Sie haben diese Übersetzung bearbeitet. Klicken, um sie zu ändern.",
+        "Machine translation": "Maschinelle Übersetzung",
+        "Your translation": "Ihre Übersetzung",
+        "Restore machine translation": "Maschinelle Übersetzung wiederherstellen",
+        "Remove your translation": "Ihre Übersetzung entfernen",
         "Translate only this sentence into %@": "Nur diesen Satz übersetzen (%@)",
         "%1$@. %2$@": "%1$@. %2$@",
         "Click to stop": "Zum Stoppen klicken",

@@ -21,10 +21,14 @@ public struct TranscriptListItem: Identifiable, Hashable, Sendable {
     public var isTranslated: Bool
     /// 原文の言語 (区間の言語。なければ文字起こしの言語)。練習で原文を隠すかを決めるのに使う
     public var language: String?
+    /// この行の訳の覚え (利用者が直した訳など。今の原文・訳に合う物だけ)。対訳の行だけに入る。
+    /// 画面は、この値を出すだけにする (行の中で結果を読み直さない)
+    public var review: TranslationNote?
 
     public init(id: UUID, start: TimeInterval, end: TimeInterval, text: String, translation: String?,
                 isOriginalInTarget: Bool, changes: [AuditChange], languageTag: String? = nil,
-                canTranslate: Bool = false, isTranslated: Bool = false, language: String? = nil) {
+                canTranslate: Bool = false, isTranslated: Bool = false, language: String? = nil,
+                review: TranslationNote? = nil) {
         self.id = id
         self.start = start
         self.end = end
@@ -36,7 +40,11 @@ public struct TranscriptListItem: Identifiable, Hashable, Sendable {
         self.canTranslate = canTranslate
         self.isTranslated = isTranslated
         self.language = language
+        self.review = review
     }
+
+    /// 利用者が直した訳の行か
+    public var isEditedTranslation: Bool { review?.isEdited == true }
 }
 
 /// 行の言語の印
@@ -100,6 +108,8 @@ public final class TranscriptRowCache {
     private var itemsTally = LanguageTally()
     /// 監査の直し (元の区間の id ごと)
     private var itemsChanges: [UUID: AuditChange] = [:]
+    /// 今も合う訳の覚え (訳のまとまりの先頭の区間の id ごと)
+    private var itemsNotes: [UUID: TranslationNote] = [:]
     /// 行に言語の印を付けている
     private var itemsTags = false
     /// 検索で絞る前の、最後の行の id
@@ -171,10 +181,12 @@ public final class TranscriptRowCache {
         // 行の「訳」は、文字起こしが終わってから (訳がある文 = ほかの区間の訳に含まれる区間も、訳がある行として扱う)
         let done = condition.done
         let covered = done ? transcript.coveredIDs : Set<UUID>()
+        // 訳の覚えは、対訳の行にだけ出す (覚えが無ければ、区間を見ずに空)
+        let notes = condition.bilingual ? transcript.validTranslationNotes : [:]
         var items: [TranscriptListItem]
         if condition.bilingual {
             items = transcript.bilingualUnits(target: condition.target).map {
-                Self.item($0, changes: changes, tags: tags, done: done, covered: covered,
+                Self.item($0, changes: changes, notes: notes, tags: tags, done: done, covered: covered,
                           transcriptLanguage: transcript.language)
             }
         } else {
@@ -190,6 +202,7 @@ public final class TranscriptRowCache {
         itemsBase = transcript
         itemsTally = tally
         itemsChanges = changes
+        itemsNotes = notes
         itemsTags = tags
     }
 
@@ -214,8 +227,8 @@ public final class TranscriptRowCache {
         var items: [TranscriptListItem]
         if condition.bilingual {
             items = added.map {
-                Self.item(transcript.bilingualUnit([$0], target: condition.target), changes: itemsChanges, tags: itemsTags,
-                          done: false, covered: covered, transcriptLanguage: transcript.language)
+                Self.item(transcript.bilingualUnit([$0], target: condition.target), changes: itemsChanges, notes: itemsNotes,
+                          tags: itemsTags, done: false, covered: covered, transcriptLanguage: transcript.language)
             }
         } else {
             items = added.map {
@@ -243,6 +256,7 @@ public final class TranscriptRowCache {
               new.sourceName == base.sourceName, new.language == base.language, new.model == base.model,
               new.duration == base.duration, new.elapsed == base.elapsed, new.audit == base.audit,
               new.translationModel == base.translationModel, new.translationLanguage == base.translationLanguage,
+              new.translationReview == base.translationReview,
               new.segments[..<count].elementsEqual(base.segments) else { return nil }
         return new.segments[count...]
     }
@@ -259,7 +273,8 @@ public final class TranscriptRowCache {
                                   isTranslated: done && translated, language: transcript.language(of: seg))
     }
 
-    private static func item(_ unit: Transcript.BilingualUnit, changes: [UUID: AuditChange], tags: Bool, done: Bool,
+    private static func item(_ unit: Transcript.BilingualUnit, changes: [UUID: AuditChange],
+                             notes: [UUID: TranslationNote], tags: Bool, done: Bool,
                              covered: Set<UUID>, transcriptLanguage: String?) -> TranscriptListItem {
         let translated = unit.segments[0].translation != nil
         return TranscriptListItem(id: unit.id, start: unit.start, end: unit.end, text: unit.text,
@@ -267,7 +282,8 @@ public final class TranscriptRowCache {
                                   changes: unit.segments.compactMap { changes[$0.id] },
                                   languageTag: tags ? LanguageTag.code(unit.language) : nil,
                                   canTranslate: done && unit.translation == nil && !covered.contains(unit.id),
-                                  isTranslated: done && translated, language: unit.language ?? transcriptLanguage)
+                                  isTranslated: done && translated, language: unit.language ?? transcriptLanguage,
+                                  review: translated ? notes[unit.id] : nil)
     }
 
     /// 検索語 (前後の空白を除いたもの) を含む行か
