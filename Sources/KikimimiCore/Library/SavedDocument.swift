@@ -20,6 +20,9 @@ public struct SavedDocument: Codable, Hashable, Identifiable, Sendable {
     public var languageCode: String?
     /// 「日本語＋英語」に自動で切り替えたとき、もとの言語
     public var autoMixedFrom: String?
+    /// 音が続いているのに文字が少なかったので、自動で無音を飛ばさずに (VAD なしで) 文字起こしし直した結果。
+    /// 古いファイル (この項目が無い) は false として読む。true の時だけ書く
+    public var vadSkippedAutomatically: Bool
     public var transcript: Transcript
     /// 版の一覧 (新しい順)
     public var versions: [VersionInfo]
@@ -29,6 +32,7 @@ public struct SavedDocument: Codable, Hashable, Identifiable, Sendable {
     public init(formatVersion: Int = SavedDocument.currentFormatVersion, id: UUID = UUID(), title: String,
                 sourcePath: String? = nil, isRecording: Bool = false, createdAt: Date = Date(),
                 updatedAt: Date? = nil, languageCode: String? = nil, autoMixedFrom: String? = nil,
+                vadSkippedAutomatically: Bool = false,
                 transcript: Transcript, versions: [VersionInfo] = [], notes: String = "") {
         self.formatVersion = formatVersion
         self.id = id
@@ -39,6 +43,7 @@ public struct SavedDocument: Codable, Hashable, Identifiable, Sendable {
         self.updatedAt = updatedAt ?? createdAt
         self.languageCode = languageCode
         self.autoMixedFrom = autoMixedFrom
+        self.vadSkippedAutomatically = vadSkippedAutomatically
         self.transcript = transcript
         self.versions = versions
         self.notes = notes
@@ -46,7 +51,7 @@ public struct SavedDocument: Codable, Hashable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case formatVersion, id, title, sourcePath, isRecording, createdAt, updatedAt
-        case languageCode, autoMixedFrom, transcript, versions
+        case languageCode, autoMixedFrom, vadSkippedAutomatically, transcript, versions
     }
 
     public init(from decoder: Decoder) throws {
@@ -64,6 +69,7 @@ public struct SavedDocument: Codable, Hashable, Identifiable, Sendable {
         updatedAt = updated ?? createdAt
         languageCode = try c.decodeIfPresent(String.self, forKey: .languageCode)
         autoMixedFrom = try c.decodeIfPresent(String.self, forKey: .autoMixedFrom)
+        vadSkippedAutomatically = try c.decodeIfPresent(Bool.self, forKey: .vadSkippedAutomatically) ?? false
         versions = try c.decodeIfPresent([VersionInfo].self, forKey: .versions) ?? []
         notes = ""
     }
@@ -79,6 +85,7 @@ public struct SavedDocument: Codable, Hashable, Identifiable, Sendable {
         try c.encode(updatedAt, forKey: .updatedAt)
         try c.encodeIfPresent(languageCode, forKey: .languageCode)
         try c.encodeIfPresent(autoMixedFrom, forKey: .autoMixedFrom)
+        if vadSkippedAutomatically { try c.encode(true, forKey: .vadSkippedAutomatically) }
         try c.encode(transcript, forKey: .transcript)
         try c.encode(versions, forKey: .versions)
     }

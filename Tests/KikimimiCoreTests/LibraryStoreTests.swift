@@ -59,6 +59,19 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(store.load(id: doc.id), doc)
     }
 
+    func testVADSkippedMarkIsWrittenOnlyWhenSetAndRoundTrips() throws {
+        var doc = document()
+        try store.save(doc)
+        var json = try String(contentsOf: store.documentURL(for: doc.id), encoding: .utf8)
+        XCTAssertFalse(json.contains("vadSkippedAutomatically"), "the mark is not written when it is false")
+        XCTAssertEqual(store.load(id: doc.id)?.vadSkippedAutomatically, false)
+        doc.vadSkippedAutomatically = true
+        try store.save(doc)
+        json = try String(contentsOf: store.documentURL(for: doc.id), encoding: .utf8)
+        XCTAssertTrue(json.contains("\"vadSkippedAutomatically\" : true"))
+        XCTAssertEqual(store.load(id: doc.id), doc)
+    }
+
     func testNotesLiveOnlyInNotesFile() throws {
         let notes = "メモの本文 > [00:01] quote\n"
         let doc = document(notes: notes)
@@ -162,6 +175,7 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertFalse(doc.isRecording)
         XCTAssertNil(doc.languageCode)
         XCTAssertNil(doc.autoMixedFrom)
+        XCTAssertFalse(doc.vadSkippedAutomatically)
         XCTAssertEqual(doc.updatedAt, doc.createdAt)
         XCTAssertEqual(doc.transcript.segments.map(\.text), ["Hello"])
         XCTAssertEqual(doc.notes, "")

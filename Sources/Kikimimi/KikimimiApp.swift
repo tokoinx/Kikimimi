@@ -390,6 +390,14 @@ struct KikimimiApp: App {
                 }
                 .disabled(!(model.selectedJob.map { $0.inLibrary && $0.status == .done } ?? false))
                 Divider()
+                // 結果の画面の「やり直す」と同じ中身 (選んでいる結果の音声を、もう一度文字起こしする。元の結果は残る)
+                Menu("やり直す") {
+                    if let job = model.selectedJob {
+                        RedoMenuItems(job: job)
+                            .environment(model)
+                    }
+                }
+                .disabled(!model.canRedo(model.selectedJob))
                 Button("監査する (繰り返し・聞き取りミス)") {
                     if let job = model.selectedJob { model.audit(job) }
                 }

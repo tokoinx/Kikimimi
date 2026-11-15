@@ -58,6 +58,15 @@ final class Job: Identifiable {
     var autoMixedNoticeDismissed = false
     /// 自動で「日本語＋英語」に切り替えない (案内の「〜だけでやり直す」で作ったジョブ)
     var allowsAutoMixed = true
+    /// このジョブだけの、無音を飛ばす (VAD) の指定 (「やり直す」で作ったジョブ。保存しない)。
+    /// nil = 設定に従う。true = VAD を使う (自動で VAD なしでやり直さない)。false = VAD を使わない
+    var vadOverride: Bool?
+    /// 音が続いているのに文字が少なかったので、自動で無音を飛ばさずに (VAD なしで) 文字起こしし直した結果を使っている
+    var vadSkippedAutomatically = false {
+        didSet { if vadSkippedAutomatically != oldValue { onChange?(self, .document) } }
+    }
+    /// 「無音を飛ばさずに文字起こししました」の案内を閉じた
+    var vadSkippedNoticeDismissed = false
 
     // 文字起こしのあとの監査・翻訳
     /// これから行う監査・翻訳
@@ -178,6 +187,8 @@ final class AppModel {
     var modelID: String { didSet { save(modelID, "modelID") } }
     var preferAccuracy: Bool { didSet { save(preferAccuracy, "preferAccuracy") } }
     var useVAD: Bool { didSet { save(useVAD, "useVAD") } }
+    /// 無音を飛ばした (VAD) 結果が、音が続いているのに文字が少ない時は、自動で無音を飛ばさずにやり直す (歌・音楽のため)
+    var autoVADOff: Bool { didSet { save(autoVADOff, "autoVADOff") } }
     var filterHallucinations: Bool { didSet { save(filterHallucinations, "filterHallucinations") } }
     /// 「日本語」「英語」「自動判定」のとき、日本語と英語が混ざった録音は自動で「日本語＋英語」で文字にする
     var autoMixedLanguage: Bool { didSet { save(autoMixedLanguage, "autoMixedLanguage") } }
@@ -259,6 +270,7 @@ final class AppModel {
         modelID = ModelCatalog.spec(id: savedModel) == nil ? ModelCatalog.defaultModelID : savedModel
         preferAccuracy = d.object(forKey: "preferAccuracy") as? Bool ?? true
         useVAD = d.object(forKey: "useVAD") as? Bool ?? true
+        autoVADOff = d.object(forKey: "autoVADOff") as? Bool ?? true
         filterHallucinations = d.object(forKey: "filterHallucinations") as? Bool ?? true
         autoMixedLanguage = d.object(forKey: "autoMixedLanguage") as? Bool ?? true
         livePreview = d.object(forKey: "livePreview") as? Bool ?? true
@@ -455,8 +467,9 @@ final class AppModel {
 
     /// 無音スキップ用の VAD モデル (約 0.9 MB) の場所。無ければ取得する。
     /// 取れなければ VAD なしで続け、失敗したら 10 分は取り直さない (繋がらないネットワークで毎回待たせない)。
-    private func vadModelPath() async -> String? {
-        guard useVAD else { return nil }
+    /// - Parameter enabled: VAD を使うか (nil なら設定に従う。ジョブだけの指定は Job.vadOverride)
+    private func vadModelPath(enabled: Bool? = nil) async -> String? {
+        guard enabled ?? useVAD else { return nil }
         if store.isVADInstalled { return store.vadURL.path }
         if let retry = vadRetryAfter, Date() < retry { return nil }
         if let running = vadTask { return await running.value }
@@ -778,18 +791,41 @@ final class AppModel {
 
     /// 同じファイルを、別の言語の設定でもう一度文字起こしする (新しいジョブ。設定の言語は変えない)。
     /// autoMixed が false なら、日本語と英語が混ざっていても「日本語＋英語」に切り替えない
-    func retranscribe(_ job: Job, languageCode code: String, autoMixed: Bool = true) {
+    /// vad は、このジョブだけの無音を飛ばす (VAD) の指定 (Job.vadOverride。nil なら設定に従う)
+    func retranscribe(_ job: Job, languageCode code: String?, autoMixed: Bool = true, vad: Bool? = nil) {
         guard let url = job.url else { return }
         // 置き換える文字起こしの監査・翻訳は止める (待っていると、やり直しがその後ろに回る。反映済みの結果は残す)
         cancelPost(job)
         let again = Job(name: job.name, url: url)
         again.languageCode = code
         again.allowsAutoMixed = autoMixed
+        again.vadOverride = vad
         adopt(again)
         job.mixedSuggestionDismissed = true
         job.autoMixedNoticeDismissed = true
+        job.vadSkippedNoticeDismissed = true
         select(again)
         ensureWorker()
+    }
+
+    /// 「やり直す」を使えるか: 音声ファイルが在り、文字起こしが終わった・失敗した・中止した結果で、録音中でない
+    func canRedo(_ job: Job?) -> Bool {
+        guard let job, !isRecording, let url = job.url else { return false }
+        switch job.status {
+        case .done, .failed, .cancelled:
+            return FileManager.default.fileExists(atPath: url.path)
+        case .queued, .running:
+            return false
+        }
+    }
+
+    /// その結果だけの指定で、もう一度文字起こしする (新しいジョブ。元の結果は残す。設定は変えない)。
+    /// - Parameters:
+    ///   - code: 言語。nil なら、元のジョブと同じ言語 (使った言語)
+    ///   - vad: 無音を飛ばす (VAD)。nil = 設定に従う、true = 使う (自動で VAD なしでやり直さない)、false = 使わない
+    func redo(_ job: Job, languageCode code: String? = nil, vad: Bool? = nil) {
+        guard canRedo(job) else { return }
+        retranscribe(job, languageCode: code ?? job.languageCode, autoMixed: job.allowsAutoMixed, vad: vad)
     }
 
     func select(_ job: Job?) {
@@ -896,10 +932,12 @@ final class AppModel {
             let modelURL = try await ensureModel(spec, cancelFlag: job.cancelFlag)
             if job.cancelFlag.isSet { throw WhisperError.cancelled }
 
-            if useVAD && !store.isVADInstalled {
+            // 無音を飛ばす (VAD) は、ジョブだけの指定 (「やり直す」) を設定より先に見る
+            let wantsVAD = job.vadOverride ?? useVAD
+            if wantsVAD && !store.isVADInstalled {
                 job.message = "無音検出 (VAD) モデルを準備中…"
             }
-            let vadPath = await vadModelPath()
+            let vadPath = await vadModelPath(enabled: wantsVAD)
             if job.cancelFlag.isSet { throw WhisperError.cancelled }
 
             let samples: [Float]
@@ -933,15 +971,22 @@ final class AppModel {
             )
             let flag = job.cancelFlag
             let started = Date()
-            let output = try await service.transcribe(
+            // 自動で VAD なしでやり直すのは、設定に従うジョブだけ (「無音を飛ばしてやり直す」のジョブではしない)
+            let autoOff = job.vadOverride == nil && autoVADOff
+            // VAD なしでやり直している最中か (進み具合の知らせを変える。メインスレッドだけで触る)
+            let phase = RunPhase()
+            let result = try await service.transcribe(
                 samples: samples,
                 modelPath: modelURL.path,
                 options: options,
+                autoVADOff: autoOff,
                 onProgress: { fraction in
                     Task { @MainActor in
                         guard job.status == .running else { return }
                         job.progress = fraction
-                        job.message = "認識中 \(Int(fraction * 100))%"
+                        job.message = phase.withoutVAD
+                            ? Self.vadRetryMessage + " \(Int(fraction * 100))%"
+                            : "認識中 \(Int(fraction * 100))%"
                     }
                 },
                 onSegment: { segment in
@@ -956,6 +1001,17 @@ final class AppModel {
                         guard job.status == .running else { return }
                         job.progress = 0
                         job.message = "認識をやり直しています…"
+                    }
+                },
+                onVADRetry: { _ in
+                    // 音が続いているのに文字が少ないので、VAD なしでやり直す: 初めの結果の区間を画面から消し
+                    // (やり直しの区間と混ざらないように)、進み具合を 0 から出し直す
+                    live.restart()
+                    Task { @MainActor in
+                        guard job.status == .running else { return }
+                        phase.withoutVAD = true
+                        job.progress = 0
+                        job.message = Self.vadRetryMessage
                     }
                 },
                 onStage: { stage in
@@ -973,6 +1029,9 @@ final class AppModel {
                 },
                 shouldCancel: { flag.isSet }
             )
+            let output = result.output
+            // 自動で VAD なしでやり直し、その結果を採った: 印を残す (結果の画面に案内を出す)
+            job.vadSkippedAutomatically = result.vadRetry?.usedRetry == true
             // 日本語と英語が混ざっていたので「日本語＋英語」で文字にした: このジョブは「日本語＋英語」として扱う
             // (英 / 日 の印・英語の行の翻訳など)
             if output.probe?.isMixed == true {
@@ -1038,6 +1097,16 @@ final class AppModel {
     }
 
     /// まとめた区間を足す。文字起こし中のジョブだけ (止まったあとに遅れて届いた分は、これまでどおり足さない)
+    /// 自動で VAD なしでやり直している間の知らせ
+    static let vadRetryMessage = "音が続いているのに文字が少ないので、無音を飛ばさずにやり直しています…"
+
+    /// 文字起こしの段階 (run の中だけで使う。メインスレッドだけで触る)
+    @MainActor
+    final class RunPhase {
+        /// 自動で VAD なしでやり直している
+        var withoutVAD = false
+    }
+
     static func applyLive(_ batch: LiveSegmentBuffer.Batch?, to job: Job) {
         guard let batch, job.status == .running, var transcript = job.transcript else { return }
         batch.apply(to: &transcript.segments)
@@ -1636,6 +1705,7 @@ extension AppModel {
             job.transcript = document.transcript
             job.languageCode = document.languageCode
             job.autoMixedFrom = document.autoMixedFrom
+            job.vadSkippedAutomatically = document.vadSkippedAutomatically
             job.versions = document.versions
             job.notes = document.notes
             job.status = .done
@@ -1643,6 +1713,7 @@ extension AppModel {
             job.message = "完了"
             job.mixedSuggestionDismissed = true
             job.autoMixedNoticeDismissed = true
+            job.vadSkippedNoticeDismissed = true
             job.inLibrary = true
             job.documentOnDisk = true
             adopt(job, at: jobs.count)
@@ -1690,7 +1761,8 @@ extension AppModel {
         guard let transcript = job.transcript else { return nil }
         return SavedDocument(id: job.id, title: job.name, sourcePath: job.sourcePath, isRecording: job.isRecording,
                              createdAt: job.createdAt, updatedAt: Date(), languageCode: job.languageCode,
-                             autoMixedFrom: job.autoMixedFrom, transcript: transcript, versions: job.versions,
+                             autoMixedFrom: job.autoMixedFrom,
+                             vadSkippedAutomatically: job.vadSkippedAutomatically, transcript: transcript, versions: job.versions,
                              notes: job.notes)
     }
 

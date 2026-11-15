@@ -6,7 +6,7 @@ import Darwin
 #endif
 
 /// `Kikimimi --selftest-whisper <音声> [--model <bin>] [--vad <bin>] [--languages ja,en] [--from 秒] [--to 秒]
-///  [--cpu] [--greedy] [--hint 語彙] [--auto-mixed] [--report <json>] [--expect <json>]`
+///  [--no-vad] [--cpu] [--greedy] [--hint 語彙] [--auto-mixed] [--auto-vad-off] [--report <json>] [--expect <json>]`
 ///
 /// 画面を出さずに文字起こしをして、区切りごとの言語の判定・文字にした範囲・点検と直し・区間ごとの言語・時間・メモリを表示する
 /// (「日本語＋英語」の動作確認・CI 用)。モデルと VAD は、指定が無ければアプリが取得したもの。
@@ -14,6 +14,8 @@ import Darwin
 /// 満たさなければ 1 で終わる。
 /// --auto-mixed は、1 つの言語 (--languages ja / en / auto) のときに、アプリの「自動で日本語＋英語にする」と同じく、
 /// 文字にする前に日本語と英語が混ざっているかを確かめる (結果と数を表示する)。
+/// --no-vad は、VAD を使わない (取得済みの VAD が在っても)。--auto-vad-off は、アプリの「音が続いているのに文字が少ない時は、
+/// 無音を飛ばさずにやり直す」と同じく、VAD を使った結果が音を落としたらしければ VAD なしでやり直し、文字の多いほうを採る。
 enum WhisperSelfTest {
     struct Expectation: Decodable {
         struct Interval: Decodable {
@@ -50,6 +52,21 @@ enum WhisperSelfTest {
         var report: MixedReport?
         /// --auto-mixed で確かめた結果
         var probe: MixedProbe.Result?
+        /// --auto-vad-off の、自動のやり直しの様子 (やり直さなかったら retried が false)
+        var vadRetry: VADRetry?
+    }
+
+    /// --auto-vad-off で、VAD なしでやり直したか・どちらを採ったか
+    struct VADRetry: Encodable {
+        var retried: Bool
+        /// "first" (初めの、VAD を使った結果) か "withoutVAD" (やり直した結果)
+        var adopted: String
+        var totalSeconds: Double?
+        var keptSeconds: Double?
+        var loudDroppedSeconds: Double?
+        var firstLetters: Int?
+        var retryLetters: Int?
+        var retryError: String?
     }
 
     static func run(arguments args: [String]) -> Int32 {
@@ -58,8 +75,9 @@ enum WhisperSelfTest {
             return args[i + 1]
         }
         guard let audioPath = value("--selftest-whisper"), FileManager.default.fileExists(atPath: audioPath) else {
-            log("usage: Kikimimi --selftest-whisper <audio> [--model <ggml.bin>] [--vad <silero.bin>] [--languages ja,en]"
-                + " [--from s] [--to s] [--cpu] [--greedy] [--hint words] [--auto-mixed] [--report out.json] [--expect expect.json]")
+            log("usage: Kikimimi --selftest-whisper <audio> [--model <ggml.bin>] [--vad <silero.bin>] [--no-vad] [--languages ja,en]"
+                + " [--from s] [--to s] [--cpu] [--greedy] [--hint words] [--auto-mixed] [--auto-vad-off]"
+                + " [--report out.json] [--expect expect.json]")
             return 2
         }
         let store = ModelStore()
@@ -70,7 +88,10 @@ enum WhisperSelfTest {
             log("SELFTEST FAILED: no speech model. Download one in the app, or pass --model <ggml.bin>")
             return 2
         }
-        let vadPath: String? = value("--vad") ?? (store.isVADInstalled ? store.vadURL.path : nil)
+        // --no-vad: VAD を使わない (取得済みの VAD が在っても)
+        let vadPath: String? = args.contains("--no-vad") ? nil
+            : value("--vad") ?? (store.isVADInstalled ? store.vadURL.path : nil)
+        let autoVADOff = args.contains("--auto-vad-off")
         let codes = (value("--languages") ?? "ja,en").replacingOccurrences(of: "+", with: ",")
             .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         let candidates = codes.count >= 2 ? codes : []
@@ -88,7 +109,7 @@ enum WhisperSelfTest {
 
         log("whisper.cpp: " + WhisperContext.systemInfo.trimmingCharacters(in: .whitespacesAndNewlines))
         log("model: \(modelPath) (\(useGPU ? "GPU" : "CPU"))")
-        log("VAD: \(vadPath ?? "none")")
+        log("VAD: \(vadPath ?? "none")" + (autoVADOff ? " (auto-vad-off: run again without VAD if sound was dropped)" : ""))
         let autoMixed = args.contains("--auto-mixed")
         log("languages: \(candidates.isEmpty ? language : candidates.joined(separator: "+"))"
             + (autoMixed && candidates.isEmpty ? " (auto-mixed: check for Japanese + English first)" : ""))
@@ -111,7 +132,7 @@ enum WhisperSelfTest {
                        audioSeconds, offset, Date().timeIntervalSince(clock)))
 
             clock = Date()
-            let context = try WhisperContext(modelPath: modelPath, useGPU: useGPU)
+            var context: WhisperContext? = try WhisperContext(modelPath: modelPath, useGPU: useGPU)
             log(String(format: "loaded in %.1f s", Date().timeIntervalSince(clock)))
             let options = WhisperOptions(language: language, languageCandidates: candidates,
                                          useBeamSearch: !args.contains("--greedy"), vadModelPath: vadPath,
@@ -119,22 +140,60 @@ enum WhisperSelfTest {
             var peak = footprintMB() ?? 0
             var nextReport = 0.05
             clock = Date()
-            let output = try context.transcribe(samples: samples, options: options, onProgress: { p in
-                peak = max(peak, footprintMB() ?? 0)
-                if p >= nextReport {
-                    log(String(format: "  … %3.0f%%  %.0f s", p * 100, Date().timeIntervalSince(clock)))
-                    nextReport = (p / 0.05).rounded(.down) * 0.05 + 0.05
+            // whisper.cpp は VAD を使った実行の時刻の対応表を持ち続けるので、VAD のあとに VAD なしで動かす時は読み込み直す
+            // (アプリの TranscriptionService と同じ)
+            var contextUsedVAD = false
+            // アプリと同じ関数を通す (--auto-vad-off の時だけ、VAD が音を落としたらしければ VAD なしでやり直す)
+            let result = try TranscriptionService.transcribeCheckingVAD(
+                samples: samples, options: options, autoVADOff: autoVADOff,
+                transcribe: { runOptions in
+                    let usesVAD = runOptions.vadModelPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
+                    if !usesVAD, contextUsedVAD || context == nil {
+                        context = nil // 先に古いモデルを手放してメモリを空ける
+                        let reload = Date()
+                        context = try WhisperContext(modelPath: modelPath, useGPU: useGPU)
+                        contextUsedVAD = false
+                        log(String(format: "loaded again in %.1f s", Date().timeIntervalSince(reload)))
+                    }
+                    guard let ctx = context else { throw WhisperError.modelLoadFailed(modelPath) }
+                    if usesVAD { contextUsedVAD = true }
+                    let output = try ctx.transcribe(samples: samples, options: runOptions, onProgress: { p in
+                        peak = max(peak, footprintMB() ?? 0)
+                        if p >= nextReport {
+                            log(String(format: "  … %3.0f%%  %.0f s", p * 100, Date().timeIntervalSince(clock)))
+                            nextReport = (p / 0.05).rounded(.down) * 0.05 + 0.05
+                        }
+                    }, onSegment: { s in
+                        log(String(format: "  [%@] %@ %@", TimeFormat.short(s.start + offset), tag(s.language), s.text))
+                    }, onStage: { stage in
+                        switch stage {
+                        case .checkingLanguages:
+                            log("checking whether Japanese and English are mixed …")
+                        case .checkedLanguages(let probe):
+                            printProbe(probe, offset: offset)
+                        }
+                    })
+                    return (output, usesVAD)
+                },
+                onRetry: { a in
+                    log(String(format: "VAD: sound was dropped (%.1f s kept of %.1f s, %.1f s of loud sound dropped),"
+                               + " running again without VAD", a.keptSeconds, a.totalSeconds, a.loudDroppedSeconds))
+                    nextReport = 0.05
+                },
+                shouldCancel: { false }
+            )
+            let output = result.output
+            if let r = result.vadRetry {
+                if let letters = r.retryLetters {
+                    log("VAD: \(r.usedRetry ? "used the result without VAD" : "kept the result with VAD")"
+                        + " (\(r.firstLetters) letters with VAD, \(letters) without)")
+                } else {
+                    log("VAD: the run without VAD failed (\(r.retryError ?? "-")), kept the result with VAD"
+                        + " (\(r.firstLetters) letters)")
                 }
-            }, onSegment: { s in
-                log(String(format: "  [%@] %@ %@", TimeFormat.short(s.start + offset), tag(s.language), s.text))
-            }, onStage: { stage in
-                switch stage {
-                case .checkingLanguages:
-                    log("checking whether Japanese and English are mixed …")
-                case .checkedLanguages(let probe):
-                    printProbe(probe, offset: offset)
-                }
-            })
+            } else if autoVADOff {
+                log("VAD: no need to run again without VAD")
+            }
             let wall = Date().timeIntervalSince(clock)
             peak = max(peak, footprintMB() ?? 0)
 
@@ -157,7 +216,8 @@ enum WhisperSelfTest {
                                                     text: $0.text)
                                  },
                                  report: output.report.map { shifted($0, by: offset) },
-                                 probe: output.probe.map { shifted($0, by: offset) })
+                                 probe: output.probe.map { shifted($0, by: offset) },
+                                 vadRetry: autoVADOff ? vadRetryOutput(result.vadRetry) : nil)
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
                 try encoder.encode(out).write(to: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
@@ -178,6 +238,15 @@ enum WhisperSelfTest {
             log("SELFTEST FAILED: \(error.localizedDescription)")
             return 1
         }
+    }
+
+    /// --report に書く、自動のやり直しの様子
+    private static func vadRetryOutput(_ r: VADRetryReport?) -> VADRetry {
+        guard let r else { return VADRetry(retried: false, adopted: "first") }
+        return VADRetry(retried: true, adopted: r.usedRetry ? "withoutVAD" : "first",
+                        totalSeconds: r.assessment.totalSeconds, keptSeconds: r.assessment.keptSeconds,
+                        loudDroppedSeconds: r.assessment.loudDroppedSeconds, firstLetters: r.firstLetters,
+                        retryLetters: r.retryLetters, retryError: r.retryError)
     }
 
     /// 期待と合っているか (合わないものの説明を返す)

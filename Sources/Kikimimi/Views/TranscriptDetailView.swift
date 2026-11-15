@@ -26,18 +26,24 @@ struct TranscriptDetailView: View {
             }
 
             if job.status == .failed {
-                Label(job.error ?? "エラー", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                HStack(spacing: 12) {
+                    Label(job.error ?? "エラー", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .textSelection(.enabled)
+                    RedoAgainButton(job: job)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             }
 
             if job.status == .cancelled {
-                Label("中止しました", systemImage: "xmark.circle")
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                HStack(spacing: 12) {
+                    Label("中止しました", systemImage: "xmark.circle")
+                        .foregroundStyle(.secondary)
+                    RedoAgainButton(job: job)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             }
 
             if job.url != nil {
@@ -57,6 +63,11 @@ struct TranscriptDetailView: View {
                 let bilingual = model.isBilingual(stats, in: job)
                 if job.status == .done, let from = job.autoMixedFrom, !job.autoMixedNoticeDismissed {
                     AutoMixedLanguageNotice(job: job, from: from)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                }
+                if job.status == .done, job.vadSkippedAutomatically, !job.vadSkippedNoticeDismissed {
+                    VADSkippedNotice(job: job)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
                 }
@@ -189,6 +200,7 @@ struct TranscriptDetailView: View {
                 .toggleStyle(.checkbox)
                 .help("右にメモの欄を出す (理解したこと・覚えたい表現などを書ける。書いたものは自動で保存される)")
             Spacer()
+            RedoMenu(job: job)
             HistoryButton(job: job)
             AuditButton(job: job, transcript: transcript)
                 .disabled(!canPost)
@@ -1354,6 +1366,92 @@ struct AutoMixedLanguageNotice: View {
 
     private var retryTitle: String {
         from == Languages.auto.code ? "「日本語＋英語」を使わずにやり直す" : "「\(Languages.name(for: from))」だけでやり直す"
+    }
+}
+
+/// 音が続いているのに文字が少なかったので、自動で無音を飛ばさずに (VAD なしで) 文字起こししたことを知らせる。
+/// 無音を飛ばしてやり直すこともできる (やり直しでは、自動で VAD なしにしない)
+struct VADSkippedNotice: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "music.note")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            Text("音が続いているのに文字が少なかったので、無音を飛ばさずに文字起こししました (歌や音楽のようです)。")
+                .font(.callout.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if job.url != nil {
+                Button("無音を飛ばしてやり直す") {
+                    model.redo(job, vad: true)
+                }
+                .disabled(!model.canRedo(job))
+            }
+            Button {
+                job.vadSkippedNoticeDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help("閉じる")
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// 「やり直す」のメニュー (結果の画面の操作の列)。録音中か・音声ファイルが在るかは、この部品の中で見る
+/// (結果の画面が見ると、録音を始めた・止めたときに一覧まで描き直す)
+struct RedoMenu: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        if job.url != nil {
+            Menu {
+                RedoMenuItems(job: job)
+            } label: {
+                Label("やり直す", systemImage: "arrow.clockwise")
+            }
+            .menuStyle(.button)
+            .fixedSize()
+            .help("この音声を、もう一度文字起こしします。元の結果は残ります")
+            .disabled(!model.canRedo(job))
+        }
+    }
+}
+
+/// 「やり直す」の中身 (結果の画面とメニューバーの両方で使う)
+struct RedoMenuItems: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        Button("同じ設定でやり直す") { model.redo(job) }
+        Button("無音を飛ばさずにやり直す (歌・音楽向け)") { model.redo(job, vad: false) }
+        Button("無音を飛ばしてやり直す") { model.redo(job, vad: true) }
+        Divider()
+        Menu("言語を変えてやり直す") {
+            ForEach(Languages.all) { language in
+                Button(language.name) { model.redo(job, languageCode: language.code) }
+            }
+        }
+    }
+}
+
+/// 失敗・中止した結果の「もう一度文字起こしする」(同じ設定でやり直す)。録音中か・音声ファイルが在るかは、この部品の中で見る
+struct RedoAgainButton: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        if job.url != nil {
+            Button("もう一度文字起こしする") { model.redo(job) }
+                .disabled(!model.canRedo(job))
+                .help("この音声を、同じ設定でもう一度文字起こしします。元の結果は残ります")
+        }
     }
 }
 

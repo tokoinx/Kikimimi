@@ -47,6 +47,14 @@ struct TranscriptionSettingsForm: View {
                 }
                 Toggle("精度を優先する (ビームサーチ)", isOn: $model.preferAccuracy)
                 Toggle("無音を飛ばす (VAD)", isOn: $model.useVAD)
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("音が続いているのに文字が少ない時は、無音を飛ばさずにやり直す", isOn: $model.autoVADOff)
+                    Text("歌や音楽では、無音を飛ばす機能が歌声を声と見なさず、歌詞が出ない事があります。その時は、自動で、無音を飛ばさずにもう一度文字起こしします (時間は長くなります)。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .disabled(!model.useVAD)
                 Toggle("定番の誤認識と、同じ文の繰り返しを取り除く", isOn: $model.filterHallucinations)
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle("日本語と英語が混ざっている録音は、自動で「日本語＋英語」で文字にする", isOn: $model.autoMixedLanguage)

@@ -315,7 +315,7 @@ build/Kikimimi.app/Contents/MacOS/Kikimimi --eval-llm ~/Library/Application\ Sup
 swift test
 ```
 
-組み立てたアプリで文字起こしを動かす診断もあります (画面は出ません)。区切りごとの言語の判定・文字にした範囲・点検で引っかかったところと直し・区間ごとの言語・かかった時間・使ったメモリを表示します。モデルと VAD は、指定が無ければアプリで取得したものを使います。`--from` / `--to` (秒) で一部だけ、`--languages ja` で「日本語」の設定、`--auto-mixed` で (`--languages ja` などと一緒に) 日本語と英語が混ざっているかを先に確かめる設定 (確かめた区切りと結果を表示します)、`--report` で結果を JSON に書き出します。
+組み立てたアプリで文字起こしを動かす診断もあります (画面は出ません)。区切りごとの言語の判定・文字にした範囲・点検で引っかかったところと直し・区間ごとの言語・かかった時間・使ったメモリを表示します。モデルと VAD は、指定が無ければアプリで取得したものを使います。`--from` / `--to` (秒) で一部だけ、`--languages ja` で「日本語」の設定、`--auto-mixed` で (`--languages ja` などと一緒に) 日本語と英語が混ざっているかを先に確かめる設定 (確かめた区切りと結果を表示します)、`--no-vad` で無音を飛ばさない (VAD を使わない。取得済みの VAD が在っても)、`--auto-vad-off` でアプリの「音が続いているのに文字が少ない時は、無音を飛ばさずにやり直す」と同じ動き (やり直した時は、その 1 行と、採った結果がどちらかを表示します)、`--report` で結果を JSON に書き出します (`--auto-vad-off` の時は、やり直したか・採ったほうも入ります)。
 
 ```bash
 build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-whisper ~/Downloads/lecture.mp3 --languages ja,en --from 120 --to 240 --report ~/Desktop/kikimimi-report.json
