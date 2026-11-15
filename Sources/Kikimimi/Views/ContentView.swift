@@ -21,18 +21,19 @@ struct ContentView: View {
         }
         .toolbar { toolbarContent }
         .dropDestination(for: URL.self) { urls, _ in
-            let files = urls.filter { $0.isFileURL }
-            guard !files.isEmpty else { return false }
-            model.enqueue(files)
-            return true
+            // 音声・動画だけを読み込む。録音中は読み込まない
+            model.importDropped(urls)
         } isTargeted: { dropTargeted = $0 }
         .overlay {
             if dropTargeted {
+                // 録音中は、受けない事が分かる印・文・灰色の枠にする
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [10, 6]))
+                    .strokeBorder(model.isRecording ? Color.secondary : Color.accentColor,
+                                  style: StrokeStyle(lineWidth: 3, dash: [10, 6]))
                     .padding(8)
                     .overlay {
-                        Label("ここに落として文字起こし", systemImage: "waveform.badge.plus")
+                        Label(model.isRecording ? "録音中は読み込めません。録音を止めてから落としてください" : "ここに落として文字起こし",
+                              systemImage: model.isRecording ? "nosign" : "waveform.badge.plus")
                             .font(.title2.weight(.semibold))
                             .padding(20)
                             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -68,7 +69,7 @@ struct ContentView: View {
             } label: {
                 Label("開く", systemImage: "folder.badge.plus")
             }
-            .help("音声・動画ファイルを開く (⌘O)")
+            .help("音声・動画ファイルを開く (⌘O)。ファイルをウインドウに落としても読み込めます")
             .disabled(model.isRecording)
         }
         ToolbarItem(placement: .navigation) {

@@ -34,6 +34,16 @@ struct JobListView: View {
             }
         }
         .listStyle(.sidebar)
+        // 結果が在る時も、落として読み込める事が分かるように、一覧の下に案内を出す
+        .safeAreaInset(edge: .bottom) {
+            Label("音声・動画のファイルを、ここに落としても読み込めます", systemImage: "arrow.down.doc")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+        }
         .navigationTitle("ききみみ")
         // 一覧で Delete キー
         .onDeleteCommand { model.requestDelete(model.selectedJob) }

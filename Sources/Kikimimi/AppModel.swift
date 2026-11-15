@@ -744,6 +744,27 @@ final class AppModel {
         }
     }
 
+    /// ウインドウに落としたファイルを読み込む。音声・動画のファイルだけを、落とした順に順番待ちへ入れる。
+    /// 録音中は何も読み込まない (知らせは、落とす時の枠で出す)。
+    /// 読み込まなかった物が在れば、名前を知らせる。1 つでも読み込んだら true を返す
+    @discardableResult
+    func importDropped(_ urls: [URL]) -> Bool {
+        guard !isRecording else { return false }
+        let (accepted, rejected) = MediaImport.split(urls)
+        if !accepted.isEmpty {
+            enqueue(accepted)
+        }
+        if !rejected.isEmpty {
+            let limit = 5
+            var names = rejected.prefix(limit).map { $0.lastPathComponent }.joined(separator: "、")
+            if rejected.count > limit {
+                names += "、ほか \(rejected.count - limit) 件"
+            }
+            errorMessage = "音声・動画のファイルではないので、読み込みませんでした:\n" + names
+        }
+        return !accepted.isEmpty
+    }
+
     func enqueue(_ urls: [URL]) {
         for url in urls {
             let job = Job(name: url.lastPathComponent, url: url)
