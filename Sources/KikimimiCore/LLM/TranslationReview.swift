@@ -14,14 +14,17 @@ public struct TranslationNote: Codable, Hashable, Sendable {
     public var flags: [String]
     /// 印の説明 (今は使わない)
     public var detail: String?
-    /// 訳の出どころの符号 ("edited" = 利用者が直した。後で "llm"・"memory"・"confirmed" が増える)。
+    /// 訳の出どころの符号 ("edited" = 利用者が直した、"memory" = 訳の記憶から置いた。後で "llm"・"confirmed" が増える)。
     /// 知らない符号でも全体が読めるよう、enum にしない
     public var origin: String
-    /// 利用者が直す前の機械の訳 (訳が無い行に、利用者が自分で書いた時は nil)
+    /// 利用者が直す前の機械の訳 (訳が無い行に、利用者が自分で書いた時・記憶から置いた時は nil)
     public var machine: String?
 
     /// 利用者が直した訳の符号
     public static let edited = "edited"
+    /// 訳の記憶 (前に利用者が直した同じ文の訳) から、LLM を呼ばずに置いた訳の符号。
+    /// 機械の訳の上書きからは守らない (守るのは "edited" だけ)
+    public static let memory = "memory"
 
     public init(head: UUID, signature: String, flags: [String] = [], detail: String? = nil, origin: String,
                 machine: String? = nil) {
@@ -50,6 +53,9 @@ public struct TranslationNote: Codable, Hashable, Sendable {
 
     /// 利用者が直した訳の覚えか
     public var isEdited: Bool { origin == Self.edited }
+
+    /// 訳の記憶から置いた訳の覚えか
+    public var isRemembered: Bool { origin == Self.memory }
 }
 
 extension Transcript {

@@ -50,6 +50,9 @@ extension JA {
         "Edit translation": "訳を直す",
         "Edited": "直した",
         "You edited this translation. Click to change it.": "この訳は、自分で直した訳です。押すと、直せます。",
+        // 訳の記憶から置いた訳の印
+        "Remembered": "覚えた訳",
+        "This is your earlier translation of the same sentence. Click to change it.": "前に自分で直した、同じ文の訳です。押すと、直せます。",
         "Machine translation": "機械の訳",
         "Your translation": "自分の訳",
         "Restore machine translation": "機械の訳に戻す",

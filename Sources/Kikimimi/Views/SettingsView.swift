@@ -225,6 +225,8 @@ struct LLMSettingsForm: View {
 
             LearnedCorrectionsSection()
 
+            RememberedTranslationsSection()
+
             AdapterSection()
 
             Section {
@@ -345,6 +347,48 @@ struct AdapterSection: View {
                     .foregroundStyle(.secondary)
             }
             Text(L("When learned corrections build up, you can teach them to the LLM itself (fine-tuning). Export the training data and run tools/finetune/finetune.py in Terminal: it trains on this Mac and makes an “adapter” (….lora.gguf). An adapter is a small file used on top of the original LLM without changing it, and you can remove it at any time. Compare before and after training on the same cases, and add only an adapter that fixes more lines and makes nothing worse. The steps are in “Fine-tuning” in the README. For just a few corrections, “Learned corrections” above applies them as they are, without fine-tuning."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// 設定の「覚えた訳」: 対訳の行で利用者が直した訳の記憶。次の翻訳に使うかの入・切、一覧・削除。
+/// 消すのは記憶だけ (結果に残っている直した訳は、そのまま)
+struct RememberedTranslationsSection: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Section(L("Remembered translations")) {
+            Toggle(L("Use remembered translations in the next translation"), isOn: $model.reuseTranslationMemory)
+            let sentences = model.translationMemory.sentences.sorted { $0.updated > $1.updated }
+            if sentences.isEmpty {
+                Text(L("None yet. When you edit a translation in the bilingual view, it is remembered here."))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(LPlural(sentences.count, one: "%d remembered translation", other: "%d remembered translations"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(sentences) { entry in
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(TranslationTarget.displayName(for: entry.target))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(entry.source)
+                            .textSelection(.enabled)
+                        Text(entry.translation)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    Spacer()
+                    Button(L("Delete")) { model.removeRememberedTranslation(entry.id) }
+                }
+            }
+            Text(L("When the same sentence comes up again in a translation into the same language, your translation is used without asking the LLM. Short sentences are always translated again, because their meaning depends on the scene. “Translate this sentence again” always asks the LLM. Deleting here removes only the remembered translation; translations in your results stay as they are. They are saved only on this Mac."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

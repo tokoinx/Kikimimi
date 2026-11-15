@@ -1245,6 +1245,10 @@ struct BilingualRow: View {
                 // 利用者が直した訳の印 (行の値を出すだけ。押すと、訳を直す画面を開く)
                 if item.isEditedTranslation {
                     EditedTranslationBadge(id: item.id, job: job)
+                } else if item.isRememberedTranslation {
+                    // 訳の記憶から置いた訳の印 (同じ部品。文と説明だけ違う)
+                    EditedTranslationBadge(id: item.id, job: job, title: L("Remembered"),
+                                           help: L("This is your earlier translation of the same sentence. Click to change it."))
                 }
                 TranslateLineButton(item: item, job: job, targetName: targetName)
             }
@@ -1254,17 +1258,21 @@ struct BilingualRow: View {
     }
 }
 
-/// 利用者が直した訳の行の、灰色の小さな印「直した」。押すと、訳を直す画面 (一覧の外のシート) を開く
+/// 利用者が直した訳の行の、灰色の小さな印「直した」。押すと、訳を直す画面 (一覧の外のシート) を開く。
+/// 訳の記憶から置いた訳の行の印「覚えた訳」にも使う (title と help を渡す)
 struct EditedTranslationBadge: View {
     @Environment(AppModel.self) private var model
     let id: UUID
     let job: Job
+    /// 印の文と説明 (nil なら「直した」の物)
+    var title: String? = nil
+    var help: String? = nil
 
     var body: some View {
         Button {
             model.requestTranslationEdit(id, in: job)
         } label: {
-            Text(L("Edited"))
+            Text(title ?? L("Edited"))
                 .font(.caption2.weight(.semibold))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
@@ -1272,7 +1280,7 @@ struct EditedTranslationBadge: View {
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
-        .help(L("You edited this translation. Click to change it."))
+        .help(help ?? L("You edited this translation. Click to change it."))
     }
 }
 

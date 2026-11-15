@@ -23,6 +23,25 @@ public struct TranslationResult: Sendable, Hashable {
     public var head: UUID
     public var covers: [UUID]
     public var text: String
+    /// 訳の記憶 (前に利用者が直した同じ文の訳) から、LLM を呼ばずに置いた訳。
+    /// 置く時に、覚え (`TranslationNote`、出どころ "memory") を残す (`Transcript.apply(_:sources:)`)
+    public var fromMemory: Bool = false
+}
+
+/// 1 回の翻訳で、どれだけを記憶から置き、どれだけを LLM に送ったか (行 = 文のまとまり 1 つ)
+public struct TranslationRunSummary: Sendable, Hashable {
+    /// 最後まで訳せなかった区間の数 (`Translator.translate` の戻り値と同じ)
+    public var failed: Int
+    /// 記憶に当たった行の数 (LLM に送らずに、記憶の訳を置いた)
+    public var fromMemory: Int
+    /// LLM に送った行の数 (読めずに 1 行ずつ送り直した分は数えない)
+    public var sentToLLM: Int
+
+    public init(failed: Int = 0, fromMemory: Int = 0, sentToLLM: Int = 0) {
+        self.failed = failed
+        self.fromMemory = fromMemory
+        self.sentToLLM = sentToLLM
+    }
 }
 
 /// 翻訳役: 訳す先の言語 (target。既定は日本語) でない区間を、ローカル LLM でその言語に訳す。
@@ -259,22 +278,92 @@ public enum Translator {
     /// まだ訳していない区間を、文ごとに訳す。1 まとまり訳すごとに onChunk を呼ぶ (done / total は区間の数)。
     /// only を渡すと、その区間を含む文だけを訳す (行ごとの「訳」。文のまとめ方は全体を訳すときと同じ)。
     /// 戻り値は、最後まで訳せなかった区間の数。
+    /// memory を渡すと、記憶に在る文は LLM に送らずに記憶の訳を置く (`translateSummarizing` を見る)
     @discardableResult
     public static func translate(_ segments: [TranscriptSegment], language: String?, target: String = "ja",
                                  options: TranslationOptions = TranslationOptions(),
                                  only: Set<UUID>? = nil,
+                                 memory: TranslationMemoryLookup? = nil,
                                  generator: any TextGenerating, shouldCancel: () -> Bool,
                                  onChunk: (_ results: [TranslationResult], _ done: Int, _ total: Int) -> Void) throws -> Int {
+        try translateSummarizing(segments, language: language, target: target, options: options, only: only,
+                                 memory: memory, generator: generator, shouldCancel: shouldCancel,
+                                 onChunk: onChunk).failed
+    }
+
+    /// 訳の記憶だけで、訳すべき文が全部埋まるか (true なら、LLM を読み込まずに `translateSummarizing` を
+    /// generator: nil で呼べる)。訳す文が 1 つも無い時は false (いつもどおりに進める)
+    public static func memoryCoversAll(_ segments: [TranscriptSegment], language: String?, target: String = "ja",
+                                       only: Set<UUID>? = nil, memory: TranslationMemoryLookup?,
+                                       memoryExcluding: Set<UUID> = []) -> Bool {
+        guard let memory, !memory.isEmpty else { return false }
+        let units = pendingUnits(segments, language: language, target: target, only: only)
+        guard !units.isEmpty else { return false }
+        return units.allSatisfy { unit in
+            rememberedTranslation(for: unit, in: segments, target: target, memory: memory,
+                                  excluding: memoryExcluding) != nil
+        }
+    }
+
+    /// 訳す文のまとまり (only を渡すと、その区間を含む文だけ)
+    static func pendingUnits(_ segments: [TranscriptSegment], language: String?, target: String,
+                             only: Set<UUID>?) -> [[Int]] {
         var units = sentenceUnits(pendingIndices(segments, language: language, target: target), in: segments)
         if let only {
             units = units.filter { unit in unit.contains { only.contains(segments[$0].id) } }
         }
+        return units
+    }
+
+    /// 文のまとまり unit に当たる記憶の訳 (無い・短い・訳す先が違う・除く区間を含む時は nil)。
+    /// まとまりの原文は、訳を置いた後の `Transcript.translationSource(ofHead:)` と同じ作り方 (区間の文をつなぐ)
+    static func rememberedTranslation(for unit: [Int], in segments: [TranscriptSegment], target: String,
+                                      memory: TranslationMemoryLookup, excluding: Set<UUID>) -> String? {
+        guard memory.target == TranslationMemory.normalizedTarget(target),
+              !unit.contains(where: { excluding.contains(segments[$0].id) }) else { return nil }
+        return memory.translation(for: Transcript.join(unit.map { segments[$0].text }))
+    }
+
+    /// `translate` と同じく訳し、記憶に当たった行と LLM に送った行の数も返す。
+    ///
+    /// memory を渡すと、文のまとまりごとに、その原文 (`TranslationMemory.normalizedSource` でそろえた物) を引き、
+    /// 当たったまとまりは LLM に送らずに記憶の訳を置く (`TranslationResult.fromMemory`)。残りだけを、今までどおり数行ずつ送る。
+    /// 当たった文も、後ろの行の文脈 (直前の訳済みの行) には入れる。
+    /// memoryExcluding の区間を含むまとまりは、記憶を引かない (利用者が自分で押した「この文を訳し直す」)。
+    /// generator が nil の時は、LLM に送る行を訳せなかった行と数える (記憶だけで埋まる時に、LLM を読み込まずに呼ぶため)
+    public static func translateSummarizing(_ segments: [TranscriptSegment], language: String?, target: String = "ja",
+                                            options: TranslationOptions = TranslationOptions(),
+                                            only: Set<UUID>? = nil,
+                                            memory: TranslationMemoryLookup? = nil,
+                                            memoryExcluding: Set<UUID> = [],
+                                            generator: (any TextGenerating)?, shouldCancel: () -> Bool,
+                                            onChunk: (_ results: [TranslationResult], _ done: Int, _ total: Int) -> Void)
+        throws -> TranslationRunSummary {
+        let units = pendingUnits(segments, language: language, target: target, only: only)
         let pending = units.flatMap { $0 }
         // 「日本語＋英語」では、訳す区間に付いた言語 (いちばん多いもの) を原文の言語としてプロンプトに書く
         let source = sourceLanguage(of: pending.map { segments[$0] }) ?? language
         let sources = units.map { unit in Transcript.join(unit.map { segments[$0].text }) }
-        let chunks = LLMChunker.chunks(Array(units.indices), cost: { generator.tokenCount(sources[$0]) + 4 },
+        // 記憶に当たったまとまり (まとまりの位置 → 記憶の訳)
+        var remembered: [Int: String] = [:]
+        if let memory, !memory.isEmpty {
+            for u in units.indices {
+                if let t = rememberedTranslation(for: units[u], in: segments, target: target, memory: memory,
+                                                 excluding: memoryExcluding) {
+                    remembered[u] = t
+                }
+            }
+        }
+        let toLLM = units.indices.filter { remembered[$0] == nil }
+        var summary = TranslationRunSummary(fromMemory: remembered.count)
+        let chunks: [[Int]]
+        if let generator {
+            chunks = LLMChunker.chunks(toLLM, cost: { generator.tokenCount(sources[$0]) + 4 },
                                        maxLines: options.maxLinesPerChunk, maxCost: options.maxTokensPerChunk)
+        } else {
+            chunks = []
+            summary.failed = toLLM.reduce(0) { $0 + units[$1].count }
+        }
         let system = systemPrompt(language: source, target: target)
         // 文脈用に、訳しながら訳を覚えておく (最初から訳がある区間も使う)
         var known: [(position: Int, source: String, translation: String)] = segments.indices.compactMap { i in
@@ -285,11 +374,28 @@ public enum Translator {
                 : Transcript.join([segments[i].text] + segments.filter { covers.contains($0.id) }.map(\.text))
             return (i, source, t)
         }
-        var failed = 0
         var done = 0
         onChunk([], 0, pending.count)
-        for chunk in chunks {
+        // 記憶に当たった文を先に置く (LLM に送る文の文脈にも入れる)
+        if !remembered.isEmpty {
             if shouldCancel() { throw LLMError.cancelled }
+            var batch: [TranslationResult] = []
+            for u in units.indices {
+                guard let t = remembered[u] else { continue }
+                let unit = units[u]
+                batch.append(TranslationResult(head: segments[unit[0]].id, covers: unit.dropFirst().map { segments[$0].id },
+                                               text: t, fromMemory: true))
+                known.append((unit[0], sources[u], t))
+                done += unit.count
+            }
+            known.sort { $0.position < $1.position }
+            onChunk(batch, done, pending.count)
+        }
+        // generator が無い時は、chunks は空 (LLM に送る行は、上で訳せなかった行と数えてある)
+        for chunk in chunks {
+            guard let generator else { break }
+            if shouldCancel() { throw LLMError.cancelled }
+            summary.sentToLLM += chunk.count
             let first = units[chunk[0]][0]
             let context = known.filter { $0.position < first }.suffix(options.contextLines)
                 .map { (source: $0.source, translation: $0.translation) }
@@ -312,14 +418,14 @@ public enum Translator {
                     batch.append(TranslationResult(head: segments[unit[0]].id, covers: unit.dropFirst().map { segments[$0].id }, text: t))
                     known.append((unit[0], sources[u], t))
                 } else {
-                    failed += unit.count
+                    summary.failed += unit.count
                 }
                 done += unit.count
             }
             known.sort { $0.position < $1.position }
             onChunk(batch, done, pending.count)
         }
-        return failed
+        return summary
     }
 
     /// 区間に付いた言語のうち、いちばん多いもの (区間に言語が無ければ nil。同じ数なら先に出てきたもの)
@@ -384,6 +490,18 @@ extension Transcript {
         for i in following.indices {
             segments[i].translation = nil
             segments[i].translationCovers = nil
+        }
+        // 訳の出どころの覚え: 記憶から置いた訳には "memory" を残す。機械の訳を置いた時は、このまとまりの古い覚えを捨てる
+        // (ここまで来たのは、守る "edited" の覚えが無いまとまりだけ。覚えが無い結果は、覚えを見ずに済ませる)
+        if result.fromMemory || translationReview?.isEmpty == false {
+            var notes = (translationReview ?? []).filter { !ids.contains($0.head) }
+            if result.fromMemory {
+                notes.append(TranslationNote(head: result.head,
+                                             signature: Self.reviewSignature(source: translationSource(at: index),
+                                                                             translation: result.text),
+                                             origin: TranslationNote.memory))
+            }
+            translationReview = notes.isEmpty ? nil : notes
         }
         return true
     }

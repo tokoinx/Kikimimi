@@ -2,7 +2,8 @@ import Foundation
 
 /// 訳の記憶の 1 件: 利用者が直した、1 文の訳。
 ///
-/// 入るのは利用者が直した訳だけ (機械の訳は入れない)。次の翻訳で同じ文に使うのは、次の段 (U2)。
+/// 入るのは利用者が直した訳だけ (機械の訳は入れない)。次の翻訳で同じ文に出た時は、LLM を呼ばずにこの訳を置く
+/// (`TranslationMemoryLookup`)。
 public struct RememberedTranslation: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     /// 原文 (前後の空白を外した物。比べる時は `TranslationMemory.normalizedSource(_:)` でそろえる)
@@ -17,7 +18,7 @@ public struct RememberedTranslation: Codable, Hashable, Identifiable, Sendable {
     public var machine: String?
     /// 機械の訳を作った LLM の名前 (わかっていれば)
     public var model: String?
-    /// 評価用に取り分けた 1 件 (学習にも再利用にも使わない)。入れる時に、そろえた原文から決める
+    /// 評価用に取り分けた 1 件 (学習と手本には使わない。同じ文にそのまま戻す再利用には使う)。入れる時に、そろえた原文から決める
     public var heldOut: Bool
     public var updated: Date
 
@@ -209,5 +210,57 @@ public struct TranslationMemory: Codable, Hashable, Sendable {
         encoder.dateEncodingStrategy = .iso8601
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try encoder.encode(self).write(to: url, options: .atomic)
+    }
+}
+
+// MARK: 次の翻訳で使う (U2)
+
+/// 次の翻訳で同じ文に使う、訳す先 1 つ分の記憶の写し。
+///
+/// 値なので、LLM のスレッドへそのまま渡せる (`AppModel` の記憶を、訳している間に引き直さない)。
+/// 取り分けた 1 件 (`heldOut`) も入れる: 取り分けは「学習と手本に使わない」ための印で、
+/// 利用者が直した同じ文に、その訳をそのまま戻す事までは止めない
+public struct TranslationMemoryLookup: Hashable, Sendable {
+    /// 引く原文の重さの下限 (`TranslationGate.weight`。漢字・かな・ハングルは 2 と数える)。
+    /// これより短い文 (「Yes.」「はい。」など) は引かない: 短い文は、場面で訳が変わるため
+    /// (ある場面で直した「Yes.」の訳を、ほかの場面の「Yes.」に置くと、かえって合わない事が多い)
+    public static let minimumSourceWeight = 16
+
+    /// 訳す先の言語のコード (そろえた物)
+    public let target: String
+    /// そろえた原文 → 利用者の訳
+    let translations: [String: String]
+
+    public init(target: String, sentences: [RememberedTranslation]) {
+        let t = TranslationMemory.normalizedTarget(target)
+        self.target = t
+        var map: [String: String] = [:]
+        // 同じ文が 2 つ在れば、新しく直した方を使う
+        for entry in sentences.sorted(by: { $0.updated < $1.updated })
+        where TranslationMemory.normalizedTarget(entry.target) == t {
+            let key = TranslationMemory.normalizedSource(entry.source)
+            let value = entry.translation.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty, !value.isEmpty else { continue }
+            map[key] = value
+        }
+        translations = map
+    }
+
+    /// 引ける文の数
+    public var count: Int { translations.count }
+    public var isEmpty: Bool { translations.isEmpty }
+
+    /// 原文に合う利用者の訳。短い文・記憶に無い文は nil
+    public func translation(for source: String) -> String? {
+        let key = TranslationMemory.normalizedSource(source)
+        guard TranslationGate.weight(key) >= Self.minimumSourceWeight else { return nil }
+        return translations[key]
+    }
+}
+
+extension TranslationMemory {
+    /// 訳す先 target の記憶の写し (次の翻訳に渡す)
+    public func lookup(target: String) -> TranslationMemoryLookup {
+        TranslationMemoryLookup(target: target, sentences: sentences)
     }
 }

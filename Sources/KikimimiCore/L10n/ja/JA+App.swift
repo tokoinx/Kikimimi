@@ -82,6 +82,9 @@ extension JA {
         "Translating %1$d/%2$d": "翻訳中 %1$d/%2$d",
         "%d segment could not be translated. Click “Translate” again to translate only the rest.": "%d 区間は訳せませんでした。もう一度「翻訳」を押すと、残りだけを訳し直します。",
         "%d segments could not be translated. Click “Translate” again to translate only the rest.": "%d 区間は訳せませんでした。もう一度「翻訳」を押すと、残りだけを訳し直します。",
+        // 翻訳の終わりの知らせ: 訳の記憶から置いた行の数
+        "Used a remembered translation for %d line.": "覚えた訳を %d 行に使いました。",
+        "Used remembered translations for %d lines.": "覚えた訳を %d 行に使いました。",
         "Translating the selected sentences…": "選んだ文を翻訳中…",
         "Translating the selected sentences… (loading the LLM)": "選んだ文を翻訳中… (LLM を読み込み中)",
         "Translating the selected sentences %1$d/%2$d": "選んだ文を翻訳中 %1$d/%2$d",

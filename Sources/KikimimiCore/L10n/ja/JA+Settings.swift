@@ -77,6 +77,13 @@ extension JA {
         "%d learned correction": "学習した直し %d 件",
         "%d learned corrections": "学習した直し %d 件",
         "When learned corrections build up, you can teach them to the LLM itself (fine-tuning). Export the training data and run tools/finetune/finetune.py in Terminal: it trains on this Mac and makes an “adapter” (….lora.gguf). An adapter is a small file used on top of the original LLM without changing it, and you can remove it at any time. Compare before and after training on the same cases, and add only an adapter that fixes more lines and makes nothing worse. The steps are in “Fine-tuning” in the README. For just a few corrections, “Learned corrections” above applies them as they are, without fine-tuning.": "学習した直しがたまったら、LLM そのものに覚えさせることができます (追加学習)。学習用のデータを書き出し、ターミナルで tools/finetune/finetune.py を動かすと、この Mac の中で学習して「差分」(….lora.gguf) を作ります。差分は、元の LLM を書き換えずに重ねて使う小さなファイルで、いつでも外せます。学習の前後は同じ場面で比べ、直せる行が増えて、悪くなったところの無い差分だけを入れます。手順は README の「追加学習」にあります。数件の直しなら、追加学習をしなくても上の「学習した直し」がそのまま当てます。",
+        // 覚えた訳 (RememberedTranslationsSection)
+        "Remembered translations": "覚えた訳",
+        "Use remembered translations in the next translation": "覚えた訳を、次の翻訳に使う",
+        "None yet. When you edit a translation in the bilingual view, it is remembered here.": "まだありません。対訳の行で訳を直すと、ここに覚えます。",
+        "%d remembered translation": "覚えた訳 %d 件",
+        "%d remembered translations": "覚えた訳 %d 件",
+        "When the same sentence comes up again in a translation into the same language, your translation is used without asking the LLM. Short sentences are always translated again, because their meaning depends on the scene. “Translate this sentence again” always asks the LLM. Deleting here removes only the remembered translation; translations in your results stay as they are. They are saved only on this Mac.": "同じ言語へ訳す時に、同じ文がまた出たら、LLM に頼まずに自分で直した訳を置きます。短い文は場面で訳が変わるので、いつも訳し直します。「この文を訳し直す」は、いつも LLM に頼みます。ここで消すのは覚えた訳だけで、結果に残っている訳はそのままです。保存先はこの Mac の中だけです。",
         // 学習した直し (LearnedCorrectionsSection)
         "Learned corrections": "学習した直し",
         "Remember the fixes decided in the audit list and use them from next time": "監査の一覧で決めた直しを覚えて、次から使う",

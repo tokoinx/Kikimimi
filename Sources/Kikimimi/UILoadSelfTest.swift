@@ -1632,6 +1632,26 @@ extension LoadRun {
                  saved && note?.isEdited == true && note?.machine == target.translation
                     && remembered.count == 1 && remembered.first?.translation == text,
                  "saved \(saved), note \(note?.origin ?? "none"), memory \(remembered.count) (expected 1)")
+            // 直した訳の再利用: 写しの上でその文の訳を外し、記憶だけで訳し直す (LLM は使わない: generator は nil)。
+            // 記憶に在る文は訳が入り、覚えが "memory" になる。ジョブの結果は変えない
+            if let current = job.transcript {
+                var copy = current
+                copy.segments = Translator.clearingTranslations(of: [target.id], in: current.segments)
+                copy.translationReview = nil
+                let sources = Dictionary(copy.segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
+                var results: [TranslationResult] = []
+                let summary = try? Translator.translateSummarizing(
+                    copy.segments, language: copy.language, target: model.translationTarget(for: current), only: [target.id],
+                    memory: model.translationMemory.lookup(target: model.translationTarget(for: current)), generator: nil,
+                    shouldCancel: { false }) { batch, _, _ in results += batch }
+                for result in results { copy.apply(result, sources: sources) }
+                let reused = copy.segments.first { $0.id == target.id }?.translation
+                let reusedNote = copy.translationNote(for: target.id)
+                step("reuse a remembered translation without the LLM",
+                     summary?.fromMemory == 1 && summary?.sentToLLM == 0 && reused == text && reusedNote?.isRemembered == true,
+                     "from memory \(summary?.fromMemory ?? -1), sent \(summary?.sentToLLM ?? -1), "
+                        + "note \(reusedNote?.origin ?? "none") (expected 1, 0, memory)")
+            }
             model.revertTranslation(head: target.id, in: job)
             let restored = job.transcript?.segments.first { $0.id == target.id }?.translation
             let after = TranslationMemory.load(from: memoryURL).sentences

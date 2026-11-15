@@ -320,9 +320,11 @@ final class AppModel {
     var ledger = CorrectionLedger()
     /// 学習した直しを使う (監査の前に当てる・断った直しを出さない・正しい語を語彙のヒントに足す)
     var useLedger: Bool { didSet { save(useLedger, "useLedger") } }
-    /// 訳の記憶 (利用者が直した訳。Mac の中だけに保存する)。今はためるだけで、次の翻訳には使わない。
-    /// 画面には出さないので、見張らない
-    @ObservationIgnored var translationMemory = TranslationMemory()
+    /// 訳の記憶 (利用者が直した訳。Mac の中だけに保存する)。次の翻訳で同じ文に出た時に、LLM を呼ばずに置く
+    /// (`reuseTranslationMemory` が入の時)。設定の「覚えた訳」の一覧が見るので、見張る (結果の一覧は読まない)
+    var translationMemory = TranslationMemory()
+    /// 覚えた訳を、次の翻訳に使う (切の時も、直した訳は記憶にたまる)
+    var reuseTranslationMemory: Bool { didSet { save(reuseTranslationMemory, "reuseTranslationMemory") } }
     /// 訳の記憶の保存先 (学習した直しの台帳と同じフォルダの translation-memory.json)。
     /// 確認用の起動 (--selftest-…) では nil (利用者の本物の記憶を読まず・書かない。確認は useTranslationMemory(at:) で一時のファイルにする)
     @ObservationIgnored private(set) var translationMemoryURL: URL?
@@ -390,6 +392,8 @@ final class AppModel {
         notesWidth = min(max(d.object(forKey: "notesWidth") as? Double ?? 320, Self.notesWidthRange.lowerBound),
                          Self.notesWidthRange.upperBound)
         useLedger = d.object(forKey: "useLedger") as? Bool ?? true
+        // 確認用の起動では、設定を読まず、入に決める (記憶は一時のファイルにするので、本物の記憶は使わない)
+        reuseTranslationMemory = Self.isSelfTestLaunch ? true : d.object(forKey: "reuseTranslationMemory") as? Bool ?? true
         useAdapter = d.object(forKey: "useAdapter") as? Bool ?? true
         llmStore = LLMModelStore(models: store)
         let loaded = CorrectionLedger.loadKeepingUnreadable(from: ledgerURL)
@@ -468,6 +472,26 @@ final class AppModel {
         } catch {
             errorMessage = L("Could not save the translation memory: %@", error.localizedDescription)
         }
+    }
+
+    /// 設定の「覚えた訳」の一覧で、1 件を消す。消すのは記憶だけ (結果に残っている直した訳は、そのまま)
+    func removeRememberedTranslation(_ id: UUID) {
+        translationMemory.remove(id)
+        saveTranslationMemory()
+    }
+
+    /// 次の翻訳に渡す、訳す先 target の記憶の写し (設定が切・記憶が空なら nil)
+    private func translationMemoryLookup(target: String) -> TranslationMemoryLookup? {
+        guard reuseTranslationMemory, !translationMemory.isEmpty else { return nil }
+        let lookup = translationMemory.lookup(target: target)
+        return lookup.isEmpty ? nil : lookup
+    }
+
+    /// 翻訳が終わった時の知らせに、記憶から置いた行の数を足す (0 なら何も足さない)
+    private static func memoryNote(_ note: String?, used: Int) -> String? {
+        guard used > 0 else { return note }
+        let text = LPlural(used, one: "Used a remembered translation for %d line.", other: "Used remembered translations for %d lines.")
+        return note.map { $0 + " " + text } ?? text
     }
 
     /// 対訳の行の「訳を直す…」・「直した」の印: 訳を直す画面を開く (文字起こしが終わった結果だけ)
@@ -1572,20 +1596,24 @@ final class AppModel {
                 let segments = transcript.segments
                 let sources = Dictionary(segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
                 let options = TranslationOptions(glossary: glossary)
+                // 覚えた訳 (訳す先が同じ物の写し)。全体の翻訳・「〇〇語で訳し直す」は、記憶を引く
+                let memory = translationMemoryLookup(target: target)
                 let apply: @MainActor ([TranslationResult]) -> Void = { batch in
                     guard !batch.isEmpty, var t = job.transcript else { return }
                     // 訳しているあいだに監査で文が変わった区間には付けない
                     for result in batch { t.apply(result, sources: sources) }
-                    t.translationModel = selection.name
+                    // 記憶から置いただけなら、訳した LLM の名前は変えない
+                    if batch.contains(where: { !$0.fromMemory }) { t.translationModel = selection.name }
                     t.translationLanguage = target
                     job.transcript = t
                 }
-                let (failed, all) = try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
-                                                      shouldCancel: { flag.isSet }) { engine in
+                /// 訳す (generator が nil なら、記憶だけで埋める)
+                func run(_ generator: (any TextGenerating)?) throws -> (TranslationRunSummary, [TranslationResult]) {
                     var all: [TranslationResult] = []
-                    let failed = try Translator.translate(segments, language: language, target: target, options: options,
-                                                          generator: engine,
-                                                          shouldCancel: { flag.isSet }) { batch, done, total in
+                    let summary = try Translator.translateSummarizing(segments, language: language, target: target,
+                                                                      options: options, memory: memory,
+                                                                      generator: generator,
+                                                                      shouldCancel: { flag.isSet }) { batch, done, total in
                         all += batch
                         Task { @MainActor in
                             apply(batch)
@@ -1594,13 +1622,21 @@ final class AppModel {
                                                      progress: total > 0 ? Double(done) / Double(total) : nil)
                         }
                     }
-                    return (failed, all)
+                    return (summary, all)
                 }
+                // 記憶だけで全部埋まる時は、LLM を読み込まない (引くのは辞書だけなので、ここで済ませる)
+                let usesLLM = !Translator.memoryCoversAll(segments, language: language, target: target, memory: memory)
+                let (summary, all) = usesLLM
+                    ? try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
+                                        shouldCancel: { flag.isSet }) { engine in try run(engine) }
+                    : try run(nil)
                 apply(all)
+                let failed = summary.failed
                 if failed > 0 {
                     job.postNote = LPlural(failed, one: "%d segment could not be translated. Click “Translate” again to translate only the rest.", other: "%d segments could not be translated. Click “Translate” again to translate only the rest.")
                 }
-                job.postNote = adapterNote(job.postNote)
+                job.postNote = Self.memoryNote(job.postNote, used: summary.fromMemory)
+                if usesLLM { job.postNote = adapterNote(job.postNote) }
 
             case .translateLines:
                 guard useLLM else {
@@ -1625,23 +1661,31 @@ final class AppModel {
                 }
                 job.postState = .running(.translateLines, message: preparing ? L("Translating the selected sentences… (loading the LLM)") : L("Translating the selected sentences…"), progress: nil)
                 // 訳し直す文は、写しの上で訳を外してから文の区切りを決める (訳し終えるまで、画面には前の訳を残す)
-                let segments = Translator.clearingTranslations(of: job.lineRedo.intersection(only), in: transcript.segments)
+                let redo = job.lineRedo.intersection(only)
+                let segments = Translator.clearingTranslations(of: redo, in: transcript.segments)
                 let sources = Dictionary(segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
                 let options = TranslationOptions(glossary: glossary)
+                // 覚えた訳: 訳の無い 1 行だけを訳す時は引く。利用者が自分で押した「この文を訳し直す」の文は引かない
+                // (機械の訳を見たい時の逃げ道)。前の訳でまとめていた区間を全部含めて、引かない区間にする
+                let memory = translationMemoryLookup(target: target)
+                let noMemory = Set(redo.flatMap { Translator.translationGroupIDs(of: $0, in: transcript.segments) })
                 let apply: @MainActor ([TranslationResult]) -> Void = { batch in
                     guard !batch.isEmpty, var t = job.transcript else { return }
                     // 訳しているあいだに監査で文が変わった区間には付けない
                     for result in batch { t.apply(result, sources: sources) }
-                    t.translationModel = selection.name
+                    // 記憶から置いただけなら、訳した LLM の名前は変えない
+                    if batch.contains(where: { !$0.fromMemory }) { t.translationModel = selection.name }
                     t.translationLanguage = target
                     job.transcript = t
                 }
-                let (failed, all) = try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
-                                                      shouldCancel: { flag.isSet }) { engine in
+                /// 訳す (generator が nil なら、記憶だけで埋める)
+                func run(_ generator: (any TextGenerating)?) throws -> (TranslationRunSummary, [TranslationResult]) {
                     var all: [TranslationResult] = []
-                    let failed = try Translator.translate(segments, language: language, target: target, options: options,
-                                                          only: only,
-                                                          generator: engine, shouldCancel: { flag.isSet }) { batch, done, total in
+                    let summary = try Translator.translateSummarizing(segments, language: language, target: target,
+                                                                      options: options, only: only, memory: memory,
+                                                                      memoryExcluding: noMemory,
+                                                                      generator: generator,
+                                                                      shouldCancel: { flag.isSet }) { batch, done, total in
                         all += batch
                         Task { @MainActor in
                             apply(batch)
@@ -1650,13 +1694,22 @@ final class AppModel {
                                                      progress: total > 0 ? Double(done) / Double(total) : nil)
                         }
                     }
-                    return (failed, all)
+                    return (summary, all)
                 }
+                // 記憶だけで全部埋まる時は、LLM を読み込まない
+                let usesLLM = !Translator.memoryCoversAll(segments, language: language, target: target, only: only,
+                                                          memory: memory, memoryExcluding: noMemory)
+                let (summary, all) = usesLLM
+                    ? try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
+                                        shouldCancel: { flag.isSet }) { engine in try run(engine) }
+                    : try run(nil)
                 apply(all)
+                let failed = summary.failed
                 if failed > 0 {
                     job.postNote = LPlural(failed, one: "%d segment of the selected sentences could not be translated. Click “Translate line” on that line to retry.", other: "%d segments of the selected sentences could not be translated. Click “Translate line” on that line to retry.")
                 }
-                job.postNote = adapterNote(job.postNote)
+                job.postNote = Self.memoryNote(job.postNote, used: summary.fromMemory)
+                if usesLLM { job.postNote = adapterNote(job.postNote) }
             }
         } catch {
             if flag.isSet || (error as? LLMError) == .cancelled {

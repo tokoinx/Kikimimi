@@ -20,8 +20,12 @@ struct TranslationEditSheet: View {
         var note: TranslationNote?
 
         var isEdited: Bool { note?.isEdited == true }
-        /// 直す前の機械の訳 (直した訳なら覚えの物、直していなければ今の訳)
-        var machine: String? { isEdited ? note?.machine : translation }
+        /// 直す前の機械の訳 (直した訳なら覚えの物、直していなければ今の訳)。
+        /// 訳の記憶から置いた訳は、機械の訳ではないので出さない (nil)
+        var machine: String? {
+            if note?.isRemembered == true { return nil }
+            return isEdited ? note?.machine : translation
+        }
     }
 
     private var current: Current? {

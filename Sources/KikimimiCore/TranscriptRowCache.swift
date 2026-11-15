@@ -45,6 +45,9 @@ public struct TranscriptListItem: Identifiable, Hashable, Sendable {
 
     /// 利用者が直した訳の行か
     public var isEditedTranslation: Bool { review?.isEdited == true }
+
+    /// 訳の記憶から置いた訳の行か
+    public var isRememberedTranslation: Bool { review?.isRemembered == true }
 }
 
 /// 行の言語の印
