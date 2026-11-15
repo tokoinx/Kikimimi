@@ -51,6 +51,9 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
   - `confirm a flagged translation through the model`: 「この訳でよい」で印が消え、覚えの出どころが `confirmed` になる (符号は残る)。
   - `the self-test does not use the real translation memory`: 確認用の起動は、利用者の本物の訳の記憶 (`translation-memory.json`) を読まず・書かない。
   - `edit a translation through the model` → `reuse a remembered translation without the LLM` → `restore the machine translation through the model`: 一時の記憶で、訳を直すと記憶が 1 件、記憶に在る文が LLM なしで入る (覚えが `memory`)、機械の訳に戻すと記憶が 0 件。
+  - `count “this translation is fine” for the check` (256f8de で足した): 「この訳でよい」で、その印の検査 (数の抜け) の「この訳でよい」の数が 1 以上になり、覚えの判定が `confirmed` になる。
+  - `a check stops after five “this translation is fine”` (同): 一時の記憶で「この訳でよい」を 5 回数えると、その検査が、その訳す先で止まる (止めた検査の一覧に 1 つ)。
+  - `undo a stopped check` (同): [元に戻す] で、止めた検査が無くなり、保存した記憶の数も消える。
 - 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 の順)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
@@ -83,6 +86,8 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | `11-delete-confirm.png` | ゴミ箱に入れるかの確認の画面 (07・08 の後に撮る)。「ゴミ箱に入れるもの」に保存のフォルダのパス、「残るもの」に元の音声ファイルのパス、「キャンセル」と「ゴミ箱に入れる」 |
 | `12-translation-edit.png` | 訳を直す画面 (直した訳の行を開いたところ。08 の後、11 の前に撮る)。機械の訳と「機械の訳に戻す」 |
 | `13-translation-check.png` | 要確認の行を開いた、訳を直す画面。上に理由の行と「この訳でよい」 |
+
+- 12・13 のシートには、23f94f8 (U5) から、下に訳語の 1 行「語を、いつもこう訳す (任意)」が在る (シートのコードでは、いつも出す)。
 
 - 変えた画面に関わる絵を Read で開いて見る。絵の場面ごとの注意 (`… may show no playing tint` など) が出力に在れば、その絵は特に見る。
 

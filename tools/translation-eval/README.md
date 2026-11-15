@@ -97,6 +97,8 @@
 
    測り・採点し直しと一緒に `--save-baseline <名前>` を付けると、その結果を写します。もう在る名前には上書きしません。
    次からは `--baseline tools/translation-eval/baselines/<名前>` で比べます。
+   今の基準は `baselines/qwen3.5-4b-20261116/` です (Qwen3.5 4B、文に分けて訳し直す仕組みを入れた後。入れる前は `baselines/qwen3.5-4b-20261116-before-split-retry/`)。
+   比べ方: `--baseline tools/translation-eval/baselines/qwen3.5-4b-20261116`。
 
 ## 表の読み方
 
