@@ -571,17 +571,19 @@ final class LLMEvalTests: XCTestCase {
                                     keep: ["Roblox"])
         var result = LLMEval.score(c, translations: ["Roblox のおもちゃを 1500 個売りました。", "それは３０パーセント多いです。"])
         XCTAssertEqual(result.score.translated, 2)
-        XCTAssertEqual(result.score.japanese, 2)
+        XCTAssertEqual(result.score.inTarget, 2)
         XCTAssertEqual(result.score.numbersKept, 2)
         XCTAssertEqual(result.score.numbersChecked, 2)
         XCTAssertEqual(result.score.termsKept, 1)
         XCTAssertTrue(result.details.isEmpty)
         // 数字と固有名詞を落とした訳・日本語でない訳
         result = LLMEval.score(c, translations: ["おもちゃをたくさん売りました。", "That is 30 percent more."])
-        XCTAssertEqual(result.score.japanese, 1)
+        XCTAssertEqual(result.score.inTarget, 1)
         XCTAssertEqual(result.score.numbersKept, 1)
         XCTAssertEqual(result.score.termsKept, 0)
-        XCTAssertEqual(result.details.count, 3)
+        // 数字・語を落とした・日本語でない、に加えて、原文をそのまま写した行も書く
+        XCTAssertEqual(result.details.count, 4)
+        XCTAssertEqual(result.score.copied, 1)
     }
 
     func testTheSeedSetLoadsAndIsWellFormed() throws {

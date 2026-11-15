@@ -173,6 +173,13 @@ build/Kikimimi.app/Contents/MacOS/Kikimimi --eval-llm ~/Library/Application\ Sup
 
 With `--baseline <earlier report.json>` the result is compared with an earlier one, and the command exits with code 3 if it is worse (more correct lines harmed, or fewer lines fixed). `--adapter <file.lora.gguf>` adds a fine-tuned adapter, `--ledger <ledger.json>` uses learned corrections, and `--rules-only` measures the rules without an LLM.
 
+**Measuring translation in 13 languages**: when a translation scene has `target` (the language to translate into; Japanese if missing) and `references` (human translations), the harness counts, for each target language, the lines translated, the lines that are in that language (for Japanese by the script, for the others by the macOS language recognizer), whether numbers and terms were kept, copies of the source, repeated phrases, and chrF (closeness to the human translation, 0 to 100, a corpus score), and prints a table. `--baseline` compares each target language, and exits with code 3 if any of them got worse (for chrF, a drop of more than 1 point). How to build 13 sets (30 lines each) from the public parallel data WMT24++ and measure them in one go is in `tools/translation-eval/README.md` (in Japanese).
+
+```bash
+python3 tools/translation-eval/fetch_wmt24pp.py      # builds the sets (build/translation-eval/sets/)
+python3 tools/translation-eval/evaluate.py --model ~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf
+```
+
 Measured with the real Qwen3.5 (Q4_K_M) on a Linux CPU (14 lines with an error):
 
 | LLM | Fixed automatically | Found as a suggestion | Missed | Correct lines harmed | Needless suggestions |
@@ -373,6 +380,8 @@ Sources/
       AuditReport.swift  Audit results, apply and undo
       CorrectionLedger.swift  Learned corrections (remember, apply, block)
       LLMEval.swift      Evaluation harness (scenes and scoring)
+      ChrF.swift         The chrF translation score (same values as sacreBLEU's default)
+      LanguageDetection.swift  Telling the language of a translation (macOS NaturalLanguage)
       FineTuneData.swift Builds fine-tuning data from the ledger
       Translator.swift   Translation a few lines at a time, retries
       Grammar.swift      GBNF grammars that constrain the output
@@ -422,7 +431,10 @@ tools/finetune/          Fine-tuning (LoRA)
   finetune.py            Train, convert, evaluate and install in one go (Mac, MLX)
   mlx_lora_to_gguf.py    Converts an MLX adapter to a GGUF that llama.cpp reads
   selftest/              Practice data for the end-to-end check (CI)
-Tests/Fixtures/          A short English/Japanese recording (for --selftest-whisper in CI), evaluation scenes (llm-eval/)
+tools/translation-eval/  Translation evaluation (13 languages)
+  fetch_wmt24pp.py       Builds the sets from WMT24++
+  evaluate.py            Runs --eval-llm on each set and makes one table per target language
+Tests/Fixtures/          A short English/Japanese recording (for --selftest-whisper in CI), evaluation scenes (llm-eval/; translation-mini.json is a small translation set with human translations)
 ```
 
 ## Design notes
@@ -443,7 +455,7 @@ Tests/Fixtures/          A short English/Japanese recording (for --selftest-whis
 - Even with Japanese + English, about 1.5 s around a switch with no pause can be lost. Insertions shorter than about 1.5 s (backchannels), and insertions in noisy recordings, may be missed and come out in the surrounding language or be dropped.
 - Automatic detection decides the language once, from the first 30 seconds. For Japanese and English, the app first checks whether they are mixed and switches to Japanese + English (when the setting is on), but an English recording whose only Japanese is short remarks (under 3 s) is likely to be judged not mixed, so choose Japanese + English yourself to catch those remarks.
 - Translation quality depends on the small LLM running on your Mac (Qwen3.5). For the 12 languages other than Japanese, on 2026-11-15 four sample lines per language were translated with Qwen3.5 4B, and only the fact that the output is written in that language was checked (no speaker of those languages reviewed the translations; from Japanese to English, "the play button" came out as "restart button"). The checks on a translation (such as rejecting output that drifted into Chinese) are strongest when translating into Japanese; for other languages only empty output, overlong output and output without a single character of the language (Korean, Russian, Thai) are rejected.
-- When the language of a segment is unknown (for example, auto-detect could not decide), every such segment is a candidate for translation when the language to translate into is not Japanese (the LLM is told to copy lines that are already in that language). The translation score of the evaluation harness (`--eval-llm`) only covers translating into Japanese.
+- When the language of a segment is unknown (for example, auto-detect could not decide), every such segment is a candidate for translation when the language to translate into is not Japanese (the LLM is told to copy lines that are already in that language). The evaluation harness (`--eval-llm`) scores translation per target language (for languages other than Japanese, "is it in that language" relies on the macOS language recognizer, so translations shorter than 8 letters are not checked).
 - The version kept automatically before "Translate again into …" is marked "Automatic (before going back)" in the history sheet (its name is "Before changing the translation language"). In an exported CSV, the translation column is named `japanese` when the language is Japanese and `translation` otherwise.
 - Use Japanese + English with "Skip silence (VAD)" turned on (the default). Without it, language detection on silent stretches is unreliable and can invent a switch, so a few seconds may be transcribed in the wrong language.
 - A learned correction is a word replacement. A fix that is right on one line and wrong on another (two real words that sound alike) comes back only as a suggestion after one acceptance, but becomes automatic after two. If it stops fitting, delete it under "Learned corrections" in Settings.

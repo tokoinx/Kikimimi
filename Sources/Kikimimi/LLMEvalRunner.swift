@@ -15,8 +15,44 @@ enum LLMEvalRunner {
         var ledgerEntries: Int
         var sets: [String]
         var audit: AuditEvalScore
+        /// 翻訳の全体の合計
         var translation: TranslationEvalScore
+        /// 翻訳の、訳す先ごとの成績 (鍵は言語のコード)
+        var translationByTarget: [String: TranslationEvalScore]
         var details: [String]
+
+        init(model: String, adapter: String?, ledgerEntries: Int, sets: [String], audit: AuditEvalScore,
+             translation: TranslationEvalScore, translationByTarget: [String: TranslationEvalScore], details: [String]) {
+            self.model = model
+            self.adapter = adapter
+            self.ledgerEntries = ledgerEntries
+            self.sets = sets
+            self.audit = audit
+            self.translation = translation
+            self.translationByTarget = translationByTarget
+            self.details = details
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case model, adapter, ledgerEntries, sets, audit, translation, translationByTarget, details
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            model = try c.decode(String.self, forKey: .model)
+            adapter = try c.decodeIfPresent(String.self, forKey: .adapter)
+            ledgerEntries = try c.decodeIfPresent(Int.self, forKey: .ledgerEntries) ?? 0
+            sets = try c.decodeIfPresent([String].self, forKey: .sets) ?? []
+            audit = try c.decode(AuditEvalScore.self, forKey: .audit)
+            translation = try c.decodeIfPresent(TranslationEvalScore.self, forKey: .translation) ?? TranslationEvalScore()
+            details = try c.decodeIfPresent([String].self, forKey: .details) ?? []
+            if let byTarget = try c.decodeIfPresent([String: TranslationEvalScore].self, forKey: .translationByTarget) {
+                translationByTarget = byTarget
+            } else {
+                // 訳す先ごとの成績が無い古い結果は、日本語へ訳す場合だけを採点していた
+                translationByTarget = translation.lines > 0 ? ["ja": translation] : [:]
+            }
+        }
     }
 
     static func run(arguments args: [String]) -> Int32 {
@@ -49,7 +85,7 @@ enum LLMEvalRunner {
                                 adapter: adapter.map { ($0 as NSString).lastPathComponent },
                                 ledgerEntries: ledger?.corrections.count ?? 0,
                                 sets: setPaths.map { ($0 as NSString).lastPathComponent },
-                                audit: AuditEvalScore(), translation: TranslationEvalScore(), details: [])
+                                audit: AuditEvalScore(), translation: TranslationEvalScore(), translationByTarget: [:], details: [])
             var engine: LlamaEngine?
             if !rulesOnly {
                 let started = Date()
@@ -69,11 +105,17 @@ enum LLMEvalRunner {
                 let translated = try LLMEval.runTranslation(translation, generator: engine, ledger: ledger,
                                                             onCase: { done, total in log("  translation \(done)/\(total)") })
                 report.translation = translated.score
+                report.translationByTarget = translated.byTarget
                 report.details += translated.details
             }
             for line in report.details { log("  " + line) }
             log(report.audit.summary)
-            if engine != nil { log(report.translation.summary) }
+            if engine != nil {
+                log(report.translation.summary)
+                if !report.translationByTarget.isEmpty {
+                    for line in LLMEval.translationTable(report.translationByTarget) { log("  " + line) }
+                }
+            }
             if let path = value("--report") {
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -91,7 +133,7 @@ enum LLMEvalRunner {
         }
     }
 
-    /// 前の結果と比べる。害が増えた・正しく直せた数が減った・訳の点検が悪くなったら false
+    /// 前の結果と比べる。害が増えた・正しく直せた数が減った・訳す先のどれかで訳の点検が悪くなったら false
     static func compare(_ now: Report, with before: Report) -> Bool {
         func delta(_ name: String, _ a: Int, _ b: Int) -> String { "\(name) \(b) -> \(a) (\(a >= b ? "+" : "")\(a - b))" }
         let found = now.audit.fixedAutomatically + now.audit.fixedBySuggestion
@@ -102,15 +144,23 @@ enum LLMEvalRunner {
         log("  " + delta("harmed", now.audit.harmed, before.audit.harmed)
             + ", " + delta("wrong fixes", now.audit.wrongFixes, before.audit.wrongFixes)
             + ", " + delta("false suggestions", now.audit.falseSuggestions, before.audit.falseSuggestions))
-        log("  " + delta("translated", now.translation.translated, before.translation.translated)
-            + ", " + delta("Japanese", now.translation.japanese, before.translation.japanese)
-            + ", " + delta("numbers kept", now.translation.numbersKept, before.translation.numbersKept)
-            + ", " + delta("terms kept", now.translation.termsKept, before.translation.termsKept))
+        // 翻訳は、訳す先ごとに比べる (前の結果に無い訳す先は比べない)
+        for target in now.translationByTarget.keys.sorted() {
+            guard let a = now.translationByTarget[target], let b = before.translationByTarget[target] else { continue }
+            let points = [b.chrF, a.chrF].map { $0.map { String(format: "%.2f", $0) } ?? "-" }
+            log("  \(target): " + delta("translated", a.translated, b.translated)
+                + ", " + delta("in the target language", a.inTarget, b.inTarget)
+                + ", " + delta("numbers kept", a.numbersKept, b.numbersKept)
+                + ", " + delta("terms kept", a.termsKept, b.termsKept)
+                + ", " + delta("copied", a.copied, b.copied)
+                + ", " + delta("repeated", a.repeated, b.repeated)
+                + ", chrF \(points[0]) -> \(points[1])")
+        }
+        let regressions = LLMEval.translationRegressions(now.translationByTarget, baseline: before.translationByTarget)
+        for line in regressions { log("  worse: " + line) }
         let worse = now.audit.harmed + now.audit.wrongFixes > before.audit.harmed + before.audit.wrongFixes
             || found < foundBefore
-            || now.translation.japanese < before.translation.japanese
-            || now.translation.numbersKept < before.translation.numbersKept
-            || now.translation.termsKept < before.translation.termsKept
+            || !regressions.isEmpty
         log(worse ? "RESULT: WORSE than the baseline (do not use this change)" : "RESULT: not worse than the baseline")
         return !worse
     }

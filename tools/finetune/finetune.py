@@ -326,7 +326,9 @@ def evaluate(app, gguf, candidates, eval_sets, work, cpu, base_report=None):
                 f"誤った直し {a['wrongFixes']}、正しい行を壊した数 {a['harmed']}、不要な提案 {a['falseSuggestions']}")
         if tr.get("lines"):
             # 監査の学習が、翻訳を変えてしまうことがある (固有名詞の訳が崩れるなど)。翻訳の場面も同じように比べる
-            text += (f"、訳: 日本語 {tr.get('japanese', 0)}/{tr.get('translated', 0)}・"
+            # その言語だった行 (古い結果は japanese。日本語だけを採点していた)
+            in_target = tr.get("inTarget", tr.get("japanese", 0))
+            text += (f"、訳: その言語 {in_target}/{tr.get('translated', 0)}・"
                      f"数 {tr.get('numbersKept', 0)}/{tr.get('numbersChecked', 0)}・語 {tr.get('termsKept', 0)}/{tr.get('termsChecked', 0)}")
         print(text + note)
 

@@ -1,0 +1,56 @@
+{
+ "name": "translation-mini (hand-written lines with references)",
+ "translation": [
+  {
+   "id": "mini-en-fr",
+   "language": "en",
+   "target": "fr",
+   "domain": "speech",
+   "keep": [
+    "Roblox"
+   ],
+   "lines": [
+    "Welcome to today's class about Roblox.",
+    "First, we will open a new place.",
+    "It takes about 10 minutes in total."
+   ],
+   "references": [
+    "Bienvenue au cours d'aujourd'hui sur Roblox.",
+    "D'abord, nous allons ouvrir un nouveau lieu.",
+    "Cela prend environ 10 minutes au total."
+   ]
+  },
+  {
+   "id": "mini-en-th",
+   "language": "en",
+   "target": "th",
+   "domain": "speech",
+   "lines": [
+    "Thank you all for coming today.",
+    "Please save your work often.",
+    "We sold 1500 units in the first week."
+   ],
+   "references": [
+    "ขอบคุณทุกคนที่มาในวันนี้",
+    "โปรดบันทึกงานของคุณบ่อยๆ",
+    "เราขายได้ 1500 ชิ้นในสัปดาห์แรก"
+   ]
+  },
+  {
+   "id": "mini-ja-en",
+   "language": "ja",
+   "target": "en",
+   "domain": "speech",
+   "lines": [
+    "今日は集まってくれてありがとうございます。",
+    "まず、新しい場所を開きます。",
+    "全部で約20分かかります。"
+   ],
+   "references": [
+    "Thank you for gathering here today.",
+    "First, we open a new place.",
+    "It takes about 20 minutes in total."
+   ]
+  }
+ ]
+}
