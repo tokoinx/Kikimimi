@@ -93,6 +93,28 @@ struct ContentView: View {
 /// 言語とモデルの選択、モデルの状態
 struct ModelBar: View {
     @Environment(AppModel.self) private var model
+    /// 入れていないモデルを、この Picker で選んだ時に、案内 (ポップオーバー) を出す印
+    @State private var showDownloadHint = false
+
+    /// モデルの Picker の選択。利用者がここで選んだ時だけ、入れていないモデルなら案内を出す。
+    /// (設定の画面で変えた時や、起動した時には出さないため、onChange ではなく、ここで見る)
+    private var modelSelection: Binding<String> {
+        Binding(
+            get: { model.modelID },
+            set: { newID in
+                model.modelID = newID
+                showDownloadHint = model.availability(of: model.currentModel) == .notInstalled
+            }
+        )
+    }
+
+    private var isCurrentModelNotInstalled: Bool {
+        model.availability(of: model.currentModel) == .notInstalled
+    }
+
+    private var currentModelSize: String {
+        TimeFormat.bytes(Int64(model.currentModel.approxMB) * 1_000_000)
+    }
 
     var body: some View {
         @Bindable var model = model
@@ -106,7 +128,7 @@ struct ModelBar: View {
             .frame(width: 120)
             .help("話されている言語。分かっているなら指定すると精度が上がります。日本語と英語が入れ替わる録音は「日本語＋英語」")
 
-            Picker("モデル", selection: $model.modelID) {
+            Picker("モデル", selection: modelSelection) {
                 ForEach(ModelCatalog.all) { spec in
                     Text(menuLabel(spec)).tag(spec.id)
                 }
@@ -125,9 +147,16 @@ struct ModelBar: View {
                 Button {
                     model.download(model.currentModel)
                 } label: {
-                    Label("取得 (\(TimeFormat.bytes(Int64(model.currentModel.approxMB) * 1_000_000)))", systemImage: "arrow.down.circle")
+                    // ツールバーは狭いので、文字は短くし、大きさは説明と案内に出す
+                    Label("ダウンロード", systemImage: "arrow.down.circle.fill")
+                        .labelStyle(.titleAndIcon)
                 }
-                .help("Hugging Face からモデルをダウンロードします (初回のみ)")
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+                .help("モデルをダウンロードしてください (約 \(currentModelSize)。初回のみ)。Hugging Face から取得します")
+                .popover(isPresented: $showDownloadHint, arrowEdge: .bottom) {
+                    downloadHint
+                }
             case .downloading(let fraction):
                 ProgressView(value: fraction)
                     .frame(width: 80)
@@ -136,6 +165,41 @@ struct ModelBar: View {
                     .foregroundStyle(.secondary)
             }
         }
+        // 入れていない状態でなくなったら (ダウンロードが始まった・入れてあるモデルに変えた)、印を下ろす。
+        // ボタンごと消えるので、印が残ると、次に関係の無い時に案内が出てしまう
+        .onChange(of: isCurrentModelNotInstalled) { _, notInstalled in
+            if !notInstalled { showDownloadHint = false }
+        }
+    }
+
+    /// 入れていないモデルを選んだ時の案内
+    private var downloadHint: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("モデルをダウンロードしてください")
+                .font(.headline)
+            Text("「\(model.currentModel.displayName)」は、まだダウンロードしていません (約 \(currentModelSize))。ダウンロードが済むと、文字起こしに使えます。")
+                .fixedSize(horizontal: false, vertical: true)
+            Text("ダウンロードしないままファイルを開いた時は、文字起こしの始めに自動でダウンロードします。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("あとで") {
+                    showDownloadHint = false
+                }
+                Button {
+                    model.download(model.currentModel)
+                    showDownloadHint = false
+                } label: {
+                    Label("ダウンロード", systemImage: "arrow.down.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
     }
 
     private func menuLabel(_ spec: WhisperModelSpec) -> String {
@@ -267,6 +331,8 @@ struct EmptyStateView: View {
 
                     if model.availability(of: model.currentModel) == .notInstalled {
                         VStack(spacing: 8) {
+                            Text("モデルをダウンロードしてください")
+                                .font(.headline)
                             Text("最初に音声認識モデル「\(model.currentModel.displayName)」(約 \(model.currentModel.approxMB) MB) を一度だけダウンロードします。")
                                 .font(.callout)
                             Button {
@@ -275,6 +341,7 @@ struct EmptyStateView: View {
                                 Label("モデルをダウンロード", systemImage: "arrow.down.circle")
                             }
                             .buttonStyle(.borderedProminent)
+                            .tint(.blue)
                         }
                         .padding(14)
                         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
