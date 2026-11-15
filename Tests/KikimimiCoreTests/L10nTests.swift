@@ -44,9 +44,18 @@ final class L10nTests: XCTestCase {
         // 表に無い鍵は、どの言語でも鍵のまま
         L10n.language = .ja
         XCTAssertEqual(L("No such key in any table"), "No such key in any table")
-        // 表の無い言語は、英語 (鍵) のまま
-        XCTAssertEqual(L10n.text("Japanese", in: .fr), "Japanese")
+        // 言語を指定して引く。表に無い鍵は、どの言語でも鍵 (英語) のまま
+        XCTAssertEqual(L10n.text("Japanese", in: .fr), "Japonais")
         XCTAssertEqual(L10n.text("Japanese", in: .ja), "日本語")
+        XCTAssertEqual(L10n.text("No such key in any table", in: .fr), "No such key in any table")
+    }
+
+    /// 13 言語すべてに表が在る (英語は鍵そのもの)
+    func testEveryLanguageHasATable() {
+        for language in UILanguage.allCases where language != .en {
+            XCTAssertNotEqual(L10n.text("Cancel", in: language), "Cancel", "no translation of “Cancel” in \(language.rawValue)")
+        }
+        XCTAssertEqual(L10n.text("Cancel", in: .en), "Cancel")
     }
 
     func testPositionalArguments() {

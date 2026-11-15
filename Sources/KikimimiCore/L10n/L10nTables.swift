@@ -17,6 +17,17 @@ enum L10nTables {
     /// 言語ごとの表 (鍵 = 英語、値 = その言語の訳)。英語の表は無い (鍵をそのまま出す)
     static let tables: [UILanguage: [String: String]] = [
         .ja: merged(jaParts.map(\.table)),
+        .zh: zh,
+        .ko: ko,
+        .es: es,
+        .fr: fr,
+        .de: de,
+        .it: it,
+        .pt: pt,
+        .ru: ru,
+        .vi: vi,
+        .th: th,
+        .id: id,
     ]
 
     /// 部品を 1 つの表にする (同じ鍵は先の物を使う。訳が食い違っていないかは試験が見る)
