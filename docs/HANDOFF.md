@@ -14,7 +14,7 @@
 - 作業の枝は `feature/auditor-translation`。
 - 2026-11-14: `CLAUDE.md` を、このプロジェクトの決まりに置き換えた。確かめの手順の Skill を足した。
 - 2026-11-15: `make check-ui` (アプリの確認)、CI で Xcode 16.2 が無い時に止める事、この文書を足した。
-- 最後に確かめた状態 (2026-11-14、コミット 182f088): 手元の `swift test` は 266 件で失敗 0、アプリの確認は終了コード 0。CI は Xcode 16.2 と 26.3 の 2 列とも成功。
+- 最後に確かめた状態 (2026-11-14、コミット 182f088): 手元の `swift test` は 266 件で失敗 0、アプリの確認は終了コード 0。CI は Xcode 16.2 と 26.3 の 2 列とも成功 (コミット 85c6a92 の実行でも同じ)。
 
 ## 大事な前提
 
@@ -25,8 +25,15 @@
 ## 残っている事
 
 アプリ:
-- `swift build` に、「Swift 6 の言語モードでは誤りになる」という警告が 5 か所出る (2026-11-14、手元)。`@unknown default` が無い switch: `PracticeController.swift:324`、`DictationBar.swift:105`、`AppModel.swift:940`、`WhisperSelfTest.swift:131`。Sendable: `AudioDecoder.swift:36`。直していない。
-- CI の 2026-11-14 の実行で、Xcode 16.2 の列の最後の `--selftest-whisper` の段 (失敗にしない設定) の後に `Process completed with exit code 1` が出ている。同じ注記は、26.3 の列と 2026-11-12 の実行にも在る (どの段かは見ていない)。原因は調べていない。
+- `swift build` に、「Swift 6 の言語モードでは誤りになる」という警告が 5 か所出る (直していない。文は、CI の Xcode 16.2 の列の記録から写した)。
+  - 4 か所は `@unknown default` の無い switch: `PracticeController.swift:324` (`LineSequencer.Action`)、`DictationBar.swift:105` (`DictationDisplay.Style`)、`AppModel.swift:940` と `WhisperSelfTest.swift:131` (`TranscriptionStage`)。元は、`Package.swift` が KikimimiCore を `-enable-library-evolution` で作っている事 (その公開の enum は、アプリ本体から「後で case が増えうる型」に見える)。
+  - 残る 1 か所は `AudioDecoder.swift:36`: Sendable でない `[AVAssetTrack]` を、`DispatchQueue.global().async` の中へ持ち込んでいる。
+  - アプリ本体は Swift 5 の言語モードなので、今は警告で済んでいる。
+- CI の `Process completed with exit code 1` は、「Launch while a self-test is running」の段 (失敗にしない設定) が出している。`open` の後、30 秒待っても `build/launch-busy.txt` ができず、`cat` が失敗する。段を足した 2026-11-09 から、見た 4 回の実行 (11-09・11-10・11-12・11-14) の 2 列すべてで同じ。
+  - ファイルができない理由は、CI の記録からは決められない (`open` の後の様子を、この段が何も出していない)。
+  - 手元 (macOS 14.8.3・M1、2026-11-15) で見た事: 確認用の文字起こしの実行中でも、`open` は新しく起動する。Metal の準備が初回の時は、起動の確認が結果を書くまで 26〜51 秒かかる (2 回目からは 5 秒)。`LaunchSelfTest.arm` は、止まった時の見張りを仕掛ける前に whisper.cpp / llama.cpp の情報を取るので、そこで待っている間は結果が書かれない。
+  - CI では、前の段で Metal の準備が 0.01〜0.04 秒になっている。手元の遅さでは CI を説明できない。
+  - 2026-11-15 に、この段へ、待った後の様子 (プロセスの一覧・起動の記録の末尾・裏の実行の記録の末尾・起動したアプリの `sample` の初め) を出す行を足した。理由は、その後の実行の記録で読む。
 
 エージェントの仕事の仕組み:
 - 結果の一覧の決まり (`CLAUDE.md`) を、書き方で見る検査は無い。破った時の重さは、`make check-ui` と CI の 3000 行の確認が測る。
