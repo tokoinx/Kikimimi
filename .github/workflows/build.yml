@@ -79,8 +79,9 @@ jobs:
           codesign --verify --strict --verbose=2 "$APP"
 
       # whisper.cpp / llama.cpp は、初めて使う時に Metal のシェーダーを作る (新しい実行環境では 40 秒ほど)。
-      # 先に 1 度済ませて、macOS のキャッシュに残しておく。済ませておかないと、下の起動の確認 (5 秒で終わる) の結果に、
-      # 2 つの情報が「(not ready after N s)」と出る
+      # 済ませておかないと、下の起動の確認 (5 秒で終わる) の結果に、2 つの情報が「(not ready after N s)」と出る。
+      # アプリを作る台本 (build-app.sh) が、入れ替えた後の置き場から --version を走らせて済ませているので、ここはすぐ終わる。
+      # 台本を変えた時にも結果に情報が出るよう、この段は残してある
       - name: Prepare the Metal shaders (first use of whisper.cpp / llama.cpp)
         run: build/Kikimimi.app/Contents/MacOS/Kikimimi --version
 
