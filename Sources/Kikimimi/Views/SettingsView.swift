@@ -22,7 +22,8 @@ struct SettingsView: View {
         // 画面の言語を変えた時の、開き直しの案内 (新しく選んだ言語の文で出す。
         // 設定の画面は言語を変えると作り直すので、出すかどうかは AppModel が持つ)
         .alert(L("The display language was changed"), isPresented: $model.showsLanguageChangedAlert) {
-            if model.isBusy {
+            // バンドルでない起動 (swift run など) では開き直せないので、ボタンを出さない
+            if model.isBusy || !AppDelegate.canReopen {
                 Button(L("OK")) {}
             } else {
                 Button(L("Reopen now")) { AppDelegate.shared?.reopenApp() }
@@ -54,9 +55,11 @@ struct GeneralSettingsForm: View {
                         Text(L("The text on screen has already changed. Standard menu bar items (Edit, Window, and so on) change when you reopen Kikimimi."))
                             .font(.callout)
                             .fixedSize(horizontal: false, vertical: true)
-                        Button(L("Reopen now")) { AppDelegate.shared?.reopenApp() }
-                            .disabled(model.isBusy)
-                        if model.isBusy {
+                        if AppDelegate.canReopen {
+                            Button(L("Reopen now")) { AppDelegate.shared?.reopenApp() }
+                                .disabled(model.isBusy)
+                        }
+                        if model.isBusy && AppDelegate.canReopen {
                             Text(L("Work is in progress (transcription, audit, translation, recording, or download). You can reopen after it finishes."))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)

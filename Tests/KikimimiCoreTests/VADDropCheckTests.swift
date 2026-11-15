@@ -75,7 +75,24 @@ final class VADDropCheckTests: XCTestCase {
         let same = [TranscriptSegment(start: 0, end: 1, text: "あいうab")]
         let more = [TranscriptSegment(start: 0, end: 1, text: "あいうえおか")]
         XCTAssertFalse(VADDropCheck.prefersRetry(first: first, retry: same), "the same count keeps the first result")
-        XCTAssertTrue(VADDropCheck.prefersRetry(first: first, retry: more))
+        XCTAssertFalse(VADDropCheck.prefersRetry(first: first, retry: more), "one more letter is not clearly more")
         XCTAssertFalse(VADDropCheck.prefersRetry(first: more, retry: first))
+    }
+
+    /// やり直した結果を採るのは、文字の数が初めの 1.5 倍以上、かつ 20 字以上多い時だけ
+    func testRetryIsUsedOnlyWhenItHasClearlyMoreLetters() {
+        func letters(_ n: Int) -> [TranscriptSegment] {
+            n == 0 ? [] : [TranscriptSegment(start: 0, end: 1, text: String(repeating: "あ", count: n))]
+        }
+        // 実機の歌: 7 字 → 209 字
+        XCTAssertTrue(VADDropCheck.prefersRetry(first: letters(7), retry: letters(209)))
+        // 雑音から少し足しただけ: 500 字 → 560 字 (60 字多いが 1.5 倍に届かない)
+        XCTAssertFalse(VADDropCheck.prefersRetry(first: letters(500), retry: letters(560)))
+        // 何も無い → 15 字 (20 字に届かない)
+        XCTAssertFalse(VADDropCheck.prefersRetry(first: letters(0), retry: letters(15)))
+        XCTAssertTrue(VADDropCheck.prefersRetry(first: letters(0), retry: letters(30)))
+        // 境目: 40 字 → 60 字 (ちょうど 1.5 倍、ちょうど 20 字多い) は採る
+        XCTAssertTrue(VADDropCheck.prefersRetry(first: letters(40), retry: letters(60)))
+        XCTAssertFalse(VADDropCheck.prefersRetry(first: letters(40), retry: letters(59)))
     }
 }

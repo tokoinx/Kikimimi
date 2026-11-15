@@ -891,7 +891,8 @@ final class AppModel {
         guard let url = job.url else { return }
         // 置き換える文字起こしの監査・翻訳は止める (待っていると、やり直しがその後ろに回る。反映済みの結果は残す)
         cancelPost(job)
-        let again = Job(name: job.name, url: url)
+        // 録音から作った結果は、やり直しても録音の印を残す (結果をゴミ箱に入れる時、録音もゴミ箱へ移すため)
+        let again = Job(name: job.name, url: url, isRecording: job.isRecording)
         again.languageCode = code
         again.allowsAutoMixed = autoMixed
         again.vadOverride = vad
@@ -917,10 +918,11 @@ final class AppModel {
     /// その結果だけの指定で、もう一度文字起こしする (新しいジョブ。元の結果は残す。設定は変えない)。
     /// - Parameters:
     ///   - code: 言語。nil なら、元のジョブと同じ言語 (使った言語)
-    ///   - vad: 無音を飛ばす (VAD)。nil = 設定に従う、true = 使う (自動で VAD なしでやり直さない)、false = 使わない
+    ///   - vad: 無音を飛ばす (VAD)。nil = 元のジョブと同じ (元のジョブにも指定が無ければ設定に従う)、
+    ///     true = 使う (自動で VAD なしでやり直さない)、false = 使わない
     func redo(_ job: Job, languageCode code: String? = nil, vad: Bool? = nil) {
         guard canRedo(job) else { return }
-        retranscribe(job, languageCode: code ?? job.languageCode, autoMixed: job.allowsAutoMixed, vad: vad)
+        retranscribe(job, languageCode: code ?? job.languageCode, autoMixed: job.allowsAutoMixed, vad: vad ?? job.vadOverride)
     }
 
     func select(_ job: Job?) {
@@ -1463,6 +1465,13 @@ final class AppModel {
                 }
 
             case .translate:
+                // 「〇〇語で訳し直す」を中止した・失敗した (訳が 1 つも無い) 時は、訳す先の記録を外す
+                // (残すと、設定の言語を変えても、この結果はその言語で訳し続ける)。録音のための一時停止では残す (続きで使う)
+                defer {
+                    if !job.pausedForRecording, var t = job.transcript, t.clearTranslationLanguageIfUntranslated() {
+                        job.transcript = t
+                    }
+                }
                 guard useLLM else { return }
                 if pauseIfRecording(.translate, job: job) { return }
                 job.postState = .running(.translate, message: preparing ? L("Translating… (loading the LLM)") : L("Translating…"), progress: nil)

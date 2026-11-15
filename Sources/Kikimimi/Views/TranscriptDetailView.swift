@@ -91,8 +91,10 @@ struct TranscriptDetailView: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
                 }
-                // 設定の訳す先と違う言語に訳してある結果: 訳し直せることを知らせる (訳が在り、LLM が在る時だけ)
-                if job.status == .done, stats.hasTranslation, target != model.translationLanguage, model.isLLMInstalled,
+                // 設定の訳す先と違う言語に訳してある結果: 訳し直せることを知らせる (訳が在り、LLM が在る時だけ)。
+                // 訳がまだ無くても、訳す先の記録が残っている結果 (訳し直しの途中で終了した、など) にも出す (ほかに直す道が無い)
+                if job.status == .done, stats.hasTranslation || transcript.translationLanguage != nil,
+                   target != model.translationLanguage, model.isLLMInstalled,
                    !job.translationLanguageNoticeDismissed {
                     TranslationLanguageNotice(job: job, current: target, setting: model.translationLanguage)
                         .padding(.horizontal, 20)

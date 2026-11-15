@@ -227,6 +227,67 @@ final class TranslationTargetTests: XCTestCase {
         XCTAssertEqual(t.segments.map(\.text), ["Hello.", "World."])
     }
 
+    /// 訳を全部外すと、監査の直しが覚えている直す前の区間の訳も外れる (直しを元に戻しても、前の言語の訳が戻らない)
+    func testRemovingAllTranslationsAlsoClearsTheAuditSnapshots() {
+        var t = Transcript(sourceName: "a", segments: [seg(0, "Hello."), seg(3, "Um um um."), seg(6, "World.")], language: "en")
+        t.segments[0].translation = "こんにちは。"
+        t.segments[1].translation = "えーと。"
+        t.segments[2].translation = "世界。"
+        t.translationLanguage = "ja"
+        let fix = AuditChange(kind: .fix, origin: .rule, original: t.segments[0], replacement: "Hullo.", reason: "r", isConfident: true)
+        let delete = AuditChange(kind: .delete, origin: .rule, original: t.segments[1], reason: "r", isConfident: true)
+        t.adopt(AuditReport(changes: [fix, delete], model: nil, reviewedCount: 3))
+        XCTAssertEqual(t.segments.count, 2)
+        t.removeAllTranslations()
+        t.translationLanguage = "en"
+        XCTAssertTrue(t.audit?.changes.allSatisfy { $0.original.translation == nil && $0.original.translationCovers == nil } ?? false)
+        func noTranslation(_ step: String) {
+            XCTAssertTrue(t.segments.allSatisfy { $0.translation == nil }, step)
+        }
+        t.setChange(fix.id, applied: false)
+        noTranslation("fix turned off")
+        t.setChange(delete.id, applied: false)
+        noTranslation("delete turned off")
+        XCTAssertEqual(t.segments.count, 3)
+        t.setChange(fix.id, applied: true)
+        t.setChange(delete.id, applied: true)
+        t.revertAllChanges()
+        noTranslation("revert all")
+        // 監査をやり直して、前の直しが出なかった
+        t.adopt(AuditReport(changes: [], model: nil, reviewedCount: 3))
+        noTranslation("audit again")
+        XCTAssertEqual(t.segments.map(\.text), ["Hello.", "Um um um.", "World."])
+    }
+
+    /// 訳が 1 つも無いのに残った訳す先の記録 (訳し直しを中止した) は外し、設定の言語に戻す
+    func testClearingAPendingTranslationLanguage() {
+        var t = Transcript(sourceName: "a", segments: [seg(0, "Hello.")], language: "en")
+        t.translationLanguage = "fr"
+        XCTAssertTrue(t.clearTranslationLanguageIfUntranslated())
+        XCTAssertNil(t.translationLanguage)
+        XCTAssertEqual(t.translationTarget(default: "de"), "de")
+        XCTAssertFalse(t.clearTranslationLanguageIfUntranslated())
+        // 訳が在る時は外さない
+        t.segments[0].translation = "Bonjour."
+        t.translationLanguage = "fr"
+        XCTAssertFalse(t.clearTranslationLanguageIfUntranslated())
+        XCTAssertEqual(t.translationLanguage, "fr")
+    }
+
+    /// 中国語の訳の「・」「ー」と、句読点だけ違う写しは、捨てない
+    func testPlausibilityIgnoresKanaMarksAndPunctuationOnlyCopies() {
+        XCTAssertTrue(Translator.isPlausible("史蒂夫・乔布斯", source: "スティーブ・ジョブズ", target: "zh"))
+        XCTAssertTrue(Translator.isPlausible("史蒂夫·乔布斯", source: "スティーブ・ジョブズ", target: "zh"))
+        XCTAssertTrue(Translator.isPlausible("咖啡ー杯", source: "コーヒー一杯", target: "zh"))
+        XCTAssertFalse(Translator.isPlausible("これは日本語です", source: "This is Japanese.", target: "zh"))
+        XCTAssertFalse(Translator.isPlausible("スーパー", source: "Supermarket", target: "zh"))
+        XCTAssertTrue(Translator.isPlausible("NVIDIA", source: "NVIDIA.", target: "ko"))
+        XCTAssertTrue(Translator.isPlausible("Hello there", source: "Hello there!", target: "ko"))
+        XCTAssertTrue(Translator.isPlausible("Roblox Studio", source: "Roblox Studio!", target: "th"))
+        XCTAssertFalse(Translator.isPlausible("Bonjour", source: "Hello", target: "ko"))
+        XCTAssertFalse(Translator.isPlausible("Hello", source: "Hello there", target: "ru"))
+    }
+
     func testOldJSONHasNoTranslationLanguage() throws {
         let old = #"{"sourceName":"a","segments":[],"duration":1,"elapsed":0,"translationModel":"m"}"#
         let t = try JSONDecoder().decode(Transcript.self, from: Data(old.utf8))

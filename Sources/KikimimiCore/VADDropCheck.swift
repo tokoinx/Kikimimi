@@ -120,9 +120,16 @@ public enum VADDropCheck {
         }
     }
 
-    /// やり直した結果を採るか (文字の数が多いほう。同じなら初めの結果)
+    /// やり直した結果を採る条件: やり直した結果の文字の数が、初めの結果のこの倍以上、かつ、この字数以上多い。
+    /// 静かな話し声に続く雑音が在る録音では、判定 (`assess`) が誤って働く事がある。その時、VAD なしの結果が
+    /// 雑音から少し文字を足しただけで採られないようにする (実機の歌では 7 字 → 209 字だったので、これで採られる)
+    public static let retryMinimumRatio = 1.5
+    public static let retryMinimumExtraLetters = 20
+
+    /// やり直した結果を採るか (文字の数が、はっきり多い時だけ。決め方は `retryMinimumRatio`・`retryMinimumExtraLetters`)
     public static func prefersRetry(first: [TranscriptSegment], retry: [TranscriptSegment]) -> Bool {
-        letterCount(of: retry) > letterCount(of: first)
+        let a = letterCount(of: first), b = letterCount(of: retry)
+        return Double(b) >= Double(a) * retryMinimumRatio && b >= a + retryMinimumExtraLetters
     }
 
     private static func merge(_ ranges: [ClosedRange<Double>]) -> [ClosedRange<Double>] {

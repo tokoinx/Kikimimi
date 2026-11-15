@@ -132,18 +132,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 開き直している (終了の前の確認を出さない)
     private var reopening = false
 
+    /// 開き直せるか: .app のバンドルから起動した時だけ (バンドルでない起動 (swift run など) で開くと、Finder でフォルダが開く)
+    static var canReopen: Bool { Bundle.main.bundleURL.pathExtension == "app" }
+
     /// アプリを開き直す (画面の言語を変えた後、macOS が出す決まりのメニューも今の言語にするため)。
     /// 順: 作業の途中でない事を確かめる → 待っている保存を書き終える → 「このアプリが終わってから開く」小さな命令を外に出す → 終える。
     /// 新しいアプリは、今のアプリが終わってから開くので、ライブラリを読むのは、保存を全部書き終えた後になる
     func reopenApp() {
+        guard Self.canReopen else {
+            LaunchLog.note("reopen: not running from an .app bundle")
+            return
+        }
         guard !reopening, !isBusy() else { return }
         flushLibrary()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        // 今のアプリが終わるまで待ち (長くて 10 秒)、少し置いてから開く
+        // 今のアプリが終わるまで待ち (長くて 60 秒)、少し置いてから、新しいアプリとして開く。
+        // 待っても終わらない時は開かない (open が、終わりかけの今のアプリを前に出すだけになり、そのまま閉じてしまうため)
         process.arguments = [
             "-c",
-            "i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done; sleep 0.3; /usr/bin/open \"$2\"",
+            "i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 600 ]; do sleep 0.1; i=$((i+1)); done; "
+                + "kill -0 \"$1\" 2>/dev/null && exit 0; sleep 0.3; /usr/bin/open -n \"$2\"",
             "sh",
             String(ProcessInfo.processInfo.processIdentifier),
             Bundle.main.bundleURL.path

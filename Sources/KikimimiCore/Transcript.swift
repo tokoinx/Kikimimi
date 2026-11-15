@@ -116,14 +116,32 @@ public struct Transcript: Codable, Hashable, Sendable {
         hasTranslation ? (translationLanguage ?? "ja") : fallback
     }
 
-    /// 訳を全部外す (訳す先を変えて訳し直す時に使う)。訳したモデルと言語の記録も消す
+    /// 訳を全部外す (訳す先を変えて訳し直す時に使う)。訳したモデルと言語の記録も消す。
+    /// 監査の直しが覚えている直す前の区間の訳も外す (直しを元に戻した時に、前の言語の訳が戻らないように)
     public mutating func removeAllTranslations() {
         for i in segments.indices {
             segments[i].translation = nil
             segments[i].translationCovers = nil
         }
+        if var report = audit {
+            for i in report.changes.indices {
+                report.changes[i].original.translation = nil
+                report.changes[i].original.translationCovers = nil
+            }
+            audit = report
+        }
         translationModel = nil
         translationLanguage = nil
+    }
+
+    /// 訳が 1 つも無いのに残っている、訳す先の記録を外す (「〇〇語で訳し直す」を中止した・失敗した時。
+    /// 訳の無い結果は、設定の言語で訳す)。外したら true
+    @discardableResult
+    public mutating func clearTranslationLanguageIfUntranslated() -> Bool {
+        guard translationLanguage != nil, !hasTranslation else { return false }
+        translationLanguage = nil
+        translationModel = nil
+        return true
     }
 
     /// 翻訳の状況 (画面の表示に使う。区間を 1 回だけ見て数える)

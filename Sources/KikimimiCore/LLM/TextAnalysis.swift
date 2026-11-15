@@ -137,6 +137,14 @@ public enum Script {
         text.unicodeScalars.contains { isKana($0.value) }
     }
 
+    /// かなの範囲に在るが、かなの文字ではない記号 (中黒「・」と長音「ー」、その半角)
+    private static let kanaMarks: Set<UInt32> = [0x30FB, 0x30FC, 0xFF65, 0xFF70]
+
+    /// かなの文字を含むか (中黒「・」と長音「ー」は数えない。中国語の訳でも、名前の区切りとして原文から写される事がある)
+    public static func hasKanaLetters(_ text: String) -> Bool {
+        text.unicodeScalars.contains { isKana($0.value) && !kanaMarks.contains($0.value) }
+    }
+
     /// その言語の文字を含むか (ko: ハングル、ru: キリル文字、th: タイ文字。ほかの言語は、いつも false)。訳の検査に使う
     static func hasLetters(_ text: String, of language: String) -> Bool {
         let ranges: [ClosedRange<UInt32>]

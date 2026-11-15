@@ -226,17 +226,24 @@ public enum Translator {
         guard !t.isEmpty, t.count <= source.count * 6 + 60 else { return false }
         switch target {
         case "ko", "ru", "th":
-            // その言語の文字が 1 つも無い訳は捨てる。ただし、原文をそのまま写したもの (名前だけの行など) は受け取る
+            // その言語の文字が 1 つも無い訳は捨てる。ただし、原文をそのまま写したもの (名前だけの行など) は受け取る。
+            // 写したかは、文字と数字だけで比べる (「NVIDIA.」を「NVIDIA」と写した時のように、句読点だけ違っても写し)
             let s = source.trimmingCharacters(in: .whitespacesAndNewlines)
-            if Script.hasLetters(s), !Script.hasLetters(t, of: target), t != s { return false }
+            if Script.hasLetters(s), !Script.hasLetters(t, of: target), lettersAndDigits(t) != lettersAndDigits(s) { return false }
             return true
         case "zh":
-            // 簡体字の訳に、かなが入っていたら日本語に流れている
-            return !Script.hasKana(t)
+            // 簡体字の訳に、かなが入っていたら日本語に流れている (中黒「・」と長音「ー」は、かなと数えない)
+            return !Script.hasKanaLetters(t)
         default:
             // ラテン文字の言語は、文字の種類を見ない (原文と同じ文字なので、見分けられない)
             return true
         }
+    }
+
+    /// 文字と数字だけを残した文 (句読点・記号・空白を外す)。訳が原文の写しかを見るのに使う
+    static func lettersAndDigits(_ text: String) -> String {
+        let kept = CharacterSet.letters.union(.decimalDigits)
+        return String(String.UnicodeScalarView(text.unicodeScalars.filter { kept.contains($0) }))
     }
 
     /// まだ訳していない区間を、文ごとに訳す。1 まとまり訳すごとに onChunk を呼ぶ (done / total は区間の数)。
