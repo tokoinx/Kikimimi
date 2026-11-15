@@ -11,12 +11,13 @@ struct DeleteConfirmSheet: View {
     var body: some View {
         let plan = model.deletionPlan(for: job)
         VStack(alignment: .leading, spacing: 14) {
-            Text("「" + job.name + "」をゴミ箱に入れますか？")
+            // 保存していない結果は、ディスクから何も消えないので、「一覧から外す」と言う
+            Text("「" + job.name + "」を" + (plan.isEmpty ? "一覧から外しますか？" : "ゴミ箱に入れますか？"))
                 .font(.headline)
                 .lineLimit(2)
                 .truncationMode(.middle)
             if plan.stopsWork {
-                Text(workText + "の途中です。作業を止めてから、ゴミ箱に入れます。")
+                Text(workText + "の途中です。作業を止めてから、" + (plan.isEmpty ? "一覧から外します。" : "ゴミ箱に入れます。"))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -148,11 +148,18 @@ struct ModelBar: View {
                     model.download(model.currentModel)
                 } label: {
                     // ツールバーは狭いので、文字は短くし、大きさは説明と案内に出す
+                    // ツールバーの中では、ボタンの形の指定 (borderedProminent・tint) が効かず、灰色のボタンになる
+                    // (実機で見た)。青い地と白い字を、ここで自分で描く
                     Label("ダウンロード", systemImage: "arrow.down.circle.fill")
                         .labelStyle(.titleAndIcon)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.blue, in: RoundedRectangle(cornerRadius: 6))
+                        .contentShape(RoundedRectangle(cornerRadius: 6))
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
+                .buttonStyle(.plain)
                 .help("モデルをダウンロードしてください (約 \(currentModelSize)。初回のみ)。Hugging Face から取得します")
                 .popover(isPresented: $showDownloadHint, arrowEdge: .bottom) {
                     downloadHint

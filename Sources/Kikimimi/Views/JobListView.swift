@@ -33,6 +33,7 @@ struct JobListView: View {
                     }
             }
         }
+        // 一覧での delete キーは、PlaybackKeys (KikimimiApp.swift) が受ける
         .listStyle(.sidebar)
         // 結果が在る時も、落として読み込める事が分かるように、一覧の下に案内を出す
         .safeAreaInset(edge: .bottom) {
@@ -45,8 +46,6 @@ struct JobListView: View {
                 .padding(.vertical, 6)
         }
         .navigationTitle("ききみみ")
-        // 一覧で Delete キー
-        .onDeleteCommand { model.requestDelete(model.selectedJob) }
         // ゴミ箱に入れるかを確かめる画面 (右クリック・ツールバー・メニュー・Delete キー)
         .sheet(isPresented: Binding(
             get: { model.pendingDeleteJobID != nil },

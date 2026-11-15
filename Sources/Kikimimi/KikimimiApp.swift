@@ -230,10 +230,35 @@ enum PlaybackKeys {
 
     nonisolated private static func handler(model: AppModel) -> (NSEvent) -> NSEvent? {
         return { event in
-            guard !event.isARepeat, let key = playbackKey(of: event), let window = event.window else { return event }
+            guard !event.isARepeat, let window = event.window else { return event }
+            if isDeleteKey(event) {
+                let used = MainActor.assumeIsolated { handleDelete(in: window, model: model) }
+                return used ? nil : event
+            }
+            guard let key = playbackKey(of: event) else { return event }
             let used = MainActor.assumeIsolated { handle(key, in: window, model: model) }
             return used ? nil : event
         }
+    }
+
+    /// 修飾キーなしで押した、delete (⌫ 51)・前へ消す delete (⌦ 117)。
+    /// ⌦ には、押しただけで function の印が付くので、それは除いて見る
+    nonisolated private static func isDeleteKey(_ event: NSEvent) -> Bool {
+        guard event.keyCode == 51 || event.keyCode == 117 else { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
+        return flags.subtracting([.numericPad, .function]).isEmpty
+    }
+
+    /// 左の結果の一覧を触っているあいだの delete キー: 選んでいる結果を、ゴミ箱に入れるかの確かめの画面に出す。
+    /// (一覧に付けた onDeleteCommand・onKeyPress は、実機で効かなかったので、ここで受ける。)
+    /// 文字を入力している欄では、ふつうにキーを渡す
+    private static func handleDelete(in window: NSWindow, model: AppModel) -> Bool {
+        guard window.attachedSheet == nil,
+              MainWindow.all().contains(where: { $0 === window }),
+              window.firstResponder is NSTableView,
+              let job = model.selectedJob, !model.isRecording else { return false }
+        model.requestDelete(job)
+        return true
     }
 
     /// 修飾キーなしで押した、スペース (49)・下 (125)・上 (126)・左 (123) の矢印。
