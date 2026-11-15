@@ -45,6 +45,12 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | 7 | 保存の確認に失敗 | `LIBRARY CHECK FAILED: …` |
 | 8 | 練習の確認に失敗 | `PRACTICE CHECK FAILED: …` |
 
+- 保存の確認 (LIBRARY CHECK) の各段は `LIBRARY: <段の名前>: ok (…)` か `FAILED (…)` の 1 行で出る。訳に関わる段 (2026-11-16 に足した):
+  - `rows with edited and flagged translations`: 対訳のジョブに、直した行と要確認の行が両方在る (3000 行なら、それぞれ 125)。
+  - `count rows that need review`: 「要確認 N」の数 (行を作る時に数えた物) と、結果の覚えの数が同じ。
+  - `confirm a flagged translation through the model`: 「この訳でよい」で印が消え、覚えの出どころが `confirmed` になる (符号は残る)。
+  - `the self-test does not use the real translation memory`: 確認用の起動は、利用者の本物の訳の記憶 (`translation-memory.json`) を読まず・書かない。
+  - `edit a translation through the model` → `reuse a remembered translation without the LLM` → `restore the machine translation through the model`: 一時の記憶で、訳を直すと記憶が 1 件、記憶に在る文が LLM なしで入る (覚えが `memory`)、機械の訳に戻すと記憶が 0 件。
 - 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 の順)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
@@ -60,7 +66,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 
 ## 5. 絵の見方 (`build/ui-shots`)
 
-各絵は 1200 x 800 pt のウインドウ (タイトルバーつき。Retina の Mac では 2400x1600 画素)。08 と 11 はシートそのものを撮るので小さく、ウインドウは写らない。出力の `UI LOAD: screenshot <名前>.png <幅>x<高さ> (…)` の行で、できたかが分かる。
+各絵は 1200 x 800 pt のウインドウ (タイトルバーつき。Retina の Mac では 2400x1600 画素)。08・11・12・13 はシートそのものを撮るので小さく、ウインドウは写らない。出力の `UI LOAD: screenshot <名前>.png <幅>x<高さ> (…)` の行で、できたかが分かる。
 
 | 絵 | 写っているべき物 |
 |---|---|
@@ -75,6 +81,8 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | `09-practice-hidden.png` | 英語の原文が灰色の帯で隠れ、目のボタンで 1 行だけ見えている。「練習」のボタンに色 |
 | `10-dictation.png` | 下に書き取りの欄。答え合わせで 1 語が赤の取り消し線、1 語が抜け (`[…]`)、右に「n / m 語」 |
 | `11-delete-confirm.png` | ゴミ箱に入れるかの確認の画面 (07・08 の後に撮る)。「ゴミ箱に入れるもの」に保存のフォルダのパス、「残るもの」に元の音声ファイルのパス、「キャンセル」と「ゴミ箱に入れる」 |
+| `12-translation-edit.png` | 訳を直す画面 (直した訳の行を開いたところ。08 の後、11 の前に撮る)。機械の訳と「機械の訳に戻す」 |
+| `13-translation-check.png` | 要確認の行を開いた、訳を直す画面。上に理由の行と「この訳でよい」 |
 
 - 変えた画面に関わる絵を Read で開いて見る。絵の場面ごとの注意 (`… may show no playing tint` など) が出力に在れば、その絵は特に見る。
 
