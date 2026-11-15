@@ -253,10 +253,17 @@ public enum Translator {
         TranslationExamples.examples(for: target)
     }
 
-    static func userPrompt(lines: [String], context: [(source: String, translation: String)], glossary: String?) -> String {
+    /// 指示文の user の部分。terms (訳語の対) は、この 1 回に送る行に出る物だけを渡す (`checkedTranslateLines`)。
+    /// terms が空の時は、対を入れる前の指示文と 1 字も変わらない (評価の前後を比べるため)
+    static func userPrompt(lines: [String], context: [(source: String, translation: String)], glossary: String?,
+                           terms: [TermPair] = []) -> String {
         var parts: [String] = []
-        if let g = glossary?.trimmingCharacters(in: .whitespacesAndNewlines), !g.isEmpty {
+        if let g = glossaryText(glossary, without: terms) {
             parts.append("Glossary (keep exactly as written): \(g)")
+        }
+        if !terms.isEmpty {
+            parts.append("Terms (always translate the left as the right):\n"
+                + terms.map { "\($0.source) => \($0.translation)" }.joined(separator: "\n"))
         }
         if !context.isEmpty {
             parts.append("Previous lines, already translated (context only, do not output):\n"
@@ -264,6 +271,20 @@ public enum Translator {
         }
         parts.append("Lines to translate:\n" + lines.enumerated().map { "[\($0.offset + 1)] \($0.element)" }.joined(separator: "\n"))
         return parts.joined(separator: "\n\n")
+    }
+
+    /// 指示文に書く用語集 (空なら nil)。訳語の対の原語と同じ語 (大文字と小文字は区別しない) は外す:
+    /// 用語集は「そのまま書く」語、対は「訳語に訳す」語で、両方に在ると指示が食い違うため。
+    /// 外す語が無い時は、用語集の文をそのまま返す (区切りを書き直さない)。外す時は、「,」「、」・改行で分けて「, 」でつなぎ直す
+    static func glossaryText(_ glossary: String?, without terms: [TermPair]) -> String? {
+        guard let g = glossary?.trimmingCharacters(in: .whitespacesAndNewlines), !g.isEmpty else { return nil }
+        guard !terms.isEmpty else { return g }
+        let drop = Set(terms.map { $0.source.lowercased() })
+        let items = g.split(whereSeparator: { $0 == "," || $0 == "、" || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        guard items.contains(where: { drop.contains($0.lowercased()) }) else { return g }
+        let kept = items.filter { !drop.contains($0.lowercased()) }
+        return kept.isEmpty ? nil : kept.joined(separator: ", ")
     }
 
     /// 答えを読む (番号は 1 始まり)
@@ -400,6 +421,11 @@ public enum Translator {
                 }
             }
         }
+        // 訳語の対 (訳す先が同じ写しの物だけ)。送る行・関門には、その原文に出る物だけを使う
+        let termPairs = memory.map { $0.target == TranslationMemory.normalizedTarget(target) ? $0.terms : [] } ?? []
+        func unitTerms(_ u: Int) -> [(source: String, translation: String)] {
+            TermPair.matching(termPairs, in: sources[u]).map { (source: $0.source, translation: $0.translation) }
+        }
         let toLLM = units.indices.filter { remembered[$0] == nil }
         var summary = TranslationRunSummary(fromMemory: remembered.count)
         let chunks: [[Int]]
@@ -448,15 +474,16 @@ public enum Translator {
             let context = known.filter { $0.position < first }.suffix(options.contextLines)
                 .map { (source: $0.source, translation: $0.translation) }
             var results = try checkedTranslateLines(chunk.map { sources[$0] }, context: Array(context), language: source,
-                                                    target: target, system: system, options: options, generator: generator,
-                                                    shouldCancel: shouldCancel)
+                                                    target: target, system: system, options: options, terms: termPairs,
+                                                    generator: generator, shouldCancel: shouldCancel)
             // 読めなかった行は 1 行ずつ訳し直す (理由は、最後に試した時の物)
             if chunk.count > 1 {
                 for k in chunk.indices where results[k].text == nil {
                     if shouldCancel() { throw LLMError.cancelled }
                     results[k] = try checkedTranslateLines([sources[chunk[k]]], context: Array(context), language: source,
                                                            target: target, system: system, options: options,
-                                                           generator: generator, shouldCancel: shouldCancel)[0]
+                                                           terms: termPairs, generator: generator,
+                                                           shouldCancel: shouldCancel)[0]
                 }
             }
             var batch: [TranslationResult] = []
@@ -467,7 +494,7 @@ public enum Translator {
                 if var t = results[k].text {
                     // 通った訳は、関門に掛けて印を付ける。訳の後ろが抜けた (short) 時だけ、文に分けて 1 回訳し直す
                     var finding = TranslationGate.assess(source: sources[u], translation: t, sourceLanguage: unitLanguage(u),
-                                                         target: target)
+                                                         target: target, terms: unitTerms(u))
                     if options.splitRetry, finding.flags.contains(TranslationGate.short) {
                         if shouldCancel() { throw LLMError.cancelled }
                         // 文脈は、このまとまりの前の物 (同じまとまりの初めの訳と同じ決め方)
@@ -475,8 +502,8 @@ public enum Translator {
                             .suffix(options.contextLines).map { (source: $0.source, translation: $0.translation) }
                         if let retry = try splitRetry(source: sources[u], sourceLanguage: unitLanguage(u),
                                                       promptLanguage: source, target: target, system: system,
-                                                      context: Array(before), options: options, generator: generator,
-                                                      shouldCancel: shouldCancel) {
+                                                      context: Array(before), options: options, terms: termPairs,
+                                                      generator: generator, shouldCancel: shouldCancel) {
                             summary.retried += 1
                             summary.retryCalls += retry.calls
                             summary.retryLines += retry.lines
@@ -527,7 +554,7 @@ public enum Translator {
     /// かけらの 1 つでも訳せなかった (受け取れなかった・返らなかった) 時は、text は nil
     static func splitRetry(source: String, sourceLanguage: String?, promptLanguage: String?, target: String,
                            system: String, context: [(source: String, translation: String)],
-                           options: TranslationOptions, generator: any TextGenerating,
+                           options: TranslationOptions, terms: [TermPair] = [], generator: any TextGenerating,
                            shouldCancel: () -> Bool) throws -> SplitRetry? {
         let pieces = sentencePieces(source, language: sourceLanguage)
         guard pieces.count >= 2 else { return nil }
@@ -537,8 +564,9 @@ public enum Translator {
         var texts: [String?] = []
         for chunk in chunks {
             if shouldCancel() { throw LLMError.cancelled }
+            // かけらにも、そのかけらに出る訳語の対を渡す (checkedTranslateLines が、送る行に出る物だけを選ぶ)
             let outcomes = try checkedTranslateLines(chunk.map { pieces[$0] }, context: context, language: promptLanguage,
-                                                     target: target, system: system, options: options,
+                                                     target: target, system: system, options: options, terms: terms,
                                                      generator: generator, shouldCancel: shouldCancel)
             texts += outcomes.map(\.text)
         }
@@ -547,7 +575,9 @@ public enum Translator {
         guard parts.count == pieces.count else { return result }
         let joined = joinTranslations(parts, target: target)
         let finding = TranslationGate.assess(source: source, translation: joined, sourceLanguage: sourceLanguage,
-                                             target: target)
+                                             target: target,
+                                             terms: TermPair.matching(terms, in: source)
+                                                .map { (source: $0.source, translation: $0.translation) })
         guard !finding.isSevere, !finding.flags.contains(TranslationGate.short) else { return result }
         result.text = joined
         result.finding = finding
@@ -649,9 +679,12 @@ public enum Translator {
     /// `translateLines` と同じく訳し、受け取らなかった行には理由を付けて返す
     static func checkedTranslateLines(_ lines: [String], context: [(source: String, translation: String)],
                                       language: String?, target: String = "ja", system: String,
-                                      options: TranslationOptions, generator: any TextGenerating,
+                                      options: TranslationOptions, terms: [TermPair] = [], generator: any TextGenerating,
                                       shouldCancel: () -> Bool) throws -> [LineOutcome] {
-        let user = userPrompt(lines: lines, context: context, glossary: options.glossary)
+        // 訳語の対は、この 1 回に送る行に出る物だけ (無ければ、指示文は対を入れる前と同じ)。
+        // 出力の上限 (budget) は、下で指示文の長さを数えて決めるので、対で指示文が伸びた分も引かれる
+        let used = TermPair.matching(terms, in: lines.joined(separator: "\n"))
+        let user = userPrompt(lines: lines, context: context, glossary: options.glossary, terms: used)
         let shots = TranslationExamples.examples(for: target)
         let sourceTokens = lines.reduce(0) { $0 + generator.tokenCount($1) }
         let exampleTokens = shots.reduce(0) { $0 + generator.tokenCount($1.user) + generator.tokenCount($1.assistant) + 16 }

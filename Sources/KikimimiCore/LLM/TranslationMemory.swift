@@ -59,21 +59,24 @@ public struct RememberedTranslation: Codable, Hashable, Identifiable, Sendable {
 ///
 /// 監査の台帳 (`CorrectionLedger`、`learned-corrections.json`) とは別のファイル。読み書きの作りは台帳と同じ:
 /// 壊れた 1 件は飛ばし、読めないファイルは別の名前でよけ、書く時は原子的に書く。
-/// 形は `{ "version": 1, "sentences": [...] }`。後で訳語の対 (`terms`) を足すので、知らない項目は読み飛ばす
+/// 形は `{ "version": 1, "sentences": [...], "terms": [...] }`。`terms` の無い古いファイルも読める。知らない項目は読み飛ばす
 public struct TranslationMemory: Codable, Hashable, Sendable {
     public var version: Int
     public var sentences: [RememberedTranslation]
+    /// 訳語の対 (利用者が決めた「この語は、こう訳す」)。訳す先の言語ごとに持つ
+    public var terms: [TermPair]
 
     /// 保存するファイルの名前 (学習した直しの台帳と同じフォルダに置く)
     public static let fileName = "translation-memory.json"
 
-    public init(sentences: [RememberedTranslation] = []) {
+    public init(sentences: [RememberedTranslation] = [], terms: [TermPair] = []) {
         self.version = 1
         self.sentences = sentences
+        self.terms = terms
     }
 
     enum CodingKeys: String, CodingKey {
-        case version, sentences
+        case version, sentences, terms
     }
 
     /// 読めない 1 件があっても、ほかは読む (その 1 件だけを飛ばす)。原文・訳が空の物も飛ばす
@@ -88,9 +91,22 @@ public struct TranslationMemory: Codable, Hashable, Sendable {
         version = (try? c.decodeIfPresent(Int.self, forKey: .version)) ?? 1
         sentences = (try c.decodeIfPresent([Entry].self, forKey: .sentences) ?? []).compactMap(\.value)
             .filter { !Self.normalizedSource($0.source).isEmpty && !$0.translation.isEmpty }
+        // 訳語の対も、壊れた 1 件だけを飛ばす (原語・訳語・訳す先が空の物も飛ばす)
+        struct TermEntry: Decodable {
+            var value: TermPair?
+            init(from decoder: any Decoder) throws {
+                value = try? TermPair(from: decoder)
+            }
+        }
+        terms = ((try? c.decodeIfPresent([TermEntry].self, forKey: .terms)) ?? []).compactMap { $0.value }
+            .filter { !$0.source.isEmpty && !$0.translation.isEmpty && !$0.target.isEmpty }
     }
 
+    /// 覚えた文が無いか (訳語の対は数えない。対も無いかは `hasNothing`)
     public var isEmpty: Bool { sentences.isEmpty }
+
+    /// 覚えた文も、訳語の対も無いか
+    public var hasNothing: Bool { sentences.isEmpty && terms.isEmpty }
 
     // MARK: そろえる
 
@@ -173,6 +189,39 @@ public struct TranslationMemory: Codable, Hashable, Sendable {
         sentences.removeAll { $0.id == id }
     }
 
+    // MARK: 訳語の対 (U5)
+
+    /// 訳語の対を足す。原語 (大文字と小文字を区別せずに比べる)・訳す先が同じ物が在れば訳語を書き換え、無ければ足す。
+    /// 足した (書き換えた) 1 件を返す。原語・訳語・訳す先のどれかが空なら nil (何も変えない)
+    @discardableResult
+    public mutating func setTerm(source: String, translation: String, target: String, date: Date = Date()) -> TermPair? {
+        let s = TermPair.cleaned(source)
+        let t = TermPair.cleaned(translation)
+        let g = Self.normalizedTarget(target)
+        guard !s.isEmpty, !t.isEmpty, !g.isEmpty else { return nil }
+        if let i = terms.firstIndex(where: { $0.matches(source: s, target: g) }) {
+            terms[i].source = s
+            terms[i].translation = t
+            terms[i].updated = date
+            return terms[i]
+        }
+        let pair = TermPair(source: s, translation: t, target: g, updated: date)
+        terms.append(pair)
+        return pair
+    }
+
+    /// 訳語の対を 1 件消す
+    public mutating func removeTerm(_ id: UUID) {
+        terms.removeAll { $0.id == id }
+    }
+
+    /// 訳語の対の一覧 (訳す先 target を渡すと、その言語の物だけ)。訳す先・原語の順
+    public func termList(target: String? = nil) -> [TermPair] {
+        let g = target.map(Self.normalizedTarget)
+        return terms.filter { g == nil || Self.normalizedTarget($0.target) == g }
+            .sorted { ($0.target, $0.source.lowercased()) < ($1.target, $1.source.lowercased()) }
+    }
+
     // MARK: 保存
 
     public static func load(from url: URL) -> TranslationMemory {
@@ -231,8 +280,10 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
     public let target: String
     /// そろえた原文 → 利用者の訳
     let translations: [String: String]
+    /// この訳す先の訳語の対 (原文に出る物だけを指示文と関門に使う: `terms(in:)`)
+    public let terms: [TermPair]
 
-    public init(target: String, sentences: [RememberedTranslation]) {
+    public init(target: String, sentences: [RememberedTranslation], terms: [TermPair] = []) {
         let t = TranslationMemory.normalizedTarget(target)
         self.target = t
         var map: [String: String] = [:]
@@ -245,11 +296,26 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
             map[key] = value
         }
         translations = map
+        // 同じ原語が 2 つ在れば、新しく決めた方を使う
+        var seen = Set<String>()
+        var pairs: [TermPair] = []
+        for pair in terms.sorted(by: { $0.updated > $1.updated })
+        where TranslationMemory.normalizedTarget(pair.target) == t && !pair.source.isEmpty && !pair.translation.isEmpty {
+            guard seen.insert(pair.source.lowercased()).inserted else { continue }
+            pairs.append(pair)
+        }
+        self.terms = pairs
     }
 
     /// 引ける文の数
     public var count: Int { translations.count }
+    /// 引ける文が無いか (訳語の対は数えない)
     public var isEmpty: Bool { translations.isEmpty }
+
+    /// 原文 text に出る訳語の対 (`TermPair.matching` の決まり。長い語を先に、`TermPair.maxPerPrompt` 組まで)
+    public func terms(in text: String) -> [TermPair] {
+        TermPair.matching(terms, in: text)
+    }
 
     /// 原文に合う利用者の訳。短い文・記憶に無い文は nil
     public func translation(for source: String) -> String? {
@@ -262,6 +328,156 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
 extension TranslationMemory {
     /// 訳す先 target の記憶の写し (次の翻訳に渡す)
     public func lookup(target: String) -> TranslationMemoryLookup {
-        TranslationMemoryLookup(target: target, sentences: sentences)
+        TranslationMemoryLookup(target: target, sentences: sentences, terms: terms)
+    }
+
+    /// 次の翻訳に渡す写し。reuse (設定「覚えた訳を、次の翻訳に使う」) が切なら nil (覚えた文も訳語の対も渡さない)。
+    /// 訳す先 target の文も対も無ければ nil
+    public func lookup(target: String, reuse: Bool) -> TranslationMemoryLookup? {
+        guard reuse, !hasNothing else { return nil }
+        let lookup = lookup(target: target)
+        return lookup.isEmpty && lookup.terms.isEmpty ? nil : lookup
+    }
+}
+
+// MARK: 訳語の対 (U5)
+
+/// 訳語の対 1 つ: 利用者が決めた「原文のこの語は、いつもこう訳す」(例: "dashboard" → 「管理画面」)。
+///
+/// 訳す先の言語ごとに持つ。次の翻訳で、原文にこの語が出る行を送る時だけ、指示文に `X => Y` と書く
+/// (`Translator.userPrompt`)。訳に訳語が無ければ、関門が `term` の印を付ける (印だけ。訳し直さない)
+public struct TermPair: Codable, Hashable, Identifiable, Sendable {
+    public var id: UUID
+    /// 原文の語
+    public var source: String
+    /// 訳語
+    public var translation: String
+    /// 訳す先の言語のコード (そろえた物)
+    public var target: String
+    public var updated: Date
+
+    /// 1 回の指示文に入れる対の数の上限 (長い語から)。指示文が長くなりすぎて、小さな LLM が行の訳を落とさないように
+    public static let maxPerPrompt = 8
+
+    public init(id: UUID = UUID(), source: String, translation: String, target: String, updated: Date = Date()) {
+        self.id = id
+        self.source = source
+        self.translation = translation
+        self.target = target
+        self.updated = updated
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, source, translation, target, updated
+    }
+
+    /// 欠けている項目は補って読む (原語・訳語・訳す先は無いと読めない)
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        source = Self.cleaned(try c.decode(String.self, forKey: .source))
+        translation = Self.cleaned(try c.decode(String.self, forKey: .translation))
+        target = TranslationMemory.normalizedTarget(try c.decode(String.self, forKey: .target))
+        id = (try? c.decodeIfPresent(UUID.self, forKey: .id)) ?? UUID()
+        updated = (try? c.decodeIfPresent(Date.self, forKey: .updated)) ?? Date()
+    }
+
+    /// 語をそろえる: 改行を空白にし、続く空白を 1 つにし、前後の空白を外す (指示文の 1 行に収めるため)
+    static func cleaned(_ text: String) -> String {
+        text.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    }
+
+    /// 原語 (大文字と小文字は区別しない)・訳す先が同じか
+    func matches(source: String, target: String) -> Bool {
+        self.source.lowercased() == source.lowercased()
+            && TranslationMemory.normalizedTarget(self.target) == TranslationMemory.normalizedTarget(target)
+    }
+
+    // MARK: 原文に出るか
+
+    /// 対の中から、原文 text に出る物を返す (長い語を先に、limit 組まで。同じ原語は 1 つ)。
+    /// 当て方は `occurs(_:in:)`
+    public static func matching(_ pairs: [TermPair], in text: String, limit: Int = maxPerPrompt) -> [TermPair] {
+        guard !pairs.isEmpty, !text.isEmpty, limit > 0 else { return [] }
+        var seen = Set<String>()
+        var out: [TermPair] = []
+        // 長い語を先に (同じ長さなら、渡された順)
+        let ordered = pairs.enumerated().sorted { a, b in
+            a.element.source.count != b.element.source.count ? a.element.source.count > b.element.source.count
+                : a.offset < b.offset
+        }.map(\.element)
+        for pair in ordered where !pair.source.isEmpty && !pair.translation.isEmpty {
+            guard out.count < limit else { break }
+            guard !seen.contains(pair.source.lowercased()), occurs(pair.source, in: text) else { continue }
+            seen.insert(pair.source.lowercased())
+            out.append(pair)
+        }
+        return out
+    }
+
+    /// 原文の語 term が text に出るか (大文字と小文字は区別しない)。
+    /// 漢字・かな・ハングル・タイ文字を含む語は、含むかどうかだけで見る (語の間に空白を置かない書き方なので)。
+    /// ほかの語 (ラテン文字・キリル文字など) は、語の切れ目で当てる: 当たった所の前と後ろが文字でない事
+    /// ("car" は "career" にも "scar" にも当たらない)
+    public static func occurs(_ term: String, in text: String) -> Bool {
+        guard !term.isEmpty else { return false }
+        if hasUnspacedLetters(term) { return text.range(of: term, options: .caseInsensitive) != nil }
+        var start = text.startIndex
+        while start < text.endIndex,
+              let r = text.range(of: term, options: .caseInsensitive, range: start..<text.endIndex) {
+            let before = r.lowerBound > text.startIndex ? text[text.index(before: r.lowerBound)] : nil
+            let after = r.upperBound < text.endIndex ? text[r.upperBound] : nil
+            if !isWordCharacter(before), !isWordCharacter(after) { return true }
+            start = text.index(after: r.lowerBound)
+        }
+        return false
+    }
+
+    /// 文字 (letters) か。nil (文の端) は文字でない
+    static func isWordCharacter(_ c: Character?) -> Bool {
+        guard let c else { return false }
+        return c.unicodeScalars.contains { CharacterSet.letters.contains($0) }
+    }
+
+    /// 語の間に空白を置かない文字 (漢字・かな・ハングル・タイ文字) を含むか
+    static func hasUnspacedLetters(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            let v = scalar.value
+            return (0x4E00...0x9FFF).contains(v) || (0x3400...0x4DBF).contains(v) || (0xF900...0xFAFF).contains(v)
+                || (0x3040...0x30FF).contains(v) || (0x31F0...0x31FF).contains(v) || (0xFF66...0xFF9F).contains(v)
+                || (0xAC00...0xD7AF).contains(v) || (0x1100...0x11FF).contains(v) || (0x3130...0x318F).contains(v)
+                || (0x0E00...0x0E7F).contains(v)
+        }
+    }
+
+    // MARK: 訳に訳語が在るか
+
+    /// 訳語の当て方を緩める長さ: 訳語がこの字数以上の時は、頭の `keptPrefixRatio` (切り上げ) が訳に在ればよい。
+    /// ロシア語・ドイツ語・韓国語などは、文の中で語の終わりが変わる (格・助詞: "панель" → "панели"、
+    /// "Verwaltungsbereich" → "Verwaltungsbereichs") ので、そのまま含むかで見ると、正しい訳にも印が付きすぎる
+    public static let looseMatchMinimumLength = 5
+    /// 訳語の頭の、訳に在ればよい割合 (75%。語の終わりの変わる所は、ふつう最後の 1〜2 字)
+    public static let keptPrefixRatio = 0.75
+    /// そのまま含むかで見る訳す先: 語の形が変わらない、語の間に空白を置かない言語 (頭だけで当てると、別の語にも当たりやすい)
+    public static let exactMatchTargets: Set<String> = ["ja", "zh", "th"]
+
+    /// 訳 text に訳語 translation が在るか (大文字と小文字は区別しない)。
+    /// 訳語が `looseMatchMinimumLength` 字以上で、訳す先が `exactMatchTargets` でない時は、頭の 75% (切り上げ) が在ればよい
+    public static func kept(_ translation: String, in text: String, target: String) -> Bool {
+        let y = translation.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !y.isEmpty else { return true }
+        let t = TranslationTarget.normalized(target)
+        let needle: String
+        if y.count >= looseMatchMinimumLength, !exactMatchTargets.contains(t) {
+            let n = Int((Double(y.count) * keptPrefixRatio).rounded(.up))
+            needle = String(y.prefix(n))
+        } else {
+            needle = y
+        }
+        return text.range(of: needle, options: .caseInsensitive) != nil
+    }
+
+    /// 理由の文に出す並び ("X → Y")。原語と訳語が同じ (大文字と小文字を除いて) なら、訳語だけ
+    var label: String {
+        source.lowercased() == translation.lowercased() ? translation : source + " → " + translation
     }
 }

@@ -1,0 +1,180 @@
+{
+ "name": "translation-terms (hand-written lines with term pairs, no references)",
+ "translation": [
+  {
+   "id": "terms-en-ja",
+   "language": "en",
+   "target": "ja",
+   "domain": "speech",
+   "lines": [
+    "Before the meeting, please open the dashboard.",
+    "Check this week's numbers there."
+   ],
+   "terms": [
+    {
+     "source": "dashboard",
+     "translation": "管理画面"
+    }
+   ]
+  },
+  {
+   "id": "terms-en-zh",
+   "language": "en",
+   "target": "zh",
+   "domain": "speech",
+   "lines": [
+    "Our team will ship the new feature next Monday.",
+    "Please finish the tests by Friday."
+   ],
+   "terms": [
+    {
+     "source": "ship",
+     "translation": "上线"
+    }
+   ]
+  },
+  {
+   "id": "terms-en-ko",
+   "language": "en",
+   "target": "ko",
+   "domain": "speech",
+   "lines": [
+    "If the build fails again, please send me the log file."
+   ],
+   "terms": [
+    {
+     "source": "log file",
+     "translation": "기록 파일"
+    }
+   ]
+  },
+  {
+   "id": "terms-en-de",
+   "language": "en",
+   "target": "de",
+   "domain": "speech",
+   "lines": [
+    "Let's move the meeting to Thursday.",
+    "And please invite the whole sales team."
+   ],
+   "terms": [
+    {
+     "source": "meeting",
+     "translation": "Besprechung"
+    },
+    {
+     "source": "sales team",
+     "translation": "Vertrieb"
+    }
+   ]
+  },
+  {
+   "id": "terms-en-fr",
+   "language": "en",
+   "target": "fr",
+   "domain": "speech",
+   "lines": [
+    "Please upload the file to the cloud before the deadline."
+   ],
+   "terms": [
+    {
+     "source": "cloud",
+     "translation": "nuage"
+    },
+    {
+     "source": "deadline",
+     "translation": "échéance"
+    }
+   ]
+  },
+  {
+   "id": "terms-en-es",
+   "language": "en",
+   "target": "es",
+   "domain": "speech",
+   "lines": [
+    "Bring your laptop to the workshop tomorrow.",
+    "We will install the new app together."
+   ],
+   "terms": [
+    {
+     "source": "laptop",
+     "translation": "ordenador portátil"
+    },
+    {
+     "source": "app",
+     "translation": "aplicación"
+    }
+   ]
+  },
+  {
+   "id": "terms-en-ru",
+   "language": "en",
+   "target": "ru",
+   "domain": "speech",
+   "lines": [
+    "The customer wants a discount, but I think our price is already fair."
+   ],
+   "terms": [
+    {
+     "source": "customer",
+     "translation": "заказчик"
+    }
+   ]
+  },
+  {
+   "id": "terms-en-th",
+   "language": "en",
+   "target": "th",
+   "domain": "speech",
+   "lines": [
+    "Please save the report as a PDF and put it in the shared folder."
+   ],
+   "terms": [
+    {
+     "source": "shared folder",
+     "translation": "โฟลเดอร์ส่วนกลาง"
+    }
+   ]
+  },
+  {
+   "id": "terms-ja-en-1",
+   "language": "ja",
+   "target": "en",
+   "domain": "speech",
+   "lines": [
+    "明日の打ち合わせでは、新しい料金プランを説明します。"
+   ],
+   "terms": [
+    {
+     "source": "打ち合わせ",
+     "translation": "sync"
+    },
+    {
+     "source": "料金プラン",
+     "translation": "pricing tier"
+    }
+   ]
+  },
+  {
+   "id": "terms-ja-en-2",
+   "language": "ja",
+   "target": "en",
+   "domain": "speech",
+   "lines": [
+    "この不具合は、次の更新で直します。",
+    "少しだけ待ってください。"
+   ],
+   "terms": [
+    {
+     "source": "不具合",
+     "translation": "defect"
+    },
+    {
+     "source": "更新",
+     "translation": "patch"
+    }
+   ]
+  }
+ ]
+}

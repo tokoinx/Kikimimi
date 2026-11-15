@@ -480,11 +480,24 @@ final class AppModel {
         saveTranslationMemory()
     }
 
-    /// 次の翻訳に渡す、訳す先 target の記憶の写し (設定が切・記憶が空なら nil)
+    /// 設定の「覚えた訳」の訳語の一覧・訳を直す画面で、訳語の対を足す (同じ原語・訳す先の物は書き換える)。
+    /// 足したら true (原語か訳語が空なら false)。足した後、ほかの行を訳し直す事はしない (次の翻訳から効く)
+    @discardableResult
+    func addTerm(source: String, translation: String, target: String) -> Bool {
+        guard translationMemory.setTerm(source: source, translation: translation, target: target) != nil else { return false }
+        saveTranslationMemory()
+        return true
+    }
+
+    /// 設定の「覚えた訳」の訳語の一覧で、1 件を消す
+    func removeTerm(_ id: UUID) {
+        translationMemory.removeTerm(id)
+        saveTranslationMemory()
+    }
+
+    /// 次の翻訳に渡す、訳す先 target の記憶の写し (覚えた文と訳語の対)。設定が切・文も対も無ければ nil
     private func translationMemoryLookup(target: String) -> TranslationMemoryLookup? {
-        guard reuseTranslationMemory, !translationMemory.isEmpty else { return nil }
-        let lookup = translationMemory.lookup(target: target)
-        return lookup.isEmpty ? nil : lookup
+        translationMemory.lookup(target: target, reuse: reuseTranslationMemory)
     }
 
     /// 翻訳が終わった時の知らせに、記憶から置いた行の数を足す (0 なら何も足さない)

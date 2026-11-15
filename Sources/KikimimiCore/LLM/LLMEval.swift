@@ -21,6 +21,17 @@ public struct AuditEvalCase: Codable, Hashable, Sendable {
     }
 }
 
+/// 評価の問題の訳語の対 1 つ (原文の語と、その訳語)
+public struct TranslationEvalTerm: Codable, Hashable, Sendable {
+    public var source: String
+    public var translation: String
+
+    public init(source: String, translation: String) {
+        self.source = source
+        self.translation = translation
+    }
+}
+
 /// 評価用の場面 (翻訳): 訳す行と、訳に残っているべき語 (固有名詞など)。
 public struct TranslationEvalCase: Codable, Hashable, Sendable {
     public var id: String
@@ -36,9 +47,13 @@ public struct TranslationEvalCase: Codable, Hashable, Sendable {
     public var references: [String]?
     /// 文の種類 (例: "speech"・"social")。数えるのには使わない
     public var domain: String?
+    /// 訳語の対 (無い問題は今までと同じ)。翻訳に渡し (`--no-terms` なら渡さない)、採点は原文に出る対で行う
+    public var terms: [TranslationEvalTerm]?
 
     public init(id: String, language: String, glossary: String? = nil, lines: [String], keep: [String]? = nil,
-                target: String? = nil, references: [String]? = nil, domain: String? = nil) {
+                target: String? = nil, references: [String]? = nil, domain: String? = nil,
+                terms: [TranslationEvalTerm]? = nil) {
+        self.terms = terms
         self.id = id
         self.language = language
         self.glossary = glossary
@@ -511,9 +526,12 @@ public enum LLMEval {
         /// 文に分けて訳し直したまとまりの数と、そのうち入れ替えた数 (採点し直しても、そのまま使う。古い結果には無い)
         public var retried: Int?
         public var retryFixed: Int?
+        /// 問題の訳語の対 (古い結果・対の無い問題には無い)
+        public var terms: [TranslationEvalTerm]?
 
         public init(id: String, target: String, language: String, lineCount: Int, units: [Unit], keep: [String]? = nil,
-                    glossary: String? = nil, seconds: Double? = nil) {
+                    glossary: String? = nil, seconds: Double? = nil, terms: [TranslationEvalTerm]? = nil) {
+            self.terms = terms
             self.id = id
             self.target = target
             self.language = language
@@ -537,7 +555,7 @@ public enum LLMEval {
                                           asSource: unit.asSource ? true : nil)
         }
         return TranslationOutput(id: c.id, target: c.targetLanguage, language: c.language, lineCount: c.lines.count,
-                                 units: kept, keep: c.keep, glossary: c.glossary, seconds: seconds)
+                                 units: kept, keep: c.keep, glossary: c.glossary, seconds: seconds, terms: c.terms)
     }
 
     /// 翻訳の結果を採点する (translations は、行の順の訳。訳さなかった行は nil。1 行ずつの訳として数える)
@@ -626,6 +644,20 @@ public enum LLMEval {
                 }
             }
         }
+        // 訳語の対: 原文に原語が出る対を数え、訳に訳語が在るかを見る (当て方は関門と同じ `TermPair.occurs`・`TermPair.kept`)。
+        // keep と同じ欄に足す (keep だけの問題の点は変わらない)
+        if let terms = o.terms, !terms.isEmpty, !joined.isEmpty {
+            let sourceText = o.units.map(\.source).joined(separator: "\n")
+            for term in terms where !term.source.isEmpty && !term.translation.isEmpty
+                && TermPair.occurs(term.source, in: sourceText) {
+                score.termsChecked += 1
+                if TermPair.kept(term.translation, in: joined, target: target) {
+                    score.termsKept += 1
+                } else {
+                    details.append("[\(o.id)] term lost: \(term.source) => \(term.translation): \(joined)")
+                }
+            }
+        }
         return (score, details)
     }
 
@@ -646,9 +678,10 @@ public enum LLMEval {
 
     /// 翻訳の場面をひと通り動かして採点する。場面ごとの訳す先 (`target`) で訳し、訳す先ごとにも集計する。
     /// アプリと同じ `Translator.translateSummarizing` を通す (訳の後ろが抜けた時の訳し直しも同じに働く)。
-    /// splitRetry が false なら、訳し直しを切る (`--no-split-retry`)
+    /// splitRetry が false なら、訳し直しを切る (`--no-split-retry`)。
+    /// useTerms が false なら、問題の訳語の対を翻訳に渡さない (`--no-terms`。採点は対で行う)
     public static func runTranslation(_ cases: [TranslationEvalCase], generator: any TextGenerating,
-                                      ledger: CorrectionLedger? = nil, splitRetry: Bool = true,
+                                      ledger: CorrectionLedger? = nil, splitRetry: Bool = true, useTerms: Bool = true,
                                       detector: LanguageDetector? = LLMEval.defaultLanguageDetector,
                                       shouldCancel: () -> Bool = { false },
                                       onCase: (_ done: Int, _ total: Int) -> Void = { _, _ in })
@@ -666,6 +699,7 @@ public enum LLMEval {
             let run = try Translator.translateSummarizing(segments, language: c.language, target: c.targetLanguage,
                                                           options: TranslationOptions(glossary: glossary,
                                                                                       splitRetry: splitRetry),
+                                                          memory: useTerms ? termLookup(c) : nil,
                                                           generator: generator, shouldCancel: shouldCancel) { batch, _, _ in
                 for result in batch { byHead[result.head] = result }
             }
@@ -704,6 +738,15 @@ public enum LLMEval {
             onCase(done + 1, cases.count)
         }
         return (total, byTarget, details, outputs)
+    }
+
+    /// 問題の訳語の対だけを持つ写し (覚えた文は持たない)。対が無ければ nil (アプリの「記憶が無い」時と同じに訳す)
+    static func termLookup(_ c: TranslationEvalCase) -> TranslationMemoryLookup? {
+        let pairs = (c.terms ?? []).map { TermPair(source: TermPair.cleaned($0.source), translation: TermPair.cleaned($0.translation),
+                                                   target: c.targetLanguage) }
+            .filter { !$0.source.isEmpty && !$0.translation.isEmpty }
+        guard !pairs.isEmpty else { return nil }
+        return TranslationMemoryLookup(target: c.targetLanguage, sentences: [], terms: pairs)
     }
 
     /// 前の結果と比べて、訳す先ごとに悪くなった所を返す (空なら悪くなっていない)。前の結果に無い訳す先は比べない。

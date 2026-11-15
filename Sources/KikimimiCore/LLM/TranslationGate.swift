@@ -87,7 +87,8 @@ public enum TranslationGate {
     /// 1 つの文のまとまり (原文 1 つと訳 1 つ) を点検する。
     /// - sourceLanguage: 原文の言語 (分からなければ nil。写しの検査は「違う言語」と見て行う)
     /// - target: 訳す先の言語のコード
-    /// - terms: 訳語の対 (原語と訳語)。原文に原語が在るのに、訳に訳語が無ければ `term` (大文字と小文字は区別しない)
+    /// - terms: 訳語の対 (原語と訳語)。原文に原語が在るのに、訳に訳語が無ければ `term` (大文字と小文字は区別しない)。
+    ///   説明は "term: X → Y" (原語と訳語が同じなら "term: Y")
     public static func assess(source: String, translation: String?, sourceLanguage: String?, target: String,
                               terms: [(source: String, translation: String)] = [],
                               detector: LanguageDetector? = LLMEval.defaultLanguageDetector) -> Finding {
@@ -108,11 +109,14 @@ public enum TranslationGate {
             flags.insert(number)
             details.append("number: " + lost.joined(separator: ", "))
         }
+        // 訳語の対: 原語の当て方は指示文と同じ (`TermPair.occurs`。語の切れ目)。
+        // 訳語の当て方は、語の形が変わる言語のために緩める (`TermPair.kept`)
         var lostTerms: [String] = []
         for pair in terms where !pair.source.isEmpty && !pair.translation.isEmpty {
-            guard source.range(of: pair.source, options: .caseInsensitive) != nil else { continue }
-            if t.range(of: pair.translation, options: .caseInsensitive) == nil, !lostTerms.contains(pair.translation) {
-                lostTerms.append(pair.translation)
+            guard TermPair.occurs(pair.source, in: source) else { continue }
+            let label = TermPair(source: pair.source, translation: pair.translation, target: target).label
+            if !TermPair.kept(pair.translation, in: t, target: target), !lostTerms.contains(label) {
+                lostTerms.append(label)
             }
         }
         if !lostTerms.isEmpty {

@@ -354,9 +354,14 @@ struct AdapterSection: View {
 }
 
 /// 設定の「覚えた訳」: 対訳の行で利用者が直した訳の記憶。次の翻訳に使うかの入・切、一覧・削除。
-/// 消すのは記憶だけ (結果に残っている直した訳は、そのまま)
+/// 消すのは記憶だけ (結果に残っている直した訳は、そのまま)。
+/// 下に「訳語」(訳語の対) の小さな一覧を置く: 訳す先の言語・原文の語・訳語。足す行と、1 件ずつ消すボタン
 struct RememberedTranslationsSection: View {
     @Environment(AppModel.self) private var model
+    @State private var newTermSource = ""
+    @State private var newTermTranslation = ""
+    /// 足す訳語の訳す先 (nil の間は、設定の「訳す先の言語」を使う)
+    @State private var newTermTarget: String?
 
     var body: some View {
         @Bindable var model = model
@@ -391,7 +396,58 @@ struct RememberedTranslationsSection: View {
             Text(L("When the same sentence comes up again in a translation into the same language, your translation is used without asking the LLM. Short sentences are always translated again, because their meaning depends on the scene. “Translate this sentence again” always asks the LLM. Deleting here removes only the remembered translation; translations in your results stay as they are. They are saved only on this Mac."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            terms
         }
+    }
+
+    /// 訳語の対の一覧と、足す行
+    @ViewBuilder private var terms: some View {
+        Text(L("Terms"))
+            .font(.callout.weight(.semibold))
+        let pairs = model.translationMemory.termList()
+        if pairs.isEmpty {
+            Text(L("No terms yet."))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        ForEach(pairs) { pair in
+            HStack {
+                Text(TranslationTarget.displayName(for: pair.target))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("\(pair.source) → \(pair.translation)")
+                    .textSelection(.enabled)
+                Spacer()
+                Button(L("Delete")) { model.removeTerm(pair.id) }
+            }
+        }
+        let target = newTermTarget ?? model.translationLanguage
+        HStack {
+            Picker(L("Translate into"), selection: Binding(get: { target }, set: { newTermTarget = $0 })) {
+                ForEach(TranslationTarget.all, id: \.self) { code in
+                    Text(TranslationTarget.displayName(for: code)).tag(code)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+            TextField(L("Word in the original"), text: $newTermSource, prompt: Text(L("Word in the original")))
+                .labelsHidden()
+            Image(systemName: "arrow.right")
+                .foregroundStyle(.secondary)
+            TextField(L("Translation to use"), text: $newTermTranslation, prompt: Text(L("Translation to use")))
+                .labelsHidden()
+            Button(L("Add")) {
+                if model.addTerm(source: newTermSource, translation: newTermTranslation, target: target) {
+                    newTermSource = ""
+                    newTermTranslation = ""
+                }
+            }
+            .disabled(newTermSource.trimmingCharacters(in: .whitespaces).isEmpty
+                      || newTermTranslation.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        Text(L("In the next translations into that language, the LLM is told to translate the word as you decided. If a translation does not use it, the line is marked “Needs review”. Terms are used only while the switch above is on."))
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 }
 

@@ -245,7 +245,7 @@ extension Transcript {
 
 extension TranslationNote {
     /// 印の理由を、画面の言語の文にした物 (印の符号の順に 1 つずつ)。知らない符号は出さない。
-    /// 数の抜けは、説明 (`detail` の "number: …") の数を文に入れる
+    /// 数の抜けは、説明 (`detail` の "number: …") の数を、訳語の抜けは "term: …" の「X → Y」を文に入れる
     public var reasonTexts: [String] {
         flags.compactMap { Self.reasonText($0, detail: detail) }
     }
@@ -257,6 +257,9 @@ extension TranslationNote {
         case TranslationGate.number:
             let numbers = detailPart(TranslationGate.number, in: detail) ?? ""
             return L("A number from the original is missing: %@", numbers)
+        case TranslationGate.term:
+            let terms = detailPart(TranslationGate.term, in: detail) ?? ""
+            return L("Your term is not in the translation: %@", terms)
         case TranslationGate.copied: return L("The translation is the same as the original.")
         case TranslationGate.repeated: return L("The same words repeat many times.")
         case TranslationGate.short: return L("The translation is much shorter than the original. Part of it may be missing.")

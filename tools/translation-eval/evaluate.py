@@ -285,6 +285,8 @@ def main():
     parser.add_argument("--cpu", action="store_true", help="アプリにそのまま渡す: GPU を使わない")
     parser.add_argument("--no-split-retry", action="store_true",
                         help="アプリにそのまま渡す: 訳の後ろが抜けた時の、文に分けた訳し直しを切る")
+    parser.add_argument("--no-terms", action="store_true",
+                        help="アプリにそのまま渡す: 問題の訳語の対を翻訳に渡さない (採点は対で行う)")
     args = parser.parse_args()
 
     app = Path(args.app).expanduser()
@@ -345,6 +347,8 @@ def main():
             command.append("--cpu")
         if args.no_split_retry:
             command.append("--no-split-retry")
+        if args.no_terms:
+            command.append("--no-terms")
         print(f"  [{number}/{len(chosen)}] {path.name} (→ {target})", flush=True)
         if not_comparable:
             print(f"      前の結果と比べません: {not_comparable}", flush=True)
@@ -366,7 +370,7 @@ def main():
     finished = datetime.datetime.now()
     summary = {
         "model": model.name, "adapter": Path(args.adapter).name if args.adapter else None,
-        "ledger": bool(args.ledger), "splitRetry": not args.no_split_retry, "started": started.isoformat(timespec="seconds"),
+        "ledger": bool(args.ledger), "splitRetry": not args.no_split_retry, "terms": not args.no_terms, "started": started.isoformat(timespec="seconds"),
         "finished": finished.isoformat(timespec="seconds"), "sets": len(chosen), "data": about,
         "baseline": str(baseline) if baseline else None, "rows": rows, "failures": failures,
     }
@@ -377,6 +381,8 @@ def main():
         info.append("- 学習した直しの台帳: 使った")
     if args.no_split_retry:
         info.append("- 文に分けた訳し直し: 切 (--no-split-retry)")
+    if args.no_terms:
+        info.append("- 訳語の対: 翻訳に渡さない (--no-terms)")
     info.append(f"- 問題の数: {len(chosen)}")
     if about:
         info.append(f"- データ: WMT24++ ({about.get('dataset')}, {about.get('license')})、領域 {', '.join(about.get('domains', []))}、"

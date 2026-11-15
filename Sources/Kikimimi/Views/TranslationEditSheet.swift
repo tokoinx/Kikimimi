@@ -5,7 +5,9 @@ import SwiftUI
 /// 一覧の外のシートに置く: 翻訳の途中は一覧の行が作り直されるので、行の中の入力欄では下書きが消える。
 /// 下書きはこの画面の @State に持ち、結果が変わっても (翻訳が進んでも) そのまま残す。
 /// 原文・直す前の機械の訳は、body の中で今の結果から読む。
-/// 訳の関門の印 (「要確認」・訳せなかった理由) が在る行は、上に理由を 1 行ずつ出す
+/// 訳の関門の印 (「要確認」・訳せなかった理由) が在る行は、上に理由を 1 行ずつ出す。
+/// 下に任意の 1 行「語を、いつもこう訳す」(訳語の対) を置く。2 つとも入っている時だけ、保存で、
+/// その結果の訳す先の言語の対として記憶に入れる (訳を変えずに、対だけを足してもよい。ほかの行は訳し直さない)
 struct TranslationEditSheet: View {
     @Environment(AppModel.self) private var model
     let job: Job
@@ -13,6 +15,9 @@ struct TranslationEditSheet: View {
     let segmentID: UUID
     @State private var draft = ""
     @State private var started = false
+    /// 訳語の対の下書き (原文の語・訳語)
+    @State private var termSource = ""
+    @State private var termTranslation = ""
 
     /// 今の結果から読んだ、その行の訳のまとまり
     private struct Current {
@@ -44,6 +49,8 @@ struct TranslationEditSheet: View {
     var body: some View {
         let current = self.current
         let cleaned = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let termReady = !termSource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !termTranslation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         VStack(alignment: .leading, spacing: 14) {
             Text(L("Edit translation"))
                 .font(.headline)
@@ -81,6 +88,23 @@ struct TranslationEditSheet: View {
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
                     .accessibilityLabel(Text(L("Your translation")))
             }
+            section(L("Always translate a word as (optional)")) {
+                HStack {
+                    TextField(L("Word in the original"), text: $termSource, prompt: Text(L("Word in the original")))
+                        .labelsHidden()
+                    Image(systemName: "arrow.right")
+                        .foregroundStyle(.secondary)
+                    TextField(L("Translation to use"), text: $termTranslation, prompt: Text(L("Translation to use")))
+                        .labelsHidden()
+                }
+                if let transcript = job.transcript {
+                    Text(L("When both are filled in, “Save” also remembers this term for translations into %@. Lines already translated are not translated again.",
+                           model.translationTargetName(for: transcript)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             HStack {
                 if let current, current.isEdited {
                     Button(current.machine == nil ? L("Remove your translation") : L("Restore machine translation")) {
@@ -98,11 +122,17 @@ struct TranslationEditSheet: View {
                 Button(L("Cancel")) { close() }
                     .keyboardShortcut(.cancelAction)
                 Button(L("Save")) {
-                    model.setTranslation(draft, head: segmentID, in: job)
+                    // 訳語の対は、訳す先を訳を置く前に決める (訳の無い結果に初めて訳を置くと、訳す先の決め方が変わりうるため)
+                    if termReady, let transcript = job.transcript {
+                        model.addTerm(source: termSource, translation: termTranslation,
+                                      target: model.translationTarget(for: transcript))
+                    }
+                    // 訳の欄が空なら、対だけを足して閉じる (setTranslation は、今の訳と同じなら何もしない)
+                    if !cleaned.isEmpty { model.setTranslation(draft, head: segmentID, in: job) }
                     close()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(current == nil || cleaned.isEmpty)
+                .disabled(current == nil || (cleaned.isEmpty && !termReady))
             }
         }
         .padding(20)

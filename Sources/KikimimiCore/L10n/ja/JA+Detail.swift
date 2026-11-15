@@ -76,6 +76,7 @@ extension JA {
         "Go to the next translation that needs review": "次の要確認の訳へ移る",
         "The translation may not be in the target language.": "訳が、訳す先の言語でないようです。",
         "A number from the original is missing: %@": "原文の数が、訳にありません: %@",
+        "Your term is not in the translation: %@": "決めた訳語が、訳にありません: %@",
         "The translation is the same as the original.": "訳が、原文と同じです。",
         "The same words repeat many times.": "同じ言葉が、何度も繰り返されています。",
         "The translation is much shorter than the original. Part of it may be missing.": "訳が、原文よりかなり短いです。一部が抜けているかもしれません。",
