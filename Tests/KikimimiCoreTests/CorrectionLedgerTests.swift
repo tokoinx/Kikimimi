@@ -3,6 +3,18 @@ import XCTest
 
 /// 学習した直しの台帳 (利用者の決定を覚えて、監査で使う)
 final class CorrectionLedgerTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     private func segment(_ text: String, at start: Double = 0, language: String? = nil) -> TranscriptSegment {
         TranscriptSegment(start: start, end: start + 3, text: text, language: language)
     }

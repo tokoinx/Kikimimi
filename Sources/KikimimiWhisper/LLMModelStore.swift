@@ -66,15 +66,15 @@ public struct LLMModelStore: Sendable {
         public var errorDescription: String? {
             switch self {
             case .notGGUF:
-                return "GGUF 形式の LLM ではありません。llama.cpp で動く .gguf ファイルを選んでください。"
+                return L("This is not an LLM in GGUF format. Choose a .gguf file that runs on llama.cpp.")
             case .multimodalProjector:
-                return "これは画像を読むための補助ファイル (mmproj) です。本体の .gguf を選んでください。"
+                return L("This is a helper file for reading images (mmproj). Choose the main .gguf file.")
             case .notAdapter:
-                return "追加学習の差分 (LoRA アダプタ) の GGUF ではありません。tools/finetune/finetune.py が作る「….lora.gguf」を選んでください。"
+                return L("This is not a GGUF fine-tuning adapter (LoRA). Choose the “….lora.gguf” file made by tools/finetune/finetune.py.")
             case .adapterForAnotherModel(let adapter, let model):
-                return "この差分は別の種類のモデル用です (差分: \(adapter)、選んでいる LLM: \(model))。選んでいる LLM から作った差分を選んでください。"
+                return L("This adapter is for a different kind of model (adapter: %1$@, selected LLM: %2$@). Choose an adapter made from the selected LLM.", adapter, model)
             case .adapterInsteadOfModel:
-                return "これは追加学習の差分 (LoRA アダプタ) です。LLM の本体ではないので、「差分を追加…」から選んでください。"
+                return L("This is a fine-tuning adapter (LoRA), not an LLM. Choose it with “Add adapter…”.")
             }
         }
     }
@@ -175,7 +175,7 @@ public enum HuggingFaceResolver {
         public var errorDescription: String? {
             switch self {
             case .notFound(let name):
-                return "\(name) のファイルが配布元で見つかりませんでした。設定の「監査・翻訳」タブの「手元の GGUF を追加…」から取り込むこともできます。"
+                return L("The file for %@ was not found at the source. You can also add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.", name)
             }
         }
     }

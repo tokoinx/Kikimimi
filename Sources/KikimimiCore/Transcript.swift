@@ -88,7 +88,10 @@ public struct Transcript: Codable, Hashable, Sendable {
 
     /// languageLabel の中身 (spoken は spokenLanguages。結果の一覧の覚えておく所 TranscriptRowCache も使う)
     static func languageLabel(spoken: [String], language: String?) -> String? {
-        if spoken.count >= 2 { return spoken.map { Languages.name(for: $0) }.joined(separator: "＋") }
+        if spoken.count >= 2 {
+            let names = spoken.map { Languages.name(for: $0) }
+            return names.dropFirst().reduce(names[0]) { L("%1$@ + %2$@", $0, $1) }
+        }
         guard let code = language ?? spoken.first, !code.isEmpty else { return nil }
         return Languages.name(for: code)
     }

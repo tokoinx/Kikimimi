@@ -14,6 +14,18 @@ final class TimeFormatTests: XCTestCase {
 }
 
 final class ExporterTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     private func sample() -> Transcript {
         Transcript(sourceName: "会議",
                    segments: [TranscriptSegment(start: 0, end: 1.5, text: "こんにちは"),
@@ -52,6 +64,18 @@ final class ExporterTests: XCTestCase {
 }
 
 final class CatalogTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     func testCatalog() {
         XCTAssertEqual(ModelCatalog.all.filter(\.recommended).map(\.id), [ModelCatalog.defaultModelID])
         XCTAssertEqual(Set(ModelCatalog.all.map(\.id)).count, ModelCatalog.all.count)

@@ -59,9 +59,9 @@ public struct ModelStore: Sendable {
 
         public var errorDescription: String? {
             switch self {
-            case .notAModel: return "whisper.cpp 形式 (ggml) のモデルファイルではありません。"
+            case .notAModel: return L("This is not a model file in whisper.cpp (ggml) format.")
             case .unknownName(let name):
-                return "「\(name)」は一覧にない名前です。ggml-large-v3-turbo-q5_0.bin のような公式の名前のモデルか、無音検出用の \(ModelCatalog.vadFileName) を選んでください。"
+                return L("“%1$@” is not a name in the list. Choose a model with an official name such as ggml-large-v3-turbo-q5_0.bin, or %2$@ for silence detection.", name, ModelCatalog.vadFileName)
             }
         }
     }

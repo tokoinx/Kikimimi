@@ -192,7 +192,8 @@ struct HistorySheet: View {
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "ja_JP")
+        // 数だけの書式なので、言語に左右されない形にする (見た目は ja_JP の時と同じ)
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy/M/d HH:mm"
         return f
     }()

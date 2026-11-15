@@ -216,12 +216,15 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
             guard !applied.isEmpty, text != segment.text else { continue }
             // 「日本語＋英語」: 行の言語が文字の上で変わる直しは当てない
             if let own = segment.language, Script.spokenLanguage(of: text, among: ["ja", "en"], fallback: own) != own { continue }
-            let pairs = applied.map { "「\($0.wrong)」→「\($0.right)」" }.joined(separator: "、")
-            var reason = "学習した直し: \(pairs)"
+            let items = applied.map { L("“%1$@” → “%2$@”", $0.wrong, $0.right) }
+            let pairs = items.dropFirst().reduce(items[0]) { L("%1$@, %2$@", $0, $1) }
+            let reason: String
             if let risk {
-                reason += " (\(risk)。要確認)"
+                reason = L("Learned correction: %1$@ (needs review: %2$@)", pairs, risk)
             } else if applied.contains(where: { !$0.isAutomatic }) {
-                reason += " (前に 1 回反映した直し。もう一度反映すると、次から自動で直します)"
+                reason = L("Learned correction: %@ (applied once before. Apply it again and it will be fixed automatically from then on)", pairs)
+            } else {
+                reason = L("Learned correction: %@", pairs)
             }
             changes.append(AuditChange(kind: .fix, origin: .ledger, original: segment, replacement: text,
                                        reason: reason, isConfident: risk == nil && applied.allSatisfy(\.isAutomatic),

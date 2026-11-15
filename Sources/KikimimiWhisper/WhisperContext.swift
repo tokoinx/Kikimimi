@@ -98,10 +98,10 @@ public enum WhisperError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .modelLoadFailed(let path):
-            return "モデルを読み込めませんでした: \((path as NSString).lastPathComponent)。ファイルが壊れている可能性があります。設定から削除して取り直してください。"
-        case .emptyAudio: return "音声が空です。"
-        case .cancelled: return "中止しました。"
-        case .failed(let code): return "文字起こしに失敗しました (whisper.cpp エラー \(code))。"
+            return L("Could not load the model: %@. The file may be damaged. Delete it in Settings and download it again.", (path as NSString).lastPathComponent)
+        case .emptyAudio: return L("The audio is empty.")
+        case .cancelled: return L("Canceled.")
+        case .failed(let code): return L("Transcription failed (whisper.cpp error %d).", Int(code))
         }
     }
 }

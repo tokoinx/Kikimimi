@@ -8,9 +8,9 @@ public enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .txt: return "テキスト (.txt)"
-        case .srt: return "字幕 SRT (.srt)"
-        case .vtt: return "字幕 WebVTT (.vtt)"
+        case .txt: return L("Text (.txt)")
+        case .srt: return L("Subtitles SRT (.srt)")
+        case .vtt: return L("Subtitles WebVTT (.vtt)")
         case .md: return "Markdown (.md)"
         case .csv: return "CSV (.csv)"
         case .json: return "JSON (.json)"
@@ -31,9 +31,9 @@ public enum ExportContent: String, CaseIterable, Identifiable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .original: return "原文"
-        case .japanese: return "日本語訳"
-        case .bilingual: return "対訳 (原文 + 日本語)"
+        case .original: return L("Original")
+        case .japanese: return L("Japanese translation")
+        case .bilingual: return L("Bilingual (original + Japanese)")
         }
     }
 
@@ -136,17 +136,17 @@ public enum Exporter {
     public static func markdown(_ t: Transcript, content: ExportContent = .original) -> String {
         var out = ["# \(t.sourceName)", ""]
         var meta: [String] = []
-        if let l = t.languageLabel { meta.append("言語: \(l)") }
-        if t.duration > 0 { meta.append("長さ: \(TimeFormat.short(t.duration))") }
-        if let m = t.model { meta.append("モデル: \(m)") }
-        if content != .original, let m = t.translationModel { meta.append("翻訳: \(m)") }
+        if let l = t.languageLabel { meta.append(L("Language: %@", l)) }
+        if t.duration > 0 { meta.append(L("Length: %@", TimeFormat.short(t.duration))) }
+        if let m = t.model { meta.append(L("Model: %@", m)) }
+        if content != .original, let m = t.translationModel { meta.append(L("Translation: %@", m)) }
         if !meta.isEmpty { out += [meta.joined(separator: " / "), ""] }
         switch content {
         case .bilingual:
             func cell(_ s: String) -> String {
                 s.replacingOccurrences(of: "|", with: "\\|").replacingOccurrences(of: "\n", with: " ")
             }
-            out += ["| 時刻 | 原文 | 日本語訳 |", "| --- | --- | --- |"]
+            out += [L("| Time | Original | Japanese translation |"), "| --- | --- | --- |"]
             out += rows(t, content).map { row in
                 "| \(TimeFormat.short(row.start)) | \(cell(row.original)) | \(cell(row.japanese ?? "")) |"
             }

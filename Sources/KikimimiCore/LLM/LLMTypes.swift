@@ -74,19 +74,19 @@ public enum LLMError: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .modelLoadFailed(let path):
-            return "LLM のモデルを読み込めませんでした: \((path as NSString).lastPathComponent)。ファイルが壊れているか、このアプリの llama.cpp がまだ対応していない形式です。設定から削除して取り直してください。"
+            return L("Could not load the LLM model: %@. The file may be damaged, or its format is not yet supported by this app’s llama.cpp. Delete it in Settings and download it again.", (path as NSString).lastPathComponent)
         case .contextFailed:
-            return "LLM の作業領域を用意できませんでした。メモリが足りない可能性があります。ほかのアプリを閉じるか、軽いモデルを選んでください。"
+            return L("Could not prepare the LLM’s working memory. There may not be enough memory. Close other apps, or choose a lighter model.")
         case .promptTooLong(let tokens, let limit):
-            return "LLM に渡す文が長すぎます (\(tokens) / \(limit) トークン)。"
+            return L("The text for the LLM is too long (%1$d / %2$d tokens).", tokens, limit)
         case .decodeFailed(let code):
-            return "LLM の計算に失敗しました (llama.cpp エラー \(code))。"
+            return L("The LLM failed to compute (llama.cpp error %d).", Int(code))
         case .invalidGrammar:
-            return "LLM の出力の形式 (文法) を準備できませんでした。"
+            return L("Could not prepare the LLM’s output format (grammar).")
         case .cancelled:
-            return "中止しました。"
+            return L("Canceled.")
         case .adapterLoadFailed(let path):
-            return "追加学習の差分 (LoRA) を読み込めませんでした: \((path as NSString).lastPathComponent)。選んでいる LLM と同じモデルから作った差分かを確かめてください。設定で差分を外すと、元のモデルで動きます。"
+            return L("Could not load the fine-tuning adapter (LoRA): %@. Check that it was made from the same model as the selected LLM. If you remove the adapter in Settings, the original model is used.", (path as NSString).lastPathComponent)
         }
     }
 }

@@ -10,7 +10,8 @@ public struct TranscriptListItem: Identifiable, Hashable, Sendable {
     public let isOriginalJapanese: Bool
     /// この行に当たる監査の直し
     public let changes: [AuditChange]
-    /// 原文の言語の印 (英・日)。2 つの言語が混ざる文字起こしのときだけ
+    /// 原文の言語の印を付ける言語のコード (en・ja)。2 つの言語が混ざる文字起こしのときだけ。
+    /// 画面に出す印 (英・日) は、`LanguageTag.short` で、読む時に今の画面の言語で作る
     public var languageTag: String?
     /// 行の「訳」を出す (日本語以外で、まだ訳がない)
     public var canTranslate: Bool
@@ -38,10 +39,16 @@ public struct TranscriptListItem: Identifiable, Hashable, Sendable {
 
 /// 行の言語の印
 public enum LanguageTag {
+    /// 印を付ける言語か (付けるなら、そのコードを返す)
+    public static func code(_ code: String?) -> String? {
+        code == "ja" || code == "en" ? code : nil
+    }
+
+    /// 画面に出す印 (今の画面の言語で。日本語なら 英・日)
     public static func short(_ code: String?) -> String? {
         switch code {
-        case "ja": return "日"
-        case "en": return "英"
+        case "ja": return L("JA")
+        case "en": return L("EN")
         default: return nil
         }
     }
@@ -240,7 +247,7 @@ public final class TranscriptRowCache {
         let translated = seg.translation != nil || covered.contains(seg.id)
         return TranscriptListItem(id: seg.id, start: seg.start, end: seg.end, text: seg.text,
                                   japanese: nil, isOriginalJapanese: false, changes: changes[seg.id].map { [$0] } ?? [],
-                                  languageTag: tags ? LanguageTag.short(seg.language) : nil,
+                                  languageTag: tags ? LanguageTag.code(seg.language) : nil,
                                   canTranslate: done && !translated && transcript.needsTranslation(seg),
                                   isTranslated: done && translated, language: transcript.language(of: seg))
     }
@@ -251,7 +258,7 @@ public final class TranscriptRowCache {
         return TranscriptListItem(id: unit.id, start: unit.start, end: unit.end, text: unit.text,
                                   japanese: unit.japanese, isOriginalJapanese: unit.isOriginalJapanese,
                                   changes: unit.segments.compactMap { changes[$0.id] },
-                                  languageTag: tags ? LanguageTag.short(unit.language) : nil,
+                                  languageTag: tags ? LanguageTag.code(unit.language) : nil,
                                   canTranslate: done && unit.japanese == nil && !covered.contains(unit.id),
                                   isTranslated: done && translated, language: unit.language ?? transcriptLanguage)
     }

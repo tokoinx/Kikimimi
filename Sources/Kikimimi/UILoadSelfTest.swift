@@ -1578,7 +1578,7 @@ extension LoadRun {
             let newest = job.versions.first
             step("restore version A, notes only",
                  restored && job.notes == notesA && job.transcript == transcriptBefore && job.versions.count == 3
-                    && newest?.origin == .beforeRestore && newest?.label == AppModel.beforeRestoreLabel,
+                    && newest?.origin == .beforeRestore,
                  "notes of A \(job.notes == notesA), transcript unchanged \(job.transcript == transcriptBefore),"
                  + " versions \(job.versions.count) (expected 3), newest origin \(newest.map { "\($0.origin)" } ?? "none")")
             // 自動で残した版には、戻す前のメモ (C) が入っている

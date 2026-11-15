@@ -263,12 +263,13 @@ struct LanguageTagLabel: View {
     let tag: String?
 
     var body: some View {
-        if let tag {
-            Text(tag)
+        // tag は言語のコード (en・ja)。出す印は、今の画面の言語で作る
+        if let tag, let label = LanguageTag.short(tag) {
+            Text(label)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
-                .help(tag == "英" ? "英語で話している区間" : "日本語で話している区間")
+                .help(tag == "en" ? "英語で話している区間" : "日本語で話している区間")
         }
     }
 }

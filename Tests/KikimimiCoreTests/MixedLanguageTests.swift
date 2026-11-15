@@ -4,6 +4,18 @@ import XCTest
 
 /// 「日本語＋英語」(区切りごとの言語判定) の決まりごと。数値の手本は、試作 (英語と日本語の朗読を交互に並べた 208 秒の録音) の結果
 final class MixedLanguageTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     private func s(_ seconds: Double) -> Int { Int((seconds * 16_000).rounded()) }
     private func sec(_ samples: Int) -> Double { (Double(samples) / 16_000 * 100).rounded() / 100 }
 

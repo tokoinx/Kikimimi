@@ -34,7 +34,7 @@ final class Job: Identifiable {
         didSet { if status != oldValue { onChange?(self, .status) } }
     }
     var progress: Double = 0
-    var message: String = "順番待ち"
+    var message: String = L("Waiting")
     /// 文字起こしの結果。中身が変わったら (続きが出た・監査や翻訳が入った・直しを反映した)、保存する
     var transcript: Transcript? {
         didSet { if transcript != oldValue { onChange?(self, .document) } }
@@ -74,7 +74,11 @@ final class Job: Identifiable {
     /// いま行っている監査・翻訳
     var postState: PostState = .idle
     /// 監査・翻訳のお知らせ (失敗・一部だけ訳せなかった など)
-    var postNote: String?
+    var postNote: String? {
+        didSet { postNoteIsPause = false }
+    }
+    /// postNote が「録音のあいだ一時停止しています」の知らせ (文ではなく、この印で見分ける)
+    @ObservationIgnored var postNoteIsPause = false
     /// 行の「訳」で頼まれた文の区間 (頼まれた順。訳し終えるまで残る。行ではこの区間に待ちの印を出す)
     var lineQueue: [UUID] = []
     /// 行の「訳」で頼まれた区間のうち、訳のある文を訳し直すもの (右クリックの「この文を訳し直す」)
@@ -155,8 +159,44 @@ enum ModelAvailability: Equatable {
 
 /// 設定のウインドウのタブ
 enum SettingsTab: Hashable {
+    case general
     case transcription
     case llm
+}
+
+/// 画面の言語を、起動の一番初め (画面や文を作る前) に決める
+enum UILanguageSetting {
+    /// UserDefaults のキー
+    static let defaultsKey = "uiLanguage"
+
+    struct Startup: Equatable, Sendable {
+        let language: UILanguage
+        /// 設定を読み書きする起動か (確認用の起動と、`--ui-language` で言語を決めた起動は、読まず・書かない)
+        let persists: Bool
+    }
+
+    /// この起動の言語 (KikimimiMain が初めに L10n.language に入れる。AppModel も同じ値で始める)
+    static let startup = resolve(arguments: CommandLine.arguments, defaults: .standard,
+                                 preferredLanguages: Locale.preferredLanguages)
+
+    /// - `--ui-language <コード>` が在れば、その言語 (保存しない。画面を見比べるため)。
+    /// - 確認用の起動 (`--selftest-…`) は、日本語 (絵の説明が日本語の画面を前提にしているため。設定を読まず・書かない)。
+    /// - ほかは、保存した言語。無ければ、macOS の言語が 13 の中に在ればそれ、無ければ英語
+    static func resolve(arguments: [String], defaults: UserDefaults, preferredLanguages: [String]) -> Startup {
+        let selfTest = arguments.contains { $0.hasPrefix("--selftest-") }
+        if let i = arguments.firstIndex(of: "--ui-language") {
+            let code = i + 1 < arguments.count ? arguments[i + 1] : ""
+            if let language = UILanguage(rawValue: code) {
+                return Startup(language: language, persists: false)
+            }
+            LaunchLog.note("unknown --ui-language \"\(code)\"; ignored")
+        }
+        if selfTest { return Startup(language: .ja, persists: false) }
+        if let saved = defaults.string(forKey: defaultsKey).flatMap(UILanguage.init(rawValue:)) {
+            return Startup(language: saved, persists: true)
+        }
+        return Startup(language: UILanguage.initial(preferredLanguages: preferredLanguages), persists: true)
+    }
 }
 
 @MainActor
@@ -171,7 +211,7 @@ final class AppModel {
     var showTimestamps = true
     var searchText = ""
     /// 設定で開いているタブ (保存しない。LLM の案内の「設定で選ぶ…」で「監査・翻訳」に切り替える)
-    var settingsTab: SettingsTab = .transcription
+    var settingsTab: SettingsTab = .general
     let player: PlayerController
     /// 聞き取りの練習 (続けて流す・速さ・隠す・書き取り)。行の再生は、どこからでもこれを通す
     let practice: PracticeController
@@ -183,6 +223,18 @@ final class AppModel {
     var livePreviewText = ""
 
     // 設定 (UserDefaults に保存)
+    /// 画面の言語 (キー uiLanguage)。変えると、文を今の言語で引き直し (画面は `.id(uiLanguage)` で作り直す)、
+    /// macOS が出す決まりのメニュー (編集・ウインドウなど) の言語 (AppleLanguages) を、次の起動から変える
+    var uiLanguage: UILanguage {
+        didSet {
+            guard uiLanguage != oldValue else { return }
+            L10n.language = uiLanguage
+            // 確認用の起動と、--ui-language で言語を決めた起動では、保存しない
+            guard UILanguageSetting.startup.persists else { return }
+            save(uiLanguage.rawValue, UILanguageSetting.defaultsKey)
+            save([uiLanguage.localeIdentifier], "AppleLanguages")
+        }
+    }
     var languageCode: String { didSet { save(languageCode, "languageCode") } }
     var modelID: String { didSet { save(modelID, "modelID") } }
     var preferAccuracy: Bool { didSet { save(preferAccuracy, "preferAccuracy") } }
@@ -265,6 +317,8 @@ final class AppModel {
         self.player = player
         practice = PracticeController(player: player)
         let d = UserDefaults.standard
+        uiLanguage = UILanguageSetting.startup.language
+        L10n.language = UILanguageSetting.startup.language
         languageCode = d.string(forKey: "languageCode") ?? "ja"
         let savedModel = d.string(forKey: "modelID") ?? ModelCatalog.defaultModelID
         modelID = ModelCatalog.spec(id: savedModel) == nil ? ModelCatalog.defaultModelID : savedModel
@@ -288,7 +342,7 @@ final class AppModel {
         let loaded = CorrectionLedger.loadKeepingUnreadable(from: ledgerURL)
         ledger = loaded.ledger
         if let aside = loaded.setAside {
-            errorMessage = "学習した直しのファイルを読めなかったので、空の状態から始めます。元のファイルは「\(aside.lastPathComponent)」という名前で、同じフォルダにとってあります。"
+            errorMessage = L("Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.", aside.lastPathComponent)
         }
         if !Languages.isKnown(languageCode) { languageCode = "ja" }
         refreshInstalled()
@@ -319,7 +373,7 @@ final class AppModel {
         do {
             try ledger.save(to: ledgerURL)
         } catch {
-            errorMessage = "学習した直しを保存できませんでした: " + error.localizedDescription
+            errorMessage = L("Could not save the learned corrections: %@", error.localizedDescription)
         }
     }
 
@@ -399,7 +453,7 @@ final class AppModel {
                 try await ensureModel(spec)
             } catch is CancellationError {
             } catch {
-                errorMessage = "\(spec.displayName) を取得できませんでした: \(error.localizedDescription)\n\nHugging Face (huggingface.co) に接続できない場合は、設定の「手元のファイルを追加」から .bin を取り込めます。"
+                errorMessage = L("Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add a .bin file with “Add a local file…” in Settings.", spec.displayName, error.localizedDescription)
             }
         }
     }
@@ -430,7 +484,7 @@ final class AppModel {
         do {
             try store.delete(spec)
         } catch {
-            errorMessage = "削除できませんでした: \(error.localizedDescription)"
+            errorMessage = L("Could not delete: %@", error.localizedDescription)
         }
         refreshInstalled()
     }
@@ -440,8 +494,8 @@ final class AppModel {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [UTType(filenameExtension: "bin") ?? .data]
-        panel.message = "whisper.cpp のモデル (ggml-large-v3-turbo-q5_0.bin など) を選んでください"
-        panel.prompt = "追加"
+        panel.message = L("Choose a whisper.cpp model (such as ggml-large-v3-turbo-q5_0.bin)")
+        panel.prompt = L("Add")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             switch try store.importFile(from: url) {
@@ -450,7 +504,7 @@ final class AppModel {
                 modelID = spec.id
             case .vad:
                 vadRetryAfter = nil
-                errorMessage = "無音検出 (VAD) モデルを追加しました。"
+                errorMessage = L("Added the silence detection (VAD) model.")
             @unknown default:
                 // KikimimiWhisper は library evolution でビルドしているため、将来の値にも備える
                 refreshInstalled()
@@ -562,15 +616,15 @@ final class AppModel {
 
     func importAdapter() {
         guard isLLMInstalled else {
-            errorMessage = "先に LLM を取得してください (差分は、選んでいる LLM に合わせて確かめます)。"
+            errorMessage = L("Download an LLM first (the adapter is checked against the selected LLM).")
             return
         }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? .data]
-        panel.message = "追加学習の差分 (….lora.gguf) を選んでください。選んでいる LLM (\(currentLLM.name)) 用として入れます"
-        panel.prompt = "追加"
+        panel.message = L("Choose a fine-tuning adapter (….lora.gguf). It will be added for the selected LLM (%@)", currentLLM.name)
+        panel.prompt = L("Add")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let store = llmStore
         let key = adapterKey
@@ -594,7 +648,7 @@ final class AppModel {
         do {
             try llmStore.deleteAdapter(forModelKey: adapterKey)
         } catch {
-            errorMessage = "削除できませんでした: \(error.localizedDescription)"
+            errorMessage = L("Could not delete: %@", error.localizedDescription)
         }
         llm.adapterChanged()
         refreshLLMInstalled()
@@ -623,19 +677,19 @@ final class AppModel {
         let clean = cleanLinesForTraining()
         let records = FineTuneData.records(ledger: ledger, cleanLines: clean)
         guard !records.isEmpty else {
-            errorMessage = "書き出せる学習データがまだありません。監査の一覧で直しを反映したり元に戻したりすると、学習した直しがたまります。"
+            errorMessage = L("There is no training data to export yet. Learned corrections build up when you apply or undo corrections in the audit list.")
             return
         }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "kikimimi-training.jsonl"
         panel.allowedContentTypes = [UTType(filenameExtension: "jsonl") ?? .plainText]
         panel.canCreateDirectories = true
-        panel.message = "学習データ \(records.count) 件を書き出します (この Mac の中だけで使います)"
+        panel.message = LPlural(records.count, one: "Exports %d training record (used only on this Mac)", other: "Exports %d training records (used only on this Mac)")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try FineTuneData.jsonl(records).write(to: url, atomically: true, encoding: .utf8)
         } catch {
-            errorMessage = "保存できませんでした: \(error.localizedDescription)"
+            errorMessage = L("Could not save: %@", error.localizedDescription)
         }
     }
 
@@ -684,7 +738,7 @@ final class AppModel {
             } catch is CancellationError {
             } catch let error as URLError where error.code == .cancelled {
             } catch {
-                errorMessage = "\(spec.displayName) を取得できませんでした: \(error.localizedDescription)\n\nHugging Face (huggingface.co) に接続できない場合は、設定の「監査・翻訳」タブの「手元の GGUF を追加…」から取り込めます。"
+                errorMessage = L("Could not download %1$@: %2$@\n\nIf you cannot connect to Hugging Face (huggingface.co), you can add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.", spec.displayName, error.localizedDescription)
             }
         }
     }
@@ -702,7 +756,7 @@ final class AppModel {
         do {
             try llmStore.delete(fileNamed: name)
         } catch {
-            errorMessage = "削除できませんでした: \(error.localizedDescription)"
+            errorMessage = L("Could not delete: %@", error.localizedDescription)
         }
         refreshLLMInstalled()
     }
@@ -712,8 +766,8 @@ final class AppModel {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [UTType(filenameExtension: "gguf") ?? .data]
-        panel.message = "llama.cpp で動く LLM (.gguf) を選んでください"
-        panel.prompt = "追加"
+        panel.message = L("Choose an LLM (.gguf) that runs on llama.cpp")
+        panel.prompt = L("Add")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let store = llmStore
         importingLLM = true
@@ -750,8 +804,8 @@ final class AppModel {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.audio, .movie, .mpeg4Movie, .quickTimeMovie, .mp3, .wav, .aiff, .mpeg4Audio]
-        panel.message = "文字起こしする音声・動画ファイルを選んでください"
-        panel.prompt = "文字起こし"
+        panel.message = L("Choose audio or video files to transcribe")
+        panel.prompt = L("Transcribe")
         if panel.runModal() == .OK {
             enqueue(panel.urls)
         }
@@ -769,11 +823,12 @@ final class AppModel {
         }
         if !rejected.isEmpty {
             let limit = 5
-            var names = rejected.prefix(limit).map { $0.lastPathComponent }.joined(separator: "、")
+            let shown = rejected.prefix(limit).map { $0.lastPathComponent }
+            var names = shown.dropFirst().reduce(shown[0]) { L("%1$@, %2$@", $0, $1) }
             if rejected.count > limit {
-                names += "、ほか \(rejected.count - limit) 件"
+                names = L("%1$@, %2$@", names, LPlural(rejected.count - limit, one: "and %d more", other: "and %d more"))
             }
-            errorMessage = "音声・動画のファイルではないので、読み込みませんでした:\n" + names
+            errorMessage = L("These are not audio or video files, so they were not opened:\n%@", names)
         }
         return !accepted.isEmpty
     }
@@ -844,12 +899,12 @@ final class AppModel {
         switch job.status {
         case .queued:
             job.status = .cancelled
-            job.message = "中止しました"
+            job.message = L("Canceled")
             // 録音の音声は WAV に保存してある。やり直しはそのファイルから読むので、メモリの分は手放す (1 時間で約 230 MB)
             if job.url != nil { job.samples = nil }
         case .running:
             job.cancelFlag.set()
-            job.message = "中止しています…"
+            job.message = L("Canceling…")
         default:
             cancelPost(job)
         }
@@ -867,7 +922,7 @@ final class AppModel {
             job.postCancel.set()
         } else if hadQueue {
             // 録音のあいだ一時停止していた作業を取りやめた: 「録音を止めると再開します」を残さない
-            job.postNote = "監査・翻訳を中止しました。反映済みの結果は残しています。"
+            job.postNote = L("Audit and translation were canceled. Results already applied are kept.")
         }
     }
 
@@ -927,7 +982,7 @@ final class AppModel {
         let live = Self.liveFeed(for: job)
         do {
             if !store.isInstalled(spec) {
-                job.message = "\(spec.displayName) をダウンロード中 (初回のみ)…"
+                job.message = L("Downloading %@ (first time only)…", spec.displayName)
             }
             let modelURL = try await ensureModel(spec, cancelFlag: job.cancelFlag)
             if job.cancelFlag.isSet { throw WhisperError.cancelled }
@@ -935,7 +990,7 @@ final class AppModel {
             // 無音を飛ばす (VAD) は、ジョブだけの指定 (「やり直す」) を設定より先に見る
             let wantsVAD = job.vadOverride ?? useVAD
             if wantsVAD && !store.isVADInstalled {
-                job.message = "無音検出 (VAD) モデルを準備中…"
+                job.message = L("Preparing the silence detection (VAD) model…")
             }
             let vadPath = await vadModelPath(enabled: wantsVAD)
             if job.cancelFlag.isSet { throw WhisperError.cancelled }
@@ -944,7 +999,7 @@ final class AppModel {
             if let recorded = job.samples {
                 samples = recorded
             } else if let url = job.url {
-                job.message = "音声を読み込み中…"
+                job.message = L("Loading audio…")
                 samples = try await AudioDecoder.decode(url: url, cancelFlag: job.cancelFlag)
             } else {
                 throw WhisperError.emptyAudio
@@ -954,7 +1009,7 @@ final class AppModel {
 
             let duration = Double(samples.count) / AudioDecoder.sampleRate
             job.transcript = Transcript(sourceName: job.name, model: spec.id, duration: duration)
-            job.message = service.isReady(modelPath: modelURL.path, vad: vadPath != nil) ? "認識中…" : "モデルを読み込み中…"
+            job.message = service.isReady(modelPath: modelURL.path, vad: vadPath != nil) ? L("Transcribing…") : L("Loading model…")
 
             // 「日本語＋英語」は、区切りごとに日本語か英語かを判定して、その言語で文字にする
             let code = job.languageCode ?? languageCode
@@ -985,8 +1040,8 @@ final class AppModel {
                         guard job.status == .running else { return }
                         job.progress = fraction
                         job.message = phase.withoutVAD
-                            ? Self.vadRetryMessage + " \(Int(fraction * 100))%"
-                            : "認識中 \(Int(fraction * 100))%"
+                            ? L("Very little text even though there is continuous sound, so transcribing again without skipping silence… %d%%", Int(fraction * 100))
+                            : L("Transcribing %d%%", Int(fraction * 100))
                     }
                 },
                 onSegment: { segment in
@@ -1000,7 +1055,7 @@ final class AppModel {
                     Task { @MainActor in
                         guard job.status == .running else { return }
                         job.progress = 0
-                        job.message = "認識をやり直しています…"
+                        job.message = L("Restarting transcription…")
                     }
                 },
                 onVADRetry: { _ in
@@ -1019,10 +1074,10 @@ final class AppModel {
                         guard job.status == .running else { return }
                         switch stage {
                         case .checkingLanguages:
-                            job.message = "言語を確かめています…"
+                            job.message = L("Checking the spoken language…")
                         case .checkedLanguages(let probe):
                             if probe.isMixed {
-                                job.message = "日本語と英語が混ざっています。「日本語＋英語」で文字にします…"
+                                job.message = L("Japanese and English are mixed. Transcribing as “Japanese + English”…")
                             }
                         }
                     }
@@ -1051,23 +1106,23 @@ final class AppModel {
             )
             job.status = .done
             job.progress = 1
-            job.message = "完了"
+            job.message = L("Done")
         } catch let error as WhisperError where error == .cancelled {
             // 中止・失敗: 途中の結果が画面に残るので、貯まっている区間を先に足す (状態を変える前に。後始末もこれを含める)
             Self.applyLive(live.close(), to: job)
             job.status = .cancelled
-            job.message = "中止しました"
+            job.message = L("Canceled")
             if job.url != nil { job.samples = nil }
             cleanPartialTranscript(of: job)
         } catch {
             Self.applyLive(live.close(), to: job)
             if job.cancelFlag.isSet {
                 job.status = .cancelled
-                job.message = "中止しました"
+                job.message = L("Canceled")
             } else {
                 job.status = .failed
                 job.error = error.localizedDescription
-                job.message = "エラー"
+                job.message = L("Error")
             }
             // 音声を読む前に止まった録音: WAV に保存してあれば、メモリの分は手放す
             if job.url != nil { job.samples = nil }
@@ -1098,7 +1153,9 @@ final class AppModel {
 
     /// まとめた区間を足す。文字起こし中のジョブだけ (止まったあとに遅れて届いた分は、これまでどおり足さない)
     /// 自動で VAD なしでやり直している間の知らせ
-    static let vadRetryMessage = "音が続いているのに文字が少ないので、無音を飛ばさずにやり直しています…"
+    static var vadRetryMessage: String {
+        L("Very little text even though there is continuous sound, so transcribing again without skipping silence…")
+    }
 
     /// 文字起こしの段階 (run の中だけで使う。メインスレッドだけで触る)
     @MainActor
@@ -1140,7 +1197,7 @@ final class AppModel {
     /// まだ訳していない区間を日本語に訳す
     func translate(_ job: Job) {
         guard isLLMInstalled else {
-            errorMessage = "日本語に訳すには、ローカル LLM「\(currentLLM.name)」が必要です。設定の「監査・翻訳」から取得してください。"
+            errorMessage = L("Translating to Japanese needs the local LLM “%@”. Download it in the “Audit & translation” tab of Settings.", currentLLM.name)
             return
         }
         schedulePostTasks(for: job, automatic: false, tasks: [.translate])
@@ -1150,7 +1207,7 @@ final class AppModel {
     /// 文のまとめ方とプロンプトは「翻訳」と同じなので、あとの「翻訳」「残りを翻訳」はこの文を飛ばす
     func translateLine(_ id: UUID, in job: Job, redo: Bool = false) {
         guard isLLMInstalled else {
-            errorMessage = "日本語に訳すには、ローカル LLM「\(currentLLM.name)」が必要です。設定の「監査・翻訳」から取得してください。"
+            errorMessage = L("Translating to Japanese needs the local LLM “%@”. Download it in the “Audit & translation” tab of Settings.", currentLLM.name)
             return
         }
         guard job.status == .done, let transcript = job.transcript, !job.lineQueue.contains(id) else { return }
@@ -1217,25 +1274,26 @@ final class AppModel {
             if job.pausedForRecording {
                 job.pausedForRecording = false
                 job.postNote = Self.pausedNote
+                job.postNoteIsPause = true
             }
         }
-        // 一時停止から再開した: 「一時停止しています」を消す
-        if job.postNote == Self.pausedNote { job.postNote = nil }
+        // 一時停止から再開した: 「一時停止しています」を消す (文ではなく印で見る。画面の言語が変わっていても消せるように)
+        if job.postNoteIsPause { job.postNote = nil }
 
         // メモリの少ない Mac では、LLM を読み込む前に Whisper を手放す
         if useLLM && MemoryBudget.isTight { service.unload() }
-        let preparing = llm.isLoaded(modelPath: selection.url.path) ? "" : " (LLM を読み込み中)"
+        let preparing = !llm.isLoaded(modelPath: selection.url.path)
         /// 差分を読み込めなかったときの知らせ (差分なしで動かした)
         func adapterNote(_ note: String?) -> String? {
             guard let adapter, llm.failedAdapter() == adapter else { return note }
-            let warning = "追加学習の差分を読み込めなかったので、差分なしで動かしました (設定の「監査・翻訳」で差分を入れ直すか、外してください)。"
+            let warning = L("Could not load the fine-tuning adapter, so it ran without it (add the adapter again or remove it in the “Audit & translation” tab of Settings).")
             return note.map { $0 + " " + warning } ?? warning
         }
 
         do {
             switch task {
             case .audit:
-                job.postState = .running(.audit, message: "監査中…", progress: nil)
+                job.postState = .running(.audit, message: L("Auditing…"), progress: nil)
                 let segments = transcript.segmentsBeforeAudit
                 let options = AuditOptions(glossary: glossary, ledger: learned,
                                            decisions: transcript.audit?.userDecisions ?? [:])
@@ -1244,7 +1302,7 @@ final class AppModel {
                 let hadLLMAudit = transcript.audit?.model != nil
                 // LLM を消したあとで、LLM の監査をやり直そうとした: 規則だけで上書きすると前の LLM の直しと訳が外れるので、そのままにする
                 if hadLLMAudit && !useLLM {
-                    job.postNote = "LLM が見つからないため、前の監査の結果のままにしました。LLM でもう一度見直すには、設定の「監査・翻訳」から LLM を取得してください。"
+                    job.postNote = L("The LLM was not found, so the previous audit result is kept. To audit again with the LLM, download it in the “Audit & translation” tab of Settings.")
                     return
                 }
                 if !hadLLMAudit {
@@ -1258,23 +1316,23 @@ final class AppModel {
                     adopt(rules, in: job)
                 }
                 guard useLLM else {
-                    job.postNote = "LLM が未取得のため、繰り返しの見直しだけを行いました。聞き取りミスも見直すには、設定の「監査・翻訳」から LLM を取得してください。"
+                    job.postNote = L("No LLM has been downloaded, so only repetitions were checked. To also check for mishearings, download an LLM in the “Audit & translation” tab of Settings.")
                     return
                 }
                 // 規則の見直しのあいだに、メモリの少ない Mac で録音が始まった: LLM は録音のあとで
                 if pauseIfRecording(.audit, job: job) { return }
-                job.postState = .running(.audit, message: "監査中…" + preparing, progress: nil)
+                job.postState = .running(.audit, message: preparing ? L("Auditing… (loading the LLM)") : L("Auditing…"), progress: nil)
                 let partial = LockedBox<AuditReport>()
                 do {
                     let report = try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
                                                    shouldCancel: { flag.isSet }) { engine in
                         try Auditor.audit(segments, language: language, options: options, generator: engine,
-                                          modelName: selection.name + (engine.adapterPath == nil ? "" : " + 追加学習"),
+                                          modelName: engine.adapterPath == nil ? selection.name : L("%@ + fine-tuning", selection.name),
                                           shouldCancel: { flag.isSet },
                                           onProgress: { done, total in
                                               Task { @MainActor in
                                                   guard case .running(.audit, _, _) = job.postState, job.postCancel === flag else { return }
-                                                  job.postState = .running(.audit, message: "監査中 \(done)/\(total)",
+                                                  job.postState = .running(.audit, message: L("Auditing %1$d/%2$d", done, total),
                                                                            progress: total > 0 ? Double(done) / Double(total) : nil)
                                               }
                                           },
@@ -1287,8 +1345,8 @@ final class AppModel {
                     if hadLLMAudit {
                         // やり直しの途中: 前の監査の結果をそのまま残す
                         job.postNote = cancelled
-                            ? "監査のやり直しを中止しました。前の監査の結果のままです。"
-                            : "LLM で見直せなかったため、前の監査の結果のままです: " + error.localizedDescription
+                            ? L("The new audit was canceled. The previous audit result is kept.")
+                            : L("The LLM could not audit, so the previous audit result is kept: %@", error.localizedDescription)
                         return
                     }
                     // はじめての監査: LLM が見終えたまとまりまでの結果を反映する (規則の結果は反映済み)
@@ -1300,11 +1358,11 @@ final class AppModel {
                         adoptedPartial = false
                     }
                     if cancelled {
-                        job.postNote = "監査を中止しました。見終えた所までの結果を反映しています。"
+                        job.postNote = L("The audit was canceled. Results up to the point it reached are applied.")
                     } else if adoptedPartial {
-                        job.postNote = "LLM の見直しが途中で止まりました。見終えた所までの結果を反映しています: " + error.localizedDescription
+                        job.postNote = L("The LLM audit stopped partway. Results up to the point it reached are applied: %@", error.localizedDescription)
                     } else {
-                        job.postNote = "LLM で見直せなかったため、繰り返しの見直しだけを反映しました: " + error.localizedDescription
+                        job.postNote = L("The LLM could not audit, so only the repetition check was applied: %@", error.localizedDescription)
                     }
                     return
                 }
@@ -1312,7 +1370,7 @@ final class AppModel {
             case .translate:
                 guard useLLM else { return }
                 if pauseIfRecording(.translate, job: job) { return }
-                job.postState = .running(.translate, message: "翻訳中…" + preparing, progress: nil)
+                job.postState = .running(.translate, message: preparing ? L("Translating… (loading the LLM)") : L("Translating…"), progress: nil)
                 let segments = transcript.segments
                 let sources = Dictionary(segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
                 let options = TranslationOptions(glossary: glossary)
@@ -1332,7 +1390,7 @@ final class AppModel {
                         Task { @MainActor in
                             apply(batch)
                             guard case .running(.translate, _, _) = job.postState, job.postCancel === flag else { return }
-                            job.postState = .running(.translate, message: "翻訳中 \(done)/\(total)",
+                            job.postState = .running(.translate, message: L("Translating %1$d/%2$d", done, total),
                                                      progress: total > 0 ? Double(done) / Double(total) : nil)
                         }
                     }
@@ -1340,7 +1398,7 @@ final class AppModel {
                 }
                 apply(all)
                 if failed > 0 {
-                    job.postNote = "\(failed) 区間は訳せませんでした。もう一度「翻訳」を押すと、残りだけを訳し直します。"
+                    job.postNote = LPlural(failed, one: "%d segment could not be translated. Click “Translate” again to translate only the rest.", other: "%d segments could not be translated. Click “Translate” again to translate only the rest.")
                 }
                 job.postNote = adapterNote(job.postNote)
 
@@ -1365,7 +1423,7 @@ final class AppModel {
                         }
                     }
                 }
-                job.postState = .running(.translateLines, message: "選んだ文を翻訳中…" + preparing, progress: nil)
+                job.postState = .running(.translateLines, message: preparing ? L("Translating the selected sentences… (loading the LLM)") : L("Translating the selected sentences…"), progress: nil)
                 // 訳し直す文は、写しの上で訳を外してから文の区切りを決める (訳し終えるまで、画面には前の訳を残す)
                 let segments = Translator.clearingTranslations(of: job.lineRedo.intersection(only), in: transcript.segments)
                 let sources = Dictionary(segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
@@ -1386,7 +1444,7 @@ final class AppModel {
                         Task { @MainActor in
                             apply(batch)
                             guard case .running(.translateLines, _, _) = job.postState, job.postCancel === flag else { return }
-                            job.postState = .running(.translateLines, message: "選んだ文を翻訳中 \(done)/\(total)",
+                            job.postState = .running(.translateLines, message: L("Translating the selected sentences %1$d/%2$d", done, total),
                                                      progress: total > 0 ? Double(done) / Double(total) : nil)
                         }
                     }
@@ -1394,21 +1452,24 @@ final class AppModel {
                 }
                 apply(all)
                 if failed > 0 {
-                    job.postNote = "選んだ文のうち \(failed) 区間は訳せませんでした。行の「訳」をもう一度押すと、訳し直します。"
+                    job.postNote = LPlural(failed, one: "%d segment of the selected sentences could not be translated. Click the line’s “Translate” again to retry.", other: "%d segments of the selected sentences could not be translated. Click the line’s “Translate” again to retry.")
                 }
                 job.postNote = adapterNote(job.postNote)
             }
         } catch {
             if flag.isSet || (error as? LLMError) == .cancelled {
-                job.postNote = task == .audit ? "監査を中止しました。" : "翻訳を中止しました。訳せた所までは残しています。"
+                job.postNote = task == .audit ? L("The audit was canceled.") : L("Translation was canceled. What was translated so far is kept.")
             } else {
-                job.postNote = (task == .audit ? "監査" : "翻訳") + "できませんでした: " + error.localizedDescription
+                job.postNote = task == .audit ? L("Could not audit: %@", error.localizedDescription)
+                    : L("Could not translate: %@", error.localizedDescription)
             }
         }
     }
 
     /// 録音のあいだ一時停止しているときのお知らせ
-    static let pausedNote = "録音のあいだ一時停止しています。録音を止めると再開します。"
+    static var pausedNote: String {
+        L("Paused while recording. It resumes when you stop recording.")
+    }
 
     /// メモリの少ない Mac で録音中なら、この仕事を順番待ちの先頭に戻して true を返す (録音を止めると再開する)
     private func pauseIfRecording(_ task: PostTask, job: Job) -> Bool {
@@ -1463,7 +1524,7 @@ final class AppModel {
         recorder.onInterrupted = { [weak self] error in
             guard let self else { return }
             self.stopRecording()
-            self.errorMessage = "入力デバイスが切り替わったため録音を止めました。ここまでの録音を文字起こしします。(\(error.localizedDescription))"
+            self.errorMessage = L("Recording stopped because the input device changed. The recording so far will be transcribed. (%@)", error.localizedDescription)
         }
         do {
             try await recorder.start()
@@ -1532,11 +1593,11 @@ final class AppModel {
         defer { ensureWorker() }
 
         guard samples.count >= Int(LiveRecorder.sampleRate / 2) else {
-            errorMessage = "録音が短すぎます (0.5 秒未満)。"
+            errorMessage = L("The recording is too short (under 0.5 seconds).")
             return
         }
         let url = try? saveRecording(samples, startedAt: started)
-        let job = Job(name: "録音 \(Self.displayStamp.string(from: started))", url: url, isRecording: true, samples: samples)
+        let job = Job(name: L("Recording %@", Self.displayStamp.string(from: started)), url: url, isRecording: true, samples: samples)
         adopt(job)
         select(job)
         ensureWorker()
@@ -1550,14 +1611,15 @@ final class AppModel {
     private func saveRecording(_ samples: [Float], startedAt: Date) throws -> URL {
         let dir = recordingsDirectory
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent("録音-\(Self.fileStamp.string(from: startedAt)).wav")
+        let url = dir.appendingPathComponent("録音-\(Self.fileStamp.string(from: startedAt)).wav") // l10n: keep (保存するファイルの名前)
         try WAV.encode(samples: samples, sampleRate: Int(LiveRecorder.sampleRate)).write(to: url)
         return url
     }
 
     private static let displayStamp: DateFormatter = {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "ja_JP")
+        // 数だけの書式なので、言語に左右されない形にする (見た目は ja_JP の時と同じ)
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "M/d HH:mm"
         return f
     }()
@@ -1581,7 +1643,7 @@ final class AppModel {
         do {
             try Exporter.render(transcript, as: format, content: content).write(to: url, atomically: true, encoding: .utf8)
         } catch {
-            errorMessage = "保存できませんでした: \(error.localizedDescription)"
+            errorMessage = L("Could not save: %@", error.localizedDescription)
         }
     }
 
@@ -1590,14 +1652,14 @@ final class AppModel {
         guard let job = selectedJob, !job.notes.isEmpty else { return }
         let panel = NSSavePanel()
         let base = (job.name as NSString).deletingPathExtension
-        panel.nameFieldStringValue = "\(base.isEmpty ? "notes" : base)-メモ.md"
+        panel.nameFieldStringValue = "\(base.isEmpty ? "notes" : base)-メモ.md" // l10n: keep (保存するファイルの名前)
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try job.notes.write(to: url, atomically: true, encoding: .utf8)
         } catch {
-            errorMessage = "保存できませんでした: \(error.localizedDescription)"
+            errorMessage = L("Could not save: %@", error.localizedDescription)
         }
     }
 
@@ -1669,7 +1731,8 @@ extension AppModel {
     /// notes.md を書くまでに待つ長さ
     private static let notesSaveDelay: UInt64 = 800_000_000
     /// 版に戻す前に、自動で残す版の名前
-    static let beforeRestoreLabel = "戻す前の状態"
+    /// (保存される名前なので、作った時の画面の言語のまま残る。版を見分ける時は、名前ではなく origin で見る)
+    static var beforeRestoreLabel: String { L("Before restoring") }
 
     /// 確認用 (--selftest-ui-load): この場所に保存する (前の結果は読まない)
     func useLibrary(at root: URL) {
@@ -1710,7 +1773,7 @@ extension AppModel {
             job.notes = document.notes
             job.status = .done
             job.progress = 1
-            job.message = "完了"
+            job.message = L("Done")
             job.mixedSuggestionDismissed = true
             job.autoMixedNoticeDismissed = true
             job.vadSkippedNoticeDismissed = true
@@ -1719,8 +1782,9 @@ extension AppModel {
             adopt(job, at: jobs.count)
         }
         if !setAside.isEmpty {
-            let text = "保存した結果のうち \(setAside.count) 件を読めなかったので、一覧に出していません。"
-                + "元のファイルは、それぞれのフォルダに「document.unreadable-…」という名前でとってあります。"
+            let text = LPlural(setAside.count,
+                               one: "%d saved result could not be read, so it is not in the list. The original file is kept in its folder as “document.unreadable-…”.",
+                               other: "%d saved results could not be read, so they are not in the list. The original files are kept in their folders as “document.unreadable-…”.")
             errorMessage = errorMessage.map { $0 + "\n\n" + text } ?? text
         }
     }
@@ -1865,7 +1929,7 @@ extension AppModel {
             // 知らせるのは 1 回だけ (書き直すたびには出さない)。結果は一覧に残す
             if !job.saveErrorReported {
                 job.saveErrorReported = true
-                errorMessage = "「\(job.name)」を保存できませんでした (一覧には残しています): " + failure
+                errorMessage = L("Could not save “%1$@” (it stays in the list): %2$@", job.name, failure)
             }
             return
         }
@@ -1920,7 +1984,7 @@ extension AppModel {
                 do {
                     try LibraryWriter.trash(folder)
                 } catch {
-                    let message = "「\(name)」を消せませんでした: " + error.localizedDescription
+                    let message = L("Could not delete “%1$@”: %2$@", name, error.localizedDescription)
                     Task { @MainActor in report(message) }
                 }
             }
@@ -1960,8 +2024,8 @@ extension AppModel {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.audio, .movie, .mpeg4Movie, .quickTimeMovie, .mp3, .wav, .aiff, .mpeg4Audio]
-        panel.message = "「\(job.name)」の音声・動画ファイルを選んでください"
-        panel.prompt = "選ぶ"
+        panel.message = L("Choose the audio or video file for “%@”", job.name)
+        panel.prompt = L("Choose")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         job.url = url
         // 場所が変わったので保存する (Job.sourcePath の変化から)
@@ -1984,9 +2048,9 @@ extension AppModel {
 
     /// 版の作業ができないときの説明 (できるときは nil)
     func versionBlockedReason(_ job: Job) -> String? {
-        if library == nil || !job.inLibrary || job.status != .done { return "文字起こしが終わって保存した結果だけ、版を残せます。" }
-        if job.isPostActive { return "監査・翻訳の最中は、版を残したり戻したりできません。終わってからにしてください。" }
-        if job.versionBusy { return "版を書いています…" }
+        if library == nil || !job.inLibrary || job.status != .done { return L("Versions can be saved only for finished, saved transcription results.") }
+        if job.isPostActive { return L("You cannot save or restore versions during audit or translation. Wait until it finishes.") }
+        if job.versionBusy { return L("Saving the version…") }
         return nil
     }
 
@@ -2011,7 +2075,7 @@ extension AppModel {
             job.versions = updated.versions
             return true
         case .failure(let error):
-            errorMessage = "版を保存できませんでした: " + error.localizedDescription
+            errorMessage = L("Could not save the version: %@", error.localizedDescription)
             return false
         }
     }
@@ -2042,7 +2106,7 @@ extension AppModel {
             if notes { job.notes = restored.notes }
             return true
         case .failure(let error):
-            errorMessage = "版に戻せませんでした: " + error.localizedDescription
+            errorMessage = L("Could not restore the version: %@", error.localizedDescription)
             return false
         }
     }
@@ -2064,7 +2128,7 @@ extension AppModel {
             job.versions = updated.versions
             return true
         case .failure(let error):
-            errorMessage = "版を消せませんでした: " + error.localizedDescription
+            errorMessage = L("Could not delete the version: %@", error.localizedDescription)
             return false
         }
     }

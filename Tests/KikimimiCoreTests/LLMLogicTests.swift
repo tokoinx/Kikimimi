@@ -104,6 +104,18 @@ final class TextAnalysisTests: XCTestCase {
 }
 
 final class AuditorTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     func testFindRepeats() {
         let segments = [
             seg(0, "Today we will talk about the new release."),
@@ -787,6 +799,18 @@ final class TranslatorTests: XCTestCase {
 }
 
 final class BilingualExportTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     private func sample() -> Transcript {
         var t = Transcript(sourceName: "talk",
                            segments: [seg(0, "Hello | world."), seg(2, "こんにちは"), seg(4, "Untranslated line.")],

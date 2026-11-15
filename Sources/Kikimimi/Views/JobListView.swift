@@ -54,6 +54,8 @@ struct JobListView: View {
             if let job = model.jobs.first(where: { $0.id == model.pendingDeleteJobID }) {
                 DeleteConfirmSheet(job: job)
                     .environment(model)
+                    // 画面の言語を変えたら作り直す
+                    .id(model.uiLanguage)
             }
         }
     }

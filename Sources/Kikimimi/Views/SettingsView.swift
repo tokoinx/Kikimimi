@@ -7,6 +7,9 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var model = model
         TabView(selection: $model.settingsTab) {
+            GeneralSettingsForm()
+                .tabItem { Label(L("General"), systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             TranscriptionSettingsForm()
                 .tabItem { Label("文字起こし", systemImage: "waveform") }
                 .tag(SettingsTab.transcription)
@@ -16,6 +19,31 @@ struct SettingsView: View {
         }
         // 「監査・翻訳」のタブが、スクロールせずに収まる大きさ
         .frame(width: 600, height: 680)
+    }
+}
+
+/// 設定の「一般」タブ (画面の言語)
+struct GeneralSettingsForm: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Form {
+            Section {
+                Picker(L("Display language"), selection: $model.uiLanguage) {
+                    ForEach(UILanguage.allCases) { language in
+                        Text(language.nativeName).tag(language)
+                    }
+                }
+                Text(L("Standard menu bar items (Edit, Window, and so on) change after you reopen the app."))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Text(L("The spoken language for transcription is chosen in the “Transcription” tab."))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

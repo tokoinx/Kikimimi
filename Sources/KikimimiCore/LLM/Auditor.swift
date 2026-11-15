@@ -61,7 +61,7 @@ public enum Auditor {
             // 無音や音楽のところで Whisper が出しがちな定番の文 (実際にそう話すこともあるので提案どまり)
             if stockPhrases.contains(keys[i]) {
                 changes.append(AuditChange(kind: .delete, origin: .rule, original: segments[i],
-                                           reason: "無音や音楽のところで出やすい定番の誤認識の可能性", isConfident: false))
+                                           reason: L("Possibly a common misrecognition that tends to appear in silence or music"), isConfident: false))
                 flagged.insert(i)
                 continue
             }
@@ -92,14 +92,16 @@ public enum Auditor {
                         // すき間は、すぐ前の区間 (あいだの写しを消したあとに隣り合う区間) から測る
                         let gapToPrevious = segments[i].start - segments[i - 1].end
                         let confident = adjacent && ki.count >= confidentRepeatLength && gapToPrevious <= confidentRepeatGap
-                        finding = ("直前と同じ文の繰り返し (\(when))" + (confident ? "" : "。本当にくり返して話した可能性もあるため要確認"),
+                        finding = (confident
+                                   ? L("Repeats the previous sentence (%@)", when)
+                                   : L("Repeats the previous sentence (%@). It may really have been said twice, so needs review", when),
                                    confident)
                     }
                 } else if min(ki.count, kj.count) >= 15, TextSimilarity.isNearDuplicate(ki, kj, minimumRatio: 0.85) {
                     // 言い直し (「月曜に」→「火曜に」) のこともあるので、自動では消さない
-                    finding = ("直前とほぼ同じ文の繰り返し (\(when))。言い直しの可能性もあるため要確認", false)
+                    finding = (L("Nearly repeats the previous sentence (%@). It may be a rephrasing, so needs review", when), false)
                 } else if ki.count >= 10, kj.contains(ki) {
-                    finding = ("直前の文の一部の繰り返し (\(when))。要確認", false)
+                    finding = (L("Repeats part of the previous sentence (%@). Needs review", when), false)
                 } else {
                     finding = nil
                 }
@@ -139,7 +141,7 @@ public enum Auditor {
 
     /// 否定の言い方 (足されたり消されたりすると、意味が逆になる)
     static let negationWords: Set<String> = ["not", "no", "never", "none", "nothing", "nobody", "neither", "nor", "cannot"]
-    static let japaneseNegations = ["ない", "ません", "なかった", "ず", "ぬ", "無い"]
+    static let japaneseNegations = ["ない", "ません", "なかった", "ず", "ぬ", "無い"] // l10n: keep (判定に使う語)
     static let wordSeparators = CharacterSet.letters.union(CharacterSet(charactersIn: "'")).inverted
 
     static func negationCount(_ text: String) -> Int {
@@ -167,14 +169,14 @@ public enum Auditor {
     /// 自動では反映せず、確かめてもらうべき直しか (意味が変わりうる)。理由を返す
     static func meaningRisk(original: String, fixed: String, wrong: String, right: String) -> String? {
         if original.filter(\.isNumber) != fixed.filter(\.isNumber) || numberWordsIn(original) != numberWordsIn(fixed) {
-            return "数字が変わる直し"
+            return L("a correction that changes a number")
         }
-        if negationCount(original) != negationCount(fixed) { return "否定の有無が変わる直し" }
+        if negationCount(original) != negationCount(fixed) { return L("a correction that adds or removes a negation") }
         let kw = TextSimilarity.key(wrong), kr = TextSimilarity.key(right)
-        if kr.contains(kw) || kw.contains(kr) { return "語を足す・削るだけの直し" }
-        if kr.count * 2 < kw.count { return "語を大きく削る直し" }
+        if kr.contains(kw) || kw.contains(kr) { return L("a correction that only adds or removes words") }
+        if kr.count * 2 < kw.count { return L("a correction that removes many words") }
         // かなを漢字にする直し (こうせい → 構成 / 校正 / 厚生…) は、同じ音の候補から当て推量で選ぶことになる
-        if !Script.hasHan(wrong) && Script.hasHan(right) { return "漢字が新しく入る直し" }
+        if !Script.hasHan(wrong) && Script.hasHan(right) { return L("a correction that adds new kanji") }
         return nil
     }
 
@@ -210,7 +212,7 @@ public enum Auditor {
         // 「is correct」「正しいです」のように、感想として書く形だけを見る
         let lower = right.lowercased()
         let phrases = ["no error", "no change", "note:", "is correct", "are correct", "correct as", "already correct",
-                       "誤りなし", "問題なし", "正しいです", "は正しい", "が正しい", "のままで", "修正不要", "変更なし"]
+                       "誤りなし", "問題なし", "正しいです", "は正しい", "が正しい", "のままで", "修正不要", "変更なし"] // l10n: keep (判定に使う語)
         if phrases.contains(where: { lower.contains($0) && !wrong.lowercased().contains($0) }) {
             return true
         }
@@ -423,18 +425,18 @@ public enum Auditor {
                     let wholesale = TextSimilarity.key(wrong).count > TextSimilarity.key(segment.text).count * 6 / 10
                     let risk = meaningRisk(original: segment.text, fixed: fixed, wrong: wrong, right: right)
                     let confident = assessment.confident && !wholesale && risk == nil && votes == 2
-                    let note: String
+                    let reason: String
                     if confident {
-                        note = ""
+                        reason = L("Mishearing: “%1$@” → “%2$@”", wrong, right)
                     } else if let risk {
-                        note = " (\(risk)のため要確認)"
+                        reason = L("Mishearing: “%1$@” → “%2$@” (needs review: %3$@)", wrong, right, risk)
                     } else if votes < 2 {
-                        note = " (評価役の判断が割れたため要確認)"
+                        reason = L("Mishearing: “%1$@” → “%2$@” (needs review: the reviewers disagreed)", wrong, right)
                     } else {
-                        note = " (直す量が多いため要確認)"
+                        reason = L("Mishearing: “%1$@” → “%2$@” (needs review: a large change)", wrong, right)
                     }
                     found.append(AuditChange(kind: .fix, origin: .llm, original: segment, replacement: fixed,
-                                             reason: "聞き取りミス: 「\(wrong)」→「\(right)」" + note,
+                                             reason: reason,
                                              isConfident: confident, wrong: wrong, right: right))
                 }
             }
@@ -492,9 +494,13 @@ public enum Auditor {
 
     static func deletionReason(_ note: String, backed: Bool) -> String {
         let lower = note.lowercased()
-        let kind = lower.contains("dup") || lower.contains("repeat") || note.contains("繰り返") || note.contains("重複")
-            ? "繰り返し" : "実際には話していない文の可能性"
-        return backed ? "\(kind) (近くに同じ文があります。要確認)" : "\(kind) (裏付けが弱いため要確認)"
+        // 判定に使う語 (LLM の答えの文) なので訳さない
+        let repeated = lower.contains("dup") || lower.contains("repeat") || note.contains("繰り返") || note.contains("重複") // l10n: keep
+        if repeated {
+            return backed ? L("Repetition (the same sentence is nearby. Needs review)") : L("Repetition (weak evidence, so needs review)")
+        }
+        return backed ? L("Possibly a sentence that was not actually said (the same sentence is nearby. Needs review)")
+            : L("Possibly a sentence that was not actually said (weak evidence, so needs review)")
     }
 
     /// 規則 → LLM の順に見直し、1 区間 1 件にまとめた結果を返す。generator が nil なら規則だけ。
@@ -543,7 +549,7 @@ public enum Auditor {
             var change = change
             if change.isConfident, options.decisions[change.signature] == nil {
                 change.isConfident = false
-                change.reason += " (この行では、前に直しを元に戻しています。要確認)"
+                change.reason = L("%@ (You undid a correction on this line before. Needs review)", change.reason)
             }
             return (change.original.id, change)
         }, uniquingKeysWith: { first, _ in first })
@@ -564,7 +570,7 @@ public enum Auditor {
                     // 利用者が前に直しを元に戻した行は、別の直しでも、確かめてもらってから反映する
                     if change.kind == .fix, change.isConfident, revertedBefore(change) {
                         change.isConfident = false
-                        change.reason += " (この行では、前に直しを元に戻しています。要確認)"
+                        change.reason = L("%@ (You undid a correction on this line before. Needs review)", change.reason)
                     }
                     all.append(change)
                     continue

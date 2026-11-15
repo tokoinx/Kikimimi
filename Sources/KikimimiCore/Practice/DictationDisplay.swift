@@ -53,8 +53,10 @@ public enum DictationDisplay {
 
     /// 結果のまとめ: すべて合っていれば「全部合っています」、ほかは「12 / 14 語」(1 文字ずつのときは「字」)
     public static func summary(_ result: DictationCheck.Result) -> String {
-        if result.isPerfect { return "全部合っています" }
-        let unit = result.mode == .words ? "語" : "字"
-        return "\(result.correctCount) / \(result.expectedCount) \(unit)"
+        if result.isPerfect { return L("All correct") }
+        if result.mode == .words {
+            return L("%1$d / %2$d words", result.correctCount, result.expectedCount)
+        }
+        return L("%1$d / %2$d characters", result.correctCount, result.expectedCount)
     }
 }
