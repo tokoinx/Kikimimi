@@ -274,6 +274,19 @@ jobs:
           rm -f build/launch-busy.txt
           open build/Kikimimi.app --args --selftest-launch 5 --report "$PWD/build/launch-busy.txt"
           for i in $(seq 1 30); do [ -f build/launch-busy.txt ] && break; sleep 1; done
+          # 結果ができない時に理由を決められるよう、待った後の様子を出す (起動したか・どこまで進んだか・どこで待っているか)
+          echo "-- after the wait: processes --"
+          pgrep -fl Kikimimi || true
+          echo "-- after the wait: launch log --"
+          tail -5 ~/Library/Logs/Kikimimi/launch.log || true
+          echo "-- after the wait: the background self-test --"
+          tail -3 build/selftest-background.log || true
+          pid=$(pgrep -f 'selftest-launch' | head -1)
+          if [ -n "$pid" ]; then
+            echo "-- after the wait: where the launched app is (sample, first lines) --"
+            sample "$pid" 1 -file build/launch-busy-sample.txt || true
+            head -60 build/launch-busy-sample.txt || true
+          fi
           cat build/launch-busy.txt
           grep -q "LAUNCH SELFTEST OK" build/launch-busy.txt
           wait
