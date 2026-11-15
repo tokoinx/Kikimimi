@@ -147,17 +147,14 @@ struct ModelBar: View {
                 Button {
                     model.download(model.currentModel)
                 } label: {
-                    // ツールバーは狭いので、文字は短くし、大きさは説明と案内に出す
-                    // ツールバーの中では、ボタンの形の指定 (borderedProminent・tint) が効かず、灰色のボタンになる
-                    // (実機で見た)。青い地と白い字を、ここで自分で描く
-                    Label("ダウンロード", systemImage: "arrow.down.circle.fill")
-                        .labelStyle(.titleAndIcon)
-                        .font(.callout.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.blue, in: RoundedRectangle(cornerRadius: 6))
-                        .contentShape(RoundedRectangle(cornerRadius: 6))
+                    // ツールバーでは、青い印だけにする (文字は、説明と、下の案内に出す)。
+                    // ツールバーの中では、ボタンの形と色の指定 (borderedProminent・tint) が効かず、灰色になる
+                    // (実機で見た) ので、印の色をここで付ける
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.blue)
+                        .contentShape(Circle())
+                        .accessibilityLabel("モデルをダウンロード")
                 }
                 .buttonStyle(.plain)
                 .help("モデルをダウンロードしてください (約 \(currentModelSize)。初回のみ)。Hugging Face から取得します")
@@ -210,9 +207,10 @@ struct ModelBar: View {
     }
 
     private func menuLabel(_ spec: WhisperModelSpec) -> String {
-        let mark = model.installedModelIDs.contains(spec.id) ? "✓ " : ""
+        // チェックの印は、選んでいるモデルにだけ付く (メニューが自分で付ける)。
+        // 入れてあるモデルにも「✓」を付けていたが、2 つ選んでいるように見えるので、やめた
         let rec = spec.recommended ? " (おすすめ)" : ""
-        return "\(mark)\(spec.displayName)\(rec)"
+        return "\(spec.displayName)\(rec)"
     }
 }
 
@@ -336,7 +334,9 @@ struct EmptyStateView: View {
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
 
-                    if model.availability(of: model.currentModel) == .notInstalled {
+                    // モデルが 1 つも入っていない時 (初めて使う時) だけ出す。
+                    // 1 つでも入っていれば、入れていないモデルを選んだ時の案内は、ツールバーの印と、その下の案内に任せる
+                    if model.installedModelIDs.isEmpty, model.availability(of: model.currentModel) == .notInstalled {
                         VStack(spacing: 8) {
                             Text("モデルをダウンロードしてください")
                                 .font(.headline)
