@@ -209,6 +209,8 @@ final class AppModel {
     static let notesWidthRange: ClosedRange<Double> = 220...520
     /// 履歴の画面を開いているジョブ (nil なら閉じている)
     var historyJobID: Job.ID?
+    /// ゴミ箱に入れるかを確かめているジョブ (nil なら確かめの画面は閉じている)
+    var pendingDeleteJobID: Job.ID?
     /// 学習した直し (監査の一覧で利用者が決めた直し・設定で自分で書いた直し)。Mac の中だけに保存する
     var ledger = CorrectionLedger()
     /// 学習した直しを使う (監査の前に当てる・断った直しを出さない・正しい語を語彙のヒントに足す)
@@ -819,6 +821,7 @@ final class AppModel {
         jobs.removeAll { $0.id == job.id }
         if selectedJobID == job.id { select(jobs.first) }
         if historyJobID == job.id { historyJobID = nil }
+        if pendingDeleteJobID == job.id { pendingDeleteJobID = nil }
     }
 
     private enum Work {
@@ -1803,40 +1806,51 @@ extension AppModel {
     /// 結果を消す: 作業を止めて一覧から外し、保存したフォルダをゴミ箱に入れる
     /// (マイクの録音で、録音がアプリの録音フォルダにあれば、録音もゴミ箱へ)。
     /// ゴミ箱に入れるのも保存と同じ列で行うので、待っていた保存が、あとからフォルダを作り直すことはない
+    /// ゴミ箱に入れる計画を消す前に取り、その計画のとおりに消す (確認の画面に出した物と、消す物を同じにする)
     func delete(_ job: Job) {
+        let plan = deletionPlan(for: job)
         let id = job.id
         documentSaveTimers.removeValue(forKey: id)?.cancel()
         notesSaveTimers.removeValue(forKey: id)?.cancel()
         job.onChange = nil
-        let saved = job.inLibrary
         job.inLibrary = false
         remove(job)
-        guard saved, let writer = library else { return }
-        let folder = writer.store.folder(for: id)
-        // 録音を、ほかのジョブ (「やり直す」で作ったもの) も使っていれば、録音は残す
-        let sharedAudio = jobs.contains { $0.sourcePath != nil && $0.sourcePath == job.sourcePath }
-        let recording = job.isRecording && !sharedAudio ? recordingInAppFolder(job.sourcePath) : nil
+        guard !plan.isEmpty, let writer = library else { return }
+        let folder = plan.libraryFolder
+        let recording = plan.recording
         let name = job.name
         let report: @MainActor @Sendable (String) -> Void = { [weak self] message in
             self?.errorMessage = message
         }
         writer.async { _ in
-            do {
-                try LibraryWriter.trash(folder)
-            } catch {
-                let message = "「\(name)」を消せませんでした: " + error.localizedDescription
-                Task { @MainActor in report(message) }
+            if let folder {
+                do {
+                    try LibraryWriter.trash(folder)
+                } catch {
+                    let message = "「\(name)」を消せませんでした: " + error.localizedDescription
+                    Task { @MainActor in report(message) }
+                }
             }
             if let recording { try? LibraryWriter.trash(recording) }
         }
     }
 
-    /// アプリの録音フォルダの中のファイルなら、その場所 (ほかの所のファイルは消さない)
-    private func recordingInAppFolder(_ path: String?) -> URL? {
-        guard let path else { return nil }
-        let folder = recordingsDirectory.standardizedFileURL.path + "/"
-        let url = URL(fileURLWithPath: path).standardizedFileURL
-        return url.path.hasPrefix(folder) ? url : nil
+    /// ゴミ箱に入れる時に、何が消えて何が残るか。
+    /// 保存した結果なら、保存のフォルダ。マイクの録音で、録音がアプリの録音フォルダに在り、
+    /// ほかのジョブ (「やり直す」で作ったもの) が同じ録音を使っていなければ、録音も。元の音声ファイルは残す
+    func deletionPlan(for job: Job) -> DeletionPlan {
+        let folder = library?.store.folder(for: job.id)
+        let shared = jobs.contains { $0.id != job.id && $0.sourcePath != nil && $0.sourcePath == job.sourcePath }
+        return DeletionPlan.make(isSaved: job.inLibrary, libraryFolder: folder, isRecording: job.isRecording,
+                                 sourcePath: job.sourcePath, recordingsDirectory: recordingsDirectory,
+                                 audioUsedByOtherJobs: shared, isWorking: job.isActive || job.isPostActive)
+    }
+
+    /// ゴミ箱に入れるかを確かめる画面を出す (右クリック・ツールバー・メニュー・Delete キーのどれからも)。
+    /// 確認なしで消える道は作らない。録音中は受けない
+    func requestDelete(_ job: Job?) {
+        guard !isRecording, let job, jobs.contains(where: { $0.id == job.id }) else { return }
+        pendingDeleteJobID = job.id
     }
 
     /// 保存したフォルダを Finder で表示する

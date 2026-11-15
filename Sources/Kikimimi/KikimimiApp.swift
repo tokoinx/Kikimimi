@@ -334,6 +334,10 @@ struct KikimimiApp: App {
                 }
                 .keyboardShortcut(".")
                 .disabled(!(model.selectedJob.map { $0.isActive || $0.isPostActive } ?? false))
+                // ⌘⌫ は付けない (メニューのショートカットは、文字の欄より先に受けるので、メモの欄などで
+                // 「行の初めまで消す」が使えなくなる)。一覧では delete キーで同じ画面が出る
+                Button("ゴミ箱に入れる…") { model.requestDelete(model.selectedJob) }
+                    .disabled(model.selectedJob == nil || model.isRecording)
                 Divider()
                 ShowMainWindowButton()
             }

@@ -4,8 +4,6 @@ import SwiftUI
 
 struct JobListView: View {
     @Environment(AppModel.self) private var model
-    /// 消すか確かめているジョブ (保存した結果だけ確かめる)
-    @State private var pendingDelete: Job?
 
     var body: some View {
         List(selection: Binding(
@@ -27,32 +25,27 @@ struct JobListView: View {
                         if let url = job.url {
                             Button("Finder で表示") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                         }
-                        Button("削除…", role: .destructive) {
-                            // 保存していない結果 (文字起こし中・中止・失敗) は、これまでどおり、すぐに一覧から外す
-                            if job.inLibrary {
-                                pendingDelete = job
-                            } else {
-                                model.delete(job)
-                            }
+                        // どの結果も (保存していない・作業中の結果も)、確かめの画面を通す
+                        Button("ゴミ箱に入れる…", role: .destructive) {
+                            model.requestDelete(job)
                         }
+                        .disabled(model.isRecording)
                     }
             }
         }
         .listStyle(.sidebar)
         .navigationTitle("ききみみ")
-        .alert("この結果を削除しますか？", isPresented: Binding(
-            get: { pendingDelete != nil },
-            set: { if !$0 { pendingDelete = nil } }
-        ), presenting: pendingDelete) { job in
-            Button("削除", role: .destructive) {
-                pendingDelete = nil
-                model.delete(job)
+        // 一覧で Delete キー
+        .onDeleteCommand { model.requestDelete(model.selectedJob) }
+        // ゴミ箱に入れるかを確かめる画面 (右クリック・ツールバー・メニュー・Delete キー)
+        .sheet(isPresented: Binding(
+            get: { model.pendingDeleteJobID != nil },
+            set: { if !$0 { model.pendingDeleteJobID = nil } }
+        )) {
+            if let job = model.jobs.first(where: { $0.id == model.pendingDeleteJobID }) {
+                DeleteConfirmSheet(job: job)
+                    .environment(model)
             }
-            Button("キャンセル", role: .cancel) {
-                pendingDelete = nil
-            }
-        } message: { _ in
-            Text("文字起こし・訳・メモ・履歴をゴミ箱に入れます。")
         }
     }
 }

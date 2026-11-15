@@ -71,6 +71,15 @@ struct ContentView: View {
             .help("音声・動画ファイルを開く (⌘O)")
             .disabled(model.isRecording)
         }
+        ToolbarItem(placement: .navigation) {
+            Button {
+                model.requestDelete(model.selectedJob)
+            } label: {
+                Label("ゴミ箱に入れる", systemImage: "trash")
+            }
+            .help("選んでいる結果をゴミ箱に入れる (一覧では delete キーでも)")
+            .disabled(model.selectedJob == nil || model.isRecording)
+        }
         ToolbarItem(placement: .principal) {
             ModelBar()
         }

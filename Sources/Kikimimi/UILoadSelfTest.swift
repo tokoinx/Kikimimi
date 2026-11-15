@@ -253,7 +253,7 @@ enum UILoadSelfTest {
             lines += await load.takeScreenshots(into: screenshots)
         }
 
-        // 保存の確認 (ふだんと同じ AppModel の関数で)。絵を残すときは、そのあとメモの欄と履歴の画面も撮る
+        // 保存の確認 (ふだんと同じ AppModel の関数で)。絵を残すときは、そのあとメモの欄・履歴の画面・ゴミ箱に入れるかの確かめの画面も撮る
         let library = await load.libraryCheck(root: libraryRoot)
         lines += library.lines
         if let screenshots {
@@ -1613,6 +1613,12 @@ extension LoadRun {
         model.adopt(small, at: model.jobs.count)
         model.flushLibrary()
         let existed = fm.fileExists(atPath: store.folder(for: small.id).path)
+        // 確かめの画面に出す計画: ゴミ箱に入れるフォルダは、このあと無くなるフォルダと同じ
+        let plan = model.deletionPlan(for: small)
+        let expectedFolder = store.folder(for: small.id).standardizedFileURL
+        let planned = plan.libraryFolder?.standardizedFileURL
+        step("the deletion plan names the folder that is removed", planned == expectedFolder && plan.recording == nil,
+             "planned \(planned?.path ?? "none"), expected \(expectedFolder.path), recording \(plan.recording?.path ?? "none")")
         model.delete(small)
         model.flushLibrary()
         let remains = fm.fileExists(atPath: store.folder(for: small.id).path)
@@ -1687,8 +1693,8 @@ extension LoadRun {
         return lines
     }
 
-    /// 保存の確認のあとの絵: 07 メモの欄、08 履歴の画面 (シートのウインドウそのものを撮る。メインのウインドウを描いても、
-    /// シートは入らない)
+    /// 保存の確認のあとの絵: 07 メモの欄、08 履歴の画面、11 ゴミ箱に入れるかの確かめの画面
+    /// (08 と 11 は、シートのウインドウそのものを撮る。メインのウインドウを描いても、シートは入らない)
     func takeLibraryScreenshots(into directory: URL) async -> [String] {
         guard let window = MainWindow.all().first(where: { $0.isVisible }) else {
             return ["UI LOAD: screenshot failed (07, 08): no visible main window"]
@@ -1727,6 +1733,31 @@ extension LoadRun {
             lines.append("UI LOAD: screenshot failed 08-history-sheet.png: the history sheet is not shown")
         }
         model.historyJobID = nil
+        await settle()
+        // 履歴の画面が閉じきるまで待つ (次のシートを出せるように)
+        await UILoadSelfTest.sleep(0.6)
+        await settle()
+
+        // 11. 同じジョブの、ゴミ箱に入れるかの確かめの画面 (保存した結果と、残る元の音声ファイル)。
+        // 撮ったら閉じる (このジョブは消さない)
+        Self.live("scene 11: the delete confirmation sheet")
+        let plan = model.deletionPlan(for: job)
+        if plan.libraryFolder == nil || plan.keptAudio == nil {
+            lines.append("UI LOAD: screenshot 11-delete-confirm.png: the plan has folder \(plan.libraryFolder != nil),"
+                         + " kept audio \(plan.keptAudio != nil) (expected both)")
+        }
+        model.requestDelete(job)
+        await settle()
+        await UILoadSelfTest.sleep(0.6)
+        await settle()
+        if let sheet = window.attachedSheet, model.pendingDeleteJobID == job.id {
+            lines.append(shot("11-delete-confirm", in: sheet, to: directory))
+        } else {
+            lines.append("UI LOAD: screenshot failed 11-delete-confirm.png: the delete confirmation sheet is not shown")
+        }
+        model.pendingDeleteJobID = nil
+        await settle()
+        await UILoadSelfTest.sleep(0.6)
         await settle()
         if model.showNotes != wasShowingNotes { model.showNotes = wasShowingNotes }
         return lines
