@@ -2,6 +2,12 @@ import AVFoundation
 import Foundation
 import KikimimiCore
 
+/// 音声トラックの一覧を、読み込み用の別のスレッドへ渡すための包み。
+/// 安全な理由: 渡した後、元の側では一覧に触らない。渡した先では読むだけ。
+private struct TrackList: @unchecked Sendable {
+    let tracks: [AVAssetTrack]
+}
+
 /// 音声・動画ファイルを whisper.cpp が受け取れる 16 kHz モノラル Float に変換する。
 enum AudioDecoder {
     static let sampleRate: Double = 16_000
@@ -29,11 +35,12 @@ enum AudioDecoder {
             throw DecodeError.cannotRead(name)
         }
         guard !tracks.isEmpty else { throw DecodeError.noAudioTrack(name) }
+        let list = TrackList(tracks: tracks)
 
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[Float], Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    cont.resume(returning: try readPCM(asset: asset, tracks: tracks, name: name, from: from, to: to,
+                    cont.resume(returning: try readPCM(asset: asset, tracks: list.tracks, name: name, from: from, to: to,
                                                        cancelFlag: cancelFlag))
                 } catch {
                     cont.resume(throwing: error)

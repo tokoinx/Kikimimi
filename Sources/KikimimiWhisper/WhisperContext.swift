@@ -64,7 +64,8 @@ public struct WhisperOptions: Sendable {
 }
 
 /// 文字起こしの段階 (画面の表示用)
-public enum TranscriptionStage: Sendable {
+/// (`@frozen`: このパッケージはいつも全体を一緒に作り直すので、case を足した時は、使う側の switch がコンパイルで止まるほうがよい)
+@frozen public enum TranscriptionStage: Sendable {
     /// 日本語と英語が混ざっているかを確かめている
     case checkingLanguages
     /// 確かめ終わった (混ざっていれば、このあと「日本語＋英語」で文字にする)

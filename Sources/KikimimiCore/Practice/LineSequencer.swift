@@ -21,7 +21,8 @@ import Foundation
 /// 自動で次へ進むときは、長さのない行を飛ばす。
 public struct LineSequencer: Hashable, Sendable {
     /// アプリにしてほしいこと
-    public enum Action: Hashable, Sendable {
+    /// (`@frozen`: このパッケージはいつも全体を一緒に作り直すので、case を足した時は、使う側の switch がコンパイルで止まるほうがよい)
+    @frozen public enum Action: Hashable, Sendable {
         /// 何もしない (いまのままでよい)
         case nothing
         /// この行を、始まりから終わりまで流す。終わったら `lineFinished(line.id, token: token)` を呼ぶ

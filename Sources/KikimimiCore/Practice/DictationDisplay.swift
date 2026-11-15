@@ -3,7 +3,8 @@ import Foundation
 /// 書き取りの答え合わせの結果を、画面に並べる形にしたもの (色はアプリの側で付ける)
 public enum DictationDisplay {
     /// 並べる 1 つ分の文字の見え方
-    public enum Style: Hashable, Sendable {
+    /// (`@frozen`: このパッケージはいつも全体を一緒に作り直すので、case を足した時は、使う側の switch がコンパイルで止まるほうがよい)
+    @frozen public enum Style: Hashable, Sendable {
         /// 合っている語 (ふつうの色)
         case correct
         /// 打ち違えた語・余計に打った語 (赤で、取り消し線)
