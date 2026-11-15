@@ -274,6 +274,8 @@ jobs:
           rm -f build/launch-busy.txt
           open build/Kikimimi.app --args --selftest-launch 5 --report "$PWD/build/launch-busy.txt"
           for i in $(seq 1 30); do [ -f build/launch-busy.txt ] && break; sleep 1; done
+          # 合否は、30 秒待ったこの時点で結果ができていたかで決める (下の記録を出す数秒の間にできた分は、数えない)
+          ready=no; [ -f build/launch-busy.txt ] && ready=yes
           # 結果ができない時に理由を決められるよう、待った後の様子を出す (起動したか・どこまで進んだか・どこで待っているか)
           echo "-- after the wait: processes --"
           pgrep -fl Kikimimi || true
@@ -287,6 +289,7 @@ jobs:
             sample "$pid" 1 -file build/launch-busy-sample.txt || true
             head -60 build/launch-busy-sample.txt || true
           fi
+          if [ "$ready" = no ]; then echo "no report 30 s after open"; exit 1; fi
           cat build/launch-busy.txt
           grep -q "LAUNCH SELFTEST OK" build/launch-busy.txt
           wait
