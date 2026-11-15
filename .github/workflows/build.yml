@@ -271,6 +271,11 @@ jobs:
           sleep 3
           pgrep -fl Kikimimi || true
           lsappinfo list | grep -i -A6 kikimimi || echo "(the self-test is not registered as an application)"
+          # 参考: Metal のキャッシュの置き場。同じアプリが同時に 2 つ動くと、2 つ目は別のファイル (libraries1.data) を使い、
+          # そこが空だとシェーダーの作り直しになる (手元で確かめた)。open の前と、待った後の中身を出す
+          metal_cache="$(getconf DARWIN_USER_CACHE_DIR)local.kikimimi.app/com.apple.metal"
+          echo "-- Metal cache before open --"
+          ls -lT "$metal_cache"/*/ || true
           rm -f build/launch-busy.txt
           open build/Kikimimi.app --args --selftest-launch 5 --report "$PWD/build/launch-busy.txt"
           for i in $(seq 1 30); do [ -f build/launch-busy.txt ] && break; sleep 1; done
@@ -281,6 +286,8 @@ jobs:
           pgrep -fl Kikimimi || true
           echo "-- after the wait: launch log --"
           tail -5 ~/Library/Logs/Kikimimi/launch.log || true
+          echo "-- after the wait: Metal cache --"
+          ls -lT "$metal_cache"/*/ || true
           echo "-- after the wait: the background self-test --"
           tail -3 build/selftest-background.log || true
           pid=$(pgrep -f 'selftest-launch' | head -1)
