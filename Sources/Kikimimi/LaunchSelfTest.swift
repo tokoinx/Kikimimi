@@ -12,6 +12,9 @@ import Foundation
 ///
 /// 終了コード: 0 = 成功、1 = 見えているウインドウが無い、3 = 画面の準備が終わらない (メインスレッドが止まっている)、
 /// 4 = 呼ばれてもウインドウが戻らない
+///
+/// whisper.cpp / llama.cpp の情報は、別のスレッドで取る。取るのに Metal の準備で 15〜46 秒かかる事があり、
+/// メインスレッドで待つと、止まった時の見張りも仕掛けられず、結果も書かれないため。
 enum LaunchSelfTest {
     /// 起動の前に呼ぶ。数秒後の確認を予約するだけで、すぐに戻る
     static func arm(arguments: [String]) {
@@ -31,24 +34,30 @@ enum LaunchSelfTest {
             LaunchLog.versionLine + " launch self-test",
             LaunchLog.environmentLine,
             "other instances: \(LaunchLog.otherInstances())",
-            "whisper.cpp: " + LaunchLog.whisperInfo,
-            "llama.cpp:   " + LaunchLog.llamaInfo,
         ]
+        // whisper.cpp / llama.cpp の情報は別のスレッドで取る。結果を書く時に、取れている分だけを入れる
+        let engines = EngineInfo()
+        DispatchQueue.global(qos: .userInitiated).async {
+            engines.setWhisper(LaunchLog.whisperInfo)
+            engines.setLlama(LaunchLog.llamaInfo)
+        }
+        // 結果を書く。見出しの次に、その時点で取れている whisper.cpp / llama.cpp の情報を入れる
+        let report: ([String], Int32) -> Never = { lines, code in
+            finish(header + engines.lines() + lines, code: code, reportPath: reportPath)
+        }
         let hangLimit = seconds + (reopen ? 45 : 20)
         // メインスレッドが止まったまま (画面の準備が終わらない) なら、別のスレッドから知らせて終わる
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
-            finish(header + ["LAUNCH SELFTEST FAILED: the main thread did not respond for \(Int(hangLimit)) s"],
-                   code: 3, reportPath: reportPath)
+            report(["LAUNCH SELFTEST FAILED: the main thread did not respond for \(Int(hangLimit)) s"], 3)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
-            var first = header
+            var first: [String] = []
             let visible = MainActor.assumeIsolated { describeWindows(into: &first) }
             guard visible > 0 else {
-                finish(first + ["LAUNCH SELFTEST FAILED: the app is running but shows no main window"],
-                       code: 1, reportPath: reportPath)
+                report(first + ["LAUNCH SELFTEST FAILED: the app is running but shows no main window"], 1)
             }
             guard reopen else {
-                finish(first + ["LAUNCH SELFTEST OK"], code: 0, reportPath: reportPath)
+                report(first + ["LAUNCH SELFTEST OK"], 0)
             }
             // ウインドウを全部閉じても動き続ける状態 (作業中と同じ) にしてから、呼び戻せるかを確かめる
             MainActor.assumeIsolated {
@@ -69,10 +78,9 @@ enum LaunchSelfTest {
                     last.append("reopen (\(external ? "external open" : "sent to self")): \(back) visible main window(s),"
                                 + " opened by the app's own fallback \(helped) time(s)")
                     guard back > 0 else {
-                        finish(last + ["LAUNCH SELFTEST FAILED: no window came back after the reopen request"],
-                               code: 4, reportPath: reportPath)
+                        report(last + ["LAUNCH SELFTEST FAILED: no window came back after the reopen request"], 4)
                     }
-                    finish(last + ["LAUNCH SELFTEST OK"], code: 0, reportPath: reportPath)
+                    report(last + ["LAUNCH SELFTEST OK"], 0)
                 }
             }
         }
@@ -111,5 +119,31 @@ enum LaunchSelfTest {
             try? text.write(toFile: (reportPath as NSString).expandingTildeInPath, atomically: true, encoding: .utf8)
         }
         exit(code)
+    }
+}
+
+/// whisper.cpp / llama.cpp の情報の入れ物。別のスレッドが書き、結果を書く時に読む (ロックで守る)
+private final class EngineInfo: @unchecked Sendable {
+    private let lock = NSLock()
+    private let started = Date()
+    private var whisper: String?
+    private var llama: String?
+
+    func setWhisper(_ value: String) {
+        lock.lock(); defer { lock.unlock() }
+        whisper = value
+    }
+
+    func setLlama(_ value: String) {
+        lock.lock(); defer { lock.unlock() }
+        llama = value
+    }
+
+    /// 取れている物は値を、まだの物は取り始めてからの秒数を書いた 2 行
+    func lines() -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        let waiting = "(not ready after \(Int(Date().timeIntervalSince(started))) s)"
+        return ["whisper.cpp: " + (whisper ?? waiting),
+                "llama.cpp:   " + (llama ?? waiting)]
     }
 }
