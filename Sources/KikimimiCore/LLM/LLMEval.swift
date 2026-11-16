@@ -178,12 +178,14 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
     public var retryFixed = 0
     /// 訳の記憶 (`--memory`) に当たって、LLM を呼ばずに記憶の訳を置いた行の数。古い結果には無い (0 と読む)
     public var reused = 0
+    /// 似た文の手本 (`--examples`) を 1 件以上足した LLM の呼び出しの数。古い結果には無い (0 と読む)
+    public var examplesUsed = 0
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case cases, lines, translated, inTarget, numbersKept, numbersChecked, termsKept, termsChecked
-        case copied, repeated, chrFStatistics, chrF, seconds, retried, retryFixed, reused
+        case copied, repeated, chrFStatistics, chrF, seconds, retried, retryFixed, reused, examplesUsed
     }
 
     /// 日本語だけを採点していた頃の項目の名前
@@ -211,6 +213,7 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
         retried = try c.decodeIfPresent(Int.self, forKey: .retried) ?? 0
         retryFixed = try c.decodeIfPresent(Int.self, forKey: .retryFixed) ?? 0
         reused = try c.decodeIfPresent(Int.self, forKey: .reused) ?? 0
+        examplesUsed = try c.decodeIfPresent(Int.self, forKey: .examplesUsed) ?? 0
     }
 
     public mutating func add(_ other: TranslationEvalScore) {
@@ -234,6 +237,7 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
         retried += other.retried
         retryFixed += other.retryFixed
         reused += other.reused
+        examplesUsed += other.examplesUsed
     }
 
     public var summary: String {
@@ -243,6 +247,7 @@ public struct TranslationEvalScore: Codable, Hashable, Sendable {
                       cases, lines, translated, inTarget, numbersKept, numbersChecked, termsKept, termsChecked, copied, repeated)
             + "chrF \(points), " + String(format: "split retries %d (used %d), %.1f s", retried, retryFixed, seconds)
             + (reused > 0 ? ", from memory \(reused) lines" : "")
+            + (examplesUsed > 0 ? ", calls with examples \(examplesUsed)" : "")
     }
 }
 
@@ -533,6 +538,8 @@ public enum LLMEval {
         public var retryFixed: Int?
         /// 訳の記憶に当たった行の数 (採点し直しても、そのまま使う。古い結果・`--memory` の無い測りには無い)
         public var reused: Int?
+        /// 似た文の手本を足した LLM の呼び出しの数 (採点し直しても、そのまま使う。古い結果・`--examples` の無い測りには無い)
+        public var examplesUsed: Int?
         /// 問題の訳語の対 (古い結果・対の無い問題には無い)
         public var terms: [TranslationEvalTerm]?
 
@@ -593,6 +600,7 @@ public enum LLMEval {
         score.retried = o.retried ?? 0
         score.retryFixed = o.retryFixed ?? 0
         score.reused = o.reused ?? 0
+        score.examplesUsed = o.examplesUsed ?? 0
         var details: [String] = []
         var chrF: ChrF.Statistics?
         var texts: [String] = []
@@ -689,10 +697,12 @@ public enum LLMEval {
     /// splitRetry が false なら、訳し直しを切る (`--no-split-retry`)。
     /// useTerms が false なら、問題の訳語の対を翻訳に渡さない (`--no-terms`。採点は対で行う)。
     /// memory を渡すと (`--memory`)、その記憶 (覚えた文・訳語の対・止める検査) を翻訳に渡す (`caseLookup`)。
-    /// ただし問題の行と同じ文 (そろえた原文が同じ) は記憶から抜く (答えを見て訳す事になるため。`memoryExclusions`)
+    /// ただし問題の行と同じ文 (そろえた原文が同じ) は記憶から抜く (答えを見て訳す事になるため。`memoryExclusions`)。
+    /// examples が 1 以上なら (`--examples N`。memory が要る)、記憶の似た文を、多くて N 件手本として指示文に足す
+    /// (`TranslationOptions.memoryExamples`。問題の行と同じ文は、手本にも使わない)
     public static func runTranslation(_ cases: [TranslationEvalCase], generator: any TextGenerating,
                                       ledger: CorrectionLedger? = nil, splitRetry: Bool = true, useTerms: Bool = true,
-                                      memory: TranslationMemory? = nil,
+                                      memory: TranslationMemory? = nil, examples: Int = 0,
                                       detector: LanguageDetector? = LLMEval.defaultLanguageDetector,
                                       shouldCancel: () -> Bool = { false },
                                       onCase: (_ done: Int, _ total: Int) -> Void = { _, _ in })
@@ -711,7 +721,8 @@ public enum LLMEval {
             let excluded = lookup.map { memoryExclusions(segments, memory: $0) } ?? []
             let run = try Translator.translateSummarizing(segments, language: c.language, target: c.targetLanguage,
                                                           options: TranslationOptions(glossary: glossary,
-                                                                                      splitRetry: splitRetry),
+                                                                                      splitRetry: splitRetry,
+                                                                                      memoryExamples: memory == nil ? 0 : examples),
                                                           memory: lookup, memoryExcluding: excluded,
                                                           generator: generator, shouldCancel: shouldCancel) { batch, _, _ in
                 for result in batch { byHead[result.head] = result }
@@ -744,10 +755,12 @@ public enum LLMEval {
             result.score.retried = run.retried
             result.score.retryFixed = run.retryFixed
             result.score.reused = reused
+            result.score.examplesUsed = run.examplesUsed
             var saved = output(c, units: units, seconds: seconds)
             saved.retried = run.retried
             saved.retryFixed = run.retryFixed
             if memory != nil { saved.reused = reused }
+            if memory != nil, examples > 0 { saved.examplesUsed = run.examplesUsed }
             outputs.append(saved)
             total.add(result.score)
             byTarget[c.targetLanguage, default: TranslationEvalScore()].add(result.score)

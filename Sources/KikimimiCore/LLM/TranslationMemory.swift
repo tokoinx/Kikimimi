@@ -383,6 +383,9 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
     /// この訳す先で止める検査 (利用者の判定から学んだ物。`TranslationMemory.suppressedChecks(target:)`)。
     /// 翻訳は、覚えに残す印から、この検査の印を外す (訳し直しの引き金は、外す前の印で決める)
     public let suppressedChecks: Set<String>
+    /// 似た文の手本の候補 (取り分けでない文だけ。そろえた原文の順)。
+    /// 使うのは `TranslationOptions.memoryExamples` が 1 以上の時だけ (`MemoryExampleIndex`)
+    public let examples: [MemoryExample]
 
     public init(target: String, sentences: [RememberedTranslation], terms: [TermPair] = [],
                 suppressedChecks: Set<String> = []) {
@@ -390,6 +393,8 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
         self.target = t
         self.suppressedChecks = suppressedChecks.intersection(TranslationGate.learnable)
         var map: [String: String] = [:]
+        // 手本に使えるか (取り分けでないか)。同じ文の新しい方で決める
+        var usable: [String: Bool] = [:]
         // 同じ文が 2 つ在れば、新しく直した方を使う
         for entry in sentences.sorted(by: { $0.updated < $1.updated })
         where TranslationMemory.normalizedTarget(entry.target) == t {
@@ -397,8 +402,13 @@ public struct TranslationMemoryLookup: Hashable, Sendable {
             let value = entry.translation.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !key.isEmpty, !value.isEmpty else { continue }
             map[key] = value
+            usable[key] = !entry.heldOut
         }
         translations = map
+        examples = map.keys.sorted().compactMap { key in
+            guard usable[key] == true, let value = map[key] else { return nil }
+            return MemoryExample(source: key, translation: TermPair.cleaned(value))
+        }
         // 同じ原語が 2 つ在れば、新しく決めた方を使う
         var seen = Set<String>()
         var pairs: [TermPair] = []
@@ -626,5 +636,125 @@ public struct TermPair: Codable, Hashable, Identifiable, Sendable {
     /// 理由の文に出す並び ("X → Y")。原語と訳語が同じ (大文字と小文字を除いて) なら、訳語だけ
     var label: String {
         source.lowercased() == translation.lowercased() ? translation : source + " → " + translation
+    }
+}
+
+// MARK: 似た文を手本にする (実験。既定は切)
+
+/// 手本の候補 1 件: 覚えた文 (取り分けでない物) の、そろえた原文と利用者の訳 (空白をそろえた物)
+public struct MemoryExample: Hashable, Sendable {
+    public let source: String
+    public let translation: String
+
+    public init(source: String, translation: String) {
+        self.source = source
+        self.translation = translation
+    }
+}
+
+/// 送る行に似た、記憶の文を選ぶ (`TranslationOptions.memoryExamples` が 1 以上の時だけ作る)。
+///
+/// 1 回の翻訳 (`Translator.translateSummarizing`) で 1 度だけ作り、送るまとまりごとに `select(for:limit:)` で選ぶ。
+/// 似ているかの点は、原文どうしの chrF (字の n-gram の一致、0〜100)。chrF は β = 2 で再現率を重く見るので、
+/// 片方の向きだけで測ると、長い文 (参照の側なら短い文) が高く出やすい。手本の向きで偏らないように、
+/// 両方の向きの点の平均 (対称の点) を使う。
+/// 記憶が大きくても遅くならないように、先に字の 3-gram の集合の重なり (Dice 係数) で粗く絞り、
+/// 上位 `shortlist` 件にだけ、Dice 係数のいちばん高かった行との chrF を付ける
+/// (行のどれか 1 つに対する点を、その文の点とする。chrF を全部の行と付けると、行の数だけ遅くなる)
+public struct MemoryExampleIndex: Sendable {
+    /// 手本に使う点の下限 (対称の chrF)。初めに置いた値で、測って決めた値ではない
+    public static let minimumScore = 30.0
+    /// 長い手本は使わない (原文か訳が、この字数を超える物は外す。指示文を伸ばしすぎないため)
+    public static let maximumCharacters = 200
+    /// 粗く絞った後に chrF を付ける件数の上限
+    public static let shortlist = 24
+
+    struct Candidate: Sendable {
+        var example: MemoryExample
+        /// 字の 3-gram (小さい順に並べ、重なりを数えやすくした物)
+        var grams: [UInt64]
+    }
+
+    let candidates: [Candidate]
+
+    /// 候補を作る。excluding (そろえた原文) に在る文は使わない: 今の翻訳の原文と同じ文
+    /// (U2 の再利用でもう訳が置かれる文・評価で抜く文。答えを見て訳す事になる)
+    public init(_ examples: [MemoryExample], excluding: Set<String>) {
+        candidates = examples.compactMap { e in
+            guard !excluding.contains(e.source), e.source.count <= Self.maximumCharacters,
+                  e.translation.count <= Self.maximumCharacters, !e.translation.isEmpty else { return nil }
+            let grams = Self.trigrams(e.source)
+            guard !grams.isEmpty else { return nil }
+            return Candidate(example: e, grams: grams)
+        }
+    }
+
+    /// 手本に使える候補の数
+    public var count: Int { candidates.count }
+
+    /// 字の 3-gram の集合 (空白を除いたコードポイントの並びから。chrF と同じ数え方)。重なりを数えやすいよう、小さい順に並べて返す
+    static func trigrams(_ text: String) -> [UInt64] {
+        let s: [UInt32] = text.unicodeScalars.filter { !$0.properties.isWhitespace }.map(\.value)
+        guard s.count >= 3 else { return [] }
+        var out = Set<UInt64>()
+        for i in 0...(s.count - 3) {
+            out.insert(UInt64(s[i]) << 42 | UInt64(s[i + 1]) << 21 | UInt64(s[i + 2]))
+        }
+        return out.sorted()
+    }
+
+    /// 小さい順に並べた 2 つの集合の、重なりの数
+    static func sharedCount(_ a: [UInt64], _ b: [UInt64]) -> Int {
+        var i = 0, j = 0, shared = 0
+        while i < a.count && j < b.count {
+            if a[i] == b[j] {
+                shared += 1
+                i += 1
+                j += 1
+            } else if a[i] < b[j] {
+                i += 1
+            } else {
+                j += 1
+            }
+        }
+        return shared
+    }
+
+    /// 2 つの文の対称の点 (両方の向きの chrF の平均)
+    public static func similarity(_ a: String, _ b: String) -> Double {
+        (ChrF.sentence(hypothesis: a, reference: b) + ChrF.sentence(hypothesis: b, reference: a)) / 2
+    }
+
+    /// 送る行 lines に似た手本を、多くて limit 件選ぶ (点の高い順)。
+    /// 候補の点は、行のどれか 1 つに対する、いちばん高い点。`minimumScore` に届かない物は使わない
+    public func select(for lines: [String], limit: Int) -> [MemoryExample] {
+        guard limit > 0, !candidates.isEmpty else { return [] }
+        let sent = lines.map { TranslationMemory.normalizedSource($0) }.filter { !$0.isEmpty }
+        let sentGrams = sent.map(Self.trigrams)
+        guard sentGrams.contains(where: { !$0.isEmpty }) else { return [] }
+        // 粗く絞る: 3-gram の集合の Dice 係数 (行ごとの最大と、その行)
+        var rough: [(index: Int, dice: Double, line: Int)] = []
+        for (i, c) in candidates.enumerated() {
+            var best = 0.0, bestLine = 0
+            for (k, g) in sentGrams.enumerated() where !g.isEmpty {
+                let shared = Self.sharedCount(g, c.grams)
+                guard shared > 0 else { continue }
+                let dice = 2 * Double(shared) / Double(g.count + c.grams.count)
+                if dice > best {
+                    best = dice
+                    bestLine = k
+                }
+            }
+            if best > 0 { rough.append((i, best, bestLine)) }
+        }
+        rough.sort { $0.dice != $1.dice ? $0.dice > $1.dice : $0.index < $1.index }
+        // 点を付ける (Dice 係数のいちばん高かった行との、対称の chrF)
+        var scored: [(index: Int, score: Double)] = []
+        for r in rough.prefix(Self.shortlist) {
+            let score = Self.similarity(sent[r.line], candidates[r.index].example.source)
+            if score >= Self.minimumScore { scored.append((r.index, score)) }
+        }
+        scored.sort { $0.score != $1.score ? $0.score > $1.score : $0.index < $1.index }
+        return scored.prefix(limit).map { candidates[$0.index].example }
     }
 }

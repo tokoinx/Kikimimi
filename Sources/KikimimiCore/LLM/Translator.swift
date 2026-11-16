@@ -15,14 +15,18 @@ public struct TranslationOptions: Sendable {
     /// 訳の後ろが抜けた (関門の `short` の印が付いた) 訳を、文に分けて 1 回だけ訳し直すか (既定は入)。
     /// 評価で入・切を比べるための口 (`--eval-llm … --no-split-retry`)
     public var splitRetry: Bool
+    /// 訳の記憶の中の似た文を、手本として指示文に足す件数の上限 (実験。既定は 0 = 切)。
+    /// 0 の時は、指示文も訳も、この口を足す前と 1 字も変わらない。評価の `--eval-llm … --memory … --examples N` で入にする
+    public var memoryExamples: Int
 
     public init(glossary: String? = nil, maxLinesPerChunk: Int = 10, maxTokensPerChunk: Int = 500, contextLines: Int = 3,
-                splitRetry: Bool = true) {
+                splitRetry: Bool = true, memoryExamples: Int = 0) {
         self.glossary = glossary
         self.maxLinesPerChunk = maxLinesPerChunk
         self.maxTokensPerChunk = maxTokensPerChunk
         self.contextLines = contextLines
         self.splitRetry = splitRetry
+        self.memoryExamples = memoryExamples
     }
 }
 
@@ -74,10 +78,12 @@ public struct TranslationRunSummary: Sendable, Hashable {
     /// 訳し直しで増えた LLM の呼び出しの数と、送った行 (文のかけら) の数 (sentToLLM には足さない)
     public var retryCalls: Int
     public var retryLines: Int
+    /// 似た文の手本を 1 件以上足した LLM の呼び出しの数 (`TranslationOptions.memoryExamples` が 0 の時は、いつも 0)
+    public var examplesUsed: Int
 
     public init(failed: Int = 0, fromMemory: Int = 0, sentToLLM: Int = 0, flagged: Int = 0,
                 rejected: [TranslationResult] = [], retried: Int = 0, retryFixed: Int = 0, retryCalls: Int = 0,
-                retryLines: Int = 0) {
+                retryLines: Int = 0, examplesUsed: Int = 0) {
         self.failed = failed
         self.fromMemory = fromMemory
         self.sentToLLM = sentToLLM
@@ -87,6 +93,7 @@ public struct TranslationRunSummary: Sendable, Hashable {
         self.retryFixed = retryFixed
         self.retryCalls = retryCalls
         self.retryLines = retryLines
+        self.examplesUsed = examplesUsed
     }
 }
 
@@ -254,9 +261,11 @@ public enum Translator {
     }
 
     /// 指示文の user の部分。terms (訳語の対) は、この 1 回に送る行に出る物だけを渡す (`checkedTranslateLines`)。
-    /// terms が空の時は、対を入れる前の指示文と 1 字も変わらない (評価の前後を比べるため)
+    /// terms が空の時は、対を入れる前の指示文と 1 字も変わらない (評価の前後を比べるため)。
+    /// examples (記憶の似た文の手本) も同じく、空の時は手本を入れる前の指示文と 1 字も変わらない。
+    /// 手本は、訳語の対の後・直前の行の前に置く
     static func userPrompt(lines: [String], context: [(source: String, translation: String)], glossary: String?,
-                           terms: [TermPair] = []) -> String {
+                           terms: [TermPair] = [], examples: [MemoryExample] = []) -> String {
         var parts: [String] = []
         if let g = glossaryText(glossary, without: terms) {
             parts.append("Glossary (keep exactly as written): \(g)")
@@ -264,6 +273,10 @@ public enum Translator {
         if !terms.isEmpty {
             parts.append("Terms (always translate the left as the right):\n"
                 + terms.map { "\($0.source) => \($0.translation)" }.joined(separator: "\n"))
+        }
+        if !examples.isEmpty {
+            parts.append("Examples of earlier translations (same style):\n"
+                + examples.map { "\($0.source) => \($0.translation)" }.joined(separator: "\n"))
         }
         if !context.isEmpty {
             parts.append("Previous lines, already translated (context only, do not output):\n"
@@ -431,6 +444,22 @@ public enum Translator {
         }
         let toLLM = units.indices.filter { remembered[$0] == nil }
         var summary = TranslationRunSummary(fromMemory: remembered.count)
+        // 似た文の手本 (実験。既定は切)。訳す先が同じ写しの、取り分けでない文だけ。今の翻訳の原文と同じ文
+        // (区間の文・まとまりの文。U2 の再利用で訳が置かれる文と、評価で抜く文 memoryExcluding を含む) は使わない
+        let exampleIndex: MemoryExampleIndex?
+        if options.memoryExamples > 0, let memory, memory.target == TranslationMemory.normalizedTarget(target),
+           !memory.examples.isEmpty {
+            let same = Set((segments.map(\.text) + sources).map { TranslationMemory.normalizedSource($0) })
+            exampleIndex = MemoryExampleIndex(memory.examples, excluding: same)
+        } else {
+            exampleIndex = nil
+        }
+        func similarExamples(_ lines: [String]) -> [MemoryExample] {
+            guard let exampleIndex else { return [] }
+            let chosen = exampleIndex.select(for: lines, limit: options.memoryExamples)
+            if !chosen.isEmpty { summary.examplesUsed += 1 }
+            return chosen
+        }
         let chunks: [[Int]]
         if let generator {
             chunks = LLMChunker.chunks(toLLM, cost: { generator.tokenCount(sources[$0]) + 4 },
@@ -478,6 +507,7 @@ public enum Translator {
                 .map { (source: $0.source, translation: $0.translation) }
             var results = try checkedTranslateLines(chunk.map { sources[$0] }, context: Array(context), language: source,
                                                     target: target, system: system, options: options, terms: termPairs,
+                                                    examples: similarExamples(chunk.map { sources[$0] }),
                                                     generator: generator, shouldCancel: shouldCancel)
             // 読めなかった行は 1 行ずつ訳し直す (理由は、最後に試した時の物)
             if chunk.count > 1 {
@@ -485,8 +515,8 @@ public enum Translator {
                     if shouldCancel() { throw LLMError.cancelled }
                     results[k] = try checkedTranslateLines([sources[chunk[k]]], context: Array(context), language: source,
                                                            target: target, system: system, options: options,
-                                                           terms: termPairs, generator: generator,
-                                                           shouldCancel: shouldCancel)[0]
+                                                           terms: termPairs, examples: similarExamples([sources[chunk[k]]]),
+                                                           generator: generator, shouldCancel: shouldCancel)[0]
                 }
             }
             var batch: [TranslationResult] = []
@@ -568,7 +598,8 @@ public enum Translator {
         var texts: [String?] = []
         for chunk in chunks {
             if shouldCancel() { throw LLMError.cancelled }
-            // かけらにも、そのかけらに出る訳語の対を渡す (checkedTranslateLines が、送る行に出る物だけを選ぶ)
+            // かけらにも、そのかけらに出る訳語の対を渡す (checkedTranslateLines が、送る行に出る物だけを選ぶ)。
+            // 似た文の手本は渡さない (訳し直しの指示を伸ばさない)
             let outcomes = try checkedTranslateLines(chunk.map { pieces[$0] }, context: context, language: promptLanguage,
                                                      target: target, system: system, options: options, terms: terms,
                                                      generator: generator, shouldCancel: shouldCancel)
@@ -683,12 +714,13 @@ public enum Translator {
     /// `translateLines` と同じく訳し、受け取らなかった行には理由を付けて返す
     static func checkedTranslateLines(_ lines: [String], context: [(source: String, translation: String)],
                                       language: String?, target: String = "ja", system: String,
-                                      options: TranslationOptions, terms: [TermPair] = [], generator: any TextGenerating,
-                                      shouldCancel: () -> Bool) throws -> [LineOutcome] {
+                                      options: TranslationOptions, terms: [TermPair] = [], examples: [MemoryExample] = [],
+                                      generator: any TextGenerating, shouldCancel: () -> Bool) throws -> [LineOutcome] {
         // 訳語の対は、この 1 回に送る行に出る物だけ (無ければ、指示文は対を入れる前と同じ)。
-        // 出力の上限 (budget) は、下で指示文の長さを数えて決めるので、対で指示文が伸びた分も引かれる
+        // 出力の上限 (budget) は、下で指示文の長さを数えて決めるので、対・手本で指示文が伸びた分も引かれる
+        // (上限の 2 つ目の式は送る行の長さだけで決まるので、指示文が伸びても、文脈の長さが足りる限り変わらない)
         let used = TermPair.matching(terms, in: lines.joined(separator: "\n"))
-        let user = userPrompt(lines: lines, context: context, glossary: options.glossary, terms: used)
+        let user = userPrompt(lines: lines, context: context, glossary: options.glossary, terms: used, examples: examples)
         let shots = TranslationExamples.examples(for: target)
         let sourceTokens = lines.reduce(0) { $0 + generator.tokenCount($1) }
         let exampleTokens = shots.reduce(0) { $0 + generator.tokenCount($1.user) + generator.tokenCount($1.assistant) + 16 }

@@ -17,6 +17,8 @@ import KikimimiLLM
 /// `--no-terms` は、問題の訳語の対 (`terms`) を翻訳に渡さずに訳す (採点は対で行う。渡した時と `termsKept` を比べる)
 /// `--memory <記憶.json>` は、訳の記憶 (覚えた文・訳語の対・止める検査) を翻訳に渡す。問題の行と同じ文は記憶から抜いて測る
 /// (`LLMEval.runTranslation`)。記憶に当たった行の数は、結果の `reused` に残る
+/// `--examples <N>` (`--memory` が要る) は、記憶の中の似た文を、多くて N 件手本として指示文に足す (実験。既定は切)。
+/// 手本を足した呼び出しの数は、結果の `examplesUsed` に残る
 ///
 /// `Kikimimi --export-translation-eval <出力.json> [--memory <記憶.json>]` は、訳の記憶の取り分けた直し (`heldOut`) だけを、
 /// 翻訳の評価の問題 (`LLMEvalSet`) に書き出す (LLM は使わない。`--memory` が無ければ、アプリの今の記憶のファイル)
@@ -226,11 +228,24 @@ enum LLMEvalRunner {
         }
         guard !setPaths.isEmpty, rulesOnly || FileManager.default.fileExists(atPath: modelPath) else {
             log("usage: Kikimimi --eval-llm <model.gguf> --set <cases.json> [--set …] [--adapter <lora.gguf>] [--ledger <ledger.json>]"
-                + " [--memory <translation-memory.json>]"
+                + " [--memory <translation-memory.json> [--examples <N>]]"
                 + " [--rules-only] [--cpu] [--no-split-retry] [--no-terms] [--report <out.json>] [--baseline <earlier report.json>]")
             log("       Kikimimi --eval-llm none --rescore <report.json> [--report <out.json>] [--baseline <earlier report.json>]")
             log("       Kikimimi --eval-llm none --gate <cases.json or report.json> [--gate …] [--report <out.json>]")
             return 2
+        }
+        // 似た文の手本 (--examples N)。記憶が無いと手本の元が無いので、誤りにする
+        var exampleCount = 0
+        if args.contains("--examples") {
+            guard let text = value("--examples"), let n = Int(text), n >= 0 else {
+                log("EVAL FAILED: --examples needs a number of examples (0 or more), for example --examples 2")
+                return 2
+            }
+            guard value("--memory") != nil else {
+                log("EVAL FAILED: --examples needs --memory <translation-memory.json> (the examples come from the memory)")
+                return 2
+            }
+            exampleCount = n
         }
         do {
             var audit: [AuditEvalCase] = []
@@ -279,9 +294,13 @@ enum LLMEvalRunner {
                     log("memory: \(memory.sentences.count) sentences, \(memory.terms.count) terms, suppressed checks "
                         + (suppressed.isEmpty ? "none" : suppressed.joined(separator: ", "))
                         + " (sentences equal to a case line are left out)")
+                    if exampleCount > 0 {
+                        log("examples: up to \(exampleCount) similar sentences from the memory per call (held-out sentences are not used)")
+                    }
                 }
                 let translated = try LLMEval.runTranslation(translation, generator: engine, ledger: ledger,
                                                             splitRetry: splitRetry, useTerms: useTerms, memory: memory,
+                                                            examples: exampleCount,
                                                             onCase: { done, total in log("  translation \(done)/\(total)") })
                 report.translation = translated.score
                 report.translationByTarget = translated.byTarget

@@ -100,6 +100,21 @@
    今の基準は `baselines/qwen3.5-4b-20261116/` です (Qwen3.5 4B、文に分けて訳し直す仕組みを入れた後。入れる前は `baselines/qwen3.5-4b-20261116-before-split-retry/`)。
    比べ方: `--baseline tools/translation-eval/baselines/qwen3.5-4b-20261116`。
 
+## 似た文を手本にする実験 (既定は切)
+
+記憶の中の、送る行に似た文 (原文どうしの chrF が 30 以上。取り分けた文・問題と同じ文・200 字を超える文は使わない) を、
+多くて N 件、手本として指示文に足します。効くかどうかは、まだ測っていません。アプリの翻訳は切のままです。
+
+1. **見立ての記憶を作る** (評価の問題に入っていない WMT24++ の行。`--same-documents` で、問題と同じ文書の行を先に選ぶ):
+   `python3 tools/translation-eval/make_memory.py --cache build/translation-eval-100/cache --sets build/translation-eval-100/sets --same-documents --out <記憶.json>`
+2. **手本を入にして測る**: `evaluate.py --model <GGUF> --sets build/translation-eval-100/sets --memory <記憶.json> --examples 2 --baseline <比べる結果>`
+   (アプリの `--eval-llm … --memory … --examples 2` にそのまま渡します。`--examples` には `--memory` が要ります)。
+   手本を足した呼び出しの数は、結果の `examplesUsed` に残ります。
+3. **比べる**: 記憶の文に同じ文が在る行は再利用 (`reused`) にも効くので、手本だけの効き目は、同じ記憶で `--examples` を付けない測りを
+   `--baseline` にして比べます。
+
+この記憶は見立て (WMT24++ の人の訳) で、利用者が本当に直した訳ではありません。
+
 ## 表の読み方
 
 | 列 | 意味 |

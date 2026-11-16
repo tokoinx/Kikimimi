@@ -131,6 +131,7 @@ def collect_rows(stem, result, old, returncode, compared, not_comparable):
             "retried": score.get("retried", 0), "retryFixed": score.get("retryFixed", 0),
             "secondsPerLine": score.get("seconds", 0) / score["lines"] if score.get("lines") else 0,
             "reused": score.get("reused", 0),
+            "examplesUsed": score.get("examplesUsed", 0),
             "baselineChrF": previous.get("chrF") if previous else None,
             "baselineSecondsPerLine": (previous.get("seconds", 0) / previous["lines"]
                                        if previous and previous.get("lines") else None),
@@ -411,6 +412,8 @@ def main():
                         help="アプリにそのまま渡す: 問題の訳語の対を翻訳に渡さない (採点は対で行う)")
     parser.add_argument("--memory", help="アプリにそのまま渡す: 訳の記憶 (translation-memory.json)。"
                                          "問題の行と同じ文は、記憶から抜いて測る")
+    parser.add_argument("--examples", type=int, metavar="N",
+                        help="アプリにそのまま渡す: 記憶の似た文を、多くて N 件手本として指示文に足す (実験。--memory が要る)")
     parser.add_argument("--save-baseline", metavar="NAME",
                         help="結果を tools/translation-eval/baselines/<NAME>/ に写す (--from のフォルダ、"
                              "無ければこの測り・採点し直しの結果)。もう在る名前には上書きしない")
@@ -446,6 +449,10 @@ def main():
 
     if not args.model:
         fail("--model を指定してください (採点し直すだけなら --rescore)。")
+    if args.examples is not None and not args.memory:
+        fail("--examples には --memory が要ります (手本は、訳の記憶から選びます)。")
+    if args.examples is not None and args.examples < 0:
+        fail("--examples は 0 以上にしてください。")
     model = Path(args.model).expanduser()
     sets_dir = Path(args.sets).expanduser()
     if not model.exists():
@@ -493,6 +500,8 @@ def main():
             command.append("--no-terms")
         if args.memory:
             command += ["--memory", str(Path(args.memory).expanduser())]
+        if args.examples is not None:
+            command += ["--examples", str(args.examples)]
         print(f"  [{number}/{len(chosen)}] {path.name} (→ {target})", flush=True)
         if not_comparable:
             print(f"      前の結果と比べません: {not_comparable}", flush=True)
@@ -515,7 +524,7 @@ def main():
     summary = {
         "model": model.name, "adapter": Path(args.adapter).name if args.adapter else None,
         "ledger": bool(args.ledger), "splitRetry": not args.no_split_retry, "terms": not args.no_terms,
-        "memory": bool(args.memory), "started": started.isoformat(timespec="seconds"),
+        "memory": bool(args.memory), "examples": args.examples or 0, "started": started.isoformat(timespec="seconds"),
         "finished": finished.isoformat(timespec="seconds"), "sets": len(chosen), "data": about,
         "baseline": str(baseline) if baseline else None, "rows": rows, "failures": failures,
     }
@@ -531,6 +540,9 @@ def main():
     if args.memory:
         reused = sum(r.get("reused", 0) for r in rows)
         info.append(f"- 訳の記憶: 使った (問題の行と同じ文は抜いた。記憶に当たった行 {reused})")
+    if args.examples:
+        used = sum(r.get("examplesUsed", 0) for r in rows)
+        info.append(f"- 似た文の手本: 多くて {args.examples} 件 (--examples。手本を足した呼び出し {used})")
     info.append(f"- 問題の数: {len(chosen)}")
     if about:
         info.append(f"- データ: WMT24++ ({about.get('dataset')}, {about.get('license')})、領域 {', '.join(about.get('domains', []))}、"
