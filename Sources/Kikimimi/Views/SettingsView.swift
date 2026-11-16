@@ -321,25 +321,17 @@ struct AdapterSection: View {
     var body: some View {
         @Bindable var model = model
         Section(L("Fine-tuning (LoRA)")) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("Adapter for %@", model.currentLLM.name))
-                    Text(model.hasAdapter ? L("Added") : L("Not added"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if model.importingAdapter {
-                    ProgressView().controlSize(.small)
-                }
-                if model.hasAdapter {
-                    Button(L("Remove")) { model.removeAdapter() }
-                }
-                Button(model.hasAdapter ? L("Replace…") : L("Add adapter…")) { model.importAdapter() }
-                    .disabled(model.importingAdapter)
+            // 差分は、監査用と翻訳用の 2 つ。翻訳には翻訳用だけを使う (`AppModel.activeAdapterPath(for:)`)
+            row(L("Audit adapter for %@", model.currentLLM.name), kind: .audit, added: model.hasAdapter)
+            row(L("Translation adapter for %@", model.currentLLM.name), kind: .translation, added: model.hasTranslationAdapter)
+            if model.importingAdapter {
+                ProgressView().controlSize(.small)
             }
-            Toggle(L("Use this adapter for audit and translation"), isOn: $model.useAdapter)
-                .disabled(!model.hasAdapter)
+            Toggle(L("Use the adapters (the audit adapter for audit, the translation adapter for translation)"), isOn: $model.useAdapter)
+                .disabled(!model.hasAdapter && !model.hasTranslationAdapter)
+            Text(L("Translation uses only the translation adapter. Without one, translation runs without an adapter (an adapter trained for audit can garble names in translations)."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
             HStack {
                 Button(L("Export training data…")) { model.exportTrainingData() }
                 Text(LPlural(model.ledger.corrections.count, one: "%d learned correction", other: "%d learned corrections"))
@@ -349,6 +341,24 @@ struct AdapterSection: View {
             Text(L("When learned corrections build up, you can teach them to the LLM itself (fine-tuning). Export the training data and run tools/finetune/finetune.py in Terminal: it trains on this Mac and makes an “adapter” (….lora.gguf). An adapter is a small file used on top of the original LLM without changing it, and you can remove it at any time. Compare before and after training on the same cases, and add only an adapter that fixes more lines and makes nothing worse. The steps are in “Fine-tuning” in the README. For just a few corrections, “Learned corrections” above applies them as they are, without fine-tuning."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 差分 1 つの行: 名前・入っているか・[外す]・[追加…] か [入れ替える…]
+    private func row(_ title: String, kind: AdapterKind, added: Bool) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(added ? L("Added") : L("Not added"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if added {
+                Button(L("Remove")) { model.removeAdapter(kind: kind) }
+            }
+            Button(added ? L("Replace…") : L("Add adapter…")) { model.importAdapter(kind: kind) }
+                .disabled(model.importingAdapter)
         }
     }
 }

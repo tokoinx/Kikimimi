@@ -48,6 +48,61 @@ enum TrainingExport {
         }
     }
 
+    /// `Kikimimi --export-translation-training <出力.jsonl> --memory <記憶.json> [--memory <もう 1 つ> …]`
+    ///
+    /// 訳の記憶の、取り分け (`heldOut`) でない文から、翻訳の追加学習 (LoRA) 用のデータを書き出す (LLM は使わない)。
+    /// `--memory` は何度でも付けられ、足し合わせる (利用者の直しの記憶 + WMT24++ から作った見立ての記憶、など)。
+    /// 中身は `FineTuneData.translationRecords`。`tools/finetune/finetune.py --task translation` が読む
+    static func runTranslation(arguments args: [String]) -> Int32 {
+        let usage = "usage: Kikimimi --export-translation-training <out.jsonl> --memory <translation-memory.json> [--memory <another.json> …]"
+        guard let i = args.firstIndex(of: "--export-translation-training"), i + 1 < args.count, !args[i + 1].hasPrefix("--") else {
+            log(usage)
+            return 2
+        }
+        let output = (args[i + 1] as NSString).expandingTildeInPath
+        var paths: [String] = []
+        for (k, arg) in args.enumerated() where arg == "--memory" {
+            guard k + 1 < args.count, !args[k + 1].hasPrefix("--") else {
+                log(usage)
+                return 2
+            }
+            paths.append((args[k + 1] as NSString).expandingTildeInPath)
+        }
+        guard !paths.isEmpty else {
+            log(usage)
+            return 2
+        }
+        var memories: [TranslationMemory] = []
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        for path in paths {
+            // 読めない記憶は、黙って空と見ずに止める (学習データが黙って減らないように)
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+                log("✗ \(path) を読めません")
+                return 1
+            }
+            guard let memory = try? decoder.decode(TranslationMemory.self, from: data) else {
+                log("✗ \(path) は訳の記憶の形ではありません")
+                return 1
+            }
+            log("memory: \(path) (\(memory.sentences.count) sentences, \(memory.terms.count) terms)")
+            memories.append(memory)
+        }
+        let training = FineTuneData.translationRecords(memories: memories)
+        do {
+            try FineTuneData.jsonl(training.records).write(to: URL(fileURLWithPath: output), atomically: true, encoding: .utf8)
+        } catch {
+            log("✗ \(error.localizedDescription)")
+            return 1
+        }
+        for target in training.examplesByTarget.keys.sorted() {
+            log("  \(target): \(training.examplesByTarget[target] ?? 0) examples (\(training.sentencesByTarget[target] ?? 0) sentences)")
+        }
+        log("held out (not used): \(training.heldOut) sentences")
+        log("✓ \(output): \(training.records.count) examples")
+        return training.records.isEmpty ? 1 : 0
+    }
+
     /// テキストを、直す必要のない行にする (空の行と、[mm:ss] の時刻の印を除く)
     static func cleanLines(from text: String, language: String?) -> [FineTuneData.CleanLine] {
         text.split(whereSeparator: \.isNewline).compactMap { raw in

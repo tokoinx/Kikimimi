@@ -152,6 +152,14 @@ enum PostTask: Equatable {
     case translate
     /// 行の「訳」で頼まれた文だけを訳す (頼まれた文は Job.lineQueue。1 つの仕事で、待っている文をまとめて順に訳す)
     case translateLines
+
+    /// この仕事に渡す追加学習の差分の種類 (監査は監査用、翻訳は翻訳用)
+    var adapterKind: AdapterKind {
+        switch self {
+        case .audit: return .audit
+        case .translate, .translateLines: return .translation
+        }
+    }
 }
 
 enum PostState: Equatable {
@@ -276,7 +284,7 @@ final class AppModel {
     var llmModelID: String {
         didSet {
             save(llmModelID, "llmModelID")
-            hasAdapter = llmStore.hasAdapter(forModelKey: adapterKey)
+            refreshAdapters()
         }
     }
     var autoAudit: Bool { didSet { save(autoAudit, "autoAudit") } }
@@ -330,10 +338,13 @@ final class AppModel {
     @ObservationIgnored private(set) var translationMemoryURL: URL?
     /// 訳を直す画面 (対訳の行の「訳を直す…」) を開いている行 (nil なら閉じている)
     var translationEdit: TranslationEditRequest?
-    /// 追加学習の差分 (LoRA) を使う (選んでいる LLM 用の差分が入っているときだけ効く)
+    /// 追加学習の差分 (LoRA) を使う (選んでいる LLM 用の差分が入っているときだけ効く)。
+    /// 入・切は 1 つで、監査用・翻訳用の両方に効く
     var useAdapter: Bool { didSet { save(useAdapter, "useAdapter") } }
-    /// 選んでいる LLM 用の差分が入っている
+    /// 選んでいる LLM 用の、監査用の差分が入っている
     var hasAdapter = false
+    /// 選んでいる LLM 用の、翻訳用の差分が入っている
+    var hasTranslationAdapter = false
     /// 差分を取り込んでいる
     var importingAdapter = false
     var installedLLMIDs: Set<String> = []
@@ -807,10 +818,16 @@ final class AppModel {
         if !llmModelID.hasPrefix("file:"), LLMCatalog.spec(id: llmModelID) == nil {
             llmModelID = LLMCatalog.defaultModelID
         }
-        hasAdapter = llmStore.hasAdapter(forModelKey: adapterKey)
+        refreshAdapters()
     }
 
     // MARK: 追加学習の差分 (LoRA)
+
+    /// 監査用・翻訳用の差分が入っているかを、置き場から読み直す
+    private func refreshAdapters() {
+        hasAdapter = llmStore.hasAdapter(forModelKey: adapterKey, kind: .audit)
+        hasTranslationAdapter = llmStore.hasAdapter(forModelKey: adapterKey, kind: .translation)
+    }
 
     /// 選んでいる LLM の、差分の名前 (一覧のモデルは ID、取り込んだ GGUF はファイル名から拡張子を除いたもの)。
     /// `tools/finetune/finetune.py --install` が置く名前と同じ
@@ -819,12 +836,22 @@ final class AppModel {
         return current.spec?.id ?? current.url.deletingPathExtension().lastPathComponent
     }
 
-    /// 監査・翻訳で使う差分 (使う設定で、選んでいる LLM 用のものが入っているときだけ)
-    var activeAdapterPath: String? {
-        useAdapter && hasAdapter ? llmStore.adapterURL(forModelKey: adapterKey).path : nil
+    /// 仕事に渡す差分 (使う設定で、選んでいる LLM 用のその種類の差分が入っているときだけ)。
+    /// 監査には監査用、翻訳には翻訳用だけを渡す。翻訳用が無い時、翻訳は差分なしで動く
+    /// (前は、監査用の差分を翻訳にも渡していた。監査を学習した差分が、訳の固有名詞を崩した例が在ったので、やめた)
+    func activeAdapterPath(for kind: AdapterKind) -> String? {
+        var installed = Set<AdapterKind>()
+        if hasAdapter { installed.insert(.audit) }
+        if hasTranslationAdapter { installed.insert(.translation) }
+        let store = llmStore
+        let key = adapterKey
+        return AdapterFiles.activePath(for: kind, enabled: useAdapter, installed: installed) {
+            store.adapterURL(forModelKey: key, kind: $0)
+        }
     }
 
-    func importAdapter() {
+    /// 差分を取り込む (kind は、監査用か翻訳用か)
+    func importAdapter(kind: AdapterKind) {
         guard isLLMInstalled else {
             errorMessage = L("Download an LLM first (the adapter is checked against the selected LLM).")
             return
@@ -844,7 +871,7 @@ final class AppModel {
             defer { importingAdapter = false }
             do {
                 try await Task.detached(priority: .userInitiated) {
-                    try store.importAdapter(from: url, forModelKey: key, modelURL: modelURL)
+                    try store.importAdapter(from: url, forModelKey: key, kind: kind, modelURL: modelURL)
                 }.value
                 llm.adapterChanged()
                 refreshLLMInstalled()
@@ -854,9 +881,10 @@ final class AppModel {
         }
     }
 
-    func removeAdapter() {
+    /// その種類の差分だけを外す
+    func removeAdapter(kind: AdapterKind) {
         do {
-            try llmStore.deleteAdapter(forModelKey: adapterKey)
+            try llmStore.deleteAdapter(forModelKey: adapterKey, kind: kind)
         } catch {
             errorMessage = L("Could not delete: %@", error.localizedDescription)
         }
@@ -1539,7 +1567,8 @@ final class AppModel {
         let useLLM = isLLMInstalled
         let glossary = effectiveHint
         let learned = useLedger ? ledger : nil
-        let adapter = activeAdapterPath
+        // 監査には監査用の差分、翻訳 (全体・行・訳し直し) には翻訳用の差分だけ (`activeAdapterPath(for:)`)
+        let adapter = activeAdapterPath(for: task.adapterKind)
         let language = transcript.language
         // 訳す先は、仕事を始めた時に決める (訳している途中に設定の言語が変わっても、この言語で終える)
         let target = translationTarget(for: transcript)

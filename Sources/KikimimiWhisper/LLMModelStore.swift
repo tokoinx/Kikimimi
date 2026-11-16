@@ -86,18 +86,24 @@ public struct LLMModelStore: Sendable {
         directory.appendingPathComponent("Adapters", isDirectory: true)
     }
 
-    /// モデルごとの差分のファイル。key は、一覧のモデルの ID (`qwen3.5-2b`) か、取り込んだ GGUF の名前 (拡張子なし)
-    public func adapterURL(forModelKey key: String) -> URL {
-        let safe = key.map { $0 == "/" || $0 == ":" ? "-" : $0 }
-        return adaptersDirectory.appendingPathComponent(String(safe) + ".lora.gguf")
+    /// 差分の置き場での出し入れ (種類ごとに名前が分かれる。`AdapterFiles`)
+    public var adapterFiles: AdapterFiles {
+        AdapterFiles(directory: adaptersDirectory)
     }
 
-    public func hasAdapter(forModelKey key: String) -> Bool {
-        GGUFFile.isGGUF(at: adapterURL(forModelKey: key), minimumBytes: 1_000)
+    /// モデルごと・種類ごとの差分のファイル。key は、一覧のモデルの ID (`qwen3.5-2b`) か、取り込んだ GGUF の名前 (拡張子なし)。
+    /// 監査用は `<key>.lora.gguf`、翻訳用は `<key>.translation.lora.gguf`
+    public func adapterURL(forModelKey key: String, kind: AdapterKind) -> URL {
+        adapterFiles.url(forModelKey: key, kind: kind)
     }
 
-    /// 差分を取り込む。差分の GGUF であること、モデルの種類 (architecture) が modelURL と同じことを確かめる
-    public func importAdapter(from source: URL, forModelKey key: String, modelURL: URL) throws {
+    public func hasAdapter(forModelKey key: String, kind: AdapterKind) -> Bool {
+        adapterFiles.has(forModelKey: key, kind: kind)
+    }
+
+    /// 差分を、その種類の置き場に取り込む。差分の GGUF であること、モデルの種類 (architecture) が modelURL と同じことを確かめる
+    /// (検査は、監査用・翻訳用で同じ)
+    public func importAdapter(from source: URL, forModelKey key: String, kind: AdapterKind, modelURL: URL) throws {
         guard GGUFFile.isGGUF(at: source, minimumBytes: 1_000) else { throw ImportError.notGGUF }
         let adapter = GGUFFile.stringMetadata(at: source)
         guard adapter["general.type"] == "adapter" else { throw ImportError.notAdapter }
@@ -109,28 +115,12 @@ public struct LLMModelStore: Sendable {
         if let a = adapter["kikimimi.base.size_label"], let m = model["general.size_label"], a != m {
             throw ImportError.adapterForAnotherModel(adapter: a, model: m)
         }
-        let fm = FileManager.default
-        try fm.createDirectory(at: adaptersDirectory, withIntermediateDirectories: true)
-        let dest = adapterURL(forModelKey: key)
-        if source.resolvingSymlinksInPath().standardizedFileURL.path == dest.resolvingSymlinksInPath().standardizedFileURL.path {
-            return
-        }
-        let tmp = adaptersDirectory.appendingPathComponent(".import-\(UUID().uuidString).part")
-        do {
-            try fm.copyItem(at: source, to: tmp)
-            if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
-            try fm.moveItem(at: tmp, to: dest)
-        } catch {
-            try? fm.removeItem(at: tmp)
-            throw error
-        }
+        try adapterFiles.install(from: source, forModelKey: key, kind: kind)
     }
 
-    public func deleteAdapter(forModelKey key: String) throws {
-        let url = adapterURL(forModelKey: key)
-        if FileManager.default.fileExists(atPath: url.path) {
-            try FileManager.default.removeItem(at: url)
-        }
+    /// その種類の差分だけを外す
+    public func deleteAdapter(forModelKey key: String, kind: AdapterKind) throws {
+        try adapterFiles.remove(forModelKey: key, kind: kind)
     }
 
     /// 手元の GGUF を取り込む。名前が一覧のモデルと同じなら、そのモデルとして扱う。戻り値は置いたファイル名
