@@ -97,13 +97,34 @@
 
    測り・採点し直しと一緒に `--save-baseline <名前>` を付けると、その結果を写します。もう在る名前には上書きしません。
    次からは `--baseline tools/translation-eval/baselines/<名前>` で比べます。
-   今の基準は `baselines/qwen3.5-4b-20261116/` です (Qwen3.5 4B、文に分けて訳し直す仕組みを入れた後。入れる前は `baselines/qwen3.5-4b-20261116-before-split-retry/`)。
-   比べ方: `--baseline tools/translation-eval/baselines/qwen3.5-4b-20261116`。
+   今の基準は 2 つです。どちらも Qwen3.5 4B で、文に分けて訳し直す仕組みを入れた後の物です。
+   - 1 言語 30 行 (既定の問題 `build/translation-eval/sets`): `baselines/qwen3.5-4b-20261116/` (入れる前は `baselines/qwen3.5-4b-20261116-before-split-retry/`)。
+     比べ方: `--baseline tools/translation-eval/baselines/qwen3.5-4b-20261116`。
+   - 1 言語 100 行 (下の「100 行で測る」の問題): `baselines/qwen3.5-4b-100-20261116/`。
+     比べ方: `--sets build/translation-eval-100/sets --baseline tools/translation-eval/baselines/qwen3.5-4b-100-20261116`。
+
+## 100 行で測る (採る・採らないを決める時)
+
+30 行では 1〜2 点は揺れるので、採る・採らないは 1 言語 100 行で決めます。100 行の問題は、30 行の問題と別のフォルダに作ります。
+
+```bash
+python3 tools/translation-eval/fetch_wmt24pp.py --per-domain 50 --out build/translation-eval-100
+python3 tools/translation-eval/evaluate.py --model <GGUF> --sets build/translation-eval-100/sets \
+  --baseline tools/translation-eval/baselines/qwen3.5-4b-100-20261116
+```
+
+- 領域 speech・social から 50 行ずつ、種は既定の 20241 です。
+- **30 行の問題は、100 行の問題の一部ではありません** (行の選び方が違います)。30 行と 100 行の値を、じかに比べないでください。
+  比べるのは、同じ問題のフォルダで測った結果どうしだけです。
+- 13 個 × 100 行は、Qwen3.5 4B・M1 で 257 分かかりました (2026-11-16。ほかの作業が同時に走り、数分止めた時間も含むので、秒/行は当てにしていません)。
+- 2026-11-16 の値 (chrF): de 57.17・es 65.72・fr 61.69・id 57.99・it 62.69・ja 29.06・ko 28.73・pt 63.32・ru 52.28・th 42.76・vi 53.61・zh 35.52・ja→en 47.46 (参考)。
+  文に分けた訳し直しを切 (`--no-split-retry`) にした 5 言語の値は、de 55.07・ja 26.71・ko 27.34・th 40.44・zh 34.67 (道具の判定は、入れた後を「採る」)。ほかの 8 言語は、100 行では切を測っていません。
 
 ## 似た文を手本にする実験 (既定は切)
 
 記憶の中の、送る行に似た文 (原文どうしの chrF が 30 以上。取り分けた文・問題と同じ文・200 字を超える文は使わない) を、
-多くて N 件、手本として指示文に足します。効くかどうかは、まだ測っていません。アプリの翻訳は切のままです。
+多くて N 件、手本として指示文に足します。アプリの翻訳は切のままです (`TranslationOptions.memoryExamples` = 0)。
+効くかどうかは、まだ測り終わっていません (2026-11-16 の時点で、日本語・韓国語・中国語・タイ語 × 100 行、手本 2 つ、を測る順番を待っています)。結果が出るまで、アプリでは切のままにします。
 
 1. **見立ての記憶を作る** (評価の問題に入っていない WMT24++ の行。`--same-documents` で、問題と同じ文書の行を先に選ぶ):
    `python3 tools/translation-eval/make_memory.py --cache build/translation-eval-100/cache --sets build/translation-eval-100/sets --same-documents --out <記憶.json>`

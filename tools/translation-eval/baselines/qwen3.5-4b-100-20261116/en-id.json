@@ -1,0 +1,1669 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+    "[wmt24pp-en-id-test-en-speech_UVUatYPScjw_000] numbers lost: 30 => Mari kita naik yang di sana. Wah, wah, wah, anak besar! Kamu agak terlalu gemuk untuk kendaraan ini. Keselamatan dulu, eh? Tiga puluh lembar? Itu penipuan. Aku sudah bilang. Hati-hati!"
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-id.json"
+  ],
+  "translation" : {
+    "cases" : 72,
+    "chrF" : 57.99119137780806,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        18428,
+        18333,
+        18238,
+        18143,
+        18048,
+        17953
+      ],
+      "matches" : [
+        15906,
+        12776,
+        10172,
+        8637,
+        7536,
+        6661
+      ],
+      "reference" : [
+        17792,
+        17697,
+        17602,
+        17507,
+        17412,
+        17317
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 100,
+    "lines" : 100,
+    "numbersChecked" : 23,
+    "numbersKept" : 22,
+    "repeated" : 0,
+    "retried" : 1,
+    "retryFixed" : 1,
+    "reused" : 0,
+    "seconds" : 921.2535862922668,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 100
+  },
+  "translationByTarget" : {
+    "id" : {
+      "cases" : 72,
+      "chrF" : 57.99119137780806,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          18428,
+          18333,
+          18238,
+          18143,
+          18048,
+          17953
+        ],
+        "matches" : [
+          15906,
+          12776,
+          10172,
+          8637,
+          7536,
+          6661
+        ],
+        "reference" : [
+          17792,
+          17697,
+          17602,
+          17507,
+          17412,
+          17317
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 100,
+      "lines" : 100,
+      "numbersChecked" : 23,
+      "numbersKept" : 22,
+      "repeated" : 0,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "reused" : 0,
+      "seconds" : 921.2535862922668,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 100
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-id-test-en-social_111976217731399552",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.6371389627456665,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Menjadi orang-orang semacam ini pasti menyedihkan. Aku tak bisa membayangkan betapa buruknya jiwa mereka.",
+          "source" : "it must suck to be these people. i can't imagine how awful their inner life must be",
+          "text" : "Pasti menyiksa bagi orang-orang ini. Saya tidak bisa membayangkan betapa buruknya kehidupan batin mereka."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_111977470885664240",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.578308939933777,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kita semua tahu bahwa sulit untuk mendapatkan posisi dengan kekayaan dan kekuasaan seperti ini tanpa menginjak-injak orang lain dalam proses menuju ke sana.",
+          "source" : "we understand that it is hard to get to these positions of wealth and power without stepping on others along the way.",
+          "text" : "Kami memahami bahwa sulit untuk mencapai posisi kekayaan dan kekuasaan tanpa menindas orang lain di sepanjang jalan."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Dengan tidak adanya kesadaran umum seputar media, kita telah menumbuhkan suatu kesadaran kelompok yang membantu kita untuk tetap kritis.",
+          "source" : "in the absence of collective consciousness around media, we developed a level of class consciousness that helps us stay critical.",
+          "text" : "Dalam ketiadaan kesadaran kolektif seputar media, kami mengembangkan tingkat kesadaran kelas yang membantu kita tetap kritis."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.797052025794983,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Membuat karakterku mati dengan bumerangku sendiri",
+          "source" : "Killed myself with my own boomerang",
+          "text" : "Aku membunuh diri sendiri dengan boomerang sendiri."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112106953594747568",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.588841080665588,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "dan tentu, sumber-sumber lain ini PAHAM bahwa \"perang itu buruk\", tapi mereka masih menjual mesin pembunuh tersebut sebagai figur dan merchandise. Jadi, bagaimana ini?",
+          "source" : "and sure, these other sources are AWARE that \"war is bad\", but then you're still selling the killing machines as figures and merch. So, like, what are we doing?",
+          "text" : "Ya, tentu saja, sumber-sumber lain itu AWARE tahu bahwa \"perang itu buruk\", tetapi mereka masih menjual mesin pembunuh sebagai figur dan merchandise. Jadi, seperti apa yang kita lakukan?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112107889726289648",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.663325905799866,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Menurutku itu sangat membuat hidup bersemangat; mengubah bahan-bahan yang sangat sederhana menjadi sesuatu yang indah dan kompleks. Seperti menyaksikan sebuah kelahiran.",
+          "source" : "I find it very life affirming; transforming such simple ingredients into something so rich and complex. Like witnessing a birth.",
+          "text" : "Saya merasa hal ini sangat memupuk semangat hidup; mengubah bahan-bahan sederhana menjadi sesuatu yang begitu kaya dan kompleks. Seperti menyaksikan kelahiran."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112107918929771488",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.761865973472595,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "Gunakan kedua sisi otak. 🧠 Sempatkan untuk rileks. 📺",
+          "source" : "Use both sides of the brain. 🧠 Permission to relax. 📺",
+          "text" : "Gunakan kedua sisi otak. 🧠 Izin untuk bersantai. 📺"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.762313961982727,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Aku merusak perapatnya beberapa kali, sepertinya karena aku menggerakkan wajahku, dan hidungku mulai berair karena entah apa yang ada di udara di sini.",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "Aku sempat membuka segel itu beberapa kali hanya dengan menggerakkan wajahku, sepertinya, dan hidungku mulai berair karena apa pun yang melayang-layang di sana."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.791374087333679,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "kenapa koordinat GPS-ku dibulatkan ke sudut penuh terdekat? Sangat tidak berguna. Karena itu vektor dari bilangan rasional.",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless because it's a vector of rational numbers",
+          "text" : "Mengapa koordinat GPS dibulatkan ke derajat penuh terdekat? Itu benar-benar tidak berguna karena itu adalah vektor bilangan rasional."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.8030829429626465,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Oh, ya, ini esai terbaru Sally Rooney",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "Oh benar, ini esai terbaru dari Sally Rooney."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 7,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 26.227030038833618,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kotak abu-abu yang menggantung di samping kotak sarang adalah wadah baterainya.",
+          "source" : "The gray box that hangs on the side of the nesting box is where the battery lives.",
+          "text" : "Kotak abu-abu yang tergantung di sisi kotak bersarang adalah tempat baterai berada."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Aku menyebut ini sebuah fitur. Dengan begitu, burung-burung ini juga punya privasi.",
+          "source" : "I call this a feature. That way the birds get some privacy too.",
+          "text" : "Saya menyebut ini sebagai fitur. Dengan demikian, burung-burung juga mendapatkan sedikit privasi."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Sekarang, karena suatu sebab yang aku belum tahu pasti, kameranya offline. Kamera itu mati hanya satu jam setelah matahari tenggelam.",
+          "source" : "Now, for reasons I'm not sure about yet, the camera is offline. It went out only one hour after sunset.",
+          "text" : "Sekarang, karena alasan yang saya belum yakin sepenuhnya, kamera sedang offline. Kamera mati hanya satu jam setelah matahari terbenam."
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Lensa mata ikan terlalu berlebihan.",
+          "source" : "Fisheye is way overkill.",
+          "text" : "Lensa fisheye itu berlebihan."
+        },
+        {
+          "lines" : [
+            4
+          ],
+          "reference" : "Dan kameranya masih offline.",
+          "source" : "Aaaand it's still offline.",
+          "text" : "Aaaand masih offline."
+        },
+        {
+          "lines" : [
+            5
+          ],
+          "reference" : "Jadi entah ada yang salah dengan panel ini atau multimeterku, atau listing-nya sudah berubah.",
+          "source" : "So either there's something wrong with this panel or my multimeter, or they changed the listing.",
+          "text" : "Jadi, entah ada masalah pada panel ini atau multimeter saya, atau mereka mengubah daftar produknya."
+        },
+        {
+          "lines" : [
+            6
+          ],
+          "reference" : "Mungkin panel surya mengisi daya baterai itu sedikit saja sehingga cuma cukup untuk beroperasi selama 38 detik. Hanya perlu dua jam lebih sedikit untuk melakukannya.",
+          "source" : "Maybe the panel trickle-charged the battery just enough for 38 seconds of runtime. It only took a bit over two hours to do that.",
+          "text" : "Mungkin panel tersebut mengisi daya baterai secara perlahan cukup untuk waktu operasi 38 detik. Itu hanya memakan waktu lebih dari dua jam untuk melakukannya."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.637771010398865,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "Jika aku menghadiri acara, aku membawanya. Satu-satunya acara yang saat ini ada di kalenderku adalah: (Tapi bilang bahwa kamu kenal aku dari internet, jika tidak aku akan bertanya-tanya siapa kamu dan dari mana aku mengenalmu)",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are: (Though do mention you recognise me off the internet otherwise I'll be wondering who you are and where I know you from)",
+          "text" : "Jika saya berada di sebuah acara, saya membawa mereka bersamaku. Satu-satunya acara yang akan datang dalam jadwal saya saat ini adalah: (Meskipun sebutkan bahwa Anda mengenali saya dari internet, jika tidak, saya akan bertanya-tanya siapa Anda dan dari mana saya mengenal Anda)"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112112271633685072",
+      "language" : "en",
+      "lineCount" : 4,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.03868305683136,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Setelah itu beberapa kunjungan lokasi di hari Sabtu bersama klien di Swansea.",
+          "source" : "After that a couple of site visits on Saturdays with a client in Swansea.",
+          "text" : "Setelah itu, beberapa kunjungan ke lokasi pada hari Sabtu bersama klien di Swansea."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Sebaiknya aku memperbaiki beberapa sepeda motor!",
+          "source" : "I better get some motorbikes fixed, or else!",
+          "text" : "Aku harus memperbaiki beberapa sepeda motor, atau nanti akan berantakan!"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Ada beberapa tujuan, tetapi ke mana tepatnya?",
+          "source" : "Got some somewhere but exactly where?",
+          "text" : "Ada di suatu tempat, tapi persis di mana?"
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Heheh bukan satu, tetapi tiga!",
+          "source" : "Heheh not one but three!",
+          "text" : "Heheh bukan satu, tapi tiga!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112112980319428992",
+      "language" : "en",
+      "lineCount" : 3,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 30.819936990737915,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Tampaknya bayangan yang dilihat mata kiriku bukan masalah yang besar. Tetapi pada dasarnya aku juga butuh lensa varifokal. Jadi lensanya memiliki gabungan lensa. Bukan varifokal sepenuhnya, tetapi antara varifokal dan \"normal\" (aku tidak tahu terminologinya dalam bahasa Inggris).",
+          "source" : "So, apparently the ghost image my left eye sees isn’t too much of a concern. But I need basically varifocals too. So the lenses have a combo of those. Not the full on varifocals but something in between those and ”normal” glasses (no idea of the terminology in English).",
+          "text" : "Jadi, sepertinya bayangan hantu yang dilihat mata kiri saya tidak terlalu menjadi masalah. Tapi saya memang butuh kacamata beralih fokus juga. Jadi lensanya punya kombinasi keduanya. Bukan kacamata beralih fokus penuh, tapi sesuatu di antara kacamata beralih fokus dan kacamata \"normal\" (tidak tahu istilahnya dalam bahasa Inggris)."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Saat itu dijelaskan kepadaku, aku memutuskan untuk membeli kacamata baru, dan ini dia.",
+          "source" : "While this was being told to me, I made a decision to get another pair, and that pair are these.",
+          "text" : "Saat ini semua ini diceritakan kepada saya, saya memutuskan untuk mendapatkan sepasang lagi, dan pasangan itu adalah ini."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "@pengguna36 kacamata kedua itu bagus sekali! Aku suka beli kacamata, aku tak pernah membuangnya, tetapi entah kenapa aku tidak bisa menemukan kacamataku yang lain?! Saat ini kacamataku berwarna pelangi, aku juga butuh kacamata hitam juga, tapi kalau kamu butuh lensa optis, kacamatanya jelek sekali 😂",
+          "source" : "@user36 that second pair is really nice! I love buying glasses...I never throw them out but somehow I can't find any of the others?! Mine are rainbow coloured at the moment, I need some sunglasses too... but if you need prescription they're so ugly 😂",
+          "text" : "@user36 sepasang kedua itu benar-benar bagus! Saya suka membeli kacamata... saya tidak pernah membuangnya, tapi entah bagaimana saya tidak bisa menemukan yang lainnya?! Saat ini kacamata saya berwarna pelangi, saya juga butuh kacamata hitam... tapi jika Anda butuh resep, mereka sangat jelek 😂."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112122127346453600",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.595067977905273,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Dan ini saat dia mulai mengebor dengan suara sangat kencang. Hore.",
+          "source" : "And this is when he starts drilling Super Loud. Yay.",
+          "text" : "Dan inilah saat dia mulai mengebor Super Loud. Hebat."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Si tukang lantai sedang menggunakan pengisap debu, semoga itu pertanda dia sudah hampir selesai.",
+          "source" : "Floor repair person is doing a vacuum, so hopefully that means he's finishing up.",
+          "text" : "Pekerja perbaikan lantai sedang menyedot debu, jadi semoga itu berarti dia sudah selesai."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112140958167999904",
+      "language" : "en",
+      "lineCount" : 4,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 21.51643204689026,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ini pertama kalinya aku pergi ke ahli gigi palsu: Hari ini persiapan, kemudian pemasangan akan dilakukan dua pekan setelahnya. Saya sedang latihan membuka mulut lebar-lebar.",
+          "source" : "It's my first ever crown dentist visit: Prep today, then fitting in a fortnight. I'm practising opening my mouth wide.",
+          "text" : "Ini kunjungan pertama saya ke dokter gigi: persiapan hari ini, lalu pemasangan dalam dua minggu. Saya berlatih membuka mulut selebar mungkin."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Stumpy dan aku pulang dengan merasa lebih baik sekarang setelah meminum beberapa cangkir teh. Kami akan kembali dua pekan lagi untuk menyelesaikan semuanya.",
+          "source" : "Stumpy and I are home and feeling better now we’ve had a couple of mugs of tea. Back in a fortnight to get the job finished.",
+          "text" : "Stumpy dan saya sudah di rumah dan merasa lebih baik setelah minum beberapa cangkir teh. Kembali dalam dua minggu untuk menyelesaikan pekerjaan ini."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Dokter giginya tidak puas dengan kesesuaian gigi palsuku, meski dia sudah menyesuaikan dan menghaluskannya. Jadi, dia mengambil cetakan baru, dan akan membuat gigi palsu yang baru.",
+          "source" : "Dentist wasn’t happy with the fit of the crown, even after he’d footered and filed it. So new impressions were taken, and a new crown will be made.",
+          "text" : "Dokter gigi tidak puas dengan kecocokan mahkota, bahkan setelah dia menambal dan menggergajiannya. Jadi cetakan baru diambil, dan mahkota baru akan dibuat."
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Stumpy telah memakai mahkotanya. Hormat kepada Raja Stumpy.",
+          "source" : "Stumpy has been crowned. All hail King Stumpy.",
+          "text" : "Stumpy telah dikoronasi. Semboyan Raja Stumpy."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 8,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 33.65246796607971,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "data dari flightaware.",
+          "source" : "data from flightaware.",
+          "text" : "data dari flightaware."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Aku sempat mendapatkan kesempatan untuk memiliki nomor ekor pesawat sesuai pilihan, kalian TAHU nomornya haruslah variasi dari N1337_, _ itu akan diisi dengan huruf alfabet terakhir apa pun yang belum dipakai.",
+          "source" : "If I ever have the opportunity to have a custom tail number for an aircraft, you KNOW it has to be some variation of N1337_, the _ being whatever final alphabetical char is available.",
+          "text" : "Jika saya pernah punya kesempatan untuk memiliki nomor ekor khusus untuk pesawat, Anda TIDAK RAGU-ragu bahwa itu harus berupa variasi N1337_, dengan _ adalah karakter alfabet akhir yang tersedia."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Matahari pastinya akan bersinar cerah saat aku terbang, haha. Dasar.",
+          "source" : "Of course the sun is gonna be out while I'm away, lol. What a punk.",
+          "text" : "Tentu saja matahari akan bersinar saat saya pergi, lol. Apa yang bodoh."
+        },
+        {
+          "lines" : [
+            3,
+            4
+          ],
+          "reference" : "Oh, sedikit informasi acak lain: Ini tidak seperti naik mobil santai pada hari Minggu. Menurutku sekarang, ini lebih seperti olahraga, bukan berkendara santai.",
+          "source" : "Oh another random tidbit: This isn't like hopping in the car for a Sunday drive stuff. It's closer to a sport than a cruise in my newly initiated opinion.",
+          "text" : "Oh, fakta acak lainnya: Ini bukan seperti naik mobil untuk liburan Minggu biasa. Ini lebih dekat ke olahraga daripada cruise dalam opini baru saya yang baru diinisiasi."
+        },
+        {
+          "lines" : [
+            5
+          ],
+          "reference" : "Besok akan mengudara lagi dan kita akan melakukan stall dan terbang lambat.",
+          "source" : "Going back up tomorrow and we're doing stalls and slow flight.",
+          "text" : "Kembali naik besok dan kita akan melakukan stall dan slow flight."
+        },
+        {
+          "lines" : [
+            6
+          ],
+          "reference" : "Hari ini menantang, tetapi seru sekali. Kami melakukan penerbangan lambat dan stall. Kecepatan darat sempat turun hingga 16 mpj dengan kecepatan udara 65.",
+          "source" : "Choppy day today, but super fun. We did slow flight and stalls. At one point we had our ground speed down to 16mph with an airspeed of 65.",
+          "text" : "Hari ini berantakan, tapi sangat menyenangkan. Kita melakukan slow flight dan stall. Pada satu titik, kecepatan daratan kami turun hingga 16 mph dengan kecepatan udara 65."
+        },
+        {
+          "lines" : [
+            7
+          ],
+          "reference" : "Foto dari hari Sabtu, berakhir dengan ban kempis setelah pendaratan terakhir",
+          "source" : "Pics are from saturday, ended up with a flat tire after our last landing",
+          "text" : "Foto-foto dari hari Sabtu, akhirnya mendapat ban datar setelah pendaratan terakhir kami."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112166537145572640",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.43441903591156,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@pengguna48 Bootstrap akan menjadi angin segar dibanding tailwind",
+          "source" : "@user48 Bootstrap would be sweet relief over tailwind",
+          "text" : "@user48 Bootstrap akan menjadi pereda yang manis dibandingkan Tailwind."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.53190302848816,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@pengguna21 Saya hanya mendayung pada hari kerja, jadi rata-rata lebih dari 5K\/hari kerja sejauh ini. Saya membaginya tidak merata. Dengan ergometer.",
+          "source" : "@user21 I only row on weekdays, so I average out to a little over 5K\/weekday so far. I break it up in different ways. On an ERG.",
+          "text" : "@user21 Saya hanya berenang di hari kerja, jadi rata-rata saya sedikit lebih dari 5K\/hari kerja sejauh ini. Saya membaginya dalam berbagai cara. Di ERG."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112201850099412432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.113775014877319,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ayo nok, $3,74 maju.",
+          "source" : "come on nok, $3.74 let’s go.",
+          "text" : "ayo Nok, $3,74, kita lanjut."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112259676538889296",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.999953985214233,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "baiklah, ayoooo!",
+          "source" : "alright let's goooo!",
+          "text" : "oke, ayo kita mulai!"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Separuh selada dan arugula saya mati kepanasan karena saya masukkan ke baki plastik, tetapi selebihnya, bibit-bibit tumbuh cukup baik!",
+          "source" : "I hotboxed half my lettuce and arugula to death with a plastic tray cover but other than that seedlings are doing pretty good!",
+          "text" : "Saya menutupi setengah bayam dan arugula saya dengan penutup plastik hingga mati, namun selain itu, bibit-bibitnya tumbuh cukup baik!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112270350852000848",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.324829936027527,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Siap dikerjakan tukang plester pekan depan",
+          "source" : "Ready for the plasterer next week",
+          "text" : "Siap untuk tukang plester minggu depan."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112294019357219888",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.324939966201782,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "aku suka sekali kneadatite (yang warna hijau), rasanya seperti membuat patung menggunakan permen karet tapi kau akan terbiasa dan bahan ini keras serta fleksibel saat kering lebih banyak miniatur",
+          "source" : "been really enjoying kneadatite (green stuff), it's like sculpting with bubble gum but you get used to that and it's tough and flexible when it cures more miniature stuff",
+          "text" : "Sudah benar-benar menikmati kneadatite (benda hijau), itu seperti memahat dengan permen karet, tapi Anda akan terbiasa dengannya; saat mengeras, ia keras dan lentur, cocok untuk membuat banyak benda berukuran miniatur."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_--4KfTiO-n0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.990753054618835,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Oke, video selanjutnya akan membuat para kontraktor pemasangan atap marah padaku, tapi konten ini bukan untuk mereka. Ini untukmu. Kalau kamu tidak mampu membayar kontraktor pemasangan atap, tonton video ini. Video ini akan menunjukkan cara melapisi atap lamamu secara mandiri. Dan mudah sekali. Cuma perlu kelupas dan tempelkan.",
+          "source" : "Okay, the next video will get roofing contractors mad at me, but it's not for them. It's for you. If you are that person that cannot afford a roofing contractor, then you have to watch this video. This will show you how you can do a cover over an existing old roof yourself. And it's very simple. It's a peel and stick system.",
+          "text" : "Oke, video berikutnya akan membuat kontraktor atap marah padaku, tapi itu bukan untuk mereka. Itu untuk Anda. Jika Anda adalah orang yang tidak mampu membayar kontraktor atap, maka Anda harus menonton video ini. Video ini akan menunjukkan cara Anda sendiri melakukan penutup atas atap lama yang sudah ada. Dan itu sangat sederhana. Itu adalah sistem peel-and-stick."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_-0KrV5WsZq8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.052354097366333,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Venesia, kota di atas air. Tempat cantik dan romantis yang menarik jutaan pengunjung setiap tahun. Hanya beberapa langkah dari rute yang ramai dilalui turis, terdapat Venesia yang sangat berbeda, Venesia yang ditinggali oleh makhluk yang mengagumkan. Film ini menjelajahi Venesia yang jarang dilihat oleh orang-orang, sebuah kota yang secara mengejutkan memiliki kehidupan ganda.",
+          "source" : "Venice, city on the water. A place of beauty and romance that attracts millions of visitors every year. Just a few steps from the well-trodden tourist routes, there's a very different Venice, one populated by fascinating creatures. This film explores a Venice that few people ever see, a city that has a surprising double life.",
+          "text" : "Venice, kota di atas air. Sebuah tempat keindahan dan romansa yang menarik jutaan pengunjung setiap tahunnya. Hanya beberapa langkah dari jalur wisata yang sudah padat, terdapat sebuah Venice yang sangat berbeda, yang dihuni oleh makhluk-makhluk menakjubkan. Film ini menjelajahi sebuah Venice yang jarang dilihat orang, sebuah kota yang memiliki kehidupan ganda yang mengejutkan."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.939658045768738,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ini adalah rekaman lama yang asli dan nyata dari seorang raksasa sungguhan dari Jepang yang berjalan di parade militer. Yang sukar dipercaya adalah ukuran tubuhnya. Posturnya setidaknya setinggi 4 meter, atau 13 kaki. Jadi, dia sungguh tinggi dan lebih besar dari pemain NBA sungguhan, seperti Shaquille O'Neal, atau",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "Ini adalah rekaman asli dan nyata dari seorang individu raksasa yang pasti berasal dari Jepang, sedang berjalan dalam sebuah parade militer. Yang mengejutkan tentangnya adalah ukuran aslinya. Ia memiliki tinggi setinggi minimal 4 meter, atau sekitar 13 kaki. Dengan demikian, ia benar-benar lebih tinggi dan lebih besar daripada setiap pemain NBA asli lainnya, misalnya seperti Shaquille O'Neal, atau"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.24532902240753,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Pertanyaannya adalah, seperti banyaknya reruntuhan lain yang diklaim dari zaman Neolitik, bagaimana cara mereka mengerjakan sesuatu yang sesulit itu? Bagaimana mereka mengangkat batu yang sangat besar itu? Apakah situs itu, seperti yang sudah sering kita katakan sebelumnya, sisa-sisa peradaban kuno yang maju tetapi kemudian hancur? Kita menganggap kemungkinan seperti itu, khususnya, untuk orang-orang Agra di sini, sangatlah mungkin.",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "Pertanyaannya adalah, seperti banyak other reruntuhan Neolitik yang diklaim, bagaimana mereka mencapai pencapaian sebegitu? Bagaimana mereka mengangkat batu-batu raksasa tersebut? Apakah mereka, seperti yang telah kami usulkan berkali-kali sebelumnya, sisa-sisa peradaban kuno yang pernah maju namun kemudian hancur? Kami menemukan kemungkinan-kemungkinan ini, khususnya para pria di Agra, sangat meyakinkan."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_0EJ9bV6IAnM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.131309986114502,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Jadi, aku sudah beli Xbox Series X agar kalian tidak perlu beli. Atau mungkin kalian memang harus beli. Dalam video ini, aku akan memberi tahu kalian semua hal positif dan negatif dari Xbox Series X. Aku juga akan membahas perangkat keras, kontroler, game, semua tentang pengalamanku sejauh ini menggunakan Xbox Series X. Semoga kalian suka dengan video ini dan semoga video ini bermanfaat.",
+          "source" : "So, I bought an Xbox Series X so that you don't have to. Or maybe you actually have to. In this video, I'm going to tell you all the pros and cons of choosing an Xbox Series X. I'm also going to go over the actual hardware, the controller, the games, just about everything that is my experience so far with the Xbox Series X. So I hope you will enjoy this video, and maybe even find it useful.",
+          "text" : "Jadi, saya membeli Xbox Series X agar Anda tidak perlu melakukannya. Atau mungkin Anda memang harus melakukannya. Dalam video ini, saya akan menceritakan semua kelebihan dan kekurangan memilih Xbox Series X. Saya juga akan membahas perangkat keras sebenarnya, controller, game, hampir semua hal yang merupakan pengalaman saya sejauh ini dengan Xbox Series X. Jadi saya harap Anda akan menikmati video ini, dan mungkin bahkan menemukan hal ini berguna."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_1CWvFkncljw_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.175522089004517,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Baiklah, wah, wah, wah, wah, jangan buat keributan, ya? Ayah, kapan kita bisa membeli mobil yang lebih besar? Nanti saat usiamu sudah bertambah 10 tahun dan bisa menikahi seorang jutawan. Aku merasa lebih lapang saat berada di kereta bayi. Ya, dan Ayah pun belum lunas membayarnya. Bahkan, Ayah masih harus membayar angsuran rumah sakit dua kali lagi sebelum kamu bisa diambil.",
+          "source" : "All right, whoa, whoa, whoa, whoa, hold it down to a small riot, would you? Daddy, when are we going to be able to afford a larger car? When you're about 10 years older and can marry a millionaire. I had more room when I was in my baby buggy. Yeah, and I haven't finished paying for that either. In fact, I still owe two more payments to the hospital before I own you.",
+          "text" : "Baiklah, wah, wah, wah, wah, pelan-pelan saja, ya? Ayah, kapan kita bisa membeli mobil yang lebih besar? Ketika Anda berusia sekitar 10 tahun lagi dan bisa menikahi seorang miliarder. Saya punya lebih banyak ruang saat masih di dalam kereta bayi. Ya, dan saya belum selesai membayar untuk itu juga. Faktanya, saya masih harus membayar dua tagihan lagi ke rumah sakit sebelum benar-benar memiliki Anda."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_1R3j_apcikw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.651080012321472,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kita nanti akan bahas cara Ben Affleck membela diri dalam sebuah wawancara. Greg, ceritakan video yang akan kita tonton ini. Jadi, beberapa pekan yang lalu, Ben Affleck diwawancarai dua jam oleh Howard Stern. Dia membicarakan perceraiannya dengan mantan istrinya dan membahas keluarganya, dan dia mendapatkan reaksi yang negatif untuk wawancara itu. Langsung saja kita sambut, Ben Affleck!",
+          "source" : "Today we're going to talk about Ben Affleck defending an interview. Greg, why don't you to tell us about the video we're going to watch. Yeah, so a couple of weeks ago, Ben Affleck went on a two-hour interview with Howard Stern. He talked about his breakup with his ex-wife and family, and he had some fallout from it, so here we go. Here he is, Ben Affleck!",
+          "text" : "Hari ini kita akan membahas Ben Affleck membela sebuah wawancara. Greg, mengapa tidak Anda ceritakan tentang video yang akan kita tonton? Ya, beberapa minggu lalu, Ben Affleck mengikuti wawancara dua jam dengan Howard Stern. Ia berbicara tentang perpisahan dengan mantan istri dan keluarganya, serta konsekuensinya, jadi mari kita mulai. Inilah dia, Ben Affleck!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.70799207687378,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Jadi, saya sudah bermusik selama lebih dari 20 tahun, dan mengeluarkan dua album selama periode itu, dan mengadakan tur di seputar wilayah Jerman dan Polandia, dan tentu saja Swedia. Jadi, Anda sudah menjadi seniman sejak masih sangat muda? Ya, begitulah. Apakah ada tempat yang paling berkesan saat Anda tampil ketika masih muda?",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "Jadi, saya telah bekerja dengan musik selama lebih dari 20 tahun, merilis dua album pada masa itu, dan melakukan tur di Jerman, Polandia, dan tentu saja Swedia. Jadi, apakah Anda selalu menjadi seorang pengampil sejak sangat muda? Ya, saya memang demikian. Dan apakah ada tempat ikonik yang pernah Anda pertunjukkan saat masih muda?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_2Uo5zKrbips_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.627982020378113,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Dahulu, orang tua mereka dibunuh oleh pemburu liar, lalu Cheyenne dan Kuyu dijual di pasar. Setelah diselamatkan oleh organisasi Help Congo, mereka tumbuh di tempat semi-penangkaran bersama sekitar 30 simpanse yatim di kepulauan itu. Satu-demi satu, simpanse ini dikembalikan ke habitatnya di hutan. Para ilmuwan dari asosiasi tersebut memberi tiap simpanse itu nama untuk mengidentifikasi mereka.",
+          "source" : "A long time ago, their parents were killed by poachers, and Cheyenne and Kuyu were sold at the market. Taken in by the Help Congo organization, they grew up in semi-captivity with about 30 other orphans out on the islands. One after another, these young chimpanzees have been shown the way back to the forest. The association's scientists have given them each a name to identify them.",
+          "text" : "Lama-kelamaan, orang tua mereka dibunuh oleh pemburu liar, dan Cheyenne serta Kuyu dijual di pasar. Setelah diambil oleh organisasi Help Congo, mereka tumbuh besar dalam kondisi setengah budidaya bersama sekitar 30 anak yatim lainnya yang berada di pulau-pulau tersebut. Satu per satu, anak-anak chimpanzee muda ini telah diajak kembali ke hutan. Para ilmuwan asosiasi telah memberikan nama masing-masing kepada mereka untuk mengidentifikasi mereka."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_36UVjSUk-wY_035",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.087823987007141,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Alexa, putar It's My Party and I'll Cry if I Want To. Bo, Bo, kita harus gerak cepat. Alexa, putar It's My Party and I'll Cry if I Want To. Kamu juga pasti menangis kalau mengalaminya. Woo! Alexa, putar Midnight Train!",
+          "source" : "Alexa, play It's My Party and I'll Cry if I Want To. Bo, Bo, we gotta spin around. Alexa, play It's My Party and I'll Cry if I Want To. You'd cry too if it happened to you. Woo! Alexa, play Midnight Train!",
+          "text" : "Alexa, mainkan \"It's My Party and I'll Cry if I Want To\". Bo, Bo, kita harus berputar-putar. Alexa, mainkan \"It's My Party and I'll Cry if I Want To\". Kamu juga akan menangis jika hal itu terjadi padamu. Woo! Alexa, mainkan \"Midnight Train\"!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_3M_AGbXVb5s_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.428263902664185,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Sekarang, bicara soal bintang, Howard Jones tampil sebagai vokalis tamu dan berduet denganmu di album ini, di lagu \"I Made a Case\" yang memberimu dorongan besar dalam bermusik. Apakah kebetulan dia terlibat di lagu itu? Yang kudengar, kamu harus menyederhanakan lagunya karena tidak mau ada yang menghalangi suaramu bercerita.",
+          "source" : "Now, talking about stars, Howard Jones appears as a special guest vocalist in a duet with you on the album, on the track, I Made a Case, who has offered you so much encouragement with your music. Was it by chance that he happened to appear on the track? As I hear you had to strip back the track, as didn't want anything being in the way of your voices telling the story.",
+          "text" : "Sekarang, berbicara tentang bintang-bintang, Howard Jones hadir sebagai tamu vokal spesial dalam duet dengan Anda di album ini, pada lagu \"I Made a Case\", yang telah memberikan banyak semangat bagi musik Anda. Apakah kebetulan saja ia muncul di lagu tersebut? Seperti yang saya dengar, Anda harus menyederhanakan lagu tersebut karena tidak ingin ada halangan bagi suara Anda untuk menceritakan kisah tersebut."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_3S7FkKvesu8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.596820950508118,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Air, zat cair yang membentuk samudra, dan mengisi dasar laut terdalam. Hanya sedikit orang yang berani menjelajahi perairan terbuka yang tak berbatas di dunia bawah laut nan luas ini. Sebagian besar penghuni lautan mendiami area yang ramai, sama seperti manusia yang memadati kota.",
+          "source" : "Water, the liquid that oceans are made of. And it fills endless depths. Only a few will venture out into the endless open ocean of this vast underwater world. Most of the ocean inhabitants live in the city, as it were, like human societies.",
+          "text" : "Air, cairan yang menjadi dasar samudra. Dan ia mengisi kedalaman tanpa batas. Hanya sedikit yang berani menyelam ke dalam samudra lepas yang tak berujung di dunia bawah laut yang luas ini. Sebagian besar penghuni samudra hidup di kota, seperti halnya masyarakat manusia."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_4EXYb1KXvzM_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.579357981681824,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Starfire. Putri Tamaran. Kuharap kau merasa nyaman. Lord Bagrok! Oh! Sungguh pantang menyerah. Saudarimu mengambil langkah bijak dengan menyerahkanmu. Leher Garbler!",
+          "source" : "Starfire. The princess of Tamaran. Comfortable, I hope. Lord Bagrok! Oh! Such a formidable spirit. Your sister was wise to hand you over. Garbler neck!",
+          "text" : "Starfire. Putri Tamaran. Semoga nyaman, ya. Lord Bagrok! Oh! Semangat yang sangat mengintimidasi. Adikmu benar untuk menyerahkanmu. Garbler neck!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_4cfsI4ZjTbU_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.86575698852539,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Harus diakui bahwa pemerintah Republik Rakyat Tiongkok dan Amerika Serikat memiliki perbedaan yang sangat besar. Kita tetap akan memiliki perbedaan ke depannya. Namun, yang harus kita lakukan adalah mencari cara untuk tidak bermusuhan walau memiliki perbedaan.",
+          "source" : "We must recognize that the government of the People's Republic of China and the government of the United States have had great differences. We will have differences in the future. But what we must do is to find a way to see that we can have differences without being enemies in war.",
+          "text" : "Kita harus mengakui bahwa pemerintah Republik Rakyat Tiongkok dan pemerintah Amerika Serikat memiliki perbedaan yang sangat besar. Kita akan memiliki perbedaan di masa depan. Namun, yang kita lakukan adalah mencari cara untuk melihat bahwa kita bisa memiliki perbedaan tanpa menjadi musuh dalam perang."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_5TqcJCKl34g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.578824043273926,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Jadi, kapan pertama kali Anda menulis dan membawakan musik setelah tampil di depan kakek-nenek? Sebenarnya, saya lebih banyak membawakan musik. Saya pernah menulis lagu, tapi itu biasanya saya serahkan kepada para profesional, ketika saya rekaman dengan penulis lagu profesional dengan lagu-lagu yang meledak di seluruh dunia.",
+          "source" : "So, when did you first start writing and performing music after having your stage in front of your grandparents there? Well, basically, more performing. I did a bit of writing, but I left it to professionals, you know, when I was recording with professional writers and big, big hits around the world.",
+          "text" : "Jadi, kapan Anda pertama kali mulai menulis dan tampil musik setelah memiliki panggung di depan kakek dan nenek Anda?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.208538889884949,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Cek. Cek. Gunting kalah dari batu, kertas kalah dari gunting, dan batu kalah dari kertas. Kau menang. Yang kalah akan kehilangan satu bintang. Setiap permainan berakhir, wasit akan mengembalikan kartu ke kotak daur ulang. Tentu saja, kalau kedua pemain memilih kartu yang sama, hasilnya imbang, dan tidak ada yang kehilangan bintang.",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "Cek. Cek. Batu mengalahkan gunting, gunting mengalahkan kertas, dan kertas mengalahkan batu. Anda menang. Orang yang kalah akan kehilangan satu bintang. Pada akhir setiap permainan, wasit akan mengembalikan kartu ke dalam kotak daur ulang. Tentu saja, jika kedua pemain memilih kartu yang sama, permainan seri, dan tidak ada yang kehilangan bintang."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.143295049667358,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Inilah kisah lengkap Danny dan Sam. Siap? Siap. Danny Fenton dan Sam Manson adalah dua orang sahabat, dan bersama Tucker, mereka hampir selalu bersama-sama. Sam-lah yang membuat Danny memiliki kekuatan hantu. Ayo, Danny, dunia hantu? Kau harus lihat. Kau tahu? Kau benar.",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "Ini adalah kisah lengkap Danny dan Sam. Siap? Siap. Danny Fenton dan Sam Manson adalah teman terbaik, dan bersama Tucker, mereka menghabiskan sebagian besar waktu mereka bersama. Samlah alasan mengapa Danny memiliki kekuatan hantu pada awalnya. Ayo, Danny, zona hantu? Kamu harus mencobanya. Apa kata kamu? Kamu benar."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_6YeLsSSPNLQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.929687023162842,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Catatan pembasmi kejahatan 1.2747. Jump City penuh penjahat. Aku tidak bisa menegakkan keadilan di jalanan seorang diri. Aku butuh pendamping, atau mungkin sebaiknya beberapa pendamping. Aku akan memanggil mereka kolega supaya sopan, tapi semuanya akan tahu pendamping masing-masing. Aplikasi jaringan. Selamat datang, RobDog_747. Ayo buat tim. Saatnya membangun tim. Tidak boleh lebih tua dari aku.",
+          "source" : "Crime fighters' log 1.2747. Jump City is a cesspool. I can't bring justice to the streets alone. I need a sidekick, preferably several sidekicks. I'll call them teammates to be polite, but everyone will know their sidekicks. Networking apps. Welcome, RobDog_747. Let's put together a team. Team assemble mode. Not older than me.",
+          "text" : "Catatan Perang Kriminal 1.2747. Jump City adalah tempat sampah. Saya tidak bisa membawa keadilan ke jalanan sendiri. Saya membutuhkan seorang teman seperjuangan, lebih baik beberapa orang. Saya akan menyebut mereka rekan tim agar sopan, tapi semua orang akan tahu mereka adalah teman seperjuangan saya. Aplikasi jejaring sosial. Selamat datang, RobDog_747. Mari kita susun sebuah tim. Mode penyusunan tim. Tidak boleh lebih tua dari saya."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_6ji3tqZUynY_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.235859990119934,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kim Jong-il menyampaikan kepada para pejabat, \"Saya memiliki dorongan layaknya seorang pemimpin hebat, melayani masyarakat pekerja, dan niscaya bunga mekar bahkan di atas batu, jika itu yang rakyat inginkan. Inilah cita-cita utama saya. Gagasan ini telah tertanam dalam setiap aspek kehidupan rakyat, salah satunya dalam penyelesaian masalah lalu lintas.\"",
+          "source" : "Kim Jong-il said to the officials, \"I shared a great leader's motor, served the working masses, and let flowers bloom even on a rock, if this is the people's desire. This is my alpha and omega. This idea has been embedded in every aspect of the people's living in the solution of traffic problem for one thing.\"",
+          "text" : "Kim Jong-il berkata kepada para pejabat, \"Saya telah berbagi motor seorang pemimpin besar, melayani rakyat pekerja, dan membiarkan bunga mekar bahkan di atas batu, jika ini adalah keinginan rakyat. Ini adalah awal dan akhir saya. Gagasan ini telah tertanam dalam setiap aspek kehidupan rakyat, termasuk dalam solusi masalah lalu lintas untuk satu hal.\""
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_7MQ3Yx2h3Rg_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.50337290763855,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Pertama-tama, yang akan kita lakukan adalah mencampur cat ini. Cat ini dicampur satu banding satu dengan pengencer. Kita tinggal mencampurkannya seperti saat kita mengecat biasa. Sudah ada dua ounce cat di sini, dan saya akan memasukkan dua ounce pengencer. Kita aduk merata. Sekarang, campuran ini siap dimasukkan ke pistol penyemprot.",
+          "source" : "First of all, what we're going to do is just mix this paint up. It mixes one to one with a reducer. And we just mix it up like we normally would painting anything. So I have two ounces of paint here, so I'm going to put two ounces of reducer. We're going to stir it up. Now it's ready to put in the gun and spray.",
+          "text" : "Pertama-tama, yang akan kita lakukan adalah mencampur cat ini. Cat ini dicampur satu dengan satu dengan pengencer. Kita hanya mencampurnya seperti biasa saat mengecat sesuatu. Jadi saya memiliki dua ons cat di sini, jadi saya akan memasukkan dua ons pengencer. Kita akan mengaduknya. Sekarang sudah siap dimasukkan ke dalam pistol dan disemprotkan."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_8bbVFeTIIg8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.160789966583252,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Pendaftarannya ke program Master Psikologi Harvard awalnya ditolak, tetapi pada akhirnya diterima. Kegagalan awal ini berawal dari Milgram yang tidak mengambil mata kuliah psikologi tingkat sarjana di Queens College. Pada tahun 1961, Milgram menerima gelar PhD di bidang psikologi sosial. Dia menjadi asisten profesor di Yale pada kurun waktu yang sama.",
+          "source" : "Initial applications to Harvard for a psychology master's were rejected, but was eventually admitted. The initial setbacks were due to Milgram not taking any undergraduate courses in psychology at Queens College. In 1961, Milgram received a PhD in social psychology. He became an assistant professor at Yale around the same time.",
+          "text" : "Aplikasi awal Milgram untuk program master psikologi di Harvard ditolak, namun akhirnya diterima. Kegagalan awal tersebut disebabkan karena Milgram tidak mengambil kursus sarjana di bidang psikologi di Queens College. Pada tahun 1961, Milgram menerima gelar PhD dalam psikologi sosial. Ia menjadi asisten profesor di Yale sekitar waktu yang sama."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_9GhGiB4KhTM_004",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.390035033226013,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Aku tidak berkata begitu. Tidak perlu. Kau lebih tahu dibandingkan orang lain bahwa kekerasan selalu melahirkan lebih banyak kekerasan. Dewanlah yang membuat keputusan. Dewan telah tiada! Kita menghabiskan seluruh hidup kita, seribu tahun, untuk melindungi kehidupan.",
+          "source" : "I didn't say that. You don't have to. You know better than anyone that violence begets violence every time. The Council made the decision. The Council is gone! We spend our entire lives, entire millennia devoted to protecting life.",
+          "text" : "Aku tidak mengatakan itu. Kamu tidak perlu melakukannya. Kamu sendiri yang lebih tahu bahwa kekerasan selalu melahirkan kekerasan setiap kali. Dewan telah membuat keputusan. Dewan sudah tiada! Kami menghabiskan seluruh hidup kami, seluruh ribuan tahun untuk melindungi kehidupan."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_9s2UyGBuvYw_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.886479020118713,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Dan ada sesuatu yang benar-benar akan mengundang kekaguman. Itulah yang ingin saya sampaikan malam ini. Semoga Anda sudah siap melakukan perjalanan yang menyenangkan dan menenangkan ke bagian sejarah Mesir kuno yang lebih mendalam ini.",
+          "source" : "And there's just something that evokes a serious sense of awe. And that's what I want to try to convey to you guys tonight. So I hope you're ready for a nice relaxing journey through some of the deeper history of ancient Egypt.",
+          "text" : "Dan ada sesuatu yang membangkitkan rasa kagum yang serius. Dan itulah yang ingin saya sampaikan kepada Anda semua malam ini. Jadi saya harap Anda siap untuk perjalanan santai yang menyenangkan melalui sebagian dari sejarah kuno Mesir yang lebih dalam."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.575268983840942,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Beberapa bulan telah  berlalu dan aku merasa masih berdiri di makamnya. Aku tidak bisa jauh darinya. Dia sudah tiada, dan aku masih belum bisa jauh darinya. Aku melihatnya setiap kali berpapasan dengan tentara berseragam, dan mereka ada di mana-mana semenjak pengeboman itu.",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "Sudah berbulan-bulan, dan saya merasa masih berdiri di depan makamnya. Saya tidak bisa meninggalkannya. Ia sudah tiada, dan saya masih tidak bisa meninggalkannya. Saya melihatnya di setiap prajurit berpakaian seragam yang saya temui, dan mereka ada di mana-mana sejak terjadi bom."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_BAvkbiKnFEY_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.294710993766785,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Halo, semuanya! Perkenalkan, nama saya Janica, dan saya adalah seorang pakar dari Finlandia yang tinggal di Belanda. Selamat datang di vlog ini. Hari ini, kita ada di kota Haarlem. Harlem benar-benar kota yang menyenangkan dan kota ini berada di provinsi Belanda Utara.",
+          "source" : "Hello, everyone! If you don't know me, my name is Janica, and I am an expert from Finland, living in the Netherlands. Welcome to this vlog. Today we are in the city of Haarlem. Harlem is a really lovely city located in the province of North Holland.",
+          "text" : "Halo, semuanya! Jika Anda tidak mengenal saya, nama saya Janica, dan saya seorang ahli dari Finlandia yang tinggal di Belanda. Selamat datang di vlog ini. Hari ini kami berada di kota Haarlem. Harlem adalah kota yang sangat indah yang terletak di provinsi Utara Holland."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_BmgU6BTfNQM_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.797787070274353,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Baterainya bagus. Bisa kita lihat sekarang IC ini telah terlepas dari PCB. Kita bisa lihat kondisi IC-nya. Sekarang, jalur ini ke arah sini. Jalur ini rusak.",
+          "source" : "Battery is good. Now we can see this IC is dislocated from the PCB. We can see the condition of this IC. Now this track is coming here. This track is damaged.",
+          "text" : "Baterai masih baik. Sekarang kita bisa melihat bahwa IC ini terlepas dari PCB. Kita bisa melihat kondisi IC ini. Sekarang jalur ini datang ke sini. Jalur ini rusak."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_Lcdy6X5kMTs_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.512257933616638,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hai, semuanya, saya TS Madison. Jika Anda saat ini sedang berusaha mengembangkan bisnis, brand, atau produk, coba saja beriklan bersama kami. Kirimkan email ke kami di booktsmadison@gmail.com untuk mendapatkan informasi tentang paket iklan lengkap kami. Kunjungan unik, subscriber unik, demografis yang luas. Beriklanlah bersama kami sekarang.",
+          "source" : "Hey, everybody, this is TS Madison. And if you are trying to grow your business, brand, or a product, why not advertise with me? Email me at booktsmadison@gmail.com so that you can get in on our comprehensive advertisement packages. Unique visits, unique subscribers, honey, a broad demographic. Advertise with me today.",
+          "text" : "Halo, semuanya, ini TS Madison. Dan jika Anda ingin mengembangkan bisnis, merek, atau produk Anda, mengapa tidak beriklan bersama saya? Kirimkan email ke booktsmadison@gmail.com agar Anda bisa mendapatkan paket iklan komprehensif kami. Kunjungan unik, pelanggan langganan unik, sayang sekali, dan demografi yang luas. Iklan bersama saya hari ini."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_MBJ0dL68I_I_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.33837604522705,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Film dokumenter yang akan Anda saksikan ini sebelumnya telah diperlihatkan kepada Bapak Alexander Kerensky, Presiden Pemerintahan Demokratis Sementara Rusia, yang dipaksa turun oleh Kubu Komunis pada tahun 1917. Bapak Kerensky bersedia memberikan sedikit kata-kata sebagai pengantar film. Inilah liputan kami bersama Alexander Kerensky yang berusia 80 tahun di apartemennya di Kota New York pada 10 Oktober 1962.",
+          "source" : "The documentary film you are about to see was shown to Mr. Alexander Kerensky, President of the Democratic Provisional Government of Russia overthrown by the Communists in 1917. Mr. Kerensky consented to make a few introductory remarks about our picture. We present 80-year-old Alexander Kerensky in his New York City apartment on October 10th, 1962.",
+          "text" : "Dokumenter film yang akan Anda tonton telah ditunjukkan kepada Mr. Alexander Kerensky, Presiden Pemerintah Sementara Demokratik Rusia yang dibalik oleh Komunis pada tahun 1917. Mr. Kerensky menyetujui untuk memberikan beberapa pengantar tentang gambar kami. Kami menghadirkan Alexander Kerensky berusia 80 tahun di apartemen New York City-nya pada tanggal 10 Oktober 1962."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_MG7hk2npXN0_005",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.17907202243805,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Yang Mulia, klien saya menerima putusan yang ditetapkan saat ini. Putusan juri dapat diterima kedua belah pihak? Kami menerima putusannya. Kami menerima putusannya. Ambil sumpah para juri.",
+          "source" : "Your Honor, my client accepts the jury as presently constituted. The jury is satisfactory to both sides? We accept the jury. The jury is satisfactory to us. Swear the jury.",
+          "text" : "Yang terhormat, klien saya menerima juri sebagaimana saat ini terbentuk. Apakah juri tersebut memuaskan kedua belah pihak? Kami menerima juri tersebut. Juri tersebut memuaskan kami. Sumpahkan juri tersebut."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_MbW7DvLZ9Lg_005",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.33574903011322,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kid Durango of Arizona: The Dust Devils. Lapisan embun yang menyelimuti padang rumput langsung sirna saat matahari mulai menyinari dari kaki bukit. Bulan masih tampak beberapa saat, kemudian hilang ditelan pegunungan. Hari dimulai layaknya hari-hari biasanya di Arizona. Begitulah, hingga awan datang.",
+          "source" : "Kid Durango of Arizona: The Dust Devils. The layer of dew that covered the prairie disappeared quickly as the sun rose over the foothills. The moon hung around for a while, and then sunk far below the ranges. The day began like a thousand other Arizona days. That was, until the cloud came.",
+          "text" : "Kid Durango dari Arizona: The Dust Devils. Lapisan embun yang menutupi padang rumput menghilang dengan cepat saat matahari terbit di atas kaki bukit. Bulan menggantung selama beberapa waktu, lalu tenggelam jauh di bawah pegunungan. Hari itu dimulai seperti ribuan hari Arizona lainnya. Itu adalah, sampai awan datang."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.02170705795288,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kau brengsek, Tom. Dengar, Celia, kita harus mengikuti minat. Minatmu robot dan minatku hanyalah menjadi hebat di luar angkasa. Kenapa tak mengaku saja bahwa kau takut dengan tangan robotku? Aku tidak takut, hanya saja... Baiklah. Aku takut. Aku bermimpi buruk dikejar oleh cakar robot raksasa ini. Terserah kau, Tom!",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "Kamu orang jahat, Tom. Lihatlah, Celia, kita harus mengikuti passion kita. Kamu punya robotik dan aku hanya ingin menjadi luar biasa di luar angkasa. Mengapa kamu tidak mengakui bahwa kamu takut dengan tangan robotku? Aku tidak takut, itu... Baiklah, sudah. Aku memang takut. Aku bermimpi buruk tentang ditelancong oleh genggaman robot raksasa itu. Oh, whatever, Tom!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_O0ORxKse1s8_088",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.988736987113953,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Halo. Bagaimana dengan telepon dari Albany? Sibuk? Baiklah, telepon kepala operator, minta dia untuk tidak menutup sambungannya. Urusan resmi. Ini soal hidup dan mati. Kuharap kau mengatakan yang sebenarnya, Nona Kennedy. Kalau tidak, kau akan dapat masalah. Sudah kubilang semua yang kukatakan itu benar. Dirken mencengkeramku. Dia merobek gaunku. Kami bergumul.",
+          "source" : "Hello. How about that Albany call? Busy? Well call the chief operator, tell her to keep the line open. Official business. It's a matter of life and death. I hope you are telling me the truth, Miss Kennedy. It won't go well with you if you're not. I tell you every word I told you's the truth. Dirken grabbed me. He tore my dress. We struggled.",
+          "text" : "Halo. Bagaimana dengan panggilan Albany itu? Penuh suara? Baiklah, hubungi operator utama, beritahu dia untuk menjaga garis tetap terbuka. Ini urusan resmi. Ini masalah hidup dan mati. Aku harap Anda mengatakan kepadaku kebenaran, Miss Kennedy. Tidak akan baik bagi Anda jika Anda tidak demikian. Katakan kepada aku bahwa setiap kata yang kukatakan adalah benar. Dirken meraihku. Dia merobek gaunku. Kami bertengkar."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.87977695465088,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Selamat datang. Selamat datang, semuanya. Saya hanya akan memastikan bahwa semua ini berjalan dengan baik. Hanya satu menit. Baru saja mencuci tangan dan siap-siap berangkat. Saya baru saja menyelesaikan persiapan. Kita siap mulai. Saya akan membuat kesalahan. Saya bisa merasakannya. Ini salah satu hari sial. Jadi, saya akan menunggu lebih banyak orang hadir, lalu kita akan mulai.",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "Selamat datang. Selamat datang, semuanya. Saya hanya ingin memastikan bahwa semuanya berfungsi dengan baik. Hanya butuh satu menit. Jadi saya datang sedikit lebih awal hanya untuk memastikan. Baru saja mencuci tangan dan siap memulai. Jadi saya baru saja menyelesaikan pengaturan. Saya pikir kita sudah siap. Saya akan membuat kesalahan. Saya bisa merasakannya. Ini salah satu hari-harinya. Jadi saya hanya akan menunggu sampai orang-orang bergabung, lalu kita akan mulai."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_OPV8Gf1FFn8_021",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.109360098838806,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ibu bilang kau tidak ingin mengunjungi kami. Ibu bilang begitu? Ya. Semua orang punya ceritanya sendiri, Nak. Kurasa itu ceritanya. Kau tahu hidup itu lucu, 'kan?",
+          "source" : "Mom says you don't want to visit us. She says that? Yeah. Everybody's got a story, son. I guess that's hers. Life's funny that way, you know?",
+          "text" : "Ibu bilang kamu tidak ingin mengunjungi kami. Dia bilang begitu? Ya. Semua orang punya cerita, anakku. Aku kira itu ceritanya. Hidup memang aneh begini, kamu tahu?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.395801901817322,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Lebih dari 4,5 miliar tahun yang lalu, Galaksi Bima Sakti bertabrakan dengan galaksi kecil yang ada di dekatnya. Tumbukan ini akhirnya mempercepat terbentuknya bintang-bintang. Tata surya kita termasuk dalam Galaksi Bima Sakti. Di dalam tata surya ini, sirkulasi materi telah berprogresi.",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "Lebih dari 4,5 miliar tahun yang lalu, Galaksi Bima Sakti bertabrakan dengan galaksi kerdil terdekat. Tabrakan ini mempercepat pembentukan bintang. Sistem tata surya kita merupakan bagian dari Galaksi Bima Sakti. Di dalam sistem tata surya, sirkulasi materi telah berlangsung."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_OtKhIhSgy78_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.525431990623474,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Astaga. Coba dengar, aku gembira sekali karena penampilan komedi spesial ini adalah hasil kerja selama kira-kira 23 tahun. Ya, begini maksudku. 23 tahun yang lalu adalah pertama kalinya aku datang ke Comedy Store dan menjadi penampil reguler, lalu menjadi komedian dan mengecewakan orang tuaku yang imigran Iran.",
+          "source" : "Oh my God. You guys, listen, I'm so excited because this comedy special is about 23 years in the making, okay? Yeah, I'll tell you what I mean by that. 23 years ago is when I first came to the Comedy Store and became a regular, and became a comedian and disappointed my Iranian immigrant parents.",
+          "text" : "Oh my God. Teman-teman, dengarkan, saya sangat antusias karena spesial komedi ini telah dibuat selama sekitar 23 tahun, oke? Ya, izinkan saya menjelaskan apa yang saya maksud dengan itu."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.038951992988586,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ketika Rescue Force berpatroli di kota, kita akan mengawasi museum ini dari tempat intaian. Para penjahat sebaiknya tidak mencuri Kaboonita selagi kita menunggu di dalam. Kita kehabisan uang! Kita harus curi permata itu dan menjualnya! Kalau tidak, kita harus bereksperimen dengan minuman soda! Bagaimana cara memasukkan robot ke dalam? Semua sudah disiapkan.",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "Saat pasukan penyelamat patroli kota, kami akan menjaga museum di dalam kotak. Tidak akan baik jika para penjahat mencoba mencuri Cabbonita sementara kami menunggu di dalamnya. Uang kita sudah habis! Kita harus mencuri berlian itu dan menjualnya! Jika tidak, kita akan melakukan eksperimen dengan minuman bersoda! Bagaimana cara kita memasukkan bot ke dalam sana? Semua sudah diatur."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_RFcdOs5dgT4_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.800140023231506,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Waktunya channel Scotty Kilmer. Warna cat mobil Anda memudar? Nah, jangan kemana-mana, karena saya akan tunjukkan caranya memoles warna cat yang memudar. Yang kita butuhkan adalah seember air, penggosok, dan sebotol Meguiar's Ultimate Compound.",
+          "source" : "Time for the Scotty Kilmer channel. Does your car have faded paint on it? Then stay tuned, because today I'm going to show you how to polish off faded paint. And all it takes is a bucket of water, a polisher, and a bottle of this Meguiar's Ultimate Compound.",
+          "text" : "Waktu untuk saluran Scotty Kilmer. Apakah mobil Anda memiliki cat yang pudar? Maka tetaplah menyimak, karena hari ini saya akan menunjukkan cara menghilangkan cat yang pudar. Dan semua yang diperlukan hanyalah sebuah ember air, sebuah polisher, dan botol Meguiar's Ultimate Compound ini."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.530833005905151,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Baiklah, biar kujelaskan. Masalahnya adalah, jika kalian lihat ke dalam sana... Kalian lihat lapisan kayunya? Ada lapisan lama di sana, dan tersambung dengan genteng. Jadi kalau saya lapisi di sini, kotorannya akan terkumpul di sini, ke flashing itu.",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "Baiklah, jadi izinkan saya menjelaskan. Oke, masalahnya adalah, jika Anda melihat ke dalam sana... Anda melihat dinding kayu? Itu adalah dinding lama, dan sambungannya bertemu dengan genteng di sana. Lalu saya menempelkan ini di atasnya. Dan yang terjadi adalah debu menumpuk di sana, pada bagian flashing tersebut."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_RpercXhgNXM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.930240988731384,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Halo, teman-teman, Thunder E di sini, dan selamat datang di video yang telah kalian nantikan. Saya akan bahas pengalaman bermain game di ASUS ROG Phone 5. Sekarang seri ROG Phone terkenal dengan keandalannya untuk bermain game, tapi dalam video ini, kita akan lihat apakah benar ROG Phone 5 ini akan kembali menjadi ponsel gaming terbaik.",
+          "source" : "Hey guys, Thunder E here, and welcome to the video you've been waiting for. I am talking about gaming on the ASUS ROG Phone 5. Now, the ROG Phone series is well known for its gaming powers, but in this video, we're going to find out if the ROG Phone 5 is truly taking back the crown as the king of gaming phones.",
+          "text" : "Halo guys, ini Thunder E, dan selamat datang di video yang sudah kalian tunggu. Aku akan membahas tentang gaming pada ASUS ROG Phone 5. Sekarang, seri ROG Phone memang terkenal dengan kekuatan gaming-nya, tetapi dalam video ini, kita akan mencari tahu apakah ROG Phone 5 benar-benar kembali menjadi raja ponsel gaming."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_S9xH4qIE5D4_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.691426992416382,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Anggota selanjutnya dari 85 South Show. Ia tidak perlu diperkenalkan. Di mana para penonton perempuan?! Kami tetap akan memperkenalkannya. Dia dari Atlanta, lewat Mississippi. Anda mungkin sudah melihatnya di MTV Wild'n Out. Penonton perempuan, inilah dia yang paling keren di permainan ini sekarang. Pria kesayangan kalian, sambutlah Karlous Miller!",
+          "source" : "The next member of the 85 South Show. He needs no introduction. Where my ladies at?! We gonna give him an introduction anyway. He's out of Atlanta, by way of Mississippi. You might have seen him on MTV Wild 'n Out. Ladies, he is the coldest in the game right now. Your baby daddy, Karlous Miller's in the building!",
+          "text" : "Anggota berikutnya dari 85 South Show. Dia tidak perlu diperkenalkan. Di mana para wanita saya?! Kami akan tetap memperkenalkan dia. Dia berasal dari Atlanta, lewat Mississippi. Mungkin Anda sudah melihatnya di MTV Wild 'n Out. Para wanita, dia adalah yang paling dingin saat ini. Ayah buah hati Anda, Karlous Miller, ada di gedung!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.717084050178528,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kami akan membiarkannya agar lembap kembali selama beberapa menit. Dengan cara masak ultralight ini, kita tidak benar-benar masak dengan kompor. Pertama, kami mendidihkan air supaya bisa menghidrasi makanan kami. Inilah salah satu alasan mengapa kami menggunakan olahan jagung instan. Waktu masaknya lebih cepat, hemat bahan bakar, dan lebih ringan. Oh ya. Jadi, ini hasilnya. Teksturnya pas.",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "Kami hanya akan biarkan itu duduk dan merehidrasi selama beberapa menit. Dengan memasak ultralight, kami sebenarnya tidak memasak di atas kompor. Kami terutama mendidihkan air agar kita bisa merehidrasi makanan kita. Ini juga salah satu alasan mengapa kami menggunakan grits instan. Waktu memasak lebih singkat, bahan bakar lebih sedikit, dan bobot lebih ringan. Oh ya. Jadi ini kira-kira apa yang sedang kita lakukan di sini. Konsistensi sempurna."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_TBPP-za78BQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.67477297782898,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kaboom City adalah kota yang dihuni para pahlawan. Super Things dan Kazzom Kids bertempur dengan kekuatan yang mereka dapat dari Kazoom. Ini adalah sumber energi terkuat yang pernah diketahui, dan sekarang dipamerkan di museum kota agar bisa dikagumi semua orang. Dan kita akan mencurinya! Apakah terlalu berbahaya menyusup ke sini? Aman. Lewat sinilah Kazoom akan dimasukkan.",
+          "source" : "Kaboom City is the city of heroes. The Super Things and the Kazoom Kids fight with their powers derived from Kazoom itself. It's the most potent energy source ever known, and now it's on display at the city museum for all to admire. And we're going to steal it! Isn't it dangerous to slip through here? Negative. This is the way the Kazooms are coming.",
+          "text" : "Kaboom City adalah kota pahlawan. Super Things dan Kazoom Kids bertarung dengan kekuatan yang berasal dari Kazoom itu sendiri. Ini adalah sumber energi paling kuat yang pernah diketahui, dan sekarang dipamerkan di museum kota untuk semua orang mengagumi. Dan kami akan mencurinya! Apakah berbahaya jika melintas di sini? Negatif. Inilah cara Kazooms datang."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_UL2vofFT7wQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.335877060890198,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Tiga puluh juta tahun yang lalu, seekor monster bebas menjelajahi wilayah ini. Nah, kita sedang membahas binatang paling buas yang pernah hidup di bumi. Ini adalah binatang buas terbesar yang pernah hidup di Amerika Utara sejak era dinosaurus. Lihatlah ukuran tengkoraknya. Lihatlah giginya. Tidak ada binatang seperti ini di mana pun.",
+          "source" : "Thirty million years ago, a monster roamed the landscape. Well, we're talking about one of the most ferocious animals that probably ever walked the earth. This was the biggest beast to live in North America since the dinosaurs. Look at the size of that skull. Look at all those teeth in there. There is no animal like this anywhere.",
+          "text" : "Tiga puluh juta tahun yang lalu, sebuah monster merajai pemandangan tersebut. Baiklah, kita berbicara tentang salah satu hewan paling ganas yang mungkin pernah berjalan di bumi ini. Ini adalah makhluk terbesar yang hidup di Amerika Utara sejak zaman dinosaurus. Lihatlah ukuran tengkorak itu. Lihatlah semua gigi di dalamnya. Tidak ada satupun hewan seperti ini di mana saja."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.83806300163269,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ayo kita naik wahana yang di sana. Wah, wah, wah, bocah besar! Kau agak terlalu berat untuk naik wahana ini. Keselamatan yang utama, 'kan? Harga tiketnya 30? Penipuan. Sudah kubilang. Perhatikan langkahmu!",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "Mari kita naik yang di sana. Wah, wah, wah, anak besar! Kamu agak terlalu gemuk untuk kendaraan ini. Keselamatan dulu, eh? Tiga puluh lembar? Itu penipuan. Aku sudah bilang. Hati-hati!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_V63Xcec-5jE_004",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.279932022094727,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Aku akan ke California. Kau akan ke California. Dan mengapa kau harus ke California? Amerika Serikat tidak cukup baik untukmu? Ah! Kau warga negara yang baik, ya? Kau bahkan tidak tahu bahwa California adalah bagian dari Amerika Serikat! Tapi, kenapa kau tertawa? Aku harus tertawa, karena kau sangat bodoh. Kau bahkan tidak sadar aku sedang bercanda.",
+          "source" : "I'm going to California. You're going to California. And why should you go to California? The United States ain't good enough for you? Ach! A fine citizen you are, yes? You don't even know that California is in the United States! But what are you laughing about? I gotta laugh, because you are so dumb, you didn't even know that I was making a joke with you.",
+          "text" : "Aku akan pergi ke California. Kamu juga akan pergi ke California. Dan mengapa kamu harus pergi ke California? Amerika Serikat tidak cukup baik bagimu? Ach! Kamu adalah warga negara yang hebat, bukan? Kamu bahkan tidak tahu bahwa California ada di Amerika Serikat! Tapi tentang apa kamu tertawa? Aku harus tertawa, karena kamu begitu bodoh, bahkan tidak tahu bahwa aku sedang bercanda padamu."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 24.601958990097046,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Halo dan selamat datang di episode perdana dari sebuah seri baru. Seri ini akan membahas sejarah beberapa skandal terburuk di dunia. Sebagiannya mungkin kalian sudah tahu, sebagian lagi mungkin belum. Seri ini terinspirasi di antaranya oleh sebuah program RTE yang disebut Scannál. Namun, saya ingin memperluas cakupannya, tidak hanya akan menyoroti skandal di Irlandia saja. Tanpa berlama-lama, mari kita mulai.",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "Halo dan selamat datang pada sebuah pilot dari seri baru. Ini akan menggali sejarah beberapa skandal terburuk di dunia—beberapa yang mungkin Anda kenal, dan beberapa yang mungkin tidak. Ini terinspirasi sebagian oleh program RTE bernama Scannál. Meskipun demikian, alih-alih berfokus pada peristiwa yang terkait dengan Irlandia, saya berencana memperluas cakupan apa yang akan saya bahas. Baiklah, tanpa penundaan lebih lanjut, mari kita mulai."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_W94uDJ55BmM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.912173986434937,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Halo, dunia! Dunia memang penuh kejutan, 'kan? Aku ingat beberapa tahun lalu, waktu menonton Resident Evil yang dibintangi Milla Jovovich, menurutku \"Ini yang paling parah!\" Ya, zaman itu terasa lebih indah. Tapi pada akhir tahun 2021, muncullah Resident Evil: Welcome to Racoon City. Atau, Selamat Datang di Neraka.",
+          "source" : "You, you the world! You're full of surprises, aren't you? I remember a few years back, watching some of those Resident Evil movies with Milla Jovovich and thinking, \"It can't get any worse than this!\" Yeah, it feels like a simpler time. But with 2021's final gasping breath, it came out with Resident Evil: Welcome to Raccoon City. AKA, Welcome to Hell.",
+          "text" : "Anda, dunia Anda! Penuh kejutan, bukan? Saya ingat beberapa tahun lalu menonton beberapa film Resident Evil bersama Milla Jovovich dan berpikir, \"Tidak bisa lebih buruk dari ini!\" Ya, rasanya seperti zaman yang lebih sederhana. Namun dengan napas terakhir 2021, ia muncul dengan Resident Evil: Welcome to Raccoon City. Atau, Welcome to Hell."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.632278084754944,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Bagi pakar Raptor, Bob Anderson, para penduduk pertama itu terlalu sombong dan tidak mau tahu. Semua burung pemangsa dianggap hama. Maksudku, semua dianggap ancaman. Mereka semua burung jahat, termasuk Elang Kepala Botak, Elang Emas, Elang Ekor merah. Semuanya ditembaki.",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "Bagi Bob Anderson, spesialis Raptor, sikap para pelopor itu hanyalah sombong dan tidak tahu apa-apa. Semua burung pemangsa dianggap sebagai hama. Saya maksudnya, semuanya adalah ayam elang. Mereka semua burung yang buruk, baik Elang Putih, Elang Emas, maupun Elang Berbelakang Merah. Mereka semuanya ditembak."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_XwIQLLbD7SI_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.598415970802307,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Dan saya ingin mulai terlebih dahulu dengan Dr. Vishal Sikka, CEO Infosys. Vishal, Anda putra seorang insinyur kereta api. Anda paham teknologi di sini, sekaligus seorang peselancar, yang tahu caranya menghindari ombak. Gangguan apa dari teknologi baru yang paling membutuhkan perhatian, dan mengapa? Mengapa kita perlu memperhatikan gangguan itu?",
+          "source" : "And I'd like to start by turning to Dr. Vishal Sikka, the CEO of Infosys. Vishal, you're the son of a railways engineer. You saw technology at that phase, and you're also a surfer, so you know all about dodging the waves. What's the disruption that we most need to pay attention to that's coming from the new technologies, and why? Why should we pay so much attention to the disruption?",
+          "text" : "Dan saya ingin memulai dengan berpamitan kepada Dr. Vishal Sikka, CEO dari Infosys. Vishal, Anda adalah putra seorang insinyur kereta api. Anda melihat teknologi pada fase tersebut, dan Anda juga seorang surfer, jadi Anda sangat paham tentang cara menghindari ombak. Apa gangguan yang paling perlu kami perhatikan yang berasal dari teknologi baru, dan mengapa? Mengapa kita harus begitu memperhatikan gangguan tersebut?"
+        }
+      ]
+    }
+  ]
+}

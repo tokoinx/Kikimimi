@@ -1,0 +1,1669 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-de.json"
+  ],
+  "translation" : {
+    "cases" : 72,
+    "chrF" : 57.1704126477026,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        18481,
+        18386,
+        18291,
+        18196,
+        18101,
+        18006
+      ],
+      "matches" : [
+        16212,
+        12879,
+        10391,
+        8839,
+        7737,
+        6841
+      ],
+      "reference" : [
+        18539,
+        18444,
+        18349,
+        18254,
+        18159,
+        18064
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 100,
+    "lines" : 100,
+    "numbersChecked" : 23,
+    "numbersKept" : 23,
+    "repeated" : 0,
+    "retried" : 3,
+    "retryFixed" : 3,
+    "reused" : 0,
+    "seconds" : 1325.1186318397522,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 100
+  },
+  "translationByTarget" : {
+    "de" : {
+      "cases" : 72,
+      "chrF" : 57.1704126477026,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          18481,
+          18386,
+          18291,
+          18196,
+          18101,
+          18006
+        ],
+        "matches" : [
+          16212,
+          12879,
+          10391,
+          8839,
+          7737,
+          6841
+        ],
+        "reference" : [
+          18539,
+          18444,
+          18349,
+          18254,
+          18159,
+          18064
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 100,
+      "lines" : 100,
+      "numbersChecked" : 23,
+      "numbersKept" : 23,
+      "repeated" : 0,
+      "retried" : 3,
+      "retryFixed" : 3,
+      "reused" : 0,
+      "seconds" : 1325.1186318397522,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 100
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-de-test-en-social_111976217731399552",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.114881992340088,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Es muss schlimm sein, einer dieser Leute zu sein. Ich kann mir nicht vorstellen, wie schrecklich deren Inneres aussehen muss",
+          "source" : "it must suck to be these people. i can't imagine how awful their inner life must be",
+          "text" : "Es muss sich anstrengen, diese Leute zu sein. Ich kann mir nicht vorstellen, wie schrecklich ihr inneres Leben sein muss."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_111977470885664240",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.107128024101257,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Uns ist klar, dass es schwer ist, reich und mächtig zu werden, ohne auf dem Weg dahin dem einen oder anderen auf die Füße zu treten.",
+          "source" : "we understand that it is hard to get to these positions of wealth and power without stepping on others along the way.",
+          "text" : "Wir verstehen, dass es schwer ist, ohne andere auf dem Weg zu treten, an diese Positionen des Reichtums und der Macht zu gelangen."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Da uns das kollektive Bewusstsein in Bezug auf Medien abhandengekommen ist, haben wir ein Klassenbewusstsein entwickelt, das unser kritisches Denken fördert.",
+          "source" : "in the absence of collective consciousness around media, we developed a level of class consciousness that helps us stay critical.",
+          "text" : "In Abwesenheit eines kollektiven Bewusstseins rund um die Medien haben wir ein Klassenbewusstsein entwickelt, das uns hilft, kritisch zu bleiben."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.37631094455719,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Mich mit meinem eigenen Bumerang getötet",
+          "source" : "Killed myself with my own boomerang",
+          "text" : "Ich habe mich mit meinem eigenen Boomerang umgebracht."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112106953594747568",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.431625008583069,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Und klar, diese anderen Quellen WISSEN „Krieg ist schlecht“, aber dann verkaufen sie trotzdem Tötungsmaschinen als Figuren und Merch. Was sollen wir also machen?",
+          "source" : "and sure, these other sources are AWARE that \"war is bad\", but then you're still selling the killing machines as figures and merch. So, like, what are we doing?",
+          "text" : "Und ja, diese anderen Quellen wissen zwar, dass „Krieg schlecht ist\", verkaufen aber weiterhin die Tötungsmaschinen als Figuren und Merchandise. Also, was machen wir eigentlich?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112107889726289648",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.154468894004822,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ich finde es sehr lebensbejahend, aus so einfachen Zutaten etwas so Reichhaltiges und Komplexes zu machen. Es ist, als würde man bei einer Geburt zuschauen.",
+          "source" : "I find it very life affirming; transforming such simple ingredients into something so rich and complex. Like witnessing a birth.",
+          "text" : "Ich finde es sehr lebensbejahend, so einfache Zutaten in etwas so Reiches und Komplexes zu verwandeln. Wie einen Geburtsakt zu erleben."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112107918929771488",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.376011967658997,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "Nutze beide Gehirnhälften. 🧠 Erlaubnis zum Entspannen. 📺",
+          "source" : "Use both sides of the brain. 🧠 Permission to relax. 📺",
+          "text" : "Nutze beide Gehirnhälften. 🧠 Erlaubnis zum Entspannen. 📺"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.983484029769897,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ich habe die Versiegelung darauf mehrmals kaputt gemacht, einfach weil ich mein Gesicht bewegt habe, und meine Nase fing an zu laufen, von dem Zeug, was da oben rumfliegt.",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "Ich habe den Verschluss ein paar Mal gebrochen, nur weil ich mein Gesicht bewegt habe, und meine Nase lief von allem, was so da oben herum schwebt."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.640514969825745,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "Warum werden die GPS-Koordinaten auf den nächsten vollen Grad gerundet. Das ist absolut sinnlos. Weil es sich um einen Vektor aus rationalen Zahlen handelt",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless because it's a vector of rational numbers",
+          "text" : "Warum werden die GPS-Koordinaten auf das nächste ganze Grad gerundet? Das ist absolut wertlos, da es sich um einen Vektor rationaler Zahlen handelt."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.890184044837952,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ach ja, hier ist Sally Rooneys neuestes Essay",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "Oh, genau, hier ist der neueste Essay von Sally Rooney."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 7,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 33.89741492271423,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "In dem grauen Kasten, der an der Seite des Nistkastens hängt, ist die Batterie.",
+          "source" : "The gray box that hangs on the side of the nesting box is where the battery lives.",
+          "text" : "Der graue Kasten, der an der Seite des Nestkastens hängt, ist dort, wo die Batterie untergebracht ist."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Das nenne ich mal ein Feature. So bekommen die Vögel auch etwas Privatsphäre.",
+          "source" : "I call this a feature. That way the birds get some privacy too.",
+          "text" : "Ich nenne das eine Funktion. So haben die Vögel auch etwas Privatsphäre."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Jetzt ist die Kamera offline und ich weiß nicht, warum. Sie hat sich nur eine Stunde nach Sonnenuntergang abgeschaltet.",
+          "source" : "Now, for reasons I'm not sure about yet, the camera is offline. It went out only one hour after sunset.",
+          "text" : "Nun, aus Gründen, die ich noch nicht ganz sicher bin, ist die Kamera offline. Sie schaltete sich erst eine Stunde nach Sonnenuntergang aus."
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Fisheye ist ziemlich übertrieben.",
+          "source" : "Fisheye is way overkill.",
+          "text" : "Der Fischaugen-Modus ist völlig übertrieben."
+        },
+        {
+          "lines" : [
+            4
+          ],
+          "reference" : "Und er ist immer noch offline.",
+          "source" : "Aaaand it's still offline.",
+          "text" : "Aaaand und sie ist immer noch offline."
+        },
+        {
+          "lines" : [
+            5
+          ],
+          "reference" : "Also entweder ist irgendetwas mit dem Panel oder mit meinem Multimeter nicht in Ordnung, oder die Daten wurden geändert.",
+          "source" : "So either there's something wrong with this panel or my multimeter, or they changed the listing.",
+          "text" : "Entweder ist etwas mit diesem Panel falsch, oder mein Multimeter, oder sie haben die Beschreibung geändert."
+        },
+        {
+          "lines" : [
+            6
+          ],
+          "reference" : "Vielleicht hat das Panel die Batterie gerade lange genug für 38 Sekunden Laufzeit aufgeladen. Dafür hat es nur etwas mehr als zwei Stunden gebraucht.",
+          "source" : "Maybe the panel trickle-charged the battery just enough for 38 seconds of runtime. It only took a bit over two hours to do that.",
+          "text" : "Vielleicht hat das Panel die Batterie nur so lange geladen, dass sie 38 Sekunden Laufzeit hatte. Das dauerte etwas über zwei Stunden."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.329802989959717,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "Wenn ich auf einem Event bin, dann hab ich welche bei mir. Die einzigen, nächsten Events in meinem Kalender sind derzeit: (Sag mir aber, dass du mich aus dem Internet kennst, sonst wundere ich mich, wer du bist und woher ich dich kenne)",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are: (Though do mention you recognise me off the internet otherwise I'll be wondering who you are and where I know you from)",
+          "text" : "Wenn ich an einem Event bin, habe ich sie dabei. Die einzigen bevorstehenden Events in meinem Kalender sind derzeit: (Aber erwähnen Sie bitte, dass Sie mich im Internet erkennen, sonst werde ich verwirrt sein, wer Sie sind und wo ich Sie kenne)"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112112271633685072",
+      "language" : "en",
+      "lineCount" : 4,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.658893942832947,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Danach ein paar Ortsbesichtigungen an Samstagen mit einem Kunden in Swansea.",
+          "source" : "After that a couple of site visits on Saturdays with a client in Swansea.",
+          "text" : "Danach ein paar Besuche auf dem Gelände am Wochenende mit einem Kunden in Swansea."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Ich sollte besser ein paar Motorräder reparieren, sonst…",
+          "source" : "I better get some motorbikes fixed, or else!",
+          "text" : "Ich sollte mir einige Motorräder reparieren lassen, sonst!"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Irgendwo habe ich welches, nur wo?",
+          "source" : "Got some somewhere but exactly where?",
+          "text" : "Ich habe welche irgendwo, aber genau wo?"
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Hehe, nicht eins, sondern drei!",
+          "source" : "Heheh not one but three!",
+          "text" : "Heheh nicht eine, sondern drei!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112112980319428992",
+      "language" : "en",
+      "lineCount" : 3,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 42.031111001968384,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Okay, anscheinend ist das Geisterbild, das ich auf dem linken Auge sehe, nicht weiter schlimm. Aber ich brauche grundsätzlich auch noch eine Gleitsichtbrille. Deshalb sind die Gläser eine Kombination aus beidem. Keine reine Gleitsichtbrille, sondern etwas zwischen einer Gleitsichtbrille und einer „normalen“ Brille (keine Ahnung, wie sowas dann heißt).",
+          "source" : "So, apparently the ghost image my left eye sees isn’t too much of a concern. But I need basically varifocals too. So the lenses have a combo of those. Not the full on varifocals but something in between those and ”normal” glasses (no idea of the terminology in English).",
+          "text" : "Also scheint das „Geistesspiegelbild\", das mein linkes Auge sieht, nicht allzu viel Bedenken zu erregen. Ich brauche aber im Grunde auch Brille mit mehrfacher Brennweite. Die Linsen haben also eine Kombination davon – nicht die volle Mehrfachbrille, sondern etwas dazwischen zwischen diesen und „normalen\" Brillen (ich habe keine Ahnung von der Terminologie auf Englisch)."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Während mir das erklärt wurde, habe ich entschieden, noch eine Brille zu kaufen, und zwar die hier.",
+          "source" : "While this was being told to me, I made a decision to get another pair, and that pair are these.",
+          "text" : "Während mir das gesagt wurde, habe ich mich entschlossen, ein weiteres Paar zu bestellen, und dieses Paar ist genau das."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "@user36 Die zweite Brille sieht wirklich gut aus! Ich liebe es, Brillen zu kaufen… ich schmeiße sie niemals weg, aber irgendwie kann ich keine von den anderen finden…! Meine aktuelle ist regenbogenfarben. Ich brauch aber auch eine Sonnenbrille… aber die auf Rezept sind so hässlich 😂.",
+          "source" : "@user36 that second pair is really nice! I love buying glasses...I never throw them out but somehow I can't find any of the others?! Mine are rainbow coloured at the moment, I need some sunglasses too... but if you need prescription they're so ugly 😂",
+          "text" : "@user36 das zweite Paar ist wirklich toll! Ich liebe es, Brille zu kaufen... ich werfe sie nie weg, aber irgendwie finde ich keine der anderen?! Meine sind derzeit farbig, ich brauche auch Sonnenbrillen... aber wenn man eine mit Rezeptur will, sind sie so hässlich 😂."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112122127346453600",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.597262024879456,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Und genau da fängt er an, super laut zu bohren. Hurra.",
+          "source" : "And this is when he starts drilling Super Loud. Yay.",
+          "text" : "Und das ist, wenn er mit dem Bohren von Super Loud beginnt. Huch."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Der Handwerker ist jetzt mit dem Staubsauger zugange. Hoffentlich bedeutet das, dass er gleich fertig ist.",
+          "source" : "Floor repair person is doing a vacuum, so hopefully that means he's finishing up.",
+          "text" : "Die Person für den Bodenersatz macht eine Saugaktion, also hofft man, dass das bedeutet, er beendet es."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112140958167999904",
+      "language" : "en",
+      "lineCount" : 4,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 32.34104800224304,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Das ist mein allererster Zahnarztbesuch wegen einer Krone: Heute war die Vorbereitung. In zwei Wochen ist dann die Anpassung. Ich übe schon mal, meinen Mund weit aufzumachen.",
+          "source" : "It's my first ever crown dentist visit: Prep today, then fitting in a fortnight. I'm practising opening my mouth wide.",
+          "text" : "Das ist mein erster Besuch beim Zahnarzt: Heute Vorbereitung, dann Fitting in zwei Wochen. Ich übe, den Mund weit zu öffnen."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Stumpi und ich sind jetzt wieder zu Hause und nach ein paar Tassen Tee fühlen wir uns besser. In zwei Wochen geht es weiter und dann wird die Behandlung beendet.",
+          "source" : "Stumpy and I are home and feeling better now we’ve had a couple of mugs of tea. Back in a fortnight to get the job finished.",
+          "text" : "Stumpy und ich sind zu Hause und fühlen uns besser, nachdem wir ein paar Tassen Tee getrunken haben. In zwei Wochen zurück, um die Arbeit abzuschließen."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Der Zahnarzt war nicht zufrieden damit, wie die Krone sitzt, selbst nachdem er sie bearbeitet und gefeilt hatte. Deshalb haben sie neue Abdrücke gemacht und es wird eine neue Krone angefertigt.",
+          "source" : "Dentist wasn’t happy with the fit of the crown, even after he’d footered and filed it. So new impressions were taken, and a new crown will be made.",
+          "text" : "Der Zahnarzt war mit dem Sitz der Krone nicht zufrieden, auch nicht nach dem Abfeilen und Fräsen. Daher wurden neue Abdrücke gemacht, und eine neue Krone wird angefertigt."
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Stumpi wurde gekrönt. Es lebe König Stumpi.",
+          "source" : "Stumpy has been crowned. All hail King Stumpy.",
+          "text" : "Stumpy ist gekrönt. Alle Helden König Stumpy."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 8,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 51.07712209224701,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Daten von Flightaware.",
+          "source" : "data from flightaware.",
+          "text" : "Daten von flightaware."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Sollte ich mir eine eigene Hecknummer für ein Flugzeug aussuchen können, dann wisst ihr, dass es auf jeden Fall eine Variante von N1337_ sein muss, wobei _ für den letzten BuchstabeN steht, der halt verfügbar ist.",
+          "source" : "If I ever have the opportunity to have a custom tail number for an aircraft, you KNOW it has to be some variation of N1337_, the _ being whatever final alphabetical char is available.",
+          "text" : "Wenn ich jemals die Möglichkeit habe, ein individuelles Flugzeug-Nummernschild zu erhalten, dann WEISS ich, dass es eine Variante von N1337_ sein muss, wobei das _ für das letzte verfügbare alphabetische Zeichen steht."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Ist logisch, dass die Sonne scheint, wenn ich weg bin, lol. Blöde Kuh.",
+          "source" : "Of course the sun is gonna be out while I'm away, lol. What a punk.",
+          "text" : "Natürlich wird die Sonne während meiner Abwesenheit draußen sein, lol. Was für ein Arschloch."
+        },
+        {
+          "lines" : [
+            3,
+            4
+          ],
+          "reference" : "Noch ein random Detail: Das ist nicht wie ein Sonntagsausflug mit dem Auto. Es ist eher ein Sport als eine Spazierfahrt, meiner neu gewonnenen Meinung nach.",
+          "source" : "Oh another random tidbit: This isn't like hopping in the car for a Sunday drive stuff. It's closer to a sport than a cruise in my newly initiated opinion.",
+          "text" : "Oh, noch ein zufälliger Fakt: Das ist nicht so etwas wie ein Sonntagsspazierfahrt im Auto. Es ist eher ein Sport als eine Kreuzfahrt nach meiner neuen Einschätzung."
+        },
+        {
+          "lines" : [
+            5
+          ],
+          "reference" : "Morgen gehe ich wieder hin. Dann üben wir Strömungsabriss und langsam Fliegen.",
+          "source" : "Going back up tomorrow and we're doing stalls and slow flight.",
+          "text" : "Morgen steigen wir wieder hoch und machen Schleifen und Langsamflug."
+        },
+        {
+          "lines" : [
+            6
+          ],
+          "reference" : "Heute war das Wetter unruhig, aber es hat großen Spaß gemacht. Wir haben langsam Fliegen und Strömungsabriss geübt. Einmal hatten wir eine Bodengeschwindigkeit von nur 16 mph bei einer Fluggeschwindigkeit von 65.",
+          "source" : "Choppy day today, but super fun. We did slow flight and stalls. At one point we had our ground speed down to 16mph with an airspeed of 65.",
+          "text" : "Heutiger Tag war windig, aber super Spaß. Wir haben Langsamflug und Schleifen gemacht. Zu einem Punkt hatten wir eine Bodenluftgeschwindigkeit von 16 mph bei einer Luftgeschwindigkeit von 65."
+        },
+        {
+          "lines" : [
+            7
+          ],
+          "reference" : "Die Bilder sind vom Samstag. Nach der letzten Landung war ein Reifen platt.",
+          "source" : "Pics are from saturday, ended up with a flat tire after our last landing",
+          "text" : "Die Bilder sind vom Samstag; nach unserer letzten Landung endete es mit einer Reifenschaden."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112166537145572640",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.024448990821838,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user48 Bootstrap wäre ein Hochgenuss im Vergleich zu Tailwind",
+          "source" : "@user48 Bootstrap would be sweet relief over tailwind",
+          "text" : "@user48 Bootstrap wäre eine süße Erleichterung gegenüber Tailwind."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.864098906517029,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user21 Ich rudere nur unter der Woche, also sind es im Schnitt bis jetzt ein bisschen über 5 km\/Werktag. Ich teile das unterschiedlich auf. Auf einem Ergometer.",
+          "source" : "@user21 I only row on weekdays, so I average out to a little over 5K\/weekday so far. I break it up in different ways. On an ERG.",
+          "text" : "@user21 Ich fahre nur an Wochentagen, sodass ich bisher durchschnittlich etwas mehr als 5K\/Woche erreiche. Ich unterteile es auf verschiedene Arten. Auf einem ERG."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112201850099412432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.268082976341248,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Mach schon nok, 3,74 $, los geht‘s.",
+          "source" : "come on nok, $3.74 let’s go.",
+          "text" : "Kommen wir, nein, 3,74 Dollar, los geht's."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112259676538889296",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.26994001865387,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ok, fangen wir an!",
+          "source" : "alright let's goooo!",
+          "text" : "Okay, los geht's!"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Ich hab die Hälfte meines Salats und Rucolas mit einer Plastikabdeckung umgebracht – zu viel Hitze –, aber davon abgesehen sehen meine Setzlinge echt gut aus!",
+          "source" : "I hotboxed half my lettuce and arugula to death with a plastic tray cover but other than that seedlings are doing pretty good!",
+          "text" : "Ich habe mein Salat und Rucola mit einem Plastikdeckel so lange gedampft, dass sie tot waren, aber ansonsten wachsen die Sämlinge ziemlich gut!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112270350852000848",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.5243589878082275,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Alles ready für den Stuckateur nächste Woche",
+          "source" : "Ready for the plasterer next week",
+          "text" : "Nächste Woche ist der Putzer dran."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-social_112294019357219888",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.918278932571411,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "hatte viel Spaß mit Kneadatite (dem grünen Zeug), es ist als modelliert man mit Kaugummi, aber man gewöhnt sich dran, und beim Aushärten kann es gut was ab und ist flexibel noch mehr Miniaturzeug",
+          "source" : "been really enjoying kneadatite (green stuff), it's like sculpting with bubble gum but you get used to that and it's tough and flexible when it cures more miniature stuff",
+          "text" : "Ich habe es mir wirklich gut gefallen, kneadatite (das grüne Material) zu verwenden; es ist wie das Formen mit Kaugummi, man gewöhnt sich daran, und wenn es aushärtet, ist es hart und flexibel – perfekt für Miniaturarbeiten."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_--4KfTiO-n0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 21.59178400039673,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "OK, also nach dem nächsten Video werden Dachdecker sauer auf mich sein, aber es ist nicht für sie! Es ist für dich – und zwar, wenn du zu denen gehörst, die sich keinen Dachdecker leisten können, dann musst du dir dieses Video anschauen. Darin siehst du, wie du selbst eine Abdeckung über ein altes, schon vorhandenes Dach bauen kannst. Es ist ganz leicht: ein System, was man einfach abziehen und ankleben kann.",
+          "source" : "Okay, the next video will get roofing contractors mad at me, but it's not for them. It's for you. If you are that person that cannot afford a roofing contractor, then you have to watch this video. This will show you how you can do a cover over an existing old roof yourself. And it's very simple. It's a peel and stick system.",
+          "text" : "Okay, der nächste Video wird Dachdecker gegen mich aufbringen, aber er ist nicht für sie. Er ist für euch. Wenn ihr die Person seid, die sich keinen Dachdecker leisten kann, dann müsst ihr dieses Video ansehen. Dies zeigt euch, wie ihr ein Überdachungssystem über einem bestehenden alten Dach selbst durchführen könnt. Und es ist sehr einfach. Es handelt sich um ein Peel-and-Stick-System."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_-0KrV5WsZq8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 21.087352991104126,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Venedig, die Stadt auf dem Wasser. Ein Ort der Schönheit und Romantik, der jährlich Millionen von Besuchern anzieht. Nur wenige Schritte von den gängigen Touristenpfaden entfernt findet man ein ganz anderes Venedig, bewohnt von faszinierenden Wesen. Dieser Film zeigt ein Venedig, das nur wenige je zu sehen bekommen, eine Stadt mit einem überraschenden Doppelleben.",
+          "source" : "Venice, city on the water. A place of beauty and romance that attracts millions of visitors every year. Just a few steps from the well-trodden tourist routes, there's a very different Venice, one populated by fascinating creatures. This film explores a Venice that few people ever see, a city that has a surprising double life.",
+          "text" : "Venedig, die Stadt am Wasser. Ein Ort der Schönheit und Romantik, der jedes Jahr Millionen Besucher anzieht. Nur wenige Schritte von den gut frequentierten Touristenrouten entfernt liegt ein ganz anderer Venedig, bevölkert von faszinierenden Wesen. Dieser Film erkundet einen Venedig, den nur wenige Menschen je gesehen haben, eine Stadt mit einer überraschenden Doppelleben."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 23.576864004135132,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Das ist eine authentische, echte alte Aufnahme eines wirklich riesenhaften Mannes aus Japan, der in einer Art Militärparade marschiert. Was daran so schockierend ist, ist seine tatsächliche Größe. Er ist mindestens 4 Meter groß, das sind mindestens 13 Fuß. Er ist also wirklich größer und massiver als jeder Original-NBA-Spieler, wie zum Beispiel Shaquille O‘Neal oder",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "Dies ist authentisches und echtes altes Filmmaterial eines echten riesigen Individuums aus Japan, das an einer Militärumzug teilnimmt. Was schockierend ist, ist seine tatsächliche Größe. Er hat eine Statur von mindestens 4 Metern Höhe, was mindestens 13 Fuß entspricht. Somit ist er wirklich höher und massiver als jeder andere ursprüngliche NBA-Spieler, zum Beispiel wie Shaquille O'Neal oder"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 22.920109033584595,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Die Frage ist, wie bei vielen anderen bekannten neolithischen Ruinen: Wie haben sie eine derartige Meisterleistung vollbracht? Wie konnten sie so riesige Steine heben? Waren sie, wie wir schon ganz oft vermutet haben, die Überreste einer einst sehr fortschrittlichen, aber zugrunde gegangenen antiken Kultur? Wir finden diese Möglichkeit, besonders hier bei den Menschen von Er Grah, sehr überzeugend.",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "Die Frage lautet, wie sie – wie unzählige andere behauptete neolithische Ruinen – solche Leistungen erbrachten. Wie hoben sie so enorme Steine? Waren sie, wie wir es bereits mehrfach postuliert haben, Überreste einer einst hochentwickelten, aber zerstörten antiken Zivilisation? Wir finden diese Möglichkeiten, insbesondere die Männer von Agra hier, sehr überzeugend."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_0EJ9bV6IAnM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 23.40681302547455,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Also, ich habe eine Xbox Series X gekauft, damit ihr das nicht tun müsst. Oder vielleicht müsst ihr doch. In diesem Video zeige ich euch alle Vor- und Nachteile der Entscheidung für eine Xbox Series X. Ich erkläre auch die Hardware selbst, den Controller, die Spiele, eigentlich alle Erfahrungen, die ich bis jetzt mit Xbox Series X gemacht habe. Ich hoffe, dieses Video gefällt euch, und ihr findet es vielleicht sogar nützlich.",
+          "source" : "So, I bought an Xbox Series X so that you don't have to. Or maybe you actually have to. In this video, I'm going to tell you all the pros and cons of choosing an Xbox Series X. I'm also going to go over the actual hardware, the controller, the games, just about everything that is my experience so far with the Xbox Series X. So I hope you will enjoy this video, and maybe even find it useful.",
+          "text" : "Also, ich habe mir eine Xbox Series X gekauft, damit ihr das nicht tun müsst. Oder vielleicht müsst ihr es doch. In diesem Video erzähle ich euch alle Vor- und Nachteile der Wahl einer Xbox Series X. Ich werde auch das eigentliche Hardware, den Controller, die Spiele sowie fast alles über meine bisherigen Erfahrungen mit der Xbox Series X besprechen. Ich hoffe, ihr findet dieses Video gefallen und vielleicht sogar nützlich."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_1CWvFkncljw_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 42.263553977012634,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ok, halt, halt, jetzt mach mal etwas weniger Krach, bitte! Papa, wann werden wir uns ein größeres Auto leisten können? Wenn du ungefähr 10 Jahre älter bist und einen Millionär heiraten kannst. In meinem Kinderwagen hatte ich mehr Platz. Ja, und den habe ich auch noch nicht abbezahlt. Ich schulde sogar dem Krankenhaus noch zwei Raten, bis du mir gehörst.",
+          "source" : "All right, whoa, whoa, whoa, whoa, hold it down to a small riot, would you? Daddy, when are we going to be able to afford a larger car? When you're about 10 years older and can marry a millionaire. I had more room when I was in my baby buggy. Yeah, and I haven't finished paying for that either. In fact, I still owe two more payments to the hospital before I own you.",
+          "text" : "Okay, halt mal kurz, halt mal kurz, halt mal kurz, halt mal kurz, lass uns das auf ein kleines Unruhestiften reduzieren, könnt ihr? Papa, wann werden wir in der Lage sein, ein größeres Auto zu kaufen? Wenn du etwa 10 Jahre älter bist und einen Millionär heiraten kannst. Ich hatte mehr Platz, als ich noch im Kinderwagen war. Ja, und ich habe auch noch nicht mit der Zahlung dafür abgeschlossen. Tatsächlich schulde ich dem Krankenhaus noch zwei weitere Zahlungen, bevor ich dich besitze."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_1R3j_apcikw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 20.756232023239136,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Heute sprechen wir über Ben Affleck in einem Interview. Greg, warum erzählst du uns nicht ein bisschen was über das Video, das wir sehen werden. Ja, also, vor etwa zwei Wochen hatte Ben Affleck ein zweistündiges Interview mit Howard Stern. Er sprach über die Trennung von seiner Ex-Frau und Familie, und das hatte Folgen, also los gehts. Hier ist er, Ben Affleck!",
+          "source" : "Today we're going to talk about Ben Affleck defending an interview. Greg, why don't you to tell us about the video we're going to watch. Yeah, so a couple of weeks ago, Ben Affleck went on a two-hour interview with Howard Stern. He talked about his breakup with his ex-wife and family, and he had some fallout from it, so here we go. Here he is, Ben Affleck!",
+          "text" : "Heute werden wir über Ben Affleck sprechen, der ein Interview verteidigt. Greg, warum erzählen Sie uns nicht über das Video, das wir ansehen werden? Ja, vor ein paar Wochen hat Ben Affleck eine zweistündigeinterview mit Howard Stern gegeben. Er sprach über seine Trennung von seiner Ex-Frau und ihrer Familie und hatte einige Konsequenzen daraus, also los geht's. Hier ist er, Ben Affleck!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.687935948371887,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Also, ich arbeite seit über 20 Jahren in der Musikbranche und habe in dieser Zeit zwei Alben herausgebracht und in Deutschland und Polen getourt, und natürlich in Schweden. Also bist du schon seit deiner Kindheit eine Performerin gewesen? Ja, bin ich. Und gibt es besonders legendäre Orte, an denen du früher aufgetreten bist?",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "Also habe ich über 20 Jahre lang mit Musik gearbeitet, zwei Alben veröffentlicht und in Deutschland, Polen und natürlich Schweden aufgetreten. Also war man schon sehr jung immer ein Performer? Ja, das war es. Und gab es irgendwelche ikonischen Orte, an denen ihr als Junge aufgetreten seid?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_2Uo5zKrbips_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 22.623224020004272,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Vor langer Zeit wurden ihre Eltern von Wilderern getötet, und Cheyenne und Kuyu wurden auf dem Markt verkauft. Sie wurden von der Organisation „Help Kongo“ aufgenommen und wuchsen in Gehegen zusammen mit etwa 30 weiteren Waisen draußen auf den Inseln auf. Nacheinander wurde diesen jungen Schimpansen der Weg zurück in den Wald gezeigt. Die Wissenschaftler des Vereins haben jedem einen Namen gegeben, um sie zu identifizieren.",
+          "source" : "A long time ago, their parents were killed by poachers, and Cheyenne and Kuyu were sold at the market. Taken in by the Help Congo organization, they grew up in semi-captivity with about 30 other orphans out on the islands. One after another, these young chimpanzees have been shown the way back to the forest. The association's scientists have given them each a name to identify them.",
+          "text" : "Vor langer Zeit wurden ihre Eltern von Wildern getötet, und Cheyenne und Kuyu wurden am Markt verkauft. Von der Organisation Help Congo aufgenommen, wuchsen sie in einer halbgefangenen Situation mit etwa 30 anderen Waisen auf den Inseln auf. Eine nach der anderen wurden diesen jungen Schimpansen der Weg zurück in den Wald gezeigt. Die Wissenschaftler der Vereinigung haben jedem von ihnen einen Namen gegeben, um sie zu identifizieren."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_36UVjSUk-wY_035",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.290590047836304,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Alexa, spiel „It's My Party and I'll Cry if I Want To“. Bo, Bo, wir drehen uns im Kreis. Alexa, spiel „It's My Party und I'll Cry if I Want To“. Du würdest auch weinen, wenn dir das passieren würde. Huhuu! Alexa, spiel „Midnight Train“!",
+          "source" : "Alexa, play It's My Party and I'll Cry if I Want To. Bo, Bo, we gotta spin around. Alexa, play It's My Party and I'll Cry if I Want To. You'd cry too if it happened to you. Woo! Alexa, play Midnight Train!",
+          "text" : "Alexa, spiele „Es ist meine Party und ich weine, wenn ich will\". Bo, Bo, wir müssen uns drehen. Alexa, spiele „Es ist meine Party und ich weine, wenn ich will\". Du würdest auch weinen, wenn es dir passiert. Woo! Alexa, spiele „Mitternachtszug\"!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_3M_AGbXVb5s_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 21.08830189704895,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Wo wir gerade von Stars sprechen, Howard Jones singt auf diesem Album als Gast ein Duett mit dir, im Song „I Made a Case“, und er hat dich bei deiner Musik immer voll unterstützt. War es Zufall, dass er bei diesem Song mit dabei ist? Ich habe gehört, du hättest die Begleitmusik zurücknehmen müssen, da du nicht wolltest, dass euren Stimmen beim Erzählen der Story etwas im Weg stünde.",
+          "source" : "Now, talking about stars, Howard Jones appears as a special guest vocalist in a duet with you on the album, on the track, I Made a Case, who has offered you so much encouragement with your music. Was it by chance that he happened to appear on the track? As I hear you had to strip back the track, as didn't want anything being in the way of your voices telling the story.",
+          "text" : "Nun, wenn wir über Sterne sprechen: Howard Jones erscheint als besonderer Gaststimme in einem Duett mit Ihnen auf dem Album, auf dem Song „I Made a Case\", der Ihnen so viel Mut für Ihre Musik gegeben hat. War es Zufall, dass er auf diesem Song erschien? Wie ich höre, mussten Sie den Track zurückfahren, da Sie nichts davor haben wollten, was die Geschichte Ihrer Stimmen behindern würde."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_3S7FkKvesu8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.19873297214508,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Wasser, die Flüssigkeit, aus der Ozeane gemacht sind. Und es füllt endlose Tiefen. Nur einige wagen sich in die riesige Unterwasserwelt des endlos weiten Meeres. Die meisten Ozeanbewohner leben sozusagen in der Stadt, wie menschliche Gesellschaften.",
+          "source" : "Water, the liquid that oceans are made of. And it fills endless depths. Only a few will venture out into the endless open ocean of this vast underwater world. Most of the ocean inhabitants live in the city, as it were, like human societies.",
+          "text" : "Wasser, die Flüssigkeit, aus der die Ozeane bestehen. Und sie füllt endlose Tiefen. Nur wenige wagen es, in das endlose offene Meer dieser riesigen Unterwasserwelt zu gehen. Die meisten Bewohner des Ozeans leben in einer Stadt, sozusagen, wie menschliche Gesellschaften."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_4EXYb1KXvzM_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.134926915168762,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Starfire. Die Prinzessin von Tamaran. Angenehm, hoffe ich. Lord Bagrok! Oh! Was für ein beeindruckender Geist. Deine Schwester war klug, dich auszuhändigen. Hässliche Kreatur!",
+          "source" : "Starfire. The princess of Tamaran. Comfortable, I hope. Lord Bagrok! Oh! Such a formidable spirit. Your sister was wise to hand you over. Garbler neck!",
+          "text" : "Starfire. Die Prinzessin von Tamaran. Ich hoffe, sie ist bequem. Herr Bagrok! Oh! Ein so furchterregender Geist. Deine Schwester war klug, dich zu übergeben. Garbler Hals!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_4cfsI4ZjTbU_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.444753050804138,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Wir müssen anerkennen, dass die Regierung der Volksrepublik China und die Regierung der Vereinigten Staaten große Unterschiede aufgewiesen haben. Wir werden auch in Zukunft unsere Differenzen haben. Aber wir müssen einen Weg finden, um diese Differenzen zu haben, ohne uns als Feinde in einem Krieg gegenüber zu stehen.",
+          "source" : "We must recognize that the government of the People's Republic of China and the government of the United States have had great differences. We will have differences in the future. But what we must do is to find a way to see that we can have differences without being enemies in war.",
+          "text" : "Wir müssen anerkennen, dass die Regierung der Volksrepublik China und die Regierung der Vereinigten Staaten große Unterschiede hatten. Wir werden auch in Zukunft Unterschiede haben. Aber was wir tun müssen, ist einen Weg zu finden, um zu erkennen, dass wir Unterschiede haben können, ohne Feinde im Krieg zu sein."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_5TqcJCKl34g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.078415989875793,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Also, wann haben Sie damit angefangen, Musik zu komponieren und zu performen, nachdem Sie da vor Ihren Großeltern auf der Bühne standen? Also, es war mehr performen. Ich habe auch ein bisschen komponiert, aber das überließ ich den Profis, wissen Sie, als ich mit professionellen Komponisten aufnahm und riesige Hits weltweit hatte.",
+          "source" : "So, when did you first start writing and performing music after having your stage in front of your grandparents there? Well, basically, more performing. I did a bit of writing, but I left it to professionals, you know, when I was recording with professional writers and big, big hits around the world.",
+          "text" : "Also, wann haben Sie nach dem Auftritt vor Ihren Großeltern dort mit Schreiben und Musizieren begonnen? Nun, im Grunde eher das Performen. Ich habe ein bisschen geschrieben, aber das überließ ich den Profis, wissen Sie, als ich mit professionellen Autoren arbeitete und große Hits weltweit produzierte."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 20.809504985809326,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Los. Los. Stein besiegt Schere, Schere besiegt Papier und Papier besiegt Stein. Du gewinnst. Der Verlierer verliert einen Stern. Am Ende jedes Spiels legt der Schiedsrichter die Karten wieder in die Recycling-Schachtel. Wenn natürlich beide Spieler die gleiche Karte wählen, gibt es ein Unentschieden, und keiner verliert einen Stern.",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "Prüfen. Prüfen. Felsen schlagen Schere, Schere schlägt Papier und Papier schlägt Felsen. Du gewinnst. Der Verlierer verliert einen Stern. Am Ende jedes Spiels wird der Schiedsrichter die Karten in den Recyclingbehälter zurücklegen. Natürlich, wenn beide Spieler dieselbe Karte wählen, ist das Spiel unentschieden und niemand verliert einen Stern."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 18.32772707939148,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Das ist die vollständige Geschichte von Danny und Sam. Bereit? Bereit. Danny Fenton und Sam Manson sind beste Freunde, und zusammen mit Tucker verbringen sie praktisch ihre ganze Zeit miteinander. Sam ist der Grund, warum dem Danny überhaupt seine Geister-Kräfte hat. So ein Quatsch, Danny, eine Geisterzone? Das musst du dir ansehen. Weißt du was? Du hast recht.",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "Hier ist die ganze Geschichte von Danny und Sam. Bereit? Bereit. Danny Fenton und Sam Manson sind beste Freunde, und zusammen mit Tucker verbringen sie fast ihre gesamte Zeit miteinander. Sam ist der Grund, warum Danny überhaupt Geisterkräfte hat. Komm schon, Danny, ein Geisterzone? Du musst es dir ansehen. Weißt du was? Du hast recht."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_6YeLsSSPNLQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 23.12311601638794,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Verbrechensbekämpfungsprotokoll 1.2747. Jump City ist voller Kriminalität. Alleine kann ich keine Gerechtigkeit auf die Straßen bringen. Ich brauche einen Sidekick, am besten gleich mehrere. Ich nenne sie aus Höflichkeit Teamkollegen, aber alle werden wissen, dass sie Sidekicks sind. Netzwerk-Apps. Willkommen, RobDog_747. Lass uns ein Team zusammenstellen. Teamerstellungs-Modus. Nicht älter als ich.",
+          "source" : "Crime fighters' log 1.2747. Jump City is a cesspool. I can't bring justice to the streets alone. I need a sidekick, preferably several sidekicks. I'll call them teammates to be polite, but everyone will know their sidekicks. Networking apps. Welcome, RobDog_747. Let's put together a team. Team assemble mode. Not older than me.",
+          "text" : "Kriminalitätsbekämpfer-Log 1.2747. Jump City ist ein Abgrund. Ich kann die Gerechtigkeit allein nicht auf die Straßen bringen. Ich brauche einen Begleiter, besser noch mehrere. Ich werde sie Teammitglieder nennen, um höflich zu sein, aber jeder wird ihre Begleiter kennen. Networking-Apps. Willkommen, RobDog_747. Lassen Sie uns ein Team bilden. Team-Zusammenstellung-Modus. Nicht älter als ich."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_6ji3tqZUynY_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 18.585180044174194,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kim Jong-il sagte zu den Amtsträgern: „Ich teilte das Auto mit einem großen Anführer, diente den arbeitenden Massen und bringe Blumen selbst auf einem Felsen zum Blühen, wenn das Volk es wünscht. Das ist mein Alpha und mein Omega. Dieser Gedanke wurde in alle Aspekte des Lebens der Menschen eingepflanzt, zum Beispiel in der Lösung des Verkehrsproblems.“",
+          "source" : "Kim Jong-il said to the officials, \"I shared a great leader's motor, served the working masses, and let flowers bloom even on a rock, if this is the people's desire. This is my alpha and omega. This idea has been embedded in every aspect of the people's living in the solution of traffic problem for one thing.\"",
+          "text" : "Kim Jong-il sagte den Beamten: „Ich teilte den Motor eines großen Führers, diente den arbeitenden Massen und ließ Blumen auch auf einem Felsen blühen, wenn dies der Wille des Volkes ist. Dies ist mein Alpha und Omega. Diese Idee ist in jedem Aspekt des Lebens des Volkes verankert, auch in der Lösung des Verkehrsproblems.\""
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_7MQ3Yx2h3Rg_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 20.850479006767273,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Was wir als allererstes tun, ist die Farbe anmischen. Sie wird eins zu eins mit Verdünner gemischt. Und wir mischen sie, wie wir es normalerweise beim Anstreichen tun würden. Hier habe ich zwei Unzen Farbe, also gebe ich zwei Unzen Verdünner dazu. Wir rühren das jetzt um. Jetzt kann sie in die Pistole gefüllt und gesprüht werden.",
+          "source" : "First of all, what we're going to do is just mix this paint up. It mixes one to one with a reducer. And we just mix it up like we normally would painting anything. So I have two ounces of paint here, so I'm going to put two ounces of reducer. We're going to stir it up. Now it's ready to put in the gun and spray.",
+          "text" : "Zuerst mischen wir einfach diese Farbe. Sie wird 1:1 mit einem Reduziermittel gemischt. Wir mischen sie genau so, wie wir es normalerweise tun, wenn wir etwas bemalen. Ich habe hier zwei Unzen Farbe, also werde ich zwei Unzen Reduziermittel hinzufügen. Wir rühren es um. Jetzt ist es bereit für die Spritzpistole und zum Sprühen."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_8bbVFeTIIg8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 21.031172037124634,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Erste Bewerbungen in Harvard für einen Master in Psychologie wurden abgelehnt, aber schließlich wurde er angenommen. Zu diesen ersten Rückschlägen kam es, weil Milgram keine Bachelor-Kurse in Psychologie in Queens College belegt hatte. 1961 erhielt Milgram einen PhD in Sozialpsychologie. Um diese Zeit wurde er auch Assistenz-Professor in Yale.",
+          "source" : "Initial applications to Harvard for a psychology master's were rejected, but was eventually admitted. The initial setbacks were due to Milgram not taking any undergraduate courses in psychology at Queens College. In 1961, Milgram received a PhD in social psychology. He became an assistant professor at Yale around the same time.",
+          "text" : "Die ersten Bewerbungen von Milgram an Harvard für einen Master in Psychologie wurden abgelehnt, doch er wurde schließlich zugelassen. Die anfänglichen Rückschläge waren darauf zurückzuführen, dass Milgram keine Grundstudienkurse in Psychologie am Queens College belegt hatte. 1961 erhielt Milgram einen Doktortitel in Sozialpsychologie. Um dieselbe Zeit wurde er Assistenzprofessor an der Yale-Universität."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_9GhGiB4KhTM_004",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.48720395565033,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Das habe ich nicht gesagt. Das brauchst du auch nicht. Du weißt besser als alle anderen, dass Gewalt jedes Mal zu mehr Gewalt führt. Der Rat hat die Entscheidung getroffen. Den Rat gibt es nicht mehr! Wir haben unser ganzes Leben, Tausende von Jahren, dem Schutz des Lebens gewidmet.",
+          "source" : "I didn't say that. You don't have to. You know better than anyone that violence begets violence every time. The Council made the decision. The Council is gone! We spend our entire lives, entire millennia devoted to protecting life.",
+          "text" : "Ich habe das nicht gesagt. Sie müssen es nicht. Niemand weiß besser als Sie, dass Gewalt immer wieder Gewalt erzeugt. Der Rat hat die Entscheidung getroffen. Der Rat ist weg! Wir widmen unser ganzes Leben, ganze Jahrtausende dem Schutz des Lebens."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_9s2UyGBuvYw_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.326825022697449,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Und das ist etwas, was eine tiefe Ehrfurcht hervorruft. Genau das ist es, was ich euch heute Abend vermitteln möchte. Ich hoffe, ihr seid bereit zu einer netten entspannenden Reise tief in die Geschichte des alten Ägypten.",
+          "source" : "And there's just something that evokes a serious sense of awe. And that's what I want to try to convey to you guys tonight. So I hope you're ready for a nice relaxing journey through some of the deeper history of ancient Egypt.",
+          "text" : "Und es gibt etwas, das einen tiefen Ehrfurchtsgefühle weckt. Genau das möchte ich euch heute Abend vermitteln. Ich hoffe also, dass ihr bereit seid für eine angenehme, entspannende Reise durch einige der tieferen Geschichte des alten Ägypten."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.054359912872314,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Es sind schon Monate vergangen, und ich habe immer noch das Gefühl, dort an seinem Grab zu stehen. Ich kann ihn nicht verlassen. Er ist nicht mehr da, und ich kann ihn immer noch nicht verlassen. Ich sehe ihn in jedem Soldaten in Uniform, an dem ich vorbeikomme, und seit dem Bombenangriff sind sie überall.",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "Es sind Monate vergangen, und ich fühle mich immer noch dort stehen, vor seinem Grab. Ich kann ihn nicht verlassen. Er ist weg, und ich kann ihn trotzdem nicht verlassen. Ich sehe ihn in jedem uniformierten Soldaten, den ich begegne, und sie sind überall, seit der Bombardierung."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_BAvkbiKnFEY_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.140018939971924,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hallo alle! Wer mich noch nicht kennt, ich bin Janica, und ich bin eine Expertin aus Finnland und lebe in den Niederlanden. Willkommen bei diesem Vlog. Heute sind wir in der Stadt Haarlem. Haarlem ist eine wunderschöne Stadt in der Provinz Nordholland.",
+          "source" : "Hello, everyone! If you don't know me, my name is Janica, and I am an expert from Finland, living in the Netherlands. Welcome to this vlog. Today we are in the city of Haarlem. Harlem is a really lovely city located in the province of North Holland.",
+          "text" : "Hallo zusammen! Wenn ihr mich noch nicht kennt, heißt ich Janica und bin eine Expertin aus Finnland, die in den Niederlanden lebt. Willkommen zu diesem Vlog. Heute sind wir in der Stadt Haarlem. Harlem ist eine wirklich schöne Stadt, die sich in der Provinz Nordholland befindet."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_BmgU6BTfNQM_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.98645305633545,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Die Batterie ist gut. Jetzt sehen wir, dass sich dieser integrierte Schaltkreis von der Leiterplatte gelöst hat. Wir sehen den Zustand dieses Schaltkreises. Dieser Track gehört hierher. Dieser Track ist beschädigt.",
+          "source" : "Battery is good. Now we can see this IC is dislocated from the PCB. We can see the condition of this IC. Now this track is coming here. This track is damaged.",
+          "text" : "Der Akku ist in Ordnung. Jetzt können wir sehen, dass dieser IC vom PCB gelöst ist. Wir können den Zustand dieses ICs erkennen. Jetzt führt diese Spur hierher. Diese Spur ist beschädigt."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_Lcdy6X5kMTs_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 20.426875948905945,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hallo alle, hier ist TS Madison. Und wenn ihr Wachstum für eurer Geschäft, eure Marke oder euer Produkt wollt, warum werbt ihr nicht mit mir? Sendet mir eine E-Mail an booktsmadison@gmail.com, um euch über unsere umfassenden Werbepakete zu informieren. Unique Visits, unique Subscriber, meine Lieben, eine vielseitige Zielgruppe. Schaltet noch heute eure Werbung über mich.",
+          "source" : "Hey, everybody, this is TS Madison. And if you are trying to grow your business, brand, or a product, why not advertise with me? Email me at booktsmadison@gmail.com so that you can get in on our comprehensive advertisement packages. Unique visits, unique subscribers, honey, a broad demographic. Advertise with me today.",
+          "text" : "Hallo zusammen, ich bin TS Madison. Und wenn ihr euer Geschäft, eure Marke oder ein Produkt wachsen lassen wollt, warum werdet ihr nicht mit mir werben? Schreibt mir bitte an booktsmadison@gmail.com, damit ihr unsere umfassenden Werbekampagnenpaket erhalten könnt. Einzigartige Besuche, einzigartige Abonnenten, Honig, eine breite Demografie. Werbt heute bei mir."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_MBJ0dL68I_I_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 23.06174600124359,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Der Dokumentarfilm, den ihr gleich sehen werdet, wurde Alexander Kerenski gezeigt, Präsident der provisorischen Regierung Russlands, die 1917 von den Kommunisten gestürzt wurde. Kerenski stimmte zu, einige einführende Worte zu unserem Film zu sagen. Wir zeigen den 80 Jahre alten Alexander Kerenski in seinem Appartement in New York City am 10. Oktober 1962.",
+          "source" : "The documentary film you are about to see was shown to Mr. Alexander Kerensky, President of the Democratic Provisional Government of Russia overthrown by the Communists in 1917. Mr. Kerensky consented to make a few introductory remarks about our picture. We present 80-year-old Alexander Kerensky in his New York City apartment on October 10th, 1962.",
+          "text" : "Der Dokumentarfilm, den Sie gerade sehen werden, wurde dem Herrn Alexander Kerensky, Präsident der demokratischen provisorischen Regierung Russlands, gezeigt, die 1917 von den Kommunisten gestürzt wurde. Herr Kerensky gab zu, einige einleitende Bemerkungen über unser Bild abzugeben. Wir stellen dem 80-jährigen Alexander Kerensky in seiner Wohnung in New York City am 10. Oktober 1962 vor."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_MG7hk2npXN0_005",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.663390040397644,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Euer Ehren, mein Mandant akzeptiert die Geschworenen so, wie sie sich aktuell zusammensetzen. Sind beide Parteien mit den Geschworenen einverstanden? Wir akzeptieren die Geschworenen. Wir sind mit den Geschworenen einverstanden. Nehmen Sie den Geschworenen den Eid ab.",
+          "source" : "Your Honor, my client accepts the jury as presently constituted. The jury is satisfactory to both sides? We accept the jury. The jury is satisfactory to us. Swear the jury.",
+          "text" : "Ehrener, meine Klientin akzeptiert die Jury in ihrer gegenwärtigen Zusammensetzung. Die Jury ist beiden Seiten zufriedenstellend? Wir akzeptieren die Jury. Die Jury ist uns zufriedenstellend. Schwören Sie die Jury."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_MbW7DvLZ9Lg_005",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.041517972946167,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kid Durango aus Arizona: Die Staubteufel. Der Tau, der die Prärie bedeckte, verschwand schnell, als die Sonnenstrahlen auf die Ausläufer der Berge fielen. Der Mond war noch eine Weile zu sehen und ging dann weit hinter dem Gebirge unter. Der Tag begann wie Tausende andere Tage in Arizona. Bis die Wolke kam.",
+          "source" : "Kid Durango of Arizona: The Dust Devils. The layer of dew that covered the prairie disappeared quickly as the sun rose over the foothills. The moon hung around for a while, and then sunk far below the ranges. The day began like a thousand other Arizona days. That was, until the cloud came.",
+          "text" : "Kid Durango aus Arizona: Die Staubteufel. Die Schicht von Tau, die die Prärie bedeckte, verschwand schnell, als die Sonne über den Hügelrücken aufging. Der Mond blieb eine Weile am Himmel und sank dann weit unter die Berge. Der Tag begann wie tausend andere Arizona-Tage. Das war, bis die Wolke kam."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 24.24324607849121,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Du bis ein Idiot, Tom. Aber, Celia, wir müssen unserer Leidenschaft nachgehen. Du hast deine Robotik, und ich will einfach ein toller Typ im Weltraum sein. Warum gibst du nicht einfach zu, dass du vor meiner Roboterhand Angst hast? Ich hab keine Angst, es ist… OK, du hast recht. Ich hab Angst. Ich habe Albträume, dass ich von dieser riesigen Roboter-Klaue verfolgt werde. Was auch immer, Tom!",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "Du bist ein Idiot, Tom. Hör zu, Celia: Wir müssen unseren Leidenschaften folgen. Du hast deine Robotik und ich will einfach nur im Weltraum großartig sein. Warum gestehst du nicht, dass du von meiner Roboterhand erschrocken bist? Ich bin nicht erschrocken von... Okay, gut. Ich bin erschrocken. Ich habe Albträume, in denen ich von diesem riesigen, robotischen Greifarm gejagt werde. Oh, egal, Tom!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_O0ORxKse1s8_088",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 24.34518003463745,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hallo. Was ist mit dem Albany-Anruf? Besetzt? Dann rufen Sie in der Zentrale an und sagen, sie soll die Leitung offen halten. Offizielle Angelegenheit. Es geht um Leben und Tod. Ich hoffe, Sie sagen mir die Wahrheit, Miss Kennedy. Das wird böse ausgehen, wenn Sie es nicht tun. Ich sage Ihnen, jedes Wort ist wahr. Dirken hat mich gepackt. Er hat mein Kleid zerrissen. Wir haben gekämpft.",
+          "source" : "Hello. How about that Albany call? Busy? Well call the chief operator, tell her to keep the line open. Official business. It's a matter of life and death. I hope you are telling me the truth, Miss Kennedy. It won't go well with you if you're not. I tell you every word I told you's the truth. Dirken grabbed me. He tore my dress. We struggled.",
+          "text" : "Hallo. Wie war der Anruf aus Albany? War es beschäftigt? Gut, rufen Sie den Hauptschaltoperator an, sagen Sie ihr, die Leitung offen zu halten. Offizielle Angelegenheit. Es geht um Leben und Tod. Ich hoffe, Sie sagen mir die Wahrheit, Frau Kennedy. Wenn Sie das nicht tun, wird es Ihnen schlecht gehen. Ich sage Ihnen, jedes Wort, das ich Ihnen gesagt habe, ist wahr. Dirken hat mich ergriffen. Er riss mein Kleid. Wir haben gekämpft."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 23.77165198326111,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Willkommen. Willkommen an alle. Ich will mich nur vergewissern, dass das hier alles funktioniert. Dauert nur einen Moment. Deswegen bin ich etwas früher live, nur um sicherzugehen. Ich hab eben meine Hände gewaschen und mich fertig gemacht. Ich mach noch schnell alles hier fertig. Ich glaub, wir können anfangen. Ich werd Fehler machen. Ich kann es fühlen. Es ist einer dieser Tage. Ich warte noch etwas, bis mehr Leute dazukommen, und dann legen wir los.",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "Willkommen. Willkommen, alle zusammen. Ich möchte nur sicherstellen, dass alles funktioniert. Es dauert nur eine Minute. Also bin ich etwas früh hereingekommen, um sicherzugehen. Ich habe mir die Hände gewaschen und mich auf den Start vorbereitet. Also beende ich gerade die Einrichtung. Ich denke, wir sind bereit. Ich werde Fehler machen. Ich spüre es. Es ist einer dieser Tage. Also warte ich nur, bis die Leute ankommen, und dann fangen wir an."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_OPV8Gf1FFn8_021",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.27978503704071,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Mom sagt, du willst uns nicht besuchen. Das sagt sie? Ja. Jeder hat seine Geschichte, Junge. Das ist wohl ihre. Das Leben ist schon komisch, weißt du?",
+          "source" : "Mom says you don't want to visit us. She says that? Yeah. Everybody's got a story, son. I guess that's hers. Life's funny that way, you know?",
+          "text" : "Mama sagt, du willst uns nicht besuchen. Sie sagt das? Ja. Jeder hat eine Geschichte, Sohn. Ich vermute, das ist ihre. Das Leben ist auf diese Weise lustig, weißt du?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.15958297252655,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Vor mehr als 4,5 Milliarden Jahren stieß die Milchstraße mit einer nahe gelegenen Zwerggalaxie zusammen. Durch dieses Aufeinandertreffen wurde die Bildung der Sterne beschleunigt. Unser Sonnensystem ist ein Teil der Milchstraße. Innerhalb des Sonnensystems ging die Rotation des Materials weiter.",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "Vor mehr als 4,5 Milliarden Jahren kollidierte die Milchstraße mit einer nahegelegenen Zwerggalaxie. Dieser Zusammenstoß beschleunigte die Sternentstehung. Unser Sonnensystem ist Teil der Milchstraße. Innerhalb des Sonnensystems verlief ein Materialkreislauf."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_OtKhIhSgy78_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.321110010147095,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Oh mein Gott. Leute, passt auf, ich freu mich so, weil dieses Comedy-Special ist schon seit etwa 23 Jahren in Arbeit. Ja, ich werde euch erklären, wie ich das meine. Vor 23 Jahren kam ich zum ersten Mal zum Comedy Store und wurde erst Stammgast, und dann Komiker und enttäuschte meine Immigranten-Eltern aus dem Iran.",
+          "source" : "Oh my God. You guys, listen, I'm so excited because this comedy special is about 23 years in the making, okay? Yeah, I'll tell you what I mean by that. 23 years ago is when I first came to the Comedy Store and became a regular, and became a comedian and disappointed my Iranian immigrant parents.",
+          "text" : "Oh mein Gott. Ihr Leute, hört zu: Ich bin so aufgeregt, weil dieses Comedy-Special etwa 23 Jahre in die making ging, okay? Ja, ich werde euch sagen, was ich damit meine. Vor 23 Jahren kam ich zum Comedy Store und wurde ein Regelmäßiger, wurde Komiker und enttäuschte meine iranischen Einwanderer-Eltern."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 22.1822669506073,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Während die Rettungskräfte die Stadt patrouillieren, bewachen wir in den Bots das Museum. Es wäre keine gute Idee für die Schurken, zu versuchen, den Cabbonita zu stehlen, während wir drinnen warten. Wir haben kein Geld mehr! Wir müssen diesen Diamanten stehlen und verkaufen! Wenn nicht, müssen wir unsere Experimente mit Sodapop durchführen! Wie bringen wir die Bots hinein? Es ist an alles gedacht.",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "Während die Rettungskräfte die Stadt patrouillieren, kümmern wir uns darum, das Museum in der Box zu bewachen. Es wäre nicht gut, wenn die Bösewichte versuchen würden, die Cabbonita mit uns zu stehlen, die dort warten. Wir sind pleite! Wir müssen diesen Diamanten stehlen und verkaufen! Sonst müssten wir unsere Experimente mit Cola machen! Wie kommen wir die Bots rein? Das ist alles geregelt."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_RFcdOs5dgT4_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.89979600906372,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Zeit für den Kanal von Scotty Kilmer. Ist der Lack an eurem Auto verblasst? Dann bleibt dran, denn heute zeige ich euch, wie ihr verblassten Lack aufpoliert. Alles, was ihr dafür braucht, ist ein Eimer Wasser, ein Poliertuch und eine Flasche des Ultimative Compound von Meguiar.",
+          "source" : "Time for the Scotty Kilmer channel. Does your car have faded paint on it? Then stay tuned, because today I'm going to show you how to polish off faded paint. And all it takes is a bucket of water, a polisher, and a bottle of this Meguiar's Ultimate Compound.",
+          "text" : "Zeit für den Scotty Kilmer-Kanal. Hat Ihr Auto abgeblaßte Lackstellen? Dann bleiben Sie dran, denn heute zeige ich Ihnen, wie man abgeblaßten Lack poliert. Und alles, was Sie brauchen, ist ein Eimer Wasser, ein Polierer und eine Flasche dieser Meguiar's Ultimate Compound."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 21.217812061309814,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Also, lasst mich das erklären. Okay, also, das Problem ist, wenn ihr hier reinschaut… Seht ihr die Holzverkleidung? Das ist die alte Verkleidung, und sie reicht bis zu den Schindeln dort. Und dann habe ich das darübergelegt. Das Problem ist, dass sich dort Schmutz sammelt, an dieser Abdeckung.",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "Okay, also erlaube mir, das zu erklären. In Ordnung, also ist das Problem folgendes: Wenn man dort drin hinschaut... Sieht man das Holzverkleidung? Das ist die alte Verkleidung und sie stößt dort auf die Dachziegel an. Und dann habe ich das darübergelegt. Und was passiert, ist, dass sich der Schmutz dort sammelt, an dieser Abdichtung."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_RpercXhgNXM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.110536098480225,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hallo Leute, hier ist Thunder E, willkommen bei dem Video, auf das ihr gewartet habt. Ich rede vom Spielen auf dem ASUS ROG Phone 5. Die ROG Phone-Serie ist für ihre starke Spieleleistung bekannt, aber in diesem Video werden wir herausfinden, ob das ROG Phone 5 wirklich wieder zum König der Gaming-Smartphones gekrönt werden kann.",
+          "source" : "Hey guys, Thunder E here, and welcome to the video you've been waiting for. I am talking about gaming on the ASUS ROG Phone 5. Now, the ROG Phone series is well known for its gaming powers, but in this video, we're going to find out if the ROG Phone 5 is truly taking back the crown as the king of gaming phones.",
+          "text" : "Hey Guys, hier ist Thunder E, und willkommen zu dem Video, auf das ihr gewartet habt. Ich spreche über Gaming auf dem ASUS ROG Phone 5."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_S9xH4qIE5D4_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.594102025032043,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Das nächste Mitglied der 85 South Show. Vorstellen, muss ich ihn nicht. „Where my ladies at?!“ Wir stellen ihn trotzdem vor. Er ist aus Atlanta, ursprünglich aus Mississippi. Vielleicht haben ihr ihn in „Wild 'n Out“ auf MTV gesehen. Ladys, er ist zurzeit der Kälteste im Spiel. Euer Baby Daddy Karlous Miller ist in the house!",
+          "source" : "The next member of the 85 South Show. He needs no introduction. Where my ladies at?! We gonna give him an introduction anyway. He's out of Atlanta, by way of Mississippi. You might have seen him on MTV Wild 'n Out. Ladies, he is the coldest in the game right now. Your baby daddy, Karlous Miller's in the building!",
+          "text" : "Der nächste Teilnehmer der 85 South Show. Er braucht keine Vorstellung. Wo sind meine Damen?! Wir werden ihm sowieso eine geben. Er kommt aus Atlanta, über Mississippi. Vielleicht habt ihr ihn schon auf MTV Wild 'n Out gesehen. Damen, er ist gerade der Kälteste im Spiel. Euer Babyvater, Karlous Miller, ist da!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 33.0061399936676,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Wir lassen das jetzt einfach kurz stehen, damit es für ein paar Minuten rehydrieren kann. Beim ultraleichten Kochen wird nicht wirklich am Herd gekocht. Wir kochen hauptsächlich Wasser, um unser Essen damit zu rehydrieren. Das ist auch einer der Gründe, weshalb wir Instant-Gerichte verwenden. Kürzere Kochzeit, verbraucht weniger Gas und wiegt weniger. Oh ja! Das ist es also, was wir hier zubereiten. Perfekte Konsistenz.",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "Wir lassen das einfach ruhen und für ein paar Minuten wieder aufquellen. Bei ultraleichter Zubereitung kochen wir nicht wirklich auf dem Herd. Wir kochen hauptsächlich Wasser, damit wir unsere Lebensmittel wieder aufquellen können. Es ist auch einer der Gründe, warum wir Instant-Grits verwenden. Weniger Kochzeit, weniger Brennstoff und weniger Gewicht. Oh ja. Also das ist ungefähr, was wir hier vorhaben. Perfekter Konsistenzgrad."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_TBPP-za78BQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 21.672960996627808,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kaboom City ist eine Stadt der Helden. Die Super Things und die Kazoom Kids kämpfen mit den Kräften, die sie von Kazoom selbst erhalten haben. Das ist die stärkste je dagewesene Energiequelle, und jetzt wird sie im Museum der Stadt ausgestellt, wo sie von allen bewundert werden kann. Und wir werden sie stehlen! Ist es gefährlich, dort durchzuschleichen? Negativ. Von dort kommen die Kazooms.",
+          "source" : "Kaboom City is the city of heroes. The Super Things and the Kazoom Kids fight with their powers derived from Kazoom itself. It's the most potent energy source ever known, and now it's on display at the city museum for all to admire. And we're going to steal it! Isn't it dangerous to slip through here? Negative. This is the way the Kazooms are coming.",
+          "text" : "Kaboom City ist die Stadt der Helden. Die Super-Dinge und die Kazoom-Kinder kämpfen mit ihren Kräften, die aus dem Kazoom selbst stammen. Es ist die stärkste Energiequelle, die je bekannt war, und nun steht sie im Stadtmuseum zur Bewunderung aller zur Verfügung. Und wir werden es stehlen! Ist es nicht gefährlich, hier hindurchzukommen? Negativ. So kommen die Kazooms."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_UL2vofFT7wQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.694043040275574,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Vor 30 Millionen Jahren streifte ein Monster durchs Land. Wir sprechen von einem der gefährlichsten Tiere, das es wohl je auf der Erde gegeben hat. Es war das größte Tier in Nordamerika seit den Dinosauriern. Schaut euch die Größe dieses Schädels an. Schaut euch diese Zähne hier drin an. So ein Tier gibt es nirgends.",
+          "source" : "Thirty million years ago, a monster roamed the landscape. Well, we're talking about one of the most ferocious animals that probably ever walked the earth. This was the biggest beast to live in North America since the dinosaurs. Look at the size of that skull. Look at all those teeth in there. There is no animal like this anywhere.",
+          "text" : "Vor 30 Millionen Jahren wanderte ein Monster über die Landschaft. Nun, wir sprechen von einem der gewaltigsten Tiere, die wahrscheinlich je auf der Erde liefen. Dies war das größte Tier, das seit den Dinosauriern in Nordamerika lebte. Schauen Sie sich die Größe dieses Schädelns an. Schauen Sie sich all diese Zähne dort an. Es gibt kein Tier wie dieses irgendwo."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.523141980171204,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Lass uns mit dem dort drüben fahren. Warte, warte, Großer! Du bist ein bisschen zu stämmig für den Fahrstuhl. Sicherheit geht vor, ja? 30 Scheine? Was für eine Abzocke. Ich habs dir gesagt. Pass auf!",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "Fahren wir auf dem da hin. Woah, woah, woah, großer Junge! Du bist für dieses Fahrzeug etwas zu schwer. Sicherheit zuerst, oder? 30 Dollar? Was für ein Betrug. Ich habe es dir gesagt. Achte auf deine Schritte!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_V63Xcec-5jE_004",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 23.162999987602234,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ich gehe nach Kalifornien. Du gehst nach Kalifornien. Und was willst du in Kalifornien? Sind die Vereinigten Staaten dir nicht gut genug? Ach! Du bist ja ein toller Bürger, du weißt nicht mal, dass Kalifornien zu den Vereinigten Staaten gehört! Aber was gibt es da zu lachen? Ich muss lachen, weil du so dämlich bist, du hast nicht mal gemerkt, dass ich mich über dich lustig gemacht habe.",
+          "source" : "I'm going to California. You're going to California. And why should you go to California? The United States ain't good enough for you? Ach! A fine citizen you are, yes? You don't even know that California is in the United States! But what are you laughing about? I gotta laugh, because you are so dumb, you didn't even know that I was making a joke with you.",
+          "text" : "Ich gehe nach Kalifornien. Du gehst nach Kalifornien. Und warum solltest du nach Kalifornien gehen? Ist die Vereinigten Staaten nicht gut genug für dich? Ach! Ein feiner Bürger bist du, ja? Du weißt gar nicht, dass Kalifornien in den Vereinigten Staaten liegt! Aber worüber lachst du? Ich muss lachen, weil du so dumm bist, dass du gar nicht verstanden hast, dass ich mit dir scherze."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 28.946563959121704,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hallo, willkommen bei einer Art Pilotfolge einer neuen Serie. Ich möchte einige Geschichten der schlimmsten Skandale der Welt behandeln – manche kennt ihr vielleicht, andere nicht. Die Serie orientiert sich zum Teil an einer RTE-Serie namens Scannal. Aber ich möchte mich nicht nur auf Ereignisse im Zusammenhang mit Irland konzentrieren, sondern ein breiteres Feld abdecken. Also, warten wir nicht länger, fangen wir an.",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "Hallo und willkommen zu einer Art Pilot einer neuen Serie. Wir werden uns mit der Geschichte einiger der schlimmsten Skandale der Welt befassen – einige kennen Sie vielleicht, andere nicht. Die Serie wurde teilweise von einem Programm des RTE namens Scannál inspiriert. Obwohl ich mich normalerweise auf Ereignisse, die mit Irland verbunden sind, konzentriere, plane ich, den Umfang zu erweitern. Ohne weitere Verzögerung fangen wir an."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_W94uDJ55BmM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 22.441407084465027,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Du, du Welt! Du steckst echt voller Überraschungen, oder? Ich weiß noch, wie ich vor ein paar Jahren die „Resident Evil“-Filme mit Milla Jovovich gesehen hab und dachte, „schlimmer als das kann es nicht mehr werden!“ Ja, das waren wohl einfachere Zeiten. Aber als 2021 in seinen letzten Zügen lag, brachte das Jahr noch „Resident Evil: Willkommen in Racoon City“ raus. Auch bekannt als „Willkommen in der Hölle“.",
+          "source" : "You, you the world! You're full of surprises, aren't you? I remember a few years back, watching some of those Resident Evil movies with Milla Jovovich and thinking, \"It can't get any worse than this!\" Yeah, it feels like a simpler time. But with 2021's final gasping breath, it came out with Resident Evil: Welcome to Raccoon City. AKA, Welcome to Hell.",
+          "text" : "Ihr, ihr die Welt! Ihr seid voller Überraschungen, oder? Ich erinnere mich vor ein paar Jahren, als ich einige Resident Evil-Filme mit Milla Jovovich sah und dachte: „Es kann nicht schlimmer werden als das!\" Ja, es fühlt sich wie eine einfachere Zeit an. Aber mit dem letzten Atemzug von 2021 kam Resident Evil: Welcome to Raccoon City heraus. AKA, Welcome to Hell."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.39343500137329,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Für den Raubvogel-Spezialisten Bob Anderson war die Einstellung der Pioniere einfach arrogant und ignorant. Alle Raubvögel wurden einfach als Schädlinge betrachtet. Ich meine, sie waren alle Habichte. Sie waren alle schlechte Vögel, sei es ein Weißkopfseeadler, ein Steinadler oder ein Rotschwanzbussard. Sie wurden alle abgeschossen.",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "Für den Raptor-Spezialisten Bob Anderson, den Pionier, war die Haltung einfach arrogant und ignorant. Alle Raubvögel wurden lediglich als Schädlinge betrachtet. Ich meine, sie waren alle Hühnerfresser. Sie waren alle schlechte Vögel, egal ob Weißkopfseeadler, Goldadler oder Rotfußbussard. Sie wurden alle erschossen."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-de-test-en-speech_XwIQLLbD7SI_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 20.21123695373535,
+      "target" : "de",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Und als Erstes möchte ich mit Dr. Vishal Sikka sprechen, dem CEO von Infosys. Vishal, Sie sind der Sohn eines Eisenbahningenieurs. Sie sahen Technologie in dieser Phase, und Sie sind auch ein Surfer, also wissen Sie alles darüber, wie man Wellen ausweicht. Auf welche Störungen müssen wir bei den neuen Technologien besonders achten, und warum? Warum sollten wir so auf die Störungen achten?",
+          "source" : "And I'd like to start by turning to Dr. Vishal Sikka, the CEO of Infosys. Vishal, you're the son of a railways engineer. You saw technology at that phase, and you're also a surfer, so you know all about dodging the waves. What's the disruption that we most need to pay attention to that's coming from the new technologies, and why? Why should we pay so much attention to the disruption?",
+          "text" : "Und ich möchte mit Dr. Vishal Sikka, dem CEO von Infosys, beginnen. Vishal, du bist der Sohn eines Eisenbahningenieurs. Du hast die Technologie in dieser Phase erlebt und bist auch Surfer, also kennst du alles über das Ausweichen auf den Wellen. Welche Störung müssen wir aus den neuen Technologien am meisten beachten, und warum? Warum sollten wir so viel Aufmerksamkeit der Störung widmen?"
+        }
+      ]
+    }
+  ]
+}
