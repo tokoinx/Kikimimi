@@ -20,7 +20,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 3. `make app` (`build/Kikimimi.app` ができる)
 4. `make check-ui` (ウインドウが開き、音が鳴る。数分かかるので run_in_background で走らせる)
 
-- 4 が走らせる命令は `Makefile` の `check-ui` に在る。CI (`.github/workflows/build.yml` の「UI load self-test (3000 lines, …)」の段) と同じ確認。アプリは作らないので、先に 3 を行う。
+- 4 が走らせる命令は `Makefile` の `check-ui` に在る。CI (`.github/workflows/build.yml` の「UI load self-test (3000 lines, …)」の段) と同じ確認。アプリは作らないので、先に 3 を行う。違いは 1 つ: CI は、「重い」(終了コード 5) の時だけ、もう 1 回だけ測り直し、2 回続けて「重い」の時に失敗にする (実行機が一時止まった時の跳ねのため。1 回目の SLOW の行は、警告として残る)。手元の `make check-ui` は測り直さない。
 - `make` を通すので、アプリの終了コード N は `make: *** [check-ui] Error N` の行に出る (`make` 自身は 2 を返す)。この行が無く `make` が 0 で終われば、アプリの終了コードは 0。
 - 結果の行は標準エラーへ、終わりにまとめて出る。途中では `UI LOAD (live): …` の行だけが出る。
 - `--selftest-…` の時は、ふだんのライブラリに保存しない (確認は一時フォルダで行い、終わりに消す)。
