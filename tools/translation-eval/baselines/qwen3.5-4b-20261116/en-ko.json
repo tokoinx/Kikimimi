@@ -1,0 +1,658 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-ko.json"
+  ],
+  "translation" : {
+    "cases" : 28,
+    "chrF" : 28.222087762514498,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        2559,
+        2529,
+        2499,
+        2469,
+        2439,
+        2409
+      ],
+      "matches" : [
+        1570,
+        956,
+        650,
+        460,
+        326,
+        227
+      ],
+      "reference" : [
+        2508,
+        2478,
+        2448,
+        2418,
+        2388,
+        2358
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 30,
+    "lines" : 30,
+    "numbersChecked" : 5,
+    "numbersKept" : 5,
+    "repeated" : 0,
+    "retried" : 2,
+    "retryFixed" : 2,
+    "seconds" : 341.8177478313446,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 30
+  },
+  "translationByTarget" : {
+    "ko" : {
+      "cases" : 28,
+      "chrF" : 28.222087762514498,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          2559,
+          2529,
+          2499,
+          2469,
+          2439,
+          2409
+        ],
+        "matches" : [
+          1570,
+          956,
+          650,
+          460,
+          326,
+          227
+        ],
+        "reference" : [
+          2508,
+          2478,
+          2448,
+          2418,
+          2388,
+          2358
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 30,
+      "lines" : 30,
+      "numbersChecked" : 5,
+      "numbersKept" : 5,
+      "repeated" : 0,
+      "retried" : 2,
+      "retryFixed" : 2,
+      "seconds" : 341.8177478313446,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 30
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_111975537143453440",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.79493999481201,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "전반적으로 나는 두 게임을 오가면서 플레이하는 걸 정말 좋아한다. 숏폼 스토리의 장점은 '마음에 드는 파트로 바로 이동'할 수 있고, 더 즉각적으로 몰입감과 만족감을 선사할 수 있다는 것이다. 롱폼 스토리는 무엇이 벌어지더라도 훨씬 더 무게감 있게 감정을 연출할 수 있다는 게 장점이다. 즉각성을 포기하는 대가로 더 강력한 보상을 받는 셈이다.",
+          "source" : "In general I really like the interplay between the two games. The advantage of shortform stories is that you can \"skip to the good part\", they can be more immediately engrossing and satisfying. The advantage of longform stories is that you can imbue whatever happens with way more emotional weight, you lose the immediacy in exchange for stronger payoffs.",
+          "text" : "일반적으로 저는 두 게임 간의 상호작용을 정말 좋아합니다. 단편 스토리의 장점은 \"좋은 부분만 건너뛰기\"가 가능하다는 점이며, 더 즉각적으로 몰입하고 만족감을 줄 수 있다는 것입니다. 반면 장편 스토리의 장점은 일어나는 모든 일에 훨씬 더 큰 감정적 무게를 부여할 수 있다는 점인데, 즉각성은 희생하더라도 더 강력한 보상 효과를 얻을 수 있습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_111976249663909024",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.553676009178162,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "AT&T의 현황 사이트에서는 장애가 없다고 주장하네...뉴스에서 장애라고 보도하고 있는데 😠",
+          "source" : "the AT&T status site claims there's no outages...even though the news is reporting an outage 😠",
+          "text" : "AT&T 상태 사이트는 장애가 없다고 주장하지만, 뉴스는 장애를 보고하고 있습니다 😠."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.141577959060669,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "용암이 싫어 #firetemple",
+          "source" : "I hate lava #firetemple",
+          "text" : "저는 라바 #파이어템플을 싫어합니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_111977766001055104",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.337607979774475,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "라이브 피드에 의하면 신호가 있다",
+          "source" : "Live feed says that they have a signal",
+          "text" : "실시간 영상에서 신호가 있다고 합니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.118411898612976,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "얼굴을 움직이다가 봉제선이 뜯어진 것 같은데, 도대체 공기 중에 뭐가 떠다니는지 콧물이 줄줄 흐르기 시작했어요.",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "그걸 몇 번이나 얼굴을 움직이며 밀봉을 깨봤는데, 아마도 그거에서 떠다니는 게 뭔지 모르겠지만 내 코가 흐르기 시작했습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.288770079612732,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "도대체 왜 GPS 좌표가 가장 가까운 완전한 각도의 값으로 반올림되는 걸까요? 그러면 전혀 쓸모없는데요.",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "text" : "왜 GPS 좌표가 가장 가까운 정수 도수로 반올림되는지, 그건 완전히 쓸모없는 거야."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.486626982688904,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "네, 샐리 루니의 최신 에세이입니다",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "오 맞습니다, 살리 로우의 최신 에세이입니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 3,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.676899075508118,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "이미 둥지를 설치한 상자가 이 집의 Wi-Fi를 죄다 쓰고 있어요.",
+          "source" : "The box that has already a nest in it is leeching off the wifi in the house.",
+          "text" : "이미 둥지를 틀어둔 그 상자는 집의 와이파이를 빨아먹고 있습니다."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "전체적으로 센서 몇 개 더 추가하면 좋을 것 같아요.",
+          "source" : "A few more sensors in general would be nice I guess.",
+          "text" : "아마도 몇 가지 더 센서가 있으면 좋겠습니다."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "제 생각으로는, 오늘 날씨가 흐리네요. 그래서 (아마도 고장난) 태양열 패널이 뭔가를 할 만큼 충분한 전기를 생성할 수 있을지 모르겠어요.",
+          "source" : "Guess what: It's cloudy today. So I'm not sure if that (probably broken) solar panel is able to generate enough juice to achieve anything.",
+          "text" : "추측해 보세요: 오늘 흐린 날입니다. 그래서 (아마도 고장 난) 태양전지가 충분한 전기를 만들어 어떤 일을 할 수 있을지 확실하지 않습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.0746169090271,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "제가 참석하는 이벤트에 가지고 나갈게요. 현재 제 캘린더에는 다음 이벤트만 있네요.",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "text" : "만약 제가 행사에 참석한다면, 그들을随身携带합니다. 현재 내 일정에서 다가오는 유일한 행사는 다음과 같습니다:"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112121157211696272",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.503522038459778,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "내 MX를 프로톤으로 전송했고 이제 기본 이메일 승인을 받으려고 구글에 돈을 낼 필요없이 풀로 SPF, DKIM, DMARC를 갖추게 되었죠.",
+          "source" : "I transferred my MX to Proton and have now full SPF, DKIM and DMARC without having to pay Google for basic email validation.",
+          "text" : "저는 MX 를 Proton 으로 이전했고, 기본 이메일 검증에 Google 에 비용을 지불하지 않아도 이제 SPF, DKIM, DMARC 를 모두 갖게 되었습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112132847725764752",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.346948027610779,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "방금 휴스턴 IAH에서 국제선에 탑승할 때 안면 인식 시스템이 있더라고요. 세관 문제 때문이겠죠??",
+          "source" : "Just encountered a facial recognition system while boarding an intl flight from Houston's IAH. Apparently it's for some customs-related thing??",
+          "text" : "휴스턴 IAH 공항에서 국제편에 탑승할 때 얼굴 인식 시스템을 마주쳤습니다. apparently 그것은 어떤 관세 관련 문제용인 것 같습니다??"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.594789028167725,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "사랑하는 여러분 즐거운 토요일이에요. 4,000피트 상공에 오신 걸 환영합니다.",
+          "source" : "Happy Saturday lovelies. Welcome to 4000ft.",
+          "text" : "사랑스러운 여러분, 토요일 축하합니다. 4000피트에 오신 것을 환영합니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.965109944343567,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user20 그래서 매일 최소 2.8km를 노를 젓는다고요? ERG에서요 아님 물에서요?",
+          "source" : "@user20 so every day you row at least 2.8km? Is that on the erg or on the water?",
+          "text" : "@user20 매일 최소 2.8km를 페달하나요? 그건 에르그에서 하신 건가요, 아니면 물에서 하신 건가요?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.573469042778015,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "이건 일본의 어떤 거인이 군 열병식에서 실제로 행진하는 모습을 찍은 아주 오래된 영상이에요. 충격적인 것은 그 사람의 실제 신체 사이즈인데요. 신장이 적어도 4미터, 즉, 최소 13피트 정도입니다. 따라서 그는 실제로 NBA 선수 그 어느 누구보다도 키가 크고 거대합니다. 예를 들면, 샤킬 오닐 같은 선수보다도요. 또는",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "이것은 일본 출신의 확실한 거대 개인이 어떤 군사 행진에 걸어서 걷고 있는, 진정하고 실제적인 오래된 영상입니다. 놀라운 점은 그의 실제 크기입니다. 그는 최소 4 미터, 즉 13 피트 이상의 키를 가지고 있습니다. 따라서 그는 샤퀤일 오'네알 같은 각기 다른 원래 NBA 선수들보다 정말로 더 높고 더 무겁습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.03908395767212,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "문제는 이것입니다. 무수히 많은 다른 신석기 유물이라고 주장하는 경우와 마찬가지로, 어떻게 그들이 그런 기술을 갖췄을까요? 그들은 어떻게 그런 거대한 바위를 들어올렸을까요? 그들은 우리가 이전에 수차례 가정했듯이 한때 진보했으나 멸망해버린 고대 문명인의 남은 자들이었을까요? 우리는 그런 가능성을 특히 이곳 아그라의 남자들에게서 발견했으며 상당히 설득력이 있습니다.",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "질문은, 수많은 다른 신석기 유적과 마찬가지로, 그들은 어떻게 이러한 업적을 달성했는가? 거대한 돌들을 어떻게 들어 올렸는가? 우리는 이전에 여러 번 주장한 바와 같이, 이는 한번 번영했으나 파괴된 고대 문명의 잔해였을까요? 우리는 특히, 여기의 아그라 사람들, 이러한 가능성들을 매우 설득력 있게 생각합니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.03536593914032,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "저는 20년 이상 음악 관련 일을 해왔고 그 당시 앨범 2개를 냈습니다. 독일과 폴란드, 물론 스웨덴에서도 공연 투어를 했습니다. 그럼 아주 어릴 적부터 늘 공연을 해왔던 거군요? 네, 그랬어요. 더 어렸을 때 공연했던 곳 중 상징적인 장소가 있을까요?",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "그래서 저는 20 년 이상 음악을 하고 있으며, 그 동안 두 개의 앨범을 발매했고, 독일과 폴란드, 그리고 물론 스웨덴을巡回했습니다. 그래서 아주 어린 시절부터 항상 공연자였나요? 네, 그렇습니다. 그리고 젊은 시절에 공연한 대표적인 장소가 있나요?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.64214301109314,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "확인하세요. 확인하세요. 바위는 가위를 이기고, 가위는 보를 이기고, 보는 바위를 이깁니다. 당신이 이겼어요. 진 사람은 별을 하나 잃게 됩니다. 각 게임이 끝날 때 심판은 재활용 박스에 카드를 다시 넣습니다. 물론, 양 선수 모두 같은 카드를 고를 경우, 게임은 무승부가 되고 아무도 별을 잃지 않습니다.",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "확인, 확인. 바위 가위 가위, 가위 종이, 종이 바위를 이깁니다. 승리했습니다. 패자는 한 별을 잃습니다. 각 게임 종료 시 판사는 카드를 재활용 상자에 다시 넣습니다. 물론 두 플레이어가 같은 카드를 선택하면 무승부이며, 누구도 별을 잃지 않습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.062880992889404,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "대니와 샘에 대한 전체 이야기예요. 준비되었나요? 준비되었어요. 대니 펜톤과 샘 맨슨은 절친이고 터커와 함께 상당히 많은 시간을 보냅니다. 애초에 대니가 유령의 힘을 갖게 된 것도 샘 때문이에요. 이봐, 대니, 고스트 존 어때? 한번 봐야 한다고. 그거 알아? 네 말이 맞아.",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "데니와 샘의 완전한 이야기입니다. 준비됐나요? 준비됐나요? 데니 펜턴과 샘 마슨은 가장 친한 친구이며, 토커와 함께 거의 모든 시간을 함께 보내고 있습니다. 샘이 데니에게 유령 능력을 갖게 한 이유입니다. 오오, 데니, 유령 존? 꼭 확인해 봐야 해. 알았어? 네, 맞다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.767052054405212,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "수개월이 지났지만 아직도 그의 무덤가에 서 있는 것만 같습니다. 그를 떠날 수 없어요. 그는 떠났지만 전 아직 그를 보낼 수가 없어요. 제복을 입은 군인을 지나칠 때마다 그인 것만 같아요. 폭격이 있고 난 이후 어디서나 군인들을 볼 수 있죠.",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "이미 몇 달이 지났지만, 여전히 그의 묘 앞에 서 있는 것만 같아. 그를 떠나지 못해. 그는 떠났고, 여전히 그를 떠나지 못해. 나는 지나가는每一名 군복을 입은 병사에게 그를 보며, 폭탄 폭발 이후 그들은 어디에나 존재하고 있어."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 20.086380004882812,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "넌 바보야, 톰. 이봐, 셀리아, 우린 우리의 열정을 따라야 해. 너에겐 로봇공학이 있고 난 우주에 푹 빠져있잖아. 네가 내 로봇 팔에 겁먹었던 거 인정하지 그래? 난 겁먹지 않았어, 그건... 그래, 맞아. 겁먹었어. 난 이 거대한 로봇 발톱이 날 쫓아오는 악몽을 꾸곤 한다고. 어쨌거나, 톰!",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "너는 멍청한 놈이야, 토미.听着, 세리야, 우리는 열정을 따라야 해. 너는 로봇공학을 하고, 나는 우주에서 위대해지고 싶단 말이지. 왜 내 로봇 손에 대해 공포심을 느끼는 걸 인정하지 않는 거야? 나는 공포심이 아니야, 그냥... 알았어, 괜찮아. 나는 공포심을 느낀다. 이 거대한 로봇 손으로 쫓기는 악몽을 꾸고 있어. 어차피, 토미야!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 26.703037977218628,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "환영합니다. 어서 오십시오, 여러분. 이게 전부 잘 작동하는지 확인하도록 하겠습니다. 잠깐이면 됩니다. 그래서 확인하려고 조금 일찍 왔답니다. 손을 씻고 시작할 준비를 할게요. 막 세팅을 마쳤습니다. 제가 보기에 잘 된 것 같네요. 전 실수를 할 것 같아요. 그런 느낌이 들어요. 좀 안 풀리는 날이 있잖아요. 사람들이 준비될 때까지 기다리고 그다음 시작할게요.",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "환영합니다. 여러분 모두 환영합니다. 모든 것이 제대로 작동하는지 확인해 보겠습니다. 단지 한 분 정도 걸립니다. 그래서 조금 일찍 왔습니다. 확인하기 위해서요. 손을 씻고 준비를 하고 있습니다. 이제 세팅을 마무리하고 있습니다. 우리가 괜찮다고 생각합니다. 실수를 할 것입니다. 그걸 느낍니다. 그런 날 중 하나입니다. 그래서 사람들이 들어오기까지 기다렸다가 시작하겠습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.776721000671387,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "45억 년보다 그 이전에, 은하수 은하는 근처의 왜은하와 충돌했습니다. 이러한 조우는 별들의 형성을 앞당겼습니다. 우리 태양계는 은하수 은하의 일부입니다. 태양계 내에는 물질적인 순환이 진행되어 왔습니다.",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "45 억 년 전, 우리 은하가 인근의 작은 은하와 충돌했습니다. 이 만남은 별들의 형성을 촉진했습니다. 우리 태양계는 우리 은하의 일부입니다. 태양계 내에서 물질 순환이 진행되어 왔습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.2288419008255,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "구조대가 도시를 순찰하는 동안 우리는 박스 안에서 박물관을 감시할 거야. 우리가 안에서 기다리는 동안 악당들이 카보니타를 훔치려고 하는 건 좋은 생각이 아닐 거야. 우리는 돈이 다 떨어졌어! 우리는 그 다이아몬드를 훔쳐서 팔아야 해! 그러지 않으면 우리는 탄산음료로 실험을 해야 해! 봇들을 어떻게 안으로 데려올 수 있을까? 다 해결됐어.",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "구원대가 도시를 순찰하는 동안 우리는 상자 속 박물관을 감시할 것입니다. 우리가 기다리고 있는 상태에서 악당들이 카보니타를 훔치려 들면 안 될 것 같습니다. 우리는 돈이 다 떨어졌어요! 그 다이아몬드를 훔쳐서 팔아야 해요. 아니면 탄산음료로 실험을 해야 할 테니까요. 봇들을 어떻게 넣을까요? 모두 해결되었습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.10513699054718,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "자, 설명해 드릴게요. 좋아요. 문제는, 거기 안을 보면... 목재 외벽널이 보이시나요? 오래된 외벽널이 있고, 지붕널 쪽으로 나와 있습니다. 그리고 이것을 그 위에 올려놓습니다. 그럼 어떻게 되냐면 먼지가 거기에 모여요.",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "네, 그럼 제가 설명드리겠습니다. 알겠습니다. 문제는 이렇게 보면... 나무 외벽을 보시나요? 그건 오래된 외벽이고, 그 위에 지붕재가 맞닿아 있습니다. 그리고 저는 이것을 그 위에 덮었습니다. 그러면 먼지가 그 플래싱에 쌓입니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.063907027244568,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "그대로 두고 몇 분 동안 재수화하겠습니다. 초경량 조리는 실제로 스토브에서 조리하는 것이 아닙니다. 주로 물을 끓여서 음식을 재수화합니다. 이는 우리가 인스턴트 그리츠를 사용하는 이유 중 하나이기도 합니다. 조리 시간이 단축되고, 연료가 절감되고, 무게가 줄어듭니다. 맞습니다. 이것이 바로 여기서 우리가 하려는 일입니다. 완벽하게 일치합니다.",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "잠시 두어 분간 두고 재수용해시키겠습니다. 초경량 조리에서는 실제로 가스레인지에서 요리하지 않습니다. 우리는 물을 끓여 음식을 재수용화시키기 때문입니다. 또한 우리가 인스턴트 그릿스를 사용하는 이유 중 하나입니다. 조리 시간이 짧고, 연료 소모가 적으며, 무게도 가볍습니다. 네, 맞습니다. 여기서는 바로 이런 것이 준비되어 있습니다. 완벽한 일관성입니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.425672054290771,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "저기 있는 저걸 한번 타보자고요. 우와, 우와, 우와, 대단한데요! 당신은 이걸 타기엔 좀 너무 덩치가 큰 거 같은데요. 안전이 제일입니다, 네? 30달러요? 바가지인 것 같은데요. 내가 그랬죠. 발 밑 조심하세요!",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "저쪽 그걸 타보겠습니다. 와, 와, 와, 큰아들! 이 탈것은 체중이 조금 무겁습니다. 안전이 최우선이지요? 30 달러? 정말 비싸네요. 미리 말씀드렸죠. 조심하세요!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 26.274513959884644,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "안녕하세요, 새로운 시리즈의 파일럿을 소개합니다. 이는 세계 최악의 스캔들 중 일부의 역사를 파헤칠 것입니다. 일부는 여러분이 알고 있을 수도 있고 일부는 그렇지 않을 수도 있습니다. 이는 Scannál이라는 RTE 프로그램에서 부분적으로 영감을 받았습니다. 하지만 아일랜드와 관련된 사건에만 초점을 맞추지는 않고 폭넓은 사건을 다룰 계획입니다. 자, 더 이상 지체하지 않고 시작하겠습니다.",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "여러분, 새로운 시리즈의 피로트입니다. 이번 프로그램은 세계 최악의 스캔들 중 일부의 역사를 파고들 것입니다. 여러분이 알고 계신 것들도 있고, 아직 모르고 계신 것들도 있습니다. 이 프로그램은 아일랜드의 RTE 에서 방영된 '스칸날'이라는 프로그램에 영감을 받았습니다. 물론, 아일랜드와 관련된 사건에만 집중하는 것이 아니라, 다루는 범위를 더 넓게 확장할 계획입니다. 이제 더 이상 지연 없이 시작하겠습니다."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ko-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.150045990943909,
+      "target" : "ko",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "맹금류 전문가 밥 앤더슨에게 그 개척자의 태도는 그저 오만하고 무지했습니다. 모든 맹금류를 해로운 조류로 여겼으니까요. 다시 말해 모두 말똥가리였습니다. 흰머리독수리, 검독수리, 붉은꼬리매 등이 모두 나쁜 새였습니다. 모두 총에 맞았죠.",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "Raptor 전문가 Bob Anderson 에게 있어 선구자의 태도는 단순하게 자만하고 무지했습니다. 모든 조류는 그저 해충으로 여겨졌습니다. 저는 말입니다, 모두 닭새끼였습니다. 모두 나쁜 새들이었습니다. Bald Eagle, Golden Eagle, Red-tailed Hawk 가든 마찬가지였습니다. 모두 쏘아죽였습니다."
+        }
+      ]
+    }
+  ]
+}

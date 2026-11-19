@@ -4,6 +4,18 @@ import XCTest
 
 /// 「日本語＋英語」(区切りごとの言語判定) の決まりごと。数値の手本は、試作 (英語と日本語の朗読を交互に並べた 208 秒の録音) の結果
 final class MixedLanguageTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     private func s(_ seconds: Double) -> Int { Int((seconds * 16_000).rounded()) }
     private func sec(_ samples: Int) -> Double { (Double(samples) / 16_000 * 100).rounded() / 100 }
 
@@ -860,7 +872,7 @@ final class MixedLanguageTests: XCTestCase {
         ], language: "en")
         XCTAssertEqual(Translator.pendingIndices(t.segments, language: t.language), [0, 2])
         XCTAssertFalse(t.needsTranslation(t.segments[1]))
-        XCTAssertEqual(t.japaneseText(of: t.segments[1]), "Ruth先生")
+        XCTAssertEqual(t.translationText(of: t.segments[1]), "Ruth先生")
         XCTAssertEqual(t.translationStats.translatable, 2)
         // 言語の無い区間 (1 つの言語の文字起こし) は、これまでどおり文字で決める
         XCTAssertTrue(Transcript(sourceName: "y", segments: [], language: "en")
@@ -904,7 +916,7 @@ final class MixedLanguageTests: XCTestCase {
         XCTAssertEqual(t.languageLabel, "英語＋日本語")
         XCTAssertEqual(t.language(of: t.segments[1]), "ja")
         XCTAssertEqual(t.bilingualUnits().map(\.language), ["en", "ja", "en"])
-        XCTAssertEqual(t.bilingualUnits().map(\.isOriginalJapanese), [false, true, false])
+        XCTAssertEqual(t.bilingualUnits().map(\.isOriginalInTarget), [false, true, false])
 
         // 区間の言語は保存して読み戻せる。言語の無い区間は、これまでと同じ形 (language の項目なし)
         let data = try JSONEncoder().encode(t)

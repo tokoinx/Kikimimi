@@ -7,20 +7,33 @@ import SwiftUI
 /// LLM / 文字起こしの動作確認だけをして終わる (診断・CI 用)。
 /// `--selftest-launch` は、ふつうに起動して、数秒後にウインドウができたかを確かめて終わる (起動しないときの診断用)。
 /// `--selftest-ui-load` は、ふつうに起動して、数千行の結果を出したまま再生や文字起こしと同じ変化を起こし、画面が固まらないかを測る。
-/// `--eval-llm` は、決まった場面で監査役・翻訳役を動かして成績を数える (評価ハーネス)
+/// `--eval-llm` は、決まった場面で監査役・翻訳役を動かして成績を数える (評価ハーネス)。
+/// `--export-translation-eval` は、訳の記憶の取り分けた直しを、評価の問題に書き出す。
+/// `--export-translation-training` は、訳の記憶の取り分けでない直しを、翻訳の追加学習のデータに書き出す
 @main
 enum KikimimiMain {
     static func main() {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--selftest-llm") {
             let path = i + 1 < args.count ? args[i + 1] : ""
-            exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu"), strict: args.contains("--strict")))
+            // --translate-to <コード>: 翻訳の例を、その言語へ訳す (無ければ、これまでどおり日本語へ)
+            let translateTo = args.firstIndex(of: "--translate-to").map { $0 + 1 < args.count ? args[$0 + 1] : "" }
+            exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu"), strict: args.contains("--strict"),
+                                 translateTo: translateTo))
         }
         if args.contains("--selftest-whisper") {
             exit(WhisperSelfTest.run(arguments: args))
         }
         if args.contains("--eval-llm") {
             exit(LLMEvalRunner.run(arguments: args))
+        }
+        // 訳の記憶の取り分けた直しを、翻訳の評価の問題に書き出す (LLM は使わない)
+        if args.contains("--export-translation-eval") {
+            exit(LLMEvalRunner.exportEval(arguments: args))
+        }
+        // 訳の記憶から、翻訳の追加学習のデータを書き出す (LLM は使わない)
+        if args.contains("--export-translation-training") {
+            exit(TrainingExport.runTranslation(arguments: args))
         }
         if args.contains("--export-training") {
             exit(TrainingExport.run(arguments: args))
@@ -32,6 +45,8 @@ enum KikimimiMain {
             print("llama.cpp:   " + LaunchLog.llamaInfo)
             exit(0)
         }
+        // 画面の言語を、画面や文を作る前に決める (保存した言語・macOS の言語・--ui-language・確認用の起動)
+        L10n.language = UILanguageSetting.startup.language
         if args.contains("--selftest-launch") {
             LaunchSelfTest.arm(arguments: args)
         }
@@ -81,7 +96,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var windowsReopened = 0
 
     /// メニューの「メインウインドウを表示」の名前 (ウインドウが 1 つも無いときは、このメニューの動作で開く)
-    static let showMainWindowTitle = "メインウインドウを表示"
+    static var showMainWindowTitle: String { L("Show main window") }
+    /// メニューの「メインウインドウを表示」のショートカット (⌘0)。メニューの項目は、名前ではなくこれで探す
+    /// (名前は画面の言語で変わるため)
+    static let showMainWindowKey = "0"
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
@@ -106,19 +124,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 終了の前に: 待っている保存を書き終え、途中の作業があれば確かめる
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         flushLibrary()
-        guard !keepRunningWithoutWindows, isBusy() else { return .terminateNow }
+        // 開き直す時は、作業の途中でない事を確かめてあるので、確認を出さずに終える
+        guard !reopening, !keepRunningWithoutWindows, isBusy() else { return .terminateNow }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "作業の途中です"
-        alert.informativeText = "終わった文字起こし・訳・メモは保存してあり、次に開いたときも一覧に出ます。"
-            + "途中の作業 (文字起こし・監査・翻訳・ダウンロード) は止まり、文字起こしの途中の結果は残りません。"
-        alert.addButton(withTitle: "終了する")
-        alert.addButton(withTitle: "キャンセル")
+        alert.messageText = L("Work is in progress")
+        alert.informativeText = L("Finished transcriptions, translations, and notes are saved and will be in the list next time. Work in progress (transcription, audit, translation, downloads) will stop, and partial transcription results will not be kept.")
+        alert.addButton(withTitle: L("Quit"))
+        alert.addButton(withTitle: L("Cancel"))
         NSApplication.shared.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
         // 確かめているあいだに監査・翻訳が進んで変わった分も、書き終えてから終わる
         flushLibrary()
         return .terminateNow
+    }
+
+    /// 開き直している (終了の前の確認を出さない)
+    private var reopening = false
+
+    /// 開き直せるか: .app のバンドルから起動した時だけ (バンドルでない起動 (swift run など) で開くと、Finder でフォルダが開く)
+    static var canReopen: Bool { Bundle.main.bundleURL.pathExtension == "app" }
+
+    /// アプリを開き直す (画面の言語を変えた後、macOS が出す決まりのメニューも今の言語にするため)。
+    /// 順: 作業の途中でない事を確かめる → 待っている保存を書き終える → 「このアプリが終わってから開く」小さな命令を外に出す → 終える。
+    /// 新しいアプリは、今のアプリが終わってから開くので、ライブラリを読むのは、保存を全部書き終えた後になる
+    func reopenApp() {
+        guard Self.canReopen else {
+            LaunchLog.note("reopen: not running from an .app bundle")
+            return
+        }
+        guard !reopening, !isBusy() else { return }
+        flushLibrary()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        // 今のアプリが終わるまで待ち (長くて 60 秒)、少し置いてから、新しいアプリとして開く。
+        // 待っても終わらない時は開かない (open が、終わりかけの今のアプリを前に出すだけになり、そのまま閉じてしまうため)
+        process.arguments = [
+            "-c",
+            "i=0; while kill -0 \"$1\" 2>/dev/null && [ $i -lt 600 ]; do sleep 0.1; i=$((i+1)); done; "
+                + "kill -0 \"$1\" 2>/dev/null && exit 0; sleep 0.3; /usr/bin/open -n \"$2\"",
+            "sh",
+            String(ProcessInfo.processInfo.processIdentifier),
+            Bundle.main.bundleURL.path
+        ]
+        do {
+            try process.run()
+        } catch {
+            LaunchLog.note("reopen: could not start /bin/sh: \(error.localizedDescription)")
+            return
+        }
+        LaunchLog.note("reopen: quitting to reopen")
+        reopening = true
+        NSApplication.shared.terminate(nil)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -159,7 +216,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for top in main.items {
             guard let menu = top.submenu else { continue }
             menu.update()
-            let index = menu.indexOfItem(withTitle: Self.showMainWindowTitle)
+            let index = menu.items.firstIndex {
+                $0.keyEquivalent == Self.showMainWindowKey
+                    && $0.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == .command
+            } ?? -1
             if index >= 0 {
                 menuOpening = true
                 defer { menuOpening = false }
@@ -318,7 +378,7 @@ private struct ShowMainWindowButton: View {
             }
             delegate.showMainWindow(openIfMissing: true)
         }
-        .keyboardShortcut("0")
+        .keyboardShortcut(KeyEquivalent(Character(AppDelegate.showMainWindowKey)))
     }
 }
 
@@ -326,9 +386,20 @@ struct KikimimiApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
 
+    /// 選んでいる結果の訳す先の言語 (メニューの「〇〇語に翻訳」と書き出しの名前)。
+    /// 文字起こしの最中は、結果を見ずに設定の言語にする (区間が増えるたびに、全部の区間から訳の有無を探さないように)
+    private var selectedTranslationTarget: String {
+        guard let job = model.selectedJob, job.status == .done, let transcript = job.transcript else {
+            return model.translationLanguage
+        }
+        return model.translationTarget(for: transcript)
+    }
+
     var body: some Scene {
-        WindowGroup("ききみみ", id: MainWindow.id) {
+        WindowGroup(L("Kikimimi"), id: MainWindow.id) {
             ContentView()
+                // 画面の言語を変えたら、ウインドウの中身を作り直す (文を今の言語で引き直す)
+                .id(model.uiLanguage)
                 .background(AppLifecycleHook(delegate: appDelegate))
                 .environment(model)
                 .frame(minWidth: 880, minHeight: 560)
@@ -347,79 +418,94 @@ struct KikimimiApp: App {
         }
         .defaultSize(width: 1120, height: 740)
         .commands {
+            // 画面の言語を読んでおく (変えたら、メニューも今の言語で作り直す)
+            let _ = model.uiLanguage
             CommandGroup(replacing: .newItem) {
-                Button("開く…") { model.presentOpenPanel() }
+                Button(L("Open…")) { model.presentOpenPanel() }
                     .keyboardShortcut("o")
-                Button(model.isRecording ? "録音を停止して文字起こし" : "マイクで録音") {
+                Button(model.isRecording ? L("Stop recording and transcribe") : L("Record with microphone")) {
                     Task { await model.toggleRecording() }
                 }
                 .keyboardShortcut("r")
-                Button("選択中の処理を中止") {
+                Button(L("Cancel selected task")) {
                     if let job = model.selectedJob { model.cancel(job) }
                 }
                 .keyboardShortcut(".")
                 .disabled(!(model.selectedJob.map { $0.isActive || $0.isPostActive } ?? false))
                 // ⌘⌫ は付けない (メニューのショートカットは、文字の欄より先に受けるので、メモの欄などで
                 // 「行の初めまで消す」が使えなくなる)。一覧では delete キーで同じ画面が出る
-                Button("ゴミ箱に入れる…") { model.requestDelete(model.selectedJob) }
+                Button(L("Move to Trash…")) { model.requestDelete(model.selectedJob) }
                     .disabled(model.selectedJob == nil || model.isRecording)
                 Divider()
                 ShowMainWindowButton()
             }
             CommandGroup(after: .saveItem) {
-                Menu("書き出す") {
+                Menu(L("Export")) {
                     // 文字起こしの最中は数えない (区間が増えるたびにメニューを作り直すので、区間を全部見ることになる)
                     ExportMenuItems(hasTranslation: model.selectedJob.map {
                         $0.status == .done && ($0.transcript?.hasTranslation ?? false)
-                    } ?? false, hasNotes: model.selectedJob?.hasNotes ?? false)
+                    } ?? false, target: selectedTranslationTarget, hasNotes: model.selectedJob?.hasNotes ?? false)
                         .environment(model)
                 }
                 .disabled(model.selectedJob?.status != .done)
-                Button("本文をコピー") { model.copySelectedText() }
+                Button(L("Copy text")) { model.copySelectedText() }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                     .disabled(model.selectedJob?.transcript == nil)
                 Divider()
                 // どちらも、選んでいる結果の履歴の画面を開く (保存した、終わった結果のときだけ)
-                Button("版として保存…") {
+                Button(L("Save as a version…")) {
                     if let job = model.selectedJob { model.historyJobID = job.id }
                 }
                 .keyboardShortcut("s")
                 .disabled(!(model.selectedJob.map { $0.inLibrary && $0.status == .done } ?? false))
-                Button("履歴…") {
+                Button(L("History…")) {
                     if let job = model.selectedJob { model.historyJobID = job.id }
                 }
                 .disabled(!(model.selectedJob.map { $0.inLibrary && $0.status == .done } ?? false))
                 Divider()
-                Button("監査する (繰り返し・聞き取りミス)") {
+                // 結果の画面の「やり直す」と同じ中身 (選んでいる結果の音声を、もう一度文字起こしする。元の結果は残る)
+                Menu(L("Transcribe again")) {
+                    if let job = model.selectedJob {
+                        RedoMenuItems(job: job)
+                            .environment(model)
+                    }
+                }
+                .disabled(!model.canRedo(model.selectedJob))
+                Button(L("Audit (repetitions and mishearings)")) {
                     if let job = model.selectedJob { model.audit(job) }
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
                 .disabled(model.selectedJob?.status != .done || model.selectedJob?.isPostActive == true)
-                Button("日本語に翻訳") {
+                // 選んでいる結果の訳す先の言語へ訳す (文字起こしの最中は数えない: 区間が増えるたびにメニューを作り直すため)
+                Button(L("Translate to %@", TranslationTarget.displayName(for: selectedTranslationTarget))) {
                     if let job = model.selectedJob { model.translate(job) }
                 }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
                 .disabled(model.selectedJob?.status != .done || model.selectedJob?.isPostActive == true
-                          || (model.selectedJob?.transcript?.untranslatedCount ?? 0) == 0)
+                          || (model.selectedJob.flatMap { job in
+                              job.status == .done ? job.transcript.map { model.translationStats(of: $0).untranslated } : nil
+                          } ?? 0) == 0)
             }
-            CommandMenu("再生") {
+            CommandMenu(L("Playback")) {
                 // ショートカットはスペースキーと矢印 (PlaybackKeys。メニューに付けると、検索欄で空白や矢印を使えなくなる)
-                Button(model.player.isPlaying || model.practice.isWaiting ? "一時停止 (スペースキー)" : "再生 (スペースキー)") {
+                Button(model.player.isPlaying || model.practice.isWaiting ? L("Pause (Space)") : L("Play (Space)")) {
                     model.practice.togglePlay()
                 }
                 .disabled(model.player.url == nil)
                 Divider()
                 let canPlayLines = model.selectedJob.map { model.canPlayLines(of: $0) } ?? false
-                Button("次の行を再生 (↓)") { model.practice.next() }
+                Button(L("Play next line (↓)")) { model.practice.next() }
                     .disabled(!canPlayLines)
-                Button("前の行を再生 (↑)") { model.practice.previous() }
+                Button(L("Play previous line (↑)")) { model.practice.previous() }
                     .disabled(!canPlayLines)
-                Button("この行をもう一度 (←)") { model.practice.replay() }
+                Button(L("Replay this line (←)")) { model.practice.replay() }
                     .disabled(!canPlayLines)
             }
         }
         Settings {
             SettingsView()
+                // 画面の言語を変えたら、設定の画面も作り直す
+                .id(model.uiLanguage)
                 .environment(model)
                 // メインのウインドウを閉じて設定だけを開いているときも、アプリに戻ったら見直す
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

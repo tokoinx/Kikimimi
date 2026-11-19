@@ -3,7 +3,23 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>ja</string>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>ja</string>
+        <string>zh-Hans</string>
+        <string>ko</string>
+        <string>es</string>
+        <string>fr</string>
+        <string>de</string>
+        <string>it</string>
+        <string>pt-BR</string>
+        <string>ru</string>
+        <string>vi</string>
+        <string>th</string>
+        <string>id</string>
+    </array>
     <key>CFBundleDisplayName</key>
     <string>ききみみ</string>
     <key>CFBundleExecutable</key>
@@ -31,9 +47,9 @@
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>ききみみ — ローカル文字起こし</string>
+    <string>Kikimimi — Local transcription / ききみみ — ローカル文字起こし</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>マイクで録音した音声を文字に起こすために使用します。音声は Mac の外に送られません。</string>
+    <string>Used to transcribe audio recorded with the microphone. The audio never leaves your Mac. / マイクで録音した音声を文字に起こすために使用します。音声は Mac の外に送られません。</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

@@ -19,8 +19,19 @@ public enum FineTuneData {
         public var messages: [Message]
 
         init(system: String, user: String, assistant: String) {
-            messages = [Message(role: "system", content: system), Message(role: "user", content: user),
-                        Message(role: "assistant", content: assistant)]
+            self.init(system: system, examples: [], user: user, assistant: assistant)
+        }
+
+        /// examples は、問いの前に置く手本のやりとり (user・assistant の順に並べる。アプリが LLM に送る会話と同じ並び)
+        init(system: String, examples: [LLMExample], user: String, assistant: String) {
+            var all = [Message(role: "system", content: system)]
+            for example in examples {
+                all.append(Message(role: "user", content: example.user))
+                all.append(Message(role: "assistant", content: example.assistant))
+            }
+            all.append(Message(role: "user", content: user))
+            all.append(Message(role: "assistant", content: assistant))
+            messages = all
         }
     }
 
@@ -128,6 +139,128 @@ public enum FineTuneData {
             records.swapAt(i, random.next(i + 1))
         }
         return records
+    }
+
+    // MARK: 翻訳の学習の例 (U7)
+
+    /// 翻訳の学習の例と、訳す先ごとの数
+    public struct TranslationTraining: Sendable {
+        public var records: [Record]
+        /// 訳す先ごとの学習の例の数 (1 行の例 + まとめた例)
+        public var examplesByTarget: [String: Int]
+        /// 訳す先ごとの、例に使った文の数
+        public var sentencesByTarget: [String: Int]
+        /// 取り分け (`heldOut`) なので使わなかった文の数
+        public var heldOut: Int
+    }
+
+    /// まとめた例の行の数の並び (この順に繰り返して切る。乱数は使わない)
+    static let translationChunkSizes = [2, 3, 4]
+
+    /// 訳の記憶 (いくつでも。足し合わせる) から、翻訳の学習の例を作る。
+    ///
+    /// - 使うのは、取り分け (`heldOut`) でない文だけ。どれかの記憶で取り分けた文 (訳す先と、そろえた原文が同じ物) は、
+    ///   ほかの記憶に在っても使わない (評価の問題に出る文を、学習に入れない)。同じ文が 2 つ在れば、先に在る方を使う
+    /// - 指示文は、アプリが翻訳で実際に送る物と同じ: system は `Translator.systemPrompt(language:target:)`、
+    ///   user は `Translator.userPrompt` (文脈・用語集なし。記憶の訳語の対のうち、その行に出る物だけを Terms に付ける)。
+    ///   答えは `[1] 訳` を行の数だけ (1 行ごとに改行)
+    /// - system と問いの間に、アプリと同じ手本のやりとり (`TranslationExamples.examples(for: 訳す先)`。
+    ///   `Translator.checkedTranslateLines` が `LLMPrompt.examples` に入れる物) を、前の会話として置く。
+    ///   学習の時と使う時で、モデルが見る会話を同じにするため (学習の対象は、最後の答えだけ。`tools/finetune/finetune.py`)
+    /// - 1 つの文は、1 行の例に 1 回、まとめた例 (同じ訳す先・同じ原文の言語の文を、記憶の並びの順に 2〜4 行) に多くて 1 回
+    /// - 原文の言語は、記憶の `sourceLanguage`。無ければ detector で決め、それでも分からなければ "en"
+    public static func translationRecords(memories: [TranslationMemory],
+                                          detector: LanguageDetector? = LLMEval.defaultLanguageDetector) -> TranslationTraining {
+        struct Item {
+            var source: String
+            var translation: String
+            var language: String
+            var target: String
+        }
+        func key(_ e: RememberedTranslation) -> String {
+            TranslationMemory.normalizedTarget(e.target) + "\u{1}" + TranslationMemory.normalizedSource(e.source)
+        }
+        let all = memories.flatMap(\.sentences)
+        let heldOutKeys = Set(all.filter(\.heldOut).map(key))
+        var seen = Set<String>()
+        var items: [Item] = []
+        var heldOut = 0
+        for entry in all {
+            let k = key(entry)
+            if heldOutKeys.contains(k) {
+                if seen.insert(k).inserted { heldOut += 1 }
+                continue
+            }
+            // 1 行に収める (改行・続く空白を 1 つの空白に)
+            let source = TermPair.cleaned(entry.source)
+            let translation = TermPair.cleaned(entry.translation)
+            guard !source.isEmpty, !translation.isEmpty, seen.insert(k).inserted else { continue }
+            let language = entry.sourceLanguage.flatMap { $0.isEmpty ? nil : $0 } ?? detector?(entry.source) ?? "en"
+            items.append(Item(source: source, translation: translation, language: language,
+                              target: TranslationMemory.normalizedTarget(entry.target)))
+        }
+
+        // 訳語の対は、全部の記憶を足した物から、訳す先ごとに引く (同じ原語は新しく決めた方。アプリの引き方と同じ)
+        let merged = TranslationMemory(terms: memories.flatMap(\.terms))
+        var termsByTarget: [String: [TermPair]] = [:]
+        func terms(_ target: String) -> [TermPair] {
+            if let cached = termsByTarget[target] { return cached }
+            let pairs = merged.lookup(target: target).terms
+            termsByTarget[target] = pairs
+            return pairs
+        }
+        func record(_ group: [Item]) -> Record {
+            let first = group[0]
+            let lines = group.map(\.source)
+            let used = TermPair.matching(terms(first.target), in: lines.joined(separator: "\n"))
+            let answer = group.enumerated().map { "[\($0.offset + 1)] \($0.element.translation)\n" }.joined()
+            return Record(system: Translator.systemPrompt(language: first.language, target: first.target),
+                          examples: TranslationExamples.examples(for: first.target),
+                          user: Translator.userPrompt(lines: lines, context: [], glossary: nil, terms: used),
+                          assistant: answer)
+        }
+
+        // 同じ原文の言語・同じ訳す先の組に分ける (初めに出た順)
+        var order: [String] = []
+        var groups: [String: [Item]] = [:]
+        for item in items {
+            let g = item.language + "\u{1}" + item.target
+            if groups[g] == nil { order.append(g) }
+            groups[g, default: []].append(item)
+        }
+        var records: [Record] = []
+        var examples: [String: Int] = [:]
+        var sentences: [String: Int] = [:]
+        for g in order {
+            guard let group = groups[g], let target = group.first?.target else { continue }
+            // 1 行の例
+            for item in group {
+                records.append(record([item]))
+            }
+            examples[target, default: 0] += group.count
+            sentences[target, default: 0] += group.count
+            // まとめた例: 並びの順に 2, 3, 4, 2, 3, 4 … 行ずつ。最後に 1 行だけ余れば、前のまとまり (4 行未満の時) に足す
+            var chunks: [[Item]] = []
+            var start = 0
+            var turn = 0
+            while start < group.count {
+                let size = translationChunkSizes[turn % translationChunkSizes.count]
+                let end = min(group.count, start + size)
+                let chunk = Array(group[start..<end])
+                if chunk.count >= 2 {
+                    chunks.append(chunk)
+                } else if let last = chunks.indices.last, chunks[last].count < 4 {
+                    chunks[last].append(contentsOf: chunk)
+                }
+                start = end
+                turn += 1
+            }
+            for chunk in chunks {
+                records.append(record(chunk))
+            }
+            examples[target, default: 0] += chunks.count
+        }
+        return TranslationTraining(records: records, examplesByTarget: examples, sentencesByTarget: sentences, heldOut: heldOut)
     }
 
     /// 1 行に 1 つの JSON (JSON Lines)

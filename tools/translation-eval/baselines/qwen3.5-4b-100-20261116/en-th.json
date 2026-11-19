@@ -1,0 +1,1668 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-th.json"
+  ],
+  "translation" : {
+    "cases" : 72,
+    "chrF" : 42.76040191876711,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        15814,
+        15720,
+        15626,
+        15532,
+        15438,
+        15344
+      ],
+      "matches" : [
+        12795,
+        8896,
+        6842,
+        5509,
+        4587,
+        3873
+      ],
+      "reference" : [
+        16970,
+        16875,
+        16780,
+        16685,
+        16590,
+        16495
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 99,
+    "lines" : 100,
+    "numbersChecked" : 23,
+    "numbersKept" : 23,
+    "repeated" : 0,
+    "retried" : 5,
+    "retryFixed" : 5,
+    "reused" : 0,
+    "seconds" : 948.5171294212341,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 99
+  },
+  "translationByTarget" : {
+    "th" : {
+      "cases" : 72,
+      "chrF" : 42.76040191876711,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          15814,
+          15720,
+          15626,
+          15532,
+          15438,
+          15344
+        ],
+        "matches" : [
+          12795,
+          8896,
+          6842,
+          5509,
+          4587,
+          3873
+        ],
+        "reference" : [
+          16970,
+          16875,
+          16780,
+          16685,
+          16590,
+          16495
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 99,
+      "lines" : 100,
+      "numbersChecked" : 23,
+      "numbersKept" : 23,
+      "repeated" : 0,
+      "retried" : 5,
+      "retryFixed" : 5,
+      "reused" : 0,
+      "seconds" : 948.5171294212341,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 99
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-th-test-en-social_111976217731399552",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.995730996131897,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉิบหายแน่ๆ ถ้าต้องเป็นอย่างคนพวกนี้ คิดไม่ออกจริงๆ ว่าชีวิตจิตใจจะย่ำแย่ขนาดไหน",
+          "source" : "it must suck to be these people. i can't imagine how awful their inner life must be",
+          "text" : "มันคงน่าปวดหัวมากสำหรับคนพวกนี้ ฉันจินตนาการไม่ได้เลยว่าชีวิตภายในของพวกเขากลายเป็นอย่างไรที่โหดร้ายขนาดนั้น"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_111977470885664240",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.839998006820679,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เราเข้าใจว่าการที่จะมีความมั่งคั่งและอำนาจในระดับนี้โดยที่ไม่เหยียบย่ำคนอื่นนั้นเป็นเรื่องยาก",
+          "source" : "we understand that it is hard to get to these positions of wealth and power without stepping on others along the way.",
+          "text" : "เราเข้าใจว่า การเข้าถึงตำแหน่งแห่งที่แห่งความมั่งคั่งและอำนาจโดยไม่เหยียบย่ำผู้อื่นในระหว่างทางนั้นเป็นเรื่องยาก"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "เมื่อสื่อไร้ซึ่งจิตสำนึกร่วมกัน เราก็ได้พัฒนาจิตสำนึกทางชนชั้นในระดับที่ช่วยให้เราคิดวิเคราะห์ได้",
+          "source" : "in the absence of collective consciousness around media, we developed a level of class consciousness that helps us stay critical.",
+          "text" : "ในภาวะที่ขาดจิตสำนึกร่วมเกี่ยวกับสื่อ เราจึงพัฒนาจิตสำนึกถึงชั้นวรรณะขึ้นมาเพื่อช่วยให้เราคงอยู่ในท่าทีวิพากษ์วิจารณ์ได้ต่อไป"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.6536580324172974,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ตายเพราะบูมเมอแรงของตัวเอง",
+          "source" : "Killed myself with my own boomerang",
+          "text" : "ฉันฆ่าตัวตายด้วยโบมเบอร์ของฉันเอง"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112106953594747568",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.363310933113098,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "และแน่นอน แหล่งข้อมูลอื่นๆ เหล่านี้ตระหนักดีว่า \"สงครามเป็นสิ่งไม่ดี\" แต่ก็ยังขายเครื่องจักรสังหารในรูปแบบของหุ่นของเล่นและสินค้า คือเรากำลังทำอะไรอยู่กันแน่",
+          "source" : "and sure, these other sources are AWARE that \"war is bad\", but then you're still selling the killing machines as figures and merch. So, like, what are we doing?",
+          "text" : "และแน่นอน แหล่งอื่นเหล่านี้ก็รู้ว่า \"สงครามเป็นเรื่องไม่ดี\" แต่คุณยังคงขายเครื่องสังหารเป็นของสะสมและสินค้าทางการค้า ดังนั้นแล้ว เราทำอะไรอยู่?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112107889726289648",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.514971017837524,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉันคิดว่ามันทำให้เห็นคุณค่าของชีวิตมากนะ การเปลี่ยนแปลงวัตถุดิบง่ายๆ เช่นนี้ให้กลายเป็นขนมที่หลากหลายและซับซ้อนน่ะ เหมือนเฝ้าดูการถือกำเนิดเลย",
+          "source" : "I find it very life affirming; transforming such simple ingredients into something so rich and complex. Like witnessing a birth.",
+          "text" : "ฉันพบว่ามันทำให้ชีวิตมีความหมายมาก; การเปลี่ยนวัตถุดิบง่ายๆ เหล่านี้ให้เป็นสิ่งที่อุดมสมบูรณ์และซับซ้อนอย่างน่าอัศจรรย์ เหมือนกับการพบลูกเกิดใหม่"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112107918929771488",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.289296984672546,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "ใช้สมองทั้งสองซีก 🧠 อนุญาตให้ตัวเองได้ผ่อนคลายบ้าง 📺",
+          "source" : "Use both sides of the brain. 🧠 Permission to relax. 📺",
+          "text" : "ใช้สมองทั้งสองข้าง 🧠 อนุญาตให้ผ่อนคลาย 📺"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.981809020042419,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉันน่าจะทำซีลพังไปสองสามครั้งแค่เพราะขยับหน้าไปมา และเริ่มมีน้ำมูกเพราะอะไรสักอย่างที่ลอยอยู่ในอากาศเนี่ยแหละ",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "ผมเปิดผนึกมันไปหลายครั้งแค่ขยับหน้าตามันไปมา ผมคิดว่าแล้วจมูกผมก็เริ่มไหลจาก Whatever ที่ลอยอยู่รอบๆ ขึ้นไปนั่นแหละครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.879068970680237,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "อะไรวะ ทำไมพิกัด GPS ถูกปัดเศษเป็นองศาจำนวนเต็มที่ใกล้ที่สุดที่ไม่มีค่าอะไรเลย เพราะว่ามันเป็นเวกเตอร์หรือจำนวนตรรกยะ",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless because it's a vector of rational numbers",
+          "text" : "ทำไมพิกัด GPS ถึงถูกปัดเศษเป็นองศาเต็มเท่านั้น ซึ่งไร้ค่าอย่างยิ่ง เพราะมันคือเวกเตอร์ของจำนวนตรรกยะ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.294405937194824,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "อ้าใช่ นี่เป็นเรียงความชิ้นใหม่ของ Sally Rooney",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "อ๋อ ใช่แล้ว นี่คือบทความล่าสุดของซาลี่ รูนี"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 7,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 25.993545055389404,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "กล่องสีเทาที่แขวนอยู่ด้านข้างของกล่องรังนกคือกล่องใส่แบตเตอรี่",
+          "source" : "The gray box that hangs on the side of the nesting box is where the battery lives.",
+          "text" : "กล่องสีเทาที่แขวนอยู่ข้างกล่องทำรังคือที่เก็บแบตเตอรี่"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "ฉันเรียกสิ่งนี้ว่าฟีเจอร์ ด้วยวิธีนี้นกจะมีความเป็นส่วนตัวด้วย",
+          "source" : "I call this a feature. That way the birds get some privacy too.",
+          "text" : "ฉันเรียกสิ่งนี้ว่าเป็นฟีเจอร์ เพื่อให้พวกนกมีความเป็นส่วนตัวบ้าง"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "ตอนนี้กล้องออฟไลน์อยู่โดยไม่ทราบสาเหตุ กล้องทำงานอยู่แค่ 1 ชั่วโมงหลังจากพระอาทิตย์ตกดิน",
+          "source" : "Now, for reasons I'm not sure about yet, the camera is offline. It went out only one hour after sunset.",
+          "text" : "ตอนนี้ เนื่องจากเหตุผลที่ยังไม่แน่ใจ กล้องก็ออฟไลน์ไปแล้ว มันดับไปแค่หนึ่งชั่วโมงหลังพระอาทิตย์ตกดิน"
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "เลนส์ตาปลาเกินความจำเป็นไปเยอะ",
+          "source" : "Fisheye is way overkill.",
+          "text" : "มุมมองแบบปลาตาคือเกินความจำเป็นมาก"
+        },
+        {
+          "lines" : [
+            4
+          ],
+          "reference" : "ก็ยังคงออฟไลน์อยู่",
+          "source" : "Aaaand it's still offline.",
+          "text" : "และมันยังออฟไลน์อยู่"
+        },
+        {
+          "lines" : [
+            5
+          ],
+          "reference" : "อาจเป็นเพราะแผงนี้หรือมัลติมิเตอร์ของฉันทำงานผิดพลาด หรือไม่ก็อาจจะมีการเปลี่ยนข้อมูลสินค้า",
+          "source" : "So either there's something wrong with this panel or my multimeter, or they changed the listing.",
+          "text" : "ดังนั้น要么是แผงวงจรมีปัญหา หรือเครื่องวัดมัลติมิเตอร์ของฉันมีปัญหา หรือพวกเขาเปลี่ยนรายการสินค้า"
+        },
+        {
+          "lines" : [
+            6
+          ],
+          "reference" : "บางทีแผงอาจจะกระตุ้นให้เกิดการชาร์จแบตเตอรี่ในระดับที่เพียงพอสำหรับช่วงเวลาการใช้งาน 38 วินาที ซึ่งใช้เวลาเพียง 2 ชั่วโมงนิดๆ เท่านั้น",
+          "source" : "Maybe the panel trickle-charged the battery just enough for 38 seconds of runtime. It only took a bit over two hours to do that.",
+          "text" : "อาจเป็นไปได้ว่าแผงวงจรชาร์จแบตเตอรี่แบบ trickle-charging เพียงพอสำหรับการทำงานได้แค่ 38 วินาทีเท่านั้น มันใช้เวลาเกินสองชั่วโมงกว่าจะทำได้เช่นนั้น"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.592604041099548,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "ถ้าผมไปงานอีเวนท์ผมก็จะพกไปด้วย งานอีเวนท์ที่กำลังจะจัดขึ้นที่ผมจะไปก็คือ (แต่ขอให้บอกด้วยว่าจำผมได้จากอินเทอร์เน็ต ไม่งั้นผมจะไม่รู้ว่าคุณเป็นใครและรู้จักคุณจากที่ไหน)",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are: (Though do mention you recognise me off the internet otherwise I'll be wondering who you are and where I know you from)",
+          "text" : "ถ้าฉันอยู่ที่งาน ฉันจะพกพวกเขาไปด้วย เหตุการณ์เดียวที่เหลืออยู่ในปฏิทินของฉันตอนนี้คือ: (แม้ว่าจะบอกว่าคุณรู้จักฉันจากอินเทอร์เน็ตก็แล้วแต่ ถ้าไม่ฉันจะสงสัยว่า你是谁 และฉันรู้จักคุณจากที่ไหน)"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112112271633685072",
+      "language" : "en",
+      "lineCount" : 4,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.486609935760498,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "หลังจากนั้นก็ไปเที่ยวอีกสองสามแห่งในวันเสาร์พร้อมกับลูกค้าจาก Swansea",
+          "source" : "After that a couple of site visits on Saturdays with a client in Swansea.",
+          "text" : "หลังจากนั้นไปเยี่ยมชมสถานที่สองแห่งในวันเสาร์กับลูกค้าที่สวานซี"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "ซ่อมมอเตอร์ไซค์ดีกว่า ไม่งั้นเดี๋ยวจะแย่!",
+          "source" : "I better get some motorbikes fixed, or else!",
+          "text" : "ฉันควรซ่อมรถมอเตอร์ไซค์สักคัน หรือจะแย่ลง!"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "มีอยู่ตรงไหนสักที่เนี่ยแหละ แต่มันตรงไหนกันแน่ล่ะ",
+          "source" : "Got some somewhere but exactly where?",
+          "text" : "มีที่ไหนสักแห่ง แต่อยู่ตรงไหนแน่?"
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "ฮี่ฮี่ ไม่ได้มีแค่ 1 แต่มีตั้ง 3!",
+          "source" : "Heheh not one but three!",
+          "text" : "เฮเฮ ไม่ใช่หนึ่งแต่สามคัน!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112112980319428992",
+      "language" : "en",
+      "lineCount" : 3,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 28.044444918632507,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ดูเหมือนว่าภาพติดตาข้างซ้ายไม่น่ากังวลเท่าไหร่ แต่ฉันต้องใช้เลนส์โปรเกรสซีฟด้วย ดังนั้นจึงต้องใช้เลนส์ที่มีคุณสมบัติเหล่านั้น ไม่ใช่เลนส์โปรเกรสซีฟเต็มรูปแบบ แต่เป็นเลนส์ที่ผสานคุณสมบัติดังกล่าวกับคุณสมบัติของแว่นตา \"ปกติ\" (นึกคำศัพท์ที่ใช้เรียกไม่ออก)",
+          "source" : "So, apparently the ghost image my left eye sees isn’t too much of a concern. But I need basically varifocals too. So the lenses have a combo of those. Not the full on varifocals but something in between those and ”normal” glasses (no idea of the terminology in English).",
+          "text" : "ดังนั้น apparently ภาพสะท้อนที่ตาซ้ายของฉันเห็นนั้นไม่ใช่เรื่องกังวลมาก แต่ฉันต้องการแว่นสายตาแบบหลายระยะเช่นกัน ดังนั้นเลนส์จึงมีคุณสมบัติผสมผสานระหว่างสองแบบนี้ ไม่ใช่แว่นหลายระยะแบบเต็มรูปแบบ แต่เป็นอะไรที่อยู่ระหว่างนั้นและแว่นธรรมดา (ไม่แน่ใจว่าคำศัพท์ภาษาอังกฤษคืออะไร)"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "เมื่อฉันทราบเรื่องนี้แล้วก็ตัดสินใจซื้อแว่นอันใหม่ ซึ่งก็คืออันนี้",
+          "source" : "While this was being told to me, I made a decision to get another pair, and that pair are these.",
+          "text" : "ในขณะที่กำลังเล่าเรื่องนี้ให้ฉันฟัง ฉันก็ตัดสินใจซื้ออีกคู่หนึ่ง และคู่นั้นคือคู่นี้"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "@user36 แว่นอันที่สองดูดีมาก! ฉันชอบซื้อแว่น และไม่เคยทิ้งสักอัน แต่กลับหาอันอื่นไม่เจอเลย ฉันใช้อันที่เป็นสีรุ้งอยู่ตอนนี้ และก็อยากได้แว่นกันแดดเหมือนกัน แต่ถ้าคุณอยากได้แว่นตามใบสั่งแพทย์ ขอบอกเลยว่าแว่นพวกนี้ไม่สวยนะ 😂",
+          "source" : "@user36 that second pair is really nice! I love buying glasses...I never throw them out but somehow I can't find any of the others?! Mine are rainbow coloured at the moment, I need some sunglasses too... but if you need prescription they're so ugly 😂",
+          "text" : "@user36 คู่ที่สองนั้นสวยมาก! ฉันชอบการซื้อแว่น...ฉันไม่เคยทิ้งพวกมัน แต่อย่างไรก็ตาม ฉันหาแว่นอื่นๆ ไม่เจอเลย! แว่นของฉันตอนนี้เป็นสีรุ้ง ฉันต้องการแว่นกันแดดด้วย... แต่ถ้าคุณต้องการแว่นตามสั่ง พวกมันดูน่าเกลียดมาก 😂"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112122127346453600",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.456784963607788,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "และนี่คือตอนที่เขาเริ่มเจาะเสียงดังมาก เย้",
+          "source" : "And this is when he starts drilling Super Loud. Yay.",
+          "text" : "และนี่คือตอนที่เขาเริ่มเจาะ Super Loud เย้"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "คนซ่อมพื้นกำลังดูดฝุ่น หวังว่านั่นหมายถึงเขาใกล้เสร็จงานแล้วนะ",
+          "source" : "Floor repair person is doing a vacuum, so hopefully that means he's finishing up.",
+          "text" : "คนซ่อมพื้นกำลังดูดฝุ่น ดังนั้นหวังว่านั่นหมายความว่าเขากำลังจะเสร็จสิ้นงานแล้ว"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112140958167999904",
+      "language" : "en",
+      "lineCount" : 4,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 22.633090019226074,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "นัดใส่ครอบฟันครั้งแรกในชีวิต: วันนี้เตรียมฟัน แล้วอีกสองสัปดาห์ไปใส่ครอบฟัน ตอนนี้ฉันกำลังซ้อมอ้าปากกว้างๆ อยู่",
+          "source" : "It's my first ever crown dentist visit: Prep today, then fitting in a fortnight. I'm practising opening my mouth wide.",
+          "text" : "นี่คือครั้งแรกที่ฉันไปพบทันตแพทย์: วันนี้จะเตรียมฟัน แล้วใส่ครอบในอีกสองสัปดาห์ ฉันกำลังฝึกเปิดปากให้กว้างที่สุด"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "สตัมปี้กับฉันอยู่บ้าน และรู้สึกดีขึ้นแล้วหลังจากได้ดื่มชาไปสองสามแก้ว อีกสองสัปดาห์จะกลับไปจัดการให้เรียบร้อย",
+          "source" : "Stumpy and I are home and feeling better now we’ve had a couple of mugs of tea. Back in a fortnight to get the job finished.",
+          "text" : "สแตมปีและฉันอยู่บ้านแล้วรู้สึกดีขึ้นหลังจากดื่มชาสองแก้ว ตอนนี้ต้องกลับมาอีกสองสัปดาห์เพื่อเสร็จงานนี้"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "หมอฟันไม่พอใจกับขนาดของครอบฟันแม้จะตะไบแล้วตะไบอีก ก็เลยต้องพิมพ์ปากใหม่ แล้วก็ต้องทำครอบฟันใหม่",
+          "source" : "Dentist wasn’t happy with the fit of the crown, even after he’d footered and filed it. So new impressions were taken, and a new crown will be made.",
+          "text" : "ทันตแพทย์ไม่พอใจกับการพอดีของครอบ แม้ว่าจะทำการปรับแต่งและขัดฟันไปแล้ว ดังนั้นจึงได้พิมพ์รอยฟันใหม่ และจะผลิตครอบใหม่"
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "สตัมปี้ใส่ครอบฟันแล้ว ทุกคนมาฉลองกันหน่อย",
+          "source" : "Stumpy has been crowned. All hail King Stumpy.",
+          "text" : "สแตมปีได้รับการสวมมงกุฎแล้ว ยินดีด้วยกับกษัตริย์สแตมปี"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 8,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 32.99830102920532,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ข้อมูลจาก FlightAware",
+          "source" : "data from flightaware.",
+          "text" : "ข้อมูลจาก flightaware"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "ถ้าฉันมีโอกาสได้เลือกหมายเลขที่ส่วนท้ายของเครื่องบิน แน่นอนว่าต้องเป็นสักรูปแบบหนึ่งของ N1337_ โดย _ เป็นตัวอักษรอะไรก็ได้ที่ใช้ได้",
+          "source" : "If I ever have the opportunity to have a custom tail number for an aircraft, you KNOW it has to be some variation of N1337_, the _ being whatever final alphabetical char is available.",
+          "text" : "ถ้าฉันมีโอกาสได้หมายเลขท้ายเครื่องบินแบบพิเศษ ฉันรู้ดีว่าต้องเป็นรูปแบบของ N1337_ โดย _ คือตัวอักษรภาษาอังกฤษสุดท้ายที่มีอยู่"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "แน่นอนว่าแดดก็ต้องออกตอนที่ไม่ได้ขับเครื่องบิน 555 โคตรกวนตีน",
+          "source" : "Of course the sun is gonna be out while I'm away, lol. What a punk.",
+          "text" : "แน่นอนว่าดวงอาทิตย์จะออกตอนฉันไปนะ lol. คนโง่จริงๆ"
+        },
+        {
+          "lines" : [
+            3,
+            4
+          ],
+          "reference" : "อ้อ แล้วก็เกร็ดเล็กเกร็ดน้อยเรื่อยเปื่อย: นี่ไม่เหมือนการออกไปขับรถเล่นในวันอาทิตย์ มือใหม่อย่างฉันคิดว่ามันเหมือนกีฬามากกว่าการพักผ่อน",
+          "source" : "Oh another random tidbit: This isn't like hopping in the car for a Sunday drive stuff. It's closer to a sport than a cruise in my newly initiated opinion.",
+          "text" : "โอ้ อีกข้อเท็จจริงสุ่มอีกข้อ: สิ่งนี้ไม่ใช่แค่ขับรถไปเที่ยววันอาทิตย์ทั่วไป มันใกล้เคียงกับการแข่งขันกีฬามากกว่าการพักผ่อนในความคิดของฉันหลังจากเพิ่งเริ่มใหม่"
+        },
+        {
+          "lines" : [
+            5
+          ],
+          "reference" : "พรุ่งนี้จะบินกลับขึ้นไปอีก และเราจะบินแบบลดระดับและบินแบบช้าๆ กัน",
+          "source" : "Going back up tomorrow and we're doing stalls and slow flight.",
+          "text" : "พรุ่งนี้เราจะบินขึ้นอีกครั้ง และเราจะทำการบินตกค้างและบินช้า"
+        },
+        {
+          "lines" : [
+            6
+          ],
+          "reference" : "วันนี้บินไม่ค่อยราบรื่นเท่าไรแต่สนุกมาก เราบินแบบช้าๆ และบินแบบลดระดับ มีช่วงหนึ่งที่ความเร็วเมื่อเทียบกับพื้นโลกเหลือ 16 ไมล์ต่อชม. โดยความเร็วของเครื่องบินอยู่ที่ 65",
+          "source" : "Choppy day today, but super fun. We did slow flight and stalls. At one point we had our ground speed down to 16mph with an airspeed of 65.",
+          "text" : "วันนี้มีลมกระโชกแรงแต่สนุกมาก เราทำการบินช้าและการบินตกค้าง จุดหนึ่งเราลดความเร็วบนพื้นลงเหลือ 16 ไมล์ต่อชั่วโมง โดยมีความเร็วอากาศที่ 65"
+        },
+        {
+          "lines" : [
+            7
+          ],
+          "reference" : "รูปจากเมื่อวันเสาร์ ยางแบนหลังจากเอาเครื่องลงจอดครั้งล่าสุด",
+          "source" : "Pics are from saturday, ended up with a flat tire after our last landing",
+          "text" : "รูปถ่ายมาจากวันเสาร์ จบลงด้วยการแบนยางหลังการลงจอดครั้งสุดท้ายของเรา"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112166537145572640",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.2896000146865845,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user48 ถ้าได้ใช้ Bootstrap คงจะดีกว่า Tailwind มากๆ",
+          "source" : "@user48 Bootstrap would be sweet relief over tailwind",
+          "text" : "@user48 Bootstrap จะให้ความรู้สึกเหมือนการพักผ่อนจาก Tailwind"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.964422106742859,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user21 ผมกรรเชียงแค่วันธรรมดา ก็เลยเฉลี่ยได้ประมาณ 5 กม.\/ต่อวันธรรมดา แบ่งทำต่างๆ กันไป ผมเล่นเครื่องกรรเชียงบก",
+          "source" : "@user21 I only row on weekdays, so I average out to a little over 5K\/weekday so far. I break it up in different ways. On an ERG.",
+          "text" : "@user21 ฉันปั่นจักรยานเฉพาะวันธรรมดาเท่านั้น ดังนั้นโดยเฉลี่ยแล้วตอนนี้ฉันได้มากกว่า 5K\/วันทำงาน ฉันแบ่งวิธีการปั่นออกเป็นแบบต่างๆ บนเครื่อง ERG"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112201850099412432",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.1209999322891235,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เอาหน่อย NOK ไปให้ถึง $3.74 เลย",
+          "source" : "come on nok, $3.74 let’s go.",
+          "text" : "มาหน่อยนะ น็อก 3.74 ดอลลาร์ ไปกันเลย"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112259676538889296",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.42563509941101,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เอาล่ะ ไปกันเลยยยย!",
+          "source" : "alright let's goooo!",
+          "text" : "โอเค มาเริ่มกันเลย!"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "ผักกาดกับผักร็อกเก็ตของผมโดนอบตายไปครึ่งหนึ่งตอนที่ใช้ถาดพลาสติกคลุม แต่ถ้าไม่นับเรื่องนั้นต้นอ่อนก็แข็งแรงดี!",
+          "source" : "I hotboxed half my lettuce and arugula to death with a plastic tray cover but other than that seedlings are doing pretty good!",
+          "text" : "ฉันใช้กล่องพลาสติกคลุมผักสลัดก้านหอมและผักชีฝรั่งจนสุก แต่โดยรวมแล้วต้นกล้ากำลังเติบโตได้ดีมากครับ!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112270350852000848",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.129378080368042,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "พร้อมให้ช่างมาฉาบปูนในสัปดาห์หน้าแล้ว",
+          "source" : "Ready for the plasterer next week",
+          "text" : "พร้อมสำหรับช่างปูนปลาสเตอร์สัปดาห์หน้าแล้วครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-social_112294019357219888",
+      "language" : "en",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.286487102508545,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "ปั้นนีอะดาไทต์ (Green Stuff) สนุกมาก เหมือนปั้นหมากฝรั่ง แต่ปั้นไปสักพักก็ชิน และพอเซ็ตตัวจะทั้งแข็งแรงและยืดหยุ่น ของจิ๋วอีกนิดหน่อย",
+          "source" : "been really enjoying kneadatite (green stuff), it's like sculpting with bubble gum but you get used to that and it's tough and flexible when it cures more miniature stuff",
+          "text" : "ชอบเล่น kneadatite (ของสีเขียว) มาก มันเหมือนการปั้นด้วยยางปากกา แต่พอคุ้นๆ แล้วมันจะแข็งและยืดหยุ่นเมื่อแห้ง เหมาะสำหรับทำชิ้นงานขนาดเล็กมากๆ ครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_--4KfTiO-n0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.796780943870544,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "โอเค วิดีโอถัดไปอาจจะทำให้ผู้รับเหมามุงหลังคาโกรธผม แต่วิดีโอนี้ไม่ได้มีไว้ให้พวกเขาดู แต่มีไว้ให้คุณดูต่างหาก หากคุณเป็นคนที่ไม่มีเงินพอจะจ้างผู้รับเหมามุงหลังคา คุณต้องดูวีดีโอนี้ วิดีโอนี้จะสอนวิธีมุงหลังคาทับหลังคาที่มีอยู่ด้วยตัวเอง ซึ่งง่ายมากๆ เป็นระบบแกะแล้วแปะ",
+          "source" : "Okay, the next video will get roofing contractors mad at me, but it's not for them. It's for you. If you are that person that cannot afford a roofing contractor, then you have to watch this video. This will show you how you can do a cover over an existing old roof yourself. And it's very simple. It's a peel and stick system.",
+          "text" : "โอเค วิดีโอถัดไปจะทำให้ผู้รับเหมาทำหลังคาโกรธฉัน แต่ไม่ใช่สำหรับพวกเขา มันคือสำหรับคุณ หากคุณเป็นคนที่ไม่มีเงินจ้างผู้รับเหมาทำหลังคา คุณต้องดูวิดีโอนี้ วิดีโอนี้จะสอนให้คุณทำระบบคลุมหลังคาเก่าที่มีอยู่ได้ด้วยตัวเอง และมันง่ายมาก เป็นระบบลอกและติด"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_-0KrV5WsZq8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.133275985717773,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เวนิส เมืองแห่งสายน้ำ สถานที่แห่งความงามและความโรแมนติกซึ่งดึงดูดนักท่องเที่ยวหลายล้านรายในทุกๆ ปี  ถัดจากเส้นทางที่นักท่องเที่ยวเดินกันขวักไขว่ไปเพียงไม่กี่ก้าว เราจะได้เห็นเวนิสที่ต่างออกไปอย่างมาก ซึ่งเป็นด้านที่เต็มไปด้วยสิ่งมีชีวิตอันน่าหลงใหล ภาพยนตร์นี้จะสำรวจเวนิสในแบบที่ไม่ค่อยมีคนได้เห็น เมืองที่มีชีวิตอีกด้านอันน่าแปลกใจ",
+          "source" : "Venice, city on the water. A place of beauty and romance that attracts millions of visitors every year. Just a few steps from the well-trodden tourist routes, there's a very different Venice, one populated by fascinating creatures. This film explores a Venice that few people ever see, a city that has a surprising double life.",
+          "text" : "เวนิส เมืองแห่งน้ำ สถานที่แห่งความงามและความโรแมนติกที่ดึงดูดนักท่องเที่ยวนับล้านทุกปี แค่ก้าวไม่กี่ก้าวจากเส้นทางท่องเที่ยวที่คนเดินมาเยอะแล้ว ก็พบเห็นเวนิสอีกแบบหนึ่งที่มีสิ่งมีชีวิตที่น่าทึ่งอาศัยอยู่ นี่คือภาพยนตร์ที่สำรวจเวนิสที่คนส่วนใหญ่ไม่เคยได้สัมผัส เป็นเมืองที่มีชีวิตสองด้านที่น่าประหลาดใจ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.795108914375305,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "นี่เป็นฟุตเทจเก่าของจริงที่แสดงภาพคนร่างยักษ์ตัวจริงจากญี่ปุ่นที่กำลังเดินอยู่ในขบวนของทหาร สิ่งที่น่าทึ่งเกี่ยวกับฟุตเทจนี้ก็คือขนาดร่างกายของเขา เขามีความสูงอย่างน้อย 4 เมตร ซึ่งก็คืออย่างน้อย 13 ฟุต ดังนั้น เขาจึงมีรูปร่างสูงใหญ่กว่านักบาสเกตบอล NBA ทุกๆ คน ตัวอย่างเช่น Shaquille O'Neal หรือ",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "นี่คือภาพเก่าที่แท้จริงและจริงใจของบุคคลยักษ์จากญี่ปุ่นที่แน่นอนคนหนึ่งกำลังเดินในขบวนทหาร สิ่งที่น่าตกใจคือขนาดจริงของเขา เขาสูงอย่างน้อย 4 เมตร ซึ่งเท่ากับอย่างน้อย 13 ฟุต ดังนั้นเขาจึงสูงและหนักกว่าผู้เล่น NBA ต้นฉบับทุกคน เช่น ชากิล โอนีล หรือ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.0745290517807,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "คำถามก็แบบเดียวกันกับซากปรักหักพังในยุคหินใหม่อื่นๆ ที่มีการอ้างสิทธิ์ ก็คือพวกเขาสร้างสิ่งน่าอัศจรรย์นี้ขึ้นมาได้ยังไง ยกก้อนหินขนาดมหึมาได้ยังไง ซากเหล่านี้เป็นเศษเสี้ยวที่หลงเหลือของอารยธรรมที่ครั้งหนึ่งเคยก้าวหน้าแต่กลับถูกทำลายอย่างที่เราเคยสันนิษฐานมาแล้วหลายครั้งหรือไม่ เราคิดว่าความเป็นไปได้เหล่านี้มีความน่าดึงดูดอย่างมาก โดยเฉพาะผู้คนในเมือง Agra แห่งนี้",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_0EJ9bV6IAnM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.868520021438599,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉันซื้อ Xbox Series X มาเพื่อที่คุณจะได้ไม่ต้องซื้อ หรืออาจจะต้องซื้อก็ได้ ในวิดีโอนี้ ฉันจะพูดถึงข้อดีและข้อเสียทั้งหมดในการเลือกซื้อ Xbox Series X นอกจากนี้ ฉันจะพูดถึงตัวฮาร์ดแวร์ คอนโทรลเลอร์ เกม รวมถึงทุกๆ สิ่งที่ฉันได้สัมผัสมาตั้งแต่ใช้ Xbox Series X ด้วย ดังนั้น ฉันหวังว่าคุณจะสนุกกับวิดีโอนี้ และพบว่าวิดีโอนี้มีประโยชน์",
+          "source" : "So, I bought an Xbox Series X so that you don't have to. Or maybe you actually have to. In this video, I'm going to tell you all the pros and cons of choosing an Xbox Series X. I'm also going to go over the actual hardware, the controller, the games, just about everything that is my experience so far with the Xbox Series X. So I hope you will enjoy this video, and maybe even find it useful.",
+          "text" : "ดังนั้น ผมจึงซื้อ Xbox Series X เพื่อให้คุณไม่ต้องทำเช่นนั้น หรือบางทีคุณอาจจำเป็นต้องทำก็ได้ ในวิดีโอนี้ ผมจะบอกคุณถึงข้อดีและข้อเสียของการเลือกซื้อ Xbox Series X ผมยังจะกล่าวถึงฮาร์ดแวร์จริง ๆ คอนโทรลเลอร์ เกม และเกือบทุกอย่างที่เป็นประสบการณ์ของผมจนถึงตอนนี้กับ Xbox Series X ดังนั้นผมหวังว่าคุณจะสนุกกับวิดีโอนี้ และอาจจะพบว่ามีประโยชน์ด้วย"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_1CWvFkncljw_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 26.438493013381958,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เอาล่ะ เดี๋ยวๆๆ ช่วยทำตัวให้มันเรียบร้อยหน่อยจะได้ไหม พ่อคะ เมื่อไรเราจะซื้อรถที่คันใหญ่ขึ้นได้สักที ตอนที่ลูกโตขึ้นอีกสัก 10 ปีแล้วก็แต่งงานกับเศรษฐีได้ยังไงล่ะ ที่นั่งของผมในรถเข็นเด็กยังกว้างกว่านี้อีก ใช่ แล้วพ่อก็ยังผ่อนรถเข็นนั่นไม่หมดเลย อันที่จริง พ่อยังติดเงินโรงพยาบาลอยู่อีกตั้งสองงวดลูกถึงจะเป็นลูกของพ่อได้",
+          "source" : "All right, whoa, whoa, whoa, whoa, hold it down to a small riot, would you? Daddy, when are we going to be able to afford a larger car? When you're about 10 years older and can marry a millionaire. I had more room when I was in my baby buggy. Yeah, and I haven't finished paying for that either. In fact, I still owe two more payments to the hospital before I own you.",
+          "text" : "โอเค หยุดเดี๋ยว หยุดเดี๋ยว หยุดเดี๋ยว หยุดเดี๋ยว ให้มันสงบลงหน่อยได้ไหม พ่อครับ เมื่อไหร่เราจะพอซื้อรถใหญ่ได้ เมื่อคุณอายุครบ 10 ปีและสามารถแต่งงานกับมิลเลเนียร์ได้ ตอนฉันอยู่ในรถเข็นเด็ก ฉันมีพื้นที่มากกว่านี้ ใช่ และฉันยังไม่ได้ชำระค่ารถคันนั้นเสร็จสิ้น จริงๆ แล้วฉันยังต้องจ่ายอีกสองงวดให้โรงพยาบาลก่อนจะได้เป็นเจ้าของคุณจริงๆ ครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_1R3j_apcikw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.948930978775024,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "วันนี้เราจะมาพูดคุยกันเรื่องที่ Ben Affleck แก้ต่างให้บทสัมภาษณ์ Greg ช่วยเล่าเกี่ยวกับวิดีโอที่เรากำลังจะดูหน่อย ได้ครับ เมื่อสองสามสัปดาห์ก่อน Ben Affleck ได้ให้สัมภาษณ์กับ Howard Stern เป็นเวลาสองชั่วโมง โดยเขาได้พูดคุยเกี่ยวกับการหย่าร้างกับอดีตภรรยาและครอบครัว และผลกระทบที่เขาต้องเผชิญจากเรื่องนี้ เพราะฉะนั้นมาดูกันเลย Ben Affleck มาแล้ว!",
+          "source" : "Today we're going to talk about Ben Affleck defending an interview. Greg, why don't you to tell us about the video we're going to watch. Yeah, so a couple of weeks ago, Ben Affleck went on a two-hour interview with Howard Stern. He talked about his breakup with his ex-wife and family, and he had some fallout from it, so here we go. Here he is, Ben Affleck!",
+          "text" : "วันนี้เราจะมาพูดถึงเบน แอฟเฟลค ที่กำลังปกป้องการสัมภาษณ์ของเขา เกร็ก ทำไมไม่เล่าให้เรารู้เกี่ยวกับวิดีโอที่เราจะดูกันหน่อย ใช่แล้ว ดังนั้นเมื่อไม่กี่สัปดาห์ก่อน เบน แอฟเฟลค ได้ไปทำรายการสัมภาษณ์สองชั่วโมงกับฮอเวิร์ด สเตอร์น เขาได้พูดถึงการแยกจากภรรยาเก่าและครอบครัว และเขาก็มีปัญหากับมันด้วย ดังนั้นนี่คือจุดเริ่มต้น นี่คือเขา เบน แอฟเฟลค!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.430878043174744,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉันทำงานกับดนตรีมาเป็นเวลากว่า 20 ปีแล้ว และได้ออกอัลบั้ม 2 อัลบั้มในช่วงเวลานั้น รวมถึงทัวร์คอนเสิร์ตในเยอรมนีและโปแลนด์ และแน่นอนว่าสวีเดนด้วย ก็คือคุณเป็นนักดนตรีมาตั้งแต่ตอนอายุน้อยๆ เลยใช่ไหม ใช่แล้ว แล้วมีสถานที่ไหนที่คุณไปแสดงตอนเด็กๆ ที่คุณรู้สึกว่าโดดเด่นและเป็นที่จดจำบ้างไหม",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "ดังนั้น ฉันจึงทำงานกับดนตรีมาเกิน 20 ปีแล้ว และได้ออกอัลบั้มสองชุดในช่วงเวลานั้น รวมถึงการทัวร์ในเยอรมนี โปแลนด์ และสวีเดน แน่นอน ดังนั้นคุณเคยเป็นนักแสดงตั้งแต่ยังเด็กเสมอใช่ไหม ใช่ ฉันเคยทำมา และเคยมีสถานที่ที่เป็นตำนานที่คุณเคยแสดงเมื่อตอนยังเด็กไหมบ้าง?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_2Uo5zKrbips_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 17.48905098438263,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เมื่อนานมาแล้ว พ่อแม่ของพวกมันถูกพวกลักลอบล่าสัตว์ฆ่า จากนั้น Cheyenne และ Kuyu ก็ถูกขายในตลาด องค์กร Help Congo รับพวกมันมาเลี้ยง พวกมันเติบโตมาในสภาพแวดล้อมแบบกึ่งปล่อยร่วมกับลูกลิงกำพร้าอีกประมาณ 30 ตัวบนเกาะ ลูกลิงชิมแปนซีเหล่านี้ถูกปล่อยกลับสู่ป่าทีละตัว โดยนักวิทยาศาสตร์ประจำสมาคมได้ตั้งชื่อให้ลูกลิงแต่ละตัวเพื่อให้สามารถระบุตัวได้",
+          "source" : "A long time ago, their parents were killed by poachers, and Cheyenne and Kuyu were sold at the market. Taken in by the Help Congo organization, they grew up in semi-captivity with about 30 other orphans out on the islands. One after another, these young chimpanzees have been shown the way back to the forest. The association's scientists have given them each a name to identify them.",
+          "text" : "เมื่อครั้งนานมาแล้ว พ่อแม่ของพวกมันถูกนักล่าสัตว์ป่าสังหาร และเชยเยนและคูกูถูกขายในตลาด ถูกนำโดยองค์กรช่วยเหลือคองโก พวกมันเติบโตขึ้นในสภาพกึ่งเป็นทาสพร้อมกับเด็กกำพร้าประมาณ 30 คนอีกคนบนเกาะ หลังจากนี้ทีละตัว ชิมแปนซีหนุ่มสาวเหล่านี้ได้รับการสอนให้กลับสู่ป่าอีกครั้ง นักวิทยาศาสตร์ของสมาคมได้ตั้งชื่อให้แต่ละตัวเพื่อระบุตัวตน"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_36UVjSUk-wY_035",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.128059029579163,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "อเล็กซ่า เปิดเพลง It's My Party และ I'll Cry if I Want To โบ โบ เราต้องหมุนตัวกันหน่อย อเล็กซ่า เปิดเพลง It's My Party และ I'll Cry if I Want To ถ้าเกิดกับตัวเองเธอก็คงร้องไห้เหมือนกันนั่นแหละ วู้! อเล็กซ่า เปิดเพลง Midnight Train!",
+          "source" : "Alexa, play It's My Party and I'll Cry if I Want To. Bo, Bo, we gotta spin around. Alexa, play It's My Party and I'll Cry if I Want To. You'd cry too if it happened to you. Woo! Alexa, play Midnight Train!",
+          "text" : "Alexa เล่นเพลง It's My Party and I'll Cry if I Want To. Bo, Bo เราต้องหมุนรอบตัว"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_3M_AGbXVb5s_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.072153091430664,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เอาล่ะ พอพูดถึงเรื่องคนดัง คุณ Howard Jones ก็มาเป็นแขกพิเศษที่ร่วมร้องเพลงกับคุณในเพลง I Made a Case ในอัลบั้มนี้ เขาเป็นคนที่คอยสนับสนุนงานเพลงของคุณอย่างดีมาโดยตลอด การได้เขามาร่วมร้องเพลงนี้เป็นเรื่องบังเอิญหรือเปล่า ผมได้ยินมาว่า คุณจำเป็นต้องลดทอนองค์ประกอบเพลงลงเพราะไม่อยากให้อะไรมาบดบังการบอกเล่าเรื่องราวผ่านเสียงของคุณ",
+          "source" : "Now, talking about stars, Howard Jones appears as a special guest vocalist in a duet with you on the album, on the track, I Made a Case, who has offered you so much encouragement with your music. Was it by chance that he happened to appear on the track? As I hear you had to strip back the track, as didn't want anything being in the way of your voices telling the story.",
+          "text" : "ตอนนี้มาพูดถึงดาว ฮาวาร์ด จอห์นส์ จะปรากฏตัวในฐานะนักร้องพิเศษในเพลงคู่กับคุณบนอัลบั้ม ในเพลง I Made a Case ซึ่งเขาได้มอบการสนับสนุนให้คุณมากับดนตรีของคุณ การที่เขาปรากฏตัวในเพลงนั้นบังเอิญใช่หรือไม่? ตามที่ฉันได้ยิน คุณต้องตัดสิ่งอื่นออกจากรางเพลง เพราะไม่ต้องการให้สิ่งใดมาขัดขวางเสียงของคุณในการเล่าเรื่อง"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_3S7FkKvesu8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.738773941993713,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "น้ำคือของเหลวที่เป็นองค์ประกอบหลักของมหาสมุทรที่ลึกไร้ที่สิ้นสุด มีเพียงไม่กี่คนเท่านั้นที่จะกล้าออกผจญภัยสู่โลกใต้สมุทรที่กว้างใหญ่ไพศาลไร้จุดจบนี้ สิ่งมีชีวิตในมหาสมุทรส่วนใหญ่ก็จะอาศัยอยู่ร่วมกันเป็นชุมชนขนาดใหญ่ไม่ต่างจากสังคมของมนุษย์",
+          "source" : "Water, the liquid that oceans are made of. And it fills endless depths. Only a few will venture out into the endless open ocean of this vast underwater world. Most of the ocean inhabitants live in the city, as it were, like human societies.",
+          "text" : "น้ำ เป็นของเหลวที่มหาสมุทรทำขึ้นมา และมันเติมเต็มความลึกที่ไม่มีที่สิ้นสุด มีเพียงไม่กี่คนเท่านั้นที่จะกล้าเสี่ยงออกไปสู่มหาสมุทรเปิดอันกว้างใหญ่ของโลกใต้น้ำแห่งนี้ ส่วนใหญ่ของสิ่งมีชีวิตในทะเลอาศัยอยู่ในเมือง เหมือนกับสังคมมนุษย์"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_4EXYb1KXvzM_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.57645297050476,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Starfire เจ้าหญิงแห่ง Tamaran หวังว่าจะสะดวกสบายดีนะ Lord Bagrok! โอ้! ช่างมีแรงใจที่น่าเกรงขามอะไรเช่นนี้ น้องสาวของเจ้าคิดถูกแล้วที่ส่งตัวเจ้ามาให้ อย่ามาแตะนะ!",
+          "source" : "Starfire. The princess of Tamaran. Comfortable, I hope. Lord Bagrok! Oh! Such a formidable spirit. Your sister was wise to hand you over. Garbler neck!",
+          "text" : "สตาร์ไฟร์ เจ้าหญิงแห่งทามาราน หวังว่าเธอจะสบายดี ลอร์ดแบโกรค โอ! จิตวิญญาณที่ทรงพลังมาก น้องสาวของเธอช่างฉลาดที่จะมอบเธอให้แก่มนุษย์"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_4cfsI4ZjTbU_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.257743954658508,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เราต้องรู้ว่ารัฐบาลของประเทศจีนกับรัฐบาลของสหรัฐอเมริกานั้นแตกต่างกันมาก และข้อแตกต่างก็จะยังคงมีอยู่ในอนาคต แต่สิ่งที่เราต้องทำก็คือการยอมรับจุดต่างโดยไม่ทำสงครามต่อกัน",
+          "source" : "We must recognize that the government of the People's Republic of China and the government of the United States have had great differences. We will have differences in the future. But what we must do is to find a way to see that we can have differences without being enemies in war.",
+          "text" : "เราต้องตระหนักว่ารัฐบาลสาธารณรัฐประชาชนจีนและรัฐบาลสหรัฐอเมริกาต่างมีความขัดแย้งมาอย่างยาวนาน และเราจะยังคงมีความขัดแย้งในอนาคต แต่สิ่งที่เราต้องทำคือหาวิธีที่จะเห็นได้ว่าเราสามารถมีความขัดแย้งได้โดยที่ไม่ต้องเป็นศัตรูในสงคราม"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_5TqcJCKl34g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.96300196647644,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "แล้วคุณเริ่มเขียนเพลงและแสดงเพลงครั้งแรกตอนไหนครับหลังจากที่ขึ้นแสดงต่อหน้าคุณตาคุณยาย เอ่อ จริงๆ แล้วผมจะไปทางแสดงเพลงมากกว่า ผมมีเขียนเพลงบ้างเล็กน้อยครับ แต่ผมจะปล่อยให้เป็นงานของมืออาชีพไปครับเวลาที่ผมทำเพลงร่วมกับนักเขียนเพลงมืออาชีพที่ทำเพลงฮิตโด่งดังไปทั่วโลกมากมาย",
+          "source" : "So, when did you first start writing and performing music after having your stage in front of your grandparents there? Well, basically, more performing. I did a bit of writing, but I left it to professionals, you know, when I was recording with professional writers and big, big hits around the world.",
+          "text" : "ดังนั้น คุณเริ่มเขียนและแสดงเพลงหลังจากมีเวทีหน้าตาของคุณปู่คุณย่าเมื่อไหร่ดีล่ะ?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.181855082511902,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ตรวจสอบ ตรวจสอบ ค้อนชนะกรรไกร กรรไกรชนะกระดาษ และกระดาษชนะค้อน คุณเป็นฝ่ายชนะ ฝ่ายที่แพ้จะเสียดาวไปหนึ่งดวง เมื่อจบแต่ละเกม กรรมการจะเอาการ์ดใส่กลับเข้าไปในกล่องรีไซเคิล แน่นอนว่าหากทั้งสองฝ่ายออกการ์ดหน้าเดียวกัน ก็จะถือว่าเสมอ และไม่มีใครต้องเสียดาวไป",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "ตรวจสอบ ตรวจสอบ ร็อคชนะสกินเนอร์ สกินเนอร์ชนะกระดาษ และกระดาษชนะร็อค คุณชนะ ผู้แพ้จะเสียดาวหนึ่งดวง ในแต่ละเกม เมื่อผู้ตัดสินเสร็จสิ้น เขาจะใส่การ์ดกลับลงในกล่องรีไซเคิล แน่นอนว่าหากผู้เล่นทั้งสองเลือกการ์ดเดียวกัน เกมจะเป็นเสมอ และไม่มีใครเสียดาว"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 20.997588992118835,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "และนี่คือเรื่องราวทั้งหมดของ Danny กับ Sam พร้อมมั้ย พร้อมแล้ว Danny Fenton กับ Sam Manson เป็นเพื่อนรักกัน ทั้งสองคนและ Tucker ใช้เวลาอยู่ด้วยกันบ่อยๆ และ Sam ก็คือต้นเหตุที่ทำให้ Danny ได้รับพลังวิญญาณมา เดี๋ยวนะ Danny พื้นที่วิญญาณอย่างนั้นหรอ นายต้องเข้าไปสำรวจนะ จะว่าไปเธอก็พูดถูกนะ",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "นี่คือเรื่องราวทั้งหมดของแดนนี่และแซม พร้อมหรือยัง? พร้อม แดนนี่เฟอนตันและแซมแมนสันเป็นเพื่อนสนิท และพร้อมกับทักเกอร์ พวกเขาใช้เวลาส่วนใหญ่ร่วมกัน แซมคือเหตุผลที่ทำให้แดนนี่มีพลังวิญญาณตั้งแต่แรก มาเลย แดนนี่ โซนวิญญาณ? คุณต้องลองดู คุณรู้ไหม? คุณถูกต้องครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_6YeLsSSPNLQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 19.179646015167236,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "บันทึกนักปราบปรามอาชญากรรม 1.2747 Jump City กำลังโกลาหล ผมคนเดียวคงรับมือไม่ไหวแน่ ผมต้องการลูกมือ หลายคนได้ยิ่งดี ผมจะเรียกว่าเพื่อนร่วมทีมเพื่อความสุภาพ แต่ทุกคนก็รู้ตัวแหละว่าเป็นแค่ลูกมือ แอปเชื่อมต่อเครือข่าย ยินดีต้อนรับ RobDog_747 มาสร้างทีมกันเถอะ โหมดรวมทีม ไม่เอาคนที่แก่กว่าผมสิ",
+          "source" : "Crime fighters' log 1.2747. Jump City is a cesspool. I can't bring justice to the streets alone. I need a sidekick, preferably several sidekicks. I'll call them teammates to be polite, but everyone will know their sidekicks. Networking apps. Welcome, RobDog_747. Let's put together a team. Team assemble mode. Not older than me.",
+          "text" : "บันทึกการต่อสู้ของนักปราบปราม 1.2747. เมืองจัมพ์ซิตีคือบ่อโคลน ฉันไม่สามารถนำความยุติธรรมมาสู่ถนนได้เพียงลำพัง ฉันต้องการเพื่อนร่วมทีมอย่างน้อยหนึ่งคน แต่จะดีกว่าถ้ามีหลายคน ฉันจะเรียกพวกเขาว่า \"ทีม\" เพื่อความสุภาพ แต่ทุกคนจะรู้ว่าพวกเขาเป็นเพื่อนร่วมทีมของฉัน แอปพลิเคชันเครือข่ายสังคม ยินดีต้อนรับ RobDog_747 มาสร้างทีมกันเถอะ โหมดรวมทีม อย่ามีอายุมากกว่าฉัน"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_6ji3tqZUynY_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.988155007362366,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "คิมจองอิลพูดกับเจ้าหน้าที่ว่า \"ผมมีคติประจำใจเหมือนกับท่านผู้นำ ซึ่งก็คือ ช่วยเหลือชนชั้นแรงงาน ทำให้ดอกไม้เติบโตบนก้อนหินให้ได้หากนั่นคือความปรารถนาของประชาชน นี่คือปรัชญาในการทำงานของผม แนวคิดนี้ถูกนำมาใช้กับวิถีชีวิตของประชาชนในทุกแง่มุม เช่น การแก้ไขปัญหาด้านการจราจร\"",
+          "source" : "Kim Jong-il said to the officials, \"I shared a great leader's motor, served the working masses, and let flowers bloom even on a rock, if this is the people's desire. This is my alpha and omega. This idea has been embedded in every aspect of the people's living in the solution of traffic problem for one thing.\"",
+          "text" : "คิมจอง-il กล่าวกับเจ้าหน้าที่ว่า \"ฉันได้แบ่งปันรถของผู้นำที่ยิ่งใหญ่ บริการประชาชน และทำให้ดอกไม้บานแม้บนหิน หากนี่คือความต้องการของประชาชน นี่คือจุดเริ่มต้นและจุดสิ้นสุดของฉัน แนวคิดนี้ถูกฝังอยู่ในทุกด้านของการดำรงชีวิตของประชาชน ไม่ว่าจะเป็นการแก้ปัญหาจราจรก็ตาม\""
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_7MQ3Yx2h3Rg_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.016822934150696,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ก่อนอื่น เราจะมาผสมสีกันครับ เราจะผสมสีกับรีดิวเซอร์ในอัตราส่วนหนึ่งต่อหนึ่ง การผสมก็ทำเหมือนปกติเลยครับ ผมจะใส่สีลงไปสองออนซ์นะครับ แล้วตามด้วยรีดิวเซอร์สองออนซ์ จากนั้นเราก็จะคนให้เข้ากัน ทีนี้ก็พร้อมเอาไปบรรจุลงในปืนแล้วเอาไปพ่นแล้วครับ",
+          "source" : "First of all, what we're going to do is just mix this paint up. It mixes one to one with a reducer. And we just mix it up like we normally would painting anything. So I have two ounces of paint here, so I'm going to put two ounces of reducer. We're going to stir it up. Now it's ready to put in the gun and spray.",
+          "text" : "ก่อนอื่น สิ่งที่เราจะทำคือผสมสีนี้ให้เข้ากัน มันผสมกับตัวลดความหนืดในอัตราส่วน 1 ต่อ 1 และเราจะผสมมันเหมือนปกติเวลาทาสีอะไรก็ตาม ดังนั้นฉันมีสี 2 ออนซ์ที่นี่ ฉันจึงจะใส่ตัวลดความหน่วง 2 ออนซ์ เราจะได้กวนมันขึ้น ตอนนี้พร้อมนำไปใส่ปืนสเปรย์และฉีดแล้ว"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_8bbVFeTIIg8_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.6979740858078,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "การยื่นเข้าศึกษาระดับปริญญาโทสาขาจิตวิทยาที่ Harvard ในครั้งแรกถูกปฏิเสธ แต่ก็ได้รับการตอบรับในที่สุด สาเหตุที่ทำให้เขาถูกปฏิเสธในตอนแรกก็มาจากการที่เขาไม่ได้ศึกษาหลักสูตรด้านจิตวิทยาใดๆ เลยในระดับปริญญาตรีจาก Queens College ในปี 1961 มิลแกรมจบปริญญาเอกด้านจิตวิทยาสังคม เราได้เป็นผู้ช่วยศาสตราจารย์ที่ Yale ในช่วงเวลาเดียวกันนี้",
+          "source" : "Initial applications to Harvard for a psychology master's were rejected, but was eventually admitted. The initial setbacks were due to Milgram not taking any undergraduate courses in psychology at Queens College. In 1961, Milgram received a PhD in social psychology. He became an assistant professor at Yale around the same time.",
+          "text" : "การสมัครเข้าฮาร์วาร์ดเพื่อเรียนปริญญาโทด้านจิตวิทยาครั้งแรกถูกปฏิเสธ แต่ในที่สุดก็ได้รับการรับเข้าเรียน ความล้มเหลวครั้งแรกล่ามมาจากการที่มิลแกรมไม่ได้เรียนหลักสูตรปริญญาตรีด้านจิตวิทยาที่วิทยาลัยควีนส์ ในปี 1961 มิลแกรมได้รับปริญญาเอกด้านจิตวิทยาสังคม เขาได้กลายเป็นศาสตราจารย์ช่วยที่มหาวิทยาลัยเยลในเวลาใกล้เคียงกัน"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_9GhGiB4KhTM_004",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.476161003112793,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฉันไม่ได้พูดแบบนั้น คุณไม่จำเป็นต้องพูดหรอก คุณรู้ดีกว่าใครๆ ว่าความรุนแรงย่อมก่อให้เกิดความรุนแรงเสมอ สภาตัดสินไปแล้ว ไม่มีสภาแล้ว! เราใช้เวลาทั้งชีวิต ใช้เวลาเป็นพันปีทุ่มเทปกป้องชีวิต",
+          "source" : "I didn't say that. You don't have to. You know better than anyone that violence begets violence every time. The Council made the decision. The Council is gone! We spend our entire lives, entire millennia devoted to protecting life.",
+          "text" : "ฉันไม่ได้พูดเช่นนั้น คุณไม่ต้องพูด ฉันรู้ดีกว่าทุกคนว่า ความรุนแรงก่อให้เกิดความรุนแรงทุกครั้ง คณะกรรมาธิการได้ตัดสินใจแล้ว คณะกรรมาธิการก็หายไป เราใช้เวลาทั้งชีวิตของเราทั้งหลายพันปีเพื่อปกป้องชีวิต"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_9s2UyGBuvYw_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.95700991153717,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "และก็มีบางเรื่องที่ชวนให้เราตื่นเต้นสุดๆ ได้ และนี่ก็คือเรื่องที่ผมอยากจะเล่าให้ทุกคนได้ฟังกันในคืนนี้ หวังว่าทุกคนจะพร้อมสนุกไปกับเรื่องราวสนุกๆ ที่ชวนผ่อนคลายเกี่ยวกับประวัติศาสตร์เชิงลึกของอียิปต์โบราณครับ",
+          "source" : "And there's just something that evokes a serious sense of awe. And that's what I want to try to convey to you guys tonight. So I hope you're ready for a nice relaxing journey through some of the deeper history of ancient Egypt.",
+          "text" : "และยังมีบางอย่างที่ทำให้รู้สึกถึงความรู้สึกawe อย่างจริงจัง นั่นคือสิ่งที่ฉันต้องการจะสื่อสารกับทุกคน Tonight ดังนั้นฉันหวังว่าทุกคนพร้อมที่จะเดินทางผ่านประวัติศาสตร์ลึกซึ้งของอียิปต์โบราณอย่างสบายใจ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.735048055648804,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ตอนนี้ก็ผ่านมาหลายเดือนแล้ว แต่ฉันรู้สึกว่าตัวเองยังคงยืนอยู่หน้าหลุมศพของเขา ฉันยังปล่อยเขาไปไม่ได้ เขาจากไปแล้ว แต่ฉันยังไม่อาจปล่อยเขาไปได้ ฉันเห็นเขาสวมชุดเครื่องแบบทหารในทุกที่ที่ฉันผ่าน และทหารก็ปรากฏตัวอยู่ในทุกๆ ที่นับตั้งแต่เกิดเหตุระเบิดครั้งนั้น",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "ผ่านไปหลายเดือนแล้ว และฉันรู้สึกเหมือนยังยืนอยู่หน้าหลุมศพของเขา ฉันไม่สามารถละทิ้งเขาได้ เขาตายไปแล้ว แต่ฉันยังคงไม่สามารถละทิ้งเขาได้ ฉันเห็นเขาในทหารทุกคนที่สวมเครื่องแบบที่ฉันพบ และพวกเขาอยู่ทุกหนทุกแห่งนับตั้งแต่เกิดระเบิดขึ้น"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_BAvkbiKnFEY_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.967689037322998,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สวัสดีค่าทุกคน หากยังไม่รู้จักกัน ฉันชื่อ Janica นะคะ เป็นผู้เชี่ยวชาญจากฟินแลนด์ ตอนนี้อาศัยอยู่ที่เนเธอร์แลนด์ค่ะ ยินดีต้อนรับสู่วีล็อกนี้นะคะ วันนี้เราอยู่กันที่เมือง Haarlem เมืองนี้เป็นเมืองที่สวยมาก ตั้งอยู่ในเขตนอร์ทฮอลแลนด์ค่ะ",
+          "source" : "Hello, everyone! If you don't know me, my name is Janica, and I am an expert from Finland, living in the Netherlands. Welcome to this vlog. Today we are in the city of Haarlem. Harlem is a really lovely city located in the province of North Holland.",
+          "text" : "สวัสดีครับทุกคน! หากคุณไม่รู้จักผม ผมชื่อจันนิกา และผมเป็นผู้เชี่ยวชาญจากฟินแลนด์ ที่อาศัยอยู่ในเนเธอร์แลนด์ ยินดีต้อนรับสู่ช่อง vlog นี้ วันนี้เราอยู่ที่เมืองฮาร์เลม ฮาร์เลมเป็นเมืองที่สวยงามจริงๆ ตั้งอยู่ในจังหวัดนอร์ทฮอลแลนด์"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_BmgU6BTfNQM_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.119513034820557,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "แบตเตอรี่ยังดีอยู่ เราจะเห็นเลยว่า IC นี้หลุดออกจากแผง PCB เราจะเห็นสภาพของ IC นี้ แทร็กนี้จะมาทางนี้ แทร็กนี้เสียหาย",
+          "source" : "Battery is good. Now we can see this IC is dislocated from the PCB. We can see the condition of this IC. Now this track is coming here. This track is damaged.",
+          "text" : "แบตเตอรี่อยู่ในสภาพดี ตอนนี้เราเห็นไอซีนี้หลุดออกจาก PCB ได้แล้ว เราสามารถดูสภาพของไอซีนี้ได้ ตอนนี้เทร็กนี้มาที่นี่ เทร็กนี้เสียหาย"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_Lcdy6X5kMTs_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.123648047447205,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สวัสดีค่ะทุกคน และนี่คือ Ts Madison หากคุณกำลังมองหาวิธีพัฒนาธุรกิจ แบรนด์ หรือสินค้าให้เติบโต ทำไมไม่ลองมาโฆษณากับเราล่ะคะ ส่งอีเมลมาหาฉันได้ที่ booktsmadison@gmail.com เพื่อรับข้อมูลแพ็กเกจโฆษณาแบบครบถ้วนจากเรา การเข้าชมที่ไม่ซ้ำกัน ผู้ติดตามที่ไม่ซ้ำหน้า บอกเลยว่าประชากรกลุ่มใหญ่มาก ลงโฆษณากับเราได้แล้ววันนี้ค่ะ",
+          "source" : "Hey, everybody, this is TS Madison. And if you are trying to grow your business, brand, or a product, why not advertise with me? Email me at booktsmadison@gmail.com so that you can get in on our comprehensive advertisement packages. Unique visits, unique subscribers, honey, a broad demographic. Advertise with me today.",
+          "text" : "สวัสดีครับทุกคน ผมคือ TS Madison หากคุณต้องการขยายธุรกิจ แบรนด์ หรือผลิตภัณฑ์ของคุณ ทำไมไม่โฆษณาด้วยผม? ส่งอีเมลมาที่ booktsmadison@gmail.com เพื่อรับแพ็กเกจโฆษณาแบบครบวงจรของเรา การเข้าชมที่เป็นเอกลักษณ์ ผู้ติดตามที่เป็นเอกลักษณ์ honey ประชากรเป้าหมายที่หลากหลาย โฆษณาด้วยผมวันนี้เลย"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_MBJ0dL68I_I_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 18.90733003616333,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ภาพยนตร์สารคดีที่คุณกำลังจะได้รับชมนี้ได้ถูกนำไปแสดงให้กับคุณ Alexander Kerensky ประธานาธิบดีแห่งรัฐบาลประชาธิปไตยชั่วคราวของรัสเซียซึ่งถูกคอมมิวนิสต์ล้มล้างไปเมื่อปี 1917 คุณ Kerensky ยินดีที่จะกล่าวเกริ่นนำเล็กๆ น้อยๆ เกี่ยวกับภาพยนตร์ของเรา เราได้นำภาพยนตร์เรื่องนี้ไปแสดงให้คุณ Alexander Kerensky ในวัย 80 ปีได้รับชมที่อะพาร์ตเมนต์ของเขาในนิวยอร์กซิตีเมื่อวันที่ 10 ตุลาคม 1962",
+          "source" : "The documentary film you are about to see was shown to Mr. Alexander Kerensky, President of the Democratic Provisional Government of Russia overthrown by the Communists in 1917. Mr. Kerensky consented to make a few introductory remarks about our picture. We present 80-year-old Alexander Kerensky in his New York City apartment on October 10th, 1962.",
+          "text" : "ภาพยนตร์สารคดีที่คุณกำลังจะเห็นนั้นได้แสดงให้นายอเล็กซานเดอร์ เคนสกี ประธานาธิบดีของรัฐบาลชั่วคราวประชาธิปไตยของรัสเซีย ซึ่งถูกคอมมิวนิสต์ล้มล้างในปี 1917 ดูแล้ว นายเคนสกีให้ความยินยอมที่จะกล่าวคำนำสั้นๆ เกี่ยวกับภาพของเรา ภาพนี้เป็นการนำเสนออเล็กซานเดอร์ เคนสกีที่มีอายุ 80 ปี ในห้องพักอาศัยของเขาที่นครนิวยอร์ก เมื่อวันที่ 10 ตุลาคม ค.ศ. 1962"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_MG7hk2npXN0_005",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.094541072845459,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ข้าแต่ศาลที่เคารพ ลูกความของผมนอมรับคณะลูกขุนตามที่ปรากฏครับ คณะลูกขุนเป็นที่พอใจของทั้งสองฝ่ายแล้วนะ เรายอมรับคณะลูกขุนครับ เราพอใจกับคณะลูกขุนครับ ให้คณะลูกขุนปฏิญาณตนได้",
+          "source" : "Your Honor, my client accepts the jury as presently constituted. The jury is satisfactory to both sides? We accept the jury. The jury is satisfactory to us. Swear the jury.",
+          "text" : "ท่านผู้พิพากษา ลูกค้าของเรายอมรับคณะลูกขุนตามที่จัดตั้งไว้ คณะลูกขุนนี้เหมาะสมกับทั้งสองฝ่ายหรือไม่? เรายอมรับคณะลูกขุน คณะลูกขุนนี้เหมาะสมกับเรา ให้สาบานคณะลูกขุน"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_MbW7DvLZ9Lg_005",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.392725944519043,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kid Durango of Arizona: The Dust Devils น้ำค้างที่แผ่ปกคลุมทุ่งหญ้ามลายหายไปในทันตาเมื่อดวงอาทิตย์เคลื่อนขึ้นผ่านตีนเขา พระจันทร์ยังคงปรากฏให้เห็นอยู่ครู่หนึ่งก่อนจะหายลับลงไปหลังเขา วันนี้ก็เริ่มต้นขึ้นอีกครั้งเฉกเช่นวันอื่นๆ ในแอริโซนา จนกระทั่งเมฆเคลื่อนเข้ามา",
+          "source" : "Kid Durango of Arizona: The Dust Devils. The layer of dew that covered the prairie disappeared quickly as the sun rose over the foothills. The moon hung around for a while, and then sunk far below the ranges. The day began like a thousand other Arizona days. That was, until the cloud came.",
+          "text" : "คิด ดุรันโก จากแอริโซนา: เดิสต์ เดวิลส์ ชั้นของน้ำค้างที่ปกคลุมทุ่งหญ้าหายไปอย่างรวดเร็วเมื่อพระอาทิตย์ขึ้นเหนือเทือกเขา foothills ดวงจันทร์แขวนลอยอยู่สักพักแล้วจมลงลึกใต้เทือกเขา วันที่เริ่มต้นเหมือนวันอื่นๆ ในแอริโซนาพันวัน นั่นคือ จนกว่าเมฆจะมาถึง"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.147089958190918,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ทอม นายมันคนห่วยแตก นี่ ซีเลีย เราต้องทำตามสิ่งที่หัวใจบอกเรานะ เธอก็มีหุ่นยนต์ของเธอ ส่วนฉันก็อยากแค่อยากจะเป็นคนที่สุดยอดในอวกาศ ทำไมนายถึงไม่กล้ายอมรับล่ะว่านายกลัวแขนกลของฉัน ฉันไม่กลัวเจ้า... เอ่อ ก็ได้ ฉันกลัว ฉันฝันร้ายว่าถูกกรงเล็บหุ่นยนต์ขนาดใหญ่นี่ไล่ล่า โอ้ย อะไรกันเนี่ยทอม!",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "คุณเป็นคนที่แย่จริงๆ ทอม ดูสิ เซลิ娅 เราต้องทำตามสิ่งที่เราหลงใหล เธอมีหุ่นยนต์ของเธอ而我แค่อยากเป็นสุดยอดในอวกาศ ทำไมไม่ยอมรับเลยว่าคุณกลัวมือหุ่นยนต์ของฉัน? ฉันไม่ได้กลัวหรอก มันคือ... โอเค ได้แล้ว ฉันกลัวจริงๆ ฉันฝันร้ายว่าฉันกำลังถูกไล่ล่าโดยกรงเล็บหุ่นยนต์ยักษ์นั้น โอ้ ไร้ความหมาย ทอม!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_O0ORxKse1s8_088",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.355074048042297,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ฮัลโหล สายของ Albany เป็นยังไงบ้าง ไม่ว่างหรอ งั้นโทรหาหัวหน้าเจ้าหน้าที่ บอกให้เธอเปิดสายให้ว่างไว้ เรื่องทางการ เรื่องคอบาดบาดตายเลยล่ะ ผมหวังว่าคุณจะพูดความจริงกับผมนะครับคุณ Kennedy คงไม่เป็นผลดีกับคุณแน่หากไม่ยอมพูดความจริง ฉันก็บอกแล้วไงว่าทุกอย่างที่พูดเป็นความจริง Dirken จับตัวฉันไว้ เขาฉีกเสื้อผ้าฉัน เรายื้อยุดกัน",
+          "source" : "Hello. How about that Albany call? Busy? Well call the chief operator, tell her to keep the line open. Official business. It's a matter of life and death. I hope you are telling me the truth, Miss Kennedy. It won't go well with you if you're not. I tell you every word I told you's the truth. Dirken grabbed me. He tore my dress. We struggled.",
+          "text" : "สวัสดีครับ แล้วโทรหาอัลบานีล่ะ? สายไม่ว่างเหรอ? ก็ให้โทรหาผู้ดูแลสายหลัก บอกให้เปิดสายไว้ งานราชการ เรื่องนี้关乎生死 ผมหวังว่าคุณจะบอกความจริงกับผม มิสเซนต์เดเนียล ถ้าคุณไม่บอกความจริง มันจะไม่ดีกับคุณ ผมบอกคุณทุกคำที่ผมบอกคุณคือความจริง ดีร์คินจับผม เขาลากเสื้อผมฉีกขาด เราต่อสู้กัน"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.08908200263977,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ยินดีต้อนรับค่ะ ยินดีต้อนรับทุกคนค่ะ ฉันขอดูก่อนว่าทั้งหมดนี้ใช้ได้หรือเปล่า ขอเวลานาทีนึงนะคะ วันนี้ฉันมาเร็วหน่อยจะได้แน่ใจค่ะ เพิ่งล้างมือไปแล้วก็พร้อมเริ่มแล้วค่ะ ฉันเพิ่งเตรียมอะไรต่างๆ เสร็จเลยค่ะ ฉันคิดว่าเราน่าจะพร้อมแล้ว ฉันรู้สึกได้ว่าวันนี้ต้องทำอะไรพลาดแน่ๆ เลย เหมือนไม่ใช่วันของฉันเลยค่ะ เอาล่ะ ฉันจะรอให้คนเข้ามาก่อนนะคะ แล้วเราจะได้เริ่มกันเลย",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "ยินดีต้อนรับ ยินดีต้อนรับทุกคน ผมจะตรวจสอบให้แน่ใจว่าทุกอย่างทำงานได้ปกติ ใช้เวลาแค่ไม่กี่นาที ผมจึงมาล่วงหน้าเล็กน้อยเพื่อตรวจสอบให้แน่ใจ ล้างมือและเตรียมตัวเรียบร้อยแล้ว ตอนนี้กำลังจัดเตรียมเสร็จสิ้นแล้ว ผมคิดว่าพร้อมแล้ว ผมอาจจะทำผิดพลาดได้ ผมรู้สึกถึงมัน นั่นเป็นวันที่หนึ่งแบบนี้ ดังนั้นผมจะรอให้ผู้คนเข้าระบบก่อน แล้วเราจะเริ่มงาน"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_OPV8Gf1FFn8_021",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.121734023094177,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "แม่บอกว่าพ่อไม่อยากมาเจอเรา แม่พูดแบบนั้นหรอ ใช่ฮะ ทุกคนต่างมีเรื่องราวของตัวเองนะลูก แล้วพ่อก็คิดว่านั่นเป็นเรื่องราวของแม่ ชีวิตมันก็ตลกแบบนี้แหละ ว่ามั้ย",
+          "source" : "Mom says you don't want to visit us. She says that? Yeah. Everybody's got a story, son. I guess that's hers. Life's funny that way, you know?",
+          "text" : "แม่บอกว่าเธอไม่ต้องการมาเยี่ยมเรา เธอพูดแบบนี้เหรอ ใช่ครับ ทุกคนมีเรื่องราวของตัวเอง ลูกสาว ฉันคิดว่านั่นคือของเธอ ชีวิตก็แปลกประหลาดแบบนั้น คุณรู้ไหมครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.303416967391968,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "กว่า 4,500 ล้านปีก่อน กาแล็กซีทางช้างเผือกได้ชนเข้ากับกาแล็กซีแคระใกล้ๆ การชนกันครั้งนี้ส่งผลให้เกิดดวงดาวต่างๆ เร็วขึ้น ระบบสุริยะของเราก็เป็นส่วนหนึ่งของกาแล็กซีทางช้างเผือก ภายในระบบสุริยะนี้ องค์ประกอบต่างๆ มีการหมุนเวียนอยู่ตลอด",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "ก่อน 4.5 พันล้านปี กาแล็กซีทางช้างเผือกชนกับกาแล็กซีแคระใกล้เคียง การพบกันนี้เร่งการก่อตัวของดาวฤกษ์ ระบบสุริยะของเราเป็นส่วนหนึ่งของกาแล็กซีทางช้างเผือก ภายในระบบสุริยะวัฏจักรของสสารดำเนินมาอย่างต่อเนื่อง"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_OtKhIhSgy78_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.374490976333618,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "พระเจ้า ทุกคนฟังนะ ผมตื่นเต้นสุดๆ เพราะเดี่ยวไมโครโฟนครั้งพิเศษนี้ใช้เวลาถึง 23 ปี โอเคนะ เดี่ยวผมจะเล่าให้ฟังว่าหมายความว่ายังไง 23 ปีก่อน ผมเข้าไปที่ Comedy Store เป็นครั้งแรก แล้วกลายเป็นแขกขาประจำของร้าน ต่อมาผมก็ได้เป็นนักแสดงตลก แล้วก็ทำให้พ่อแม่ที่เป็นผู้อพยพชาวอิหร่านต้องผิดหวัง",
+          "source" : "Oh my God. You guys, listen, I'm so excited because this comedy special is about 23 years in the making, okay? Yeah, I'll tell you what I mean by that. 23 years ago is when I first came to the Comedy Store and became a regular, and became a comedian and disappointed my Iranian immigrant parents.",
+          "text" : "โอ้พระเจ้าครับ เพื่อนๆ ฟังนะ ผมตื่นเต้นมากเพราะสเปเชียลตลกนี้ใช้เวลาสร้างมา 23 ปีครับ ใช่ครับ ผมจะอธิบายให้ฟังว่าผมหมายถึงอะไร 23 ปีก่อนคือตอนที่ผมครั้งแรกมาที่ Comedy Store และกลายเป็นคนประจำที่นี่ และกลายเป็นตลกจนทำให้พ่อแม่ชาวอิหร่านของผมที่อพยพมาผิดหวัง"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.04080605506897,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ตอนที่ Rescue Force ออกไปตรวจตราในเมือง เราจะคอยดูแลเพชรในกล่องให้กับพิพิธภัณฑ์ พวกคนร้ายคงไม่คิดจะพยายามขโมย Cabbonita ทั้งๆ ที่เรารออยู่ในพิพิธภัณฑ์หรอกนะ เราไม่มีเงินแล้ว! เราต้องขโมยเพชรเอาไปขายให้ได้! ไม่อย่างนั้น เราคงจะต้องไปทำการทดลองกับโซดาป๊อบแน่! แล้วเราจะเอาบอทเข้ามาในนี้ได้ยังไง ฉันเตรียมการทุกอย่างไว้หมดแล้ว",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "ในขณะที่กำลัง Force การกู้ภัยลาดตระเวนในเมือง เราจะดูแลพิพิธภัณฑ์ในกล่องให้ มันจะไม่เป็นความคิดที่ดีสำหรับตัวร้ายที่จะพยายามขโมย Cabbonita ในขณะที่เรารออยู่ข้างใน เราไม่มีเงินแล้ว! เราจะต้องขโมย那颗เพชรและขายมัน! มิฉะนั้น เราจะต้องทำการทดลองกับน้ำอัดลม! เราจะเอาบอทเข้าไปได้อย่างไร? เรื่องทั้งหมดจัดการเรียบร้อยแล้วครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_RFcdOs5dgT4_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.09200394153595,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "พบกับช่อง Scotty Kilmer อีกครั้งครับ สีรถของคุณจางไปบ้างหรือเปล่า ถ้าเป็นอย่างนั้นล่ะก็ ห้ามพลาดคลิปนี้เลยครับ เพราะวันนี้ผมจะมาบอกวิธีขัดสีที่จางออกไป สิ่งที่ต้องใช้ก็มีแค่น้ำหนึ่งถัง เครื่องขัดสีรถ และ Ultimate Compound ของ Meguiar ขวดนี้ครับ",
+          "source" : "Time for the Scotty Kilmer channel. Does your car have faded paint on it? Then stay tuned, because today I'm going to show you how to polish off faded paint. And all it takes is a bucket of water, a polisher, and a bottle of this Meguiar's Ultimate Compound.",
+          "text" : "ถึงเวลาของช่อง Scotty Kilmer แล้ว รถของคุณมีสีซีดจางหรือไม่? แล้วจงติดตามต่อไป เพราะวันนี้ผมจะสาธิตวิธีขัดเงาสีที่ซีดจางให้กลับมาใหม่ และสิ่งที่คุณต้องเตรียมก็แค่ถังน้ำ เครื่องขัดเงา และขวดของ Meguiar's Ultimate Compound นี้เท่านั้น"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.56613004207611,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "โอเค ให้ผมอธิบายนะ เอาล่ะ ปัญหาก็คือ ถ้าคุณดูข้างในนั่น... คุณเห็นผนังไม้ไหม ตรงนั้นคือผนังเก่า และมันไปติดกับแผ่นมุงหลังคาตรงนั้น จากนั้นผมใส่สิ่งนี้ทับลงไป และสิ่งที่เกิดขึ้นก็คือสิ่งสกปรกจะไปสะสมกันอยู่ตรงนั้น ตรงแผ่นมุงข้อต่อของหลังคานั้น",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "ได้แล้ว ดังนั้นให้ผมอธิบายหน่อยครับ ถูกต้องแล้ว ปัญหาคือ ถ้าคุณมองเข้าไปข้างใน... คุณเห็นผนังไม้ด้านนอกไหม? นั่นคือผนังไม้เก่า และมันสัมผัสกับกระเบื้องหลังคานั้นๆ ตรงนั้น จากนั้นผมจึงวางสิ่งนี้ทับลงไป และสิ่งที่เกิดขึ้นคือฝุ่นดินจะสะสมอยู่ที่นั่น ที่รอยต่อระหว่างผนังไม้กับกระเบื้องหลังคา"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_RpercXhgNXM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.1248140335083,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สวัสดี ทุกคน Thunder E เอง และขอต้อนรับสู่วิดีโอที่คุณรอคอยกันมานาน ผมกำลังพูดถึงการเล่นเกมบน AUS ROG Phone 5 ตอนนี้ ซีรีส์ ROG Phone เลื่องชื่อเรื่องประสิทธิภาพในการเล่นเกม แต่ในวิดีโอนี้ เราจะมาดูกันว่า ROG Phone 5 จะชิงมงกุฎในฐานะราชาแห่งโทรศัพท์สำหรับเล่นเกมกลับมาได้จริงๆ หรือไม่",
+          "source" : "Hey guys, Thunder E here, and welcome to the video you've been waiting for. I am talking about gaming on the ASUS ROG Phone 5. Now, the ROG Phone series is well known for its gaming powers, but in this video, we're going to find out if the ROG Phone 5 is truly taking back the crown as the king of gaming phones.",
+          "text" : "สวัสดีครับทุกคน ผมคือ Thunder E และยินดีต้อนรับสู่วิดีโอที่คุณรอคอยนี้ ผมจะพูดถึงการเล่นเกมบน ASUS ROG Phone 5 ตอนนี้ ซีรีส์ ROG Phone มีชื่อเสียงด้านพลังการเล่นเกม แต่ในวิดีโอนี้ เราจะมาหาความจริงว่า ROG Phone 5 สามารถกลับมาครองตำแหน่งกษัตริย์ของโทรศัพท์เล่นเกมได้จริงหรือไม่"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_S9xH4qIE5D4_003",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 23.368669986724854,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สมาชิกคนถัดไปของ 85 South Show ไม่จำเป็นต้องแนะนำตัวเขาเลย สาวๆ ของผมอยู่ไหนกันบ้าง! เราจะแนะนำตัวเขาอยู่ดี เขามาจากแอตแลนตาผ่านทางมิสซิสซิปปี คุณอาจเคยเห็นเขาจาก MTV Wild 'n Out สาวๆ เขาคือสุดยอดแห่งยุคในตอนนี้ คุณพ่ออย่าง Karlous Miller มาเยือนแล้ว!",
+          "source" : "The next member of the 85 South Show. He needs no introduction. Where my ladies at?! We gonna give him an introduction anyway. He's out of Atlanta, by way of Mississippi. You might have seen him on MTV Wild 'n Out. Ladies, he is the coldest in the game right now. Your baby daddy, Karlous Miller's in the building!",
+          "text" : "สมาชิกถัดไปของ 85 South Show ไม่ต้องแนะนำใคร ผู้หญิงของฉันอยู่ที่ไหน?! เราจะทำ introductions ให้เขาอยู่ดี เขาจากแอตแลนตา โดยทางมิสซิสซิปปี คุณอาจเคยเห็นเขาใน MTV Wild 'n Out Ladies, ตอนนี้เขาคือคนที่เย็นที่สุดในเกม ผู้ชายของคุณ Karlous Miller มาถึงแล้ว!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 24.23718500137329,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เราจะปล่อยทิ้งไว้และดูดความชื้นสักสองสามนาที เมื่อทำอาหารแบบใช้อุปกรณ์น้อยเป็นพิเศษ เราจะไม่ทำอาหารบนเตาไฟกันจริงๆ ส่วนมากเราจะต้มน้ำ เพื่อให้เราสามารถเติมความชื้นให้กับอาหารของเราได้ ซึ่งก็เป็นอีกเหตุผลหนึ่งที่เราใช้โจ๊กสำเร็จรูป Instant Grits ด้วย เวลาทำอาหารน้อยลง เชื้อเพลิงน้อยลง และน้ำหนักน้อยลง ใช่เลย สิ่งที่เราทำกันก็มีประมาณนี้ กลมกลืนกันอย่างสมบูรณ์แบบ",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "เราจะปล่อยให้มันพักและดูดซึมน้ำไว้สักสองสามนาที ในการทำอาหารแบบเบา เราไม่ได้ใช้เตาจริง เราต้มน้ำเป็นหลักเพื่อให้สามารถนำอาหารกลับมาเป็นสภาพเดิมได้ นี่ก็เป็นหนึ่งในเหตุผลที่เราใช้ข้าวโพดผงสำเร็จรูป เวลาทำอาหารน้อยลง เชื้อเพลิงน้อยลง และน้ำหนักน้อยลง โอเคครับ ดังนั้นนี่คือสิ่งที่เรามีอยู่ที่นี่ ความสม่ำเสมอที่สมบูรณ์แบบครับ"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_TBPP-za78BQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.416164994239807,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kaboom City คือเมืองแห่งฮีโร่ เหล่า Super Thing และ Kazoom Kid ต่อสู้ด้วยพลังที่ตนได้มาจาก Kazoom เอง ซึ่งเป็นแหล่งพลังอันแข็งแกร่ง และตอนนี้ก็แสดงอยู่ที่พิพิธภัณฑ์ของเมืองให้ทุกคนได้ชื่นชม และเราก็จะขโมยมันมา! อันตรายไหมน่ะเหรอที่จะต้องเล็ดลอดผ่านตรงนี้ไป ไม่เลย นี่เป็นวิธีที่เหล่า Kazooms จะมาเยือน",
+          "source" : "Kaboom City is the city of heroes. The Super Things and the Kazoom Kids fight with their powers derived from Kazoom itself. It's the most potent energy source ever known, and now it's on display at the city museum for all to admire. And we're going to steal it! Isn't it dangerous to slip through here? Negative. This is the way the Kazooms are coming.",
+          "text" : "เมืองคาบูมซิตีคือเมืองของวีรบุรุษ สิ่งมหัศจรรย์และเด็กเคาซอมต่อสู้ด้วยพลังที่ได้มาจากเคาซอมโดยตรง นั่นคือแหล่งพลังงานที่ทรงพลังที่สุดที่เคยรู้จัก และตอนนี้มันถูกจัดแสดงอยู่ที่พิพิธภัณฑ์เมืองให้ทุกคนได้ชม และเราจะขโมยมัน! การลอดผ่านที่นี่ได้ไหม? ไม่ นั่นคือวิธีที่เคาซอมจะเข้ามา"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_UL2vofFT7wQ_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 22.104541897773743,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "เมื่อสามสิบล้านปีก่อน สัตว์ประหลาดท่องไปทั่วภูมิประเทศ เอาล่ะ เรากำลังพูดถึงสัตว์ที่น่าจะดุร้ายมากที่สุดอย่างหนึ่งเท่าที่เคยมีอยู่บนโลก ซึ่งเป็นสัตว์ประหลาดขนาดใหญ่ที่สุดในอเมริกาเหนือนับตั้งแต่ไดโนเสาร์ ดูขนาดของกระโหลกนั่นสิ ดูฟันทั้งหมดในนั้น ไม่มีสัตว์แบบนี้อีกในที่ไหนแล้ว",
+          "source" : "Thirty million years ago, a monster roamed the landscape. Well, we're talking about one of the most ferocious animals that probably ever walked the earth. This was the biggest beast to live in North America since the dinosaurs. Look at the size of that skull. Look at all those teeth in there. There is no animal like this anywhere.",
+          "text" : "hace 30 ล้านปีก่อน มีสัตว์ประหลาดเดินบนภูมิทัศน์ จริงๆ แล้วเรากำลังพูดถึงหนึ่งในสัตว์ที่ดุร้ายที่สุดที่อาจเคยเดินบนโลก นี่คือสัตว์ตัวใหญ่ที่สุดที่อาศัยอยู่ในอเมริกาเหนือตั้งแต่ยุคไดโนเสาร์ ดูขนาดกะโหลกศีรษะนั้น ดูฟันทั้งหมดที่มีอยู่ ไม่มีสัตว์ชนิดใดในโลกเหมือนสิ่งนี้เลย"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.258944988250732,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ไปขี่คันนั้นตรงนั้นกัน โว้ โว้ โว้ พ่อหนุ่มตัวโต! นายหนักเกินไปหน่อยไหมที่จะขี่คันนี้ ความปลอดภัยต้องมาก่อนไหม 30 ร่างกฎหมายเหรอ โกงกันชัดๆ บอกแล้วไง ระวังด้วย!",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "มาขี่คันนั้นกันเถอะ ว้าว ว้าว ว้าว เด็กน้อย! คุณหนักไปหน่อยสำหรับรถคันนี้ ความปลอดภัยมาก่อนนะใช่หรือไม่? 30 บิล? นี่เป็นการฉ้อโกงจริงๆ ฉันบอกไปแล้ว ให้ระวังทางนะ!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_V63Xcec-5jE_004",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.898101091384888,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "ผมจะไปแคลิฟอร์เนีย คุณจะไปแคลิฟอร์เนีย แล้วทำไมคุณถึงควรไปแคลิฟอร์เนีย สหรัฐอเมริกาไม่ดีพอสำหรับคุณเหรอ โอ๊ย! คุณนี่พลเมืองดีเด่นเลยเนอะ ใช่ไหม คุณไม่รู้ด้วยซ้ำว่าแคลิฟอร์เนียอยู่ในสหรัฐอเมริกา! แต่คุณหัวเราะอะไรอยู่ ผมต้องหัวเราะสิ เพราะคุณน่ะโง่เง่ามาก คุณไม่รู้ด้วยซ้ำว่าผมล้อเล่นกับคุณอยู่",
+          "source" : "I'm going to California. You're going to California. And why should you go to California? The United States ain't good enough for you? Ach! A fine citizen you are, yes? You don't even know that California is in the United States! But what are you laughing about? I gotta laugh, because you are so dumb, you didn't even know that I was making a joke with you.",
+          "text" : "ผมกำลังจะไปแคลิฟอร์เนีย คุณก็กำลังจะไปแคลิฟอร์เนีย แล้วทำไมคุณต้องไปแคลิฟอร์เนีย? สหรัฐอเมริกาไม่ดีพอสำหรับคุณหรือ? อัก! คุณเป็นพลเมืองที่ดีจริงๆ ใช่ไหม? คุณ甚至不知道แคลิฟอร์เนียอยู่ในสหรัฐอเมริกาเลย! แต่คุณหัวเราะเรื่องอะไรกันแน่? ผมต้องหัวเราะ เพราะคุณโง่มาก จนไม่รู้เลยว่าผมกำลังตลกกับคุณอยู่"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.383360028266907,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สวัสดีและยินดีต้อนรับสู่บทนำร่องของซีรีส์ใหม่ ซึ่งจะเจาะลึกเกี่ยวกับประวัติเรื่องอื้อฉาวที่เลวร้ายที่สุดในโลกบางส่วน พวกคุณบางคนอาจรู้จัก และบางคนก็อาจจะไม่ โดยได้รับแรงบันดาลใจบางส่วนจากโปรแกรม RTE ชื่อว่า Scannál แม้ว่าผมจะวางแผนขยายขอบเขตสิ่งที่จะกล่าวถึงมากกว่ามุ่งเน้นไปที่เหตุการณ์ที่เชื่อมโยงกับไอร์แลนด์ก็ตาม เอาล่ะ เพื่อไม่ให้เป็นการเสียเวลา มาเริ่มกันเลย",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "สวัสดีและยินดีต้อนรับสู่การทดลองของซีรีส์ใหม่这将深入探讨一些世界上最糟糕的丑闻的历史--有些您可能听说过，有些则不然。"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_W94uDJ55BmM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.941983103752136,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "คุณ คุณ ทั้งโลกนี้! คุณเต็มไปด้วยเรื่องน่าประหลาดใจเลยสินะ ผมจำได้ว่าเมื่อไม่กี่ปีก่อน ขณะที่ดูภาพยนตร์ Resident Evil บางภาคที่มี Milla Jovovich แล้วคิดว่า \"คงแย่ไปกว่านี้ไม่ได้แล้ว!\" ใช่แล้ว รู้สึกเหมือนเป็นช่วงเวลาที่เรียบง่ายมากกว่า แต่ขณะที่ปี 2021 กำลังจะสิ้นสุดลง Resident Evil: Welcome to Raccoon City หรือ Welcome to Hell ก็ได้ปล่อยออกมา",
+          "source" : "You, you the world! You're full of surprises, aren't you? I remember a few years back, watching some of those Resident Evil movies with Milla Jovovich and thinking, \"It can't get any worse than this!\" Yeah, it feels like a simpler time. But with 2021's final gasping breath, it came out with Resident Evil: Welcome to Raccoon City. AKA, Welcome to Hell.",
+          "text" : "คุณ... โลกของคุณ! เต็มไปด้วยความประหลาดใจใช่ไหม? ฉันจำได้หลายปีก่อน ตอนกำลังดูหนัง Resident Evil กับ Milla Jovovich และคิดว่า \"มันจะไม่เลวร้ายไปกว่านี้แล้ว!\" ใช่ มันรู้สึกเหมือนเป็นยุคที่เรียบง่ายกว่า แต่ด้วยลมหายใจสุดท้ายของปี 2021 หนัง Resident Evil: Welcome to Raccoon City ออกมา AKA Welcome to Hell."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.025946974754333,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "สำหรับผู้เชี่ยวชาญด้านแรปเตอร์อย่าง Bob Anderson ทัศนคติของผู้ริเริ่มรายนี้ยโสโอหังและขาดความรู้เลยก็ว่าได้ นกล่าเหยื่อทั้งหมดถูกพิจารณาว่าเป็นเพียงสัตว์ที่เป็นภัย คือว่า พวกมันทั้งหมดก็เป็นไก่ฮอว์ก พวกมันทั้งหมดเป็นนกที่ไม่ดี ไม่ว่าจะเป็นอินทรีหัวขาว อินทรีทอง เหยี่ยวหางแดง ทั้งหมดล้วนโดนยิง",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "สำหรับบ็อบ แอนเดอร์สัน นักเชี่ยวชาญเรื่องแรปเตอร์ ความเห็นของนักบุกเบิกคนนั้นคือเขาสงสัยและไร้ความรู้อย่างสิ้นเชิง นกนักล่าทุกชนิดถูกมองว่าเป็นสัตว์รบกวน ฉันหมายถึง พวกมันทั้งหมดเป็นนกฮอกไก่ พวกมันทั้งหมดเป็นนกที่แย่ไม่ว่าจะเป็นเหยี่ยวขาว เหยี่ยวทอง หรือเหยี่ยวหางแดง พวกมันถูกยิงหมดแล้ว"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-th-test-en-speech_XwIQLLbD7SI_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.885975956916809,
+      "target" : "th",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "และฉันอยากเริ่มโดยการพูดคุยกับ ดร. Vishal Sikka ซีอีโอของ Infosys Vishal คุณเป็นลูกชายของนักวิศวกรรมทางรถไฟ คุณได้เห็นเทคโนโลยีในระยะนั้น และคุณก็ยังเป็นนักโต้คลื่นด้วย ดังนั้น คุณจึงรอบรู้เกี่ยวกับการหลบคลื่น อะไรคือการเปลี่ยนแปลงที่กำลังจะเกิดขึ้นจากเทคโนโลยีใหม่ๆ ที่เราต้องสนใจมากที่สุด และเพราะอะไร ทำไมเราถึงควรให้ความสนใจมากๆ กับการเปลี่ยนแปลงนี้",
+          "source" : "And I'd like to start by turning to Dr. Vishal Sikka, the CEO of Infosys. Vishal, you're the son of a railways engineer. You saw technology at that phase, and you're also a surfer, so you know all about dodging the waves. What's the disruption that we most need to pay attention to that's coming from the new technologies, and why? Why should we pay so much attention to the disruption?",
+          "text" : "และฉันขอเริ่มต้นด้วยการกล่าวถึง ดร. วิชาล ซิกกา ซีอีโอของอินโฟซิส วิชาล คุณเป็นลูกของวิศวกรทางรถไฟ คุณได้เห็นเทคโนโลยีในเฟสนั้น และคุณยังเป็นผู้เล่นเซิร์ฟด้วย ดังนั้นคุณจึงรู้ทุกอย่างเกี่ยวกับการหลบคลื่น การรบกวนอะไรที่เราต้องให้ความสนใจมากที่สุดที่กำลังจะมาจากเทคโนโลยีใหม่ และทำไม ทำไมเราต้องใส่ใจกับการรบกวนมากขนาดนั้น?"
+        }
+      ]
+    }
+  ]
+}

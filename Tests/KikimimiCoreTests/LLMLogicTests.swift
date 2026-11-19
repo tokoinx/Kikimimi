@@ -104,6 +104,18 @@ final class TextAnalysisTests: XCTestCase {
 }
 
 final class AuditorTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     func testFindRepeats() {
         let segments = [
             seg(0, "Today we will talk about the new release."),
@@ -787,6 +799,18 @@ final class TranslatorTests: XCTestCase {
 }
 
 final class BilingualExportTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     private func sample() -> Transcript {
         var t = Transcript(sourceName: "talk",
                            segments: [seg(0, "Hello | world."), seg(2, "こんにちは"), seg(4, "Untranslated line.")],
@@ -798,9 +822,9 @@ final class BilingualExportTests: XCTestCase {
 
     func testJapaneseText() {
         let t = sample()
-        XCTAssertEqual(t.japaneseText(of: t.segments[0]), "こんにちは、世界。")
-        XCTAssertEqual(t.japaneseText(of: t.segments[1]), "こんにちは")
-        XCTAssertNil(t.japaneseText(of: t.segments[2]))
+        XCTAssertEqual(t.translationText(of: t.segments[0]), "こんにちは、世界。")
+        XCTAssertEqual(t.translationText(of: t.segments[1]), "こんにちは")
+        XCTAssertNil(t.translationText(of: t.segments[2]))
         XCTAssertTrue(t.hasTranslation)
         XCTAssertEqual(t.translatableCount, 2)
         XCTAssertEqual(t.untranslatedCount, 1)
@@ -820,12 +844,12 @@ final class BilingualExportTests: XCTestCase {
 
     func testFormats() {
         let t = sample()
-        XCTAssertEqual(Exporter.txt(t, content: .japanese), "こんにちは、世界。\nこんにちは\nUntranslated line.\n")
+        XCTAssertEqual(Exporter.txt(t, content: .translation), "こんにちは、世界。\nこんにちは\nUntranslated line.\n")
         XCTAssertTrue(Exporter.txt(t, content: .bilingual).hasPrefix("[00:00] Hello | world.\n        こんにちは、世界。\n[00:02] こんにちは\n"))
         let srt = Exporter.srt(t, content: .bilingual)
         XCTAssertTrue(srt.hasPrefix("1\n00:00:00,000 --> 00:00:02,000\nHello | world.\nこんにちは、世界。\n"), srt)
         XCTAssertTrue(srt.contains("2\n00:00:02,000 --> 00:00:04,000\nこんにちは\n"), "日本語の区間は 1 行だけ")
-        XCTAssertTrue(Exporter.vtt(t, content: .japanese).contains("00:00:00.000 --> 00:00:02.000\nこんにちは、世界。"))
+        XCTAssertTrue(Exporter.vtt(t, content: .translation).contains("00:00:00.000 --> 00:00:02.000\nこんにちは、世界。"))
         let md = Exporter.markdown(t, content: .bilingual)
         XCTAssertTrue(md.contains("翻訳: Qwen3.5 4B"))
         XCTAssertTrue(md.contains("| 00:00 | Hello \\| world. | こんにちは、世界。 |"), md)

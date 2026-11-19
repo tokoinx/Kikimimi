@@ -1,0 +1,1685 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+    "[wmt24pp-ja-en-test-en-speech_1CWvFkncljw_003] numbers lost: 10 => Hey, hey, don't get violent. Dad, when will I be able to buy a big car? If you become rich and marry me in ten years, that's when it'll happen. The stroller was much bigger. That loan is still outstanding, and there are two months' worth of hospital bills from before you were born that haven't been paid.",
+    "[wmt24pp-ja-en-test-en-speech_MBJ0dL68I_I_000] numbers lost: 10, 1962, 80 => The documentary film that will be shown next features Alexander Kerensky, the Prime Minister of the Russian Democratic Provisional Government, which was overthrown by communists in 1971. Mr. Kerensky has provided a comment at the beginning regarding this film.",
+    "[wmt24pp-ja-en-test-en-speech_ORZdsMICbUM_000] numbers lost: 45 => More than 4.5 billion years ago, the Milky Way galaxy collided with a nearby dwarf galaxy. This collision accelerated star formation. Our solar system is part of the Milky Way galaxy. Within our solar system, material recycling was progressing."
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "ja-en.json"
+  ],
+  "translation" : {
+    "cases" : 72,
+    "chrF" : 47.46362274382359,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        15465,
+        15368,
+        15271,
+        15174,
+        15077,
+        14980
+      ],
+      "matches" : [
+        13381,
+        9730,
+        7125,
+        5741,
+        4778,
+        4054
+      ],
+      "reference" : [
+        16022,
+        15925,
+        15828,
+        15731,
+        15634,
+        15537
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 100,
+    "lines" : 100,
+    "numbersChecked" : 24,
+    "numbersKept" : 19,
+    "repeated" : 0,
+    "retried" : 1,
+    "retryFixed" : 1,
+    "reused" : 0,
+    "seconds" : 872.9217507839203,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 100
+  },
+  "translationByTarget" : {
+    "en" : {
+      "cases" : 72,
+      "chrF" : 47.46362274382359,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          15465,
+          15368,
+          15271,
+          15174,
+          15077,
+          14980
+        ],
+        "matches" : [
+          13381,
+          9730,
+          7125,
+          5741,
+          4778,
+          4054
+        ],
+        "reference" : [
+          16022,
+          15925,
+          15828,
+          15731,
+          15634,
+          15537
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 100,
+      "lines" : 100,
+      "numbersChecked" : 24,
+      "numbersKept" : 19,
+      "repeated" : 0,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "reused" : 0,
+      "seconds" : 872.9217507839203,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 100
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_111976217731399552",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 5.947548985481262,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "it must suck to be these people. i can't imagine how awful their inner life must be",
+          "source" : "こんな人間として生きるのもうんざりに違いないよ。やつらの精神生活がどんなひどいもんか想像もできない。",
+          "text" : "Living as a human like this must be nauseating. I can't even imagine how terrible their mental lives are."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_111977470885664240",
+      "language" : "ja",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.34166395664215,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "we understand that it is hard to get to these positions of wealth and power without stepping on others along the way.",
+          "source" : "途中で他者を踏み台にせずに富や権力のあるポジションに到達するのが難しいことを我々は理解している。",
+          "text" : "We understand that it is difficult to reach positions of wealth or power without using others as stepping stones."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "in the absence of collective consciousness around media, we developed a level of class consciousness that helps us stay critical.",
+          "source" : "メディアに対する集団的意識がない時代において、我々は批判精神を維持する一助として一定の階級意識を作り上げた。",
+          "text" : "In an era where there was no collective consciousness toward the media, we cultivated a certain class consciousness to help maintain our critical spirit."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_111977498791056432",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.4956389665603638,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Killed myself with my own boomerang",
+          "source" : "自分のブーメランで自滅",
+          "text" : "Self-destruct with our own boomerang."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112106953594747568",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.769297957420349,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "and sure, these other sources are AWARE that \"war is bad\", but then you're still selling the killing machines as figures and merch. So, like, what are we doing?",
+          "source" : "それで絶対、他のメディアソースは「戦争は悪」だってめちゃくちゃ分かってるはずなのに、まだ殺しのマシンをフィギュアとかグッズにして売ってるんだぜ。俺らはいったい何やってるわけ？",
+          "text" : "So, even though everyone absolutely knows that other media sources say \"war is bad,\" they're still selling killing machines as figures and merchandise. What on earth are we doing?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112107889726289648",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.303578019142151,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "I find it very life affirming; transforming such simple ingredients into something so rich and complex. Like witnessing a birth.",
+          "source" : "これってすごく前向きになれる作業なんだよね；こんなシンプルな材料をすごく豊かで奥深いにもの変成させていくの。命の誕生を目の当たりにするみたいな。",
+          "text" : "This is really a job that can make you feel very positive; it transforms such simple materials into something incredibly rich and profound, like witnessing the birth of life."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112107918929771488",
+      "language" : "ja",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.761467933654785,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "Use both sides of the brain. 🧠 Permission to relax. 📺",
+          "source" : "脳の両側を使う。🧠リラックスしてよし。📺",
+          "text" : "Use both sides of your brain. 🧠 Relax and enjoy. 📺"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112109186993725712",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.08108901977539,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "source" : "ちょっと顔を動かしたかなんかで、何回かすき間ができちゃったんだけど、何か知らないけどあそこを漂ってた物のせいで鼻水が出だしたんだよね。",
+          "text" : "I think I moved my face a bit, which caused some gaps to form a few times, but for some reason, due to something drifting there that I don't know what it is, my nose started running."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112109432154590752",
+      "language" : "ja",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.619645953178406,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "source" : "ちょ、なんでGPSの座標が整数の度までで四捨五入されちゃうわけ、それって全く意味ないじゃん。",
+          "text" : "Wait, why does the GPS coordinate get rounded to the nearest integer degree? That seems completely pointless."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "because it's a vector of rational numbers",
+          "source" : "だって有理数のベクトルだからだよ",
+          "text" : "Because it's a rational vector, after all."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112110250600185424",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.963386058807373,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Oh right, here is Sally Rooney latest essay",
+          "source" : "あ、そうだ、これがサリー・ルーニーの最新エッセイ",
+          "text" : "Oh, right, this is Sally Rooney's latest essay."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112111193384667328",
+      "language" : "ja",
+      "lineCount" : 7,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 27.096494913101196,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "The gray box that hangs on the side of the nesting box is where the battery lives.",
+          "source" : "巣箱の横についてる灰色の箱がバッテリーの収納場所。",
+          "text" : "The gray box attached to the side of the nest box is where the battery is stored."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "I call this a feature. That way the birds get some privacy too.",
+          "source" : "ここがミソ。そうすれば、鳥たちのプライバシーも守れる。",
+          "text" : "That's the key point. By doing this, we can also protect the birds' privacy."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Now, for reasons I'm not sure about yet, the camera is offline. It went out only one hour after sunset.",
+          "source" : "今はまだ理由ははっきりわからないけど、カメラはオフラインになってる。日が沈んでからたった１時間で停止しちゃった。",
+          "text" : "We still don't know the exact reason, but the camera went offline and stopped after just one hour since sunset."
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Fisheye is way overkill.",
+          "source" : "魚眼はかなりやり過ぎ。",
+          "text" : "The fisheye lens was a bit too much."
+        },
+        {
+          "lines" : [
+            4
+          ],
+          "reference" : "Aaaand it's still offline.",
+          "source" : "そんでもって、まだオフライン。",
+          "text" : "And it's still offline."
+        },
+        {
+          "lines" : [
+            5
+          ],
+          "reference" : "So either there's something wrong with this panel or my multimeter, or they changed the listing.",
+          "source" : "だとすれば、このパネルか僕のマルチメーターに何か問題があるのか、商品情報が変更されたかのどちらかだ。",
+          "text" : "So either there's a problem with this panel or my multimeter, or the product information has been changed."
+        },
+        {
+          "lines" : [
+            6
+          ],
+          "reference" : "Maybe the panel trickle-charged the battery just enough for 38 seconds of runtime. It only took a bit over two hours to do that.",
+          "source" : "たぶん、パネルがバッテリーをトリクル充電して、なんとか38秒のランタイムが確保できたんだろう。そのためには2時間ちょっとしかかからなかった。",
+          "text" : "Probably the panel trickle-charged the battery, allowing us to secure a runtime of about 38 seconds, which took only about two hours."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112111346044907536",
+      "language" : "ja",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.257616996765137,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "source" : "もし僕がイベントに参加するときは、ステッカーを持ってる。今、僕の予定表で唯一のイベントはというと。",
+          "text" : "Whenever I attend an event, I bring a sticker. As for the only event on my schedule right now..."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "(Though do mention you recognise me off the internet otherwise I'll be wondering who you are and where I know you from)",
+          "source" : "（でも、僕をネットで知ってるって必ず言ってね、でないと、君がだれで、どこで知り合ったのかわからないから。）",
+          "text" : "(But please tell me you know me online; otherwise, I won't know who you are or where we met.)"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112112271633685072",
+      "language" : "ja",
+      "lineCount" : 4,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.361455082893372,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "After that a couple of site visits on Saturdays with a client in Swansea.",
+          "source" : "その後、土曜日はスオゥンジーでクライアントと数回現地訪問。",
+          "text" : "After that, on Saturday, I visited the client in Suonji a few times."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "I better get some motorbikes fixed, or else!",
+          "source" : "何台かバイクを修理しないと大変だ！",
+          "text" : "We can't get by without fixing a few bikes!"
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Got some somewhere but exactly where?",
+          "source" : "どこかにあるはずなんだけど、どこだよ、一体？",
+          "text" : "It must be somewhere, but where exactly?"
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Heheh not one but three!",
+          "source" : "へへ、１つじゃなくて３つある！",
+          "text" : "Hehe, there aren't just one, there are three!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112112980319428992",
+      "language" : "ja",
+      "lineCount" : 3,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 30.73138701915741,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "So, apparently the ghost image my left eye sees isn’t too much of a concern. But I need basically varifocals too. So the lenses have a combo of those. Not the full on varifocals but something in between those and ”normal” glasses (no idea of the terminology in English).",
+          "source" : "で、左目がぼんやりして見えるのは、それほど心配しなくていいみたい。でも、そもそも遠近両用も必要なんだよね。だからレンズはその組み合わせになってる。完全な遠近両用ではなく、「普通」の眼鏡(英語の専門用語はわからない）との中間のようなもの。",
+          "text" : "By the way, the fact that the left eye looks a bit blurry doesn't seem to be anything to worry about. However, we do need both near and far vision, so this lens is designed as a combination of the two. It's not quite full bifocal, but rather something in between regular glasses (where people don't know the English technical term) and bifocals."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "While this was being told to me, I made a decision to get another pair, and that pair are these.",
+          "source" : "話を聞いている間に、もう１本買うことにしたんだけど、それがこれ。",
+          "text" : "While listening to you, I decided to buy another pair, and this is it."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "@user36 that second pair is really nice! I love buying glasses...I never throw them out but somehow I can't find any of the others?! Mine are rainbow coloured at the moment, I need some sunglasses too... but if you need prescription they're so ugly 😂",
+          "source" : "@user36　その２本目の眼鏡、本当に素敵！私、眼鏡買うの大好き… 捨てることは絶対ないんだけど、なぜか他の眼鏡が一つも見つからないんだよね？！私が今かけてるのはレインボーカラー、サングラスも要るんだけど… 度を入れるなら、見た目があんまりよくないよね😂",
+          "text" : "@user36 That second pair of glasses is really beautiful! I love buying glasses... I never throw them away, but for some reason, I can't seem to find any other glasses? The one I'm wearing now is rainbow-colored, and I need sunglasses too... But if I put in a prescription, the appearance isn't very good 😂."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112122127346453600",
+      "language" : "ja",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.271030902862549,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "And this is when he starts drilling Super Loud. Yay.",
+          "source" : "そしてこのタイミングでやつが超うるさいドリルを使い始める。やったー。",
+          "text" : "And just as this timing hits, that damn noisy drill starts up. Yay."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Floor repair person is doing a vacuum, so hopefully that means he's finishing up.",
+          "source" : "床修理の人、掃除機かけてるから、終わりそうだといいな。",
+          "text" : "I hope the floor repair guy is finally done vacuuming."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112140958167999904",
+      "language" : "ja",
+      "lineCount" : 4,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 18.933305025100708,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "It's my first ever crown dentist visit: Prep today, then fitting in a fortnight. I'm practising opening my mouth wide.",
+          "source" : "歯医者さんで初めての被せ物：今日は調整で、２週間後に装着。口を大きく開ける練習中。",
+          "text" : "First dental crown: today is for adjustment, fitting in two weeks. Practicing opening the mouth wide."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Stumpy and I are home and feeling better now we’ve had a couple of mugs of tea. Back in a fortnight to get the job finished.",
+          "source" : "帰宅したスタンピーと私は、お茶を数杯飲んで落ち着いた。２週間後にまた行って仕上げてもらう。",
+          "text" : "Stan and I returned home, had a few cups of tea to calm down, and will go back in two weeks for the final fitting."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Dentist wasn’t happy with the fit of the crown, even after he’d footered and filed it. So new impressions were taken, and a new crown will be made.",
+          "source" : "調整して削ったのに歯医者さんは被せ物の噛み合わせが気に入らなくてね。で、型を取り直して、新しい被せ物を作ってもらう。",
+          "text" : "Even though they adjusted and shaved it, the dentist didn't like the bite of the crown. So they took new impressions and made a new crown."
+        },
+        {
+          "lines" : [
+            3
+          ],
+          "reference" : "Stumpy has been crowned. All hail King Stumpy.",
+          "source" : "スタンピーが王冠を授けられました。スタンピー国王、万歳。",
+          "text" : "Stan received his crown. King Stan, long live!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112152593528184304",
+      "language" : "ja",
+      "lineCount" : 8,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 35.986759066581726,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "data from flightaware.",
+          "source" : "FlightAwareからのデータ。",
+          "text" : "Data from FlightAware."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "If I ever have the opportunity to have a custom tail number for an aircraft, you KNOW it has to be some variation of N1337_, the _ being whatever final alphabetical char is available.",
+          "source" : "もし航空機に自分で機体番号をつける機会があるとしたら、知ってるよね、N1337なんとかにしないといけない、その最後のなんとかの部分にはアルファベット文字ならなんでも使える。",
+          "text" : "If you have the chance to assign your own tail number to an aircraft, you know it has to start with N1337 or something similar, and that \"something\" part can be any letters you like."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Of course the sun is gonna be out while I'm away, lol. What a punk.",
+          "source" : "当然、私がいないときは晴れる、笑。ずるいよね。",
+          "text" : "Of course, I'm not around when it's sunny, hehe. That's unfair, right?"
+        },
+        {
+          "lines" : [
+            3,
+            4
+          ],
+          "reference" : "Oh another random tidbit: This isn't like hopping in the car for a Sunday drive stuff. It's closer to a sport than a cruise in my newly initiated opinion.",
+          "source" : "そうだ、ちょっとした豆知識：これは休日に車に乗り込んでドライブに出かけるのとは違うんだよね。最近思ったんだけど、クルーズというよりスポーツに近い。",
+          "text" : "So, a little bit of trivia: this isn't quite like driving your car on the weekend. I've been thinking lately, it's more like a sport than a cruise."
+        },
+        {
+          "lines" : [
+            5
+          ],
+          "reference" : "Going back up tomorrow and we're doing stalls and slow flight.",
+          "source" : "明日、また空に戻って、失速と低速飛行をやる。",
+          "text" : "Tomorrow, we'll be back in the air again, doing stalls and slow flight."
+        },
+        {
+          "lines" : [
+            6
+          ],
+          "reference" : "Choppy day today, but super fun. We did slow flight and stalls. At one point we had our ground speed down to 16mph with an airspeed of 65.",
+          "source" : "今日は風が強かったけど、すごく楽しかった。低空飛行と失速をやった。一時は対地速度が16mph、対気速度が65mphまで落ちた。",
+          "text" : "The wind was strong today, but it was really fun. We did some low-altitude flying and stalls. At one point, ground speed dropped to 16 mph and airspeed to 65 mph."
+        },
+        {
+          "lines" : [
+            7
+          ],
+          "reference" : "Pics are from saturday, ended up with a flat tire after our last landing",
+          "source" : "写真は土曜日のもので、最後の着陸後にパンクしてしまった。",
+          "text" : "This photo is from Saturday, taken after the final landing when the tire went flat."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112166537145572640",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.440068960189819,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user48 Bootstrap would be sweet relief over tailwind",
+          "source" : "@user48 Bootstrapの方がTailwindより安心感があるよな",
+          "text" : "@user48 I feel Bootstrap gives more reassurance than Tailwind."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112198063182209776",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.408463001251221,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user21 I only row on weekdays, so I average out to a little over 5K\/weekday so far. I break it up in different ways. On an ERG.",
+          "source" : "@user21 平日しか漕がないから、今のところ平均すると平日に5キロちょっと。いろんなパターンで漕いでる。エルゴメーターでね。",
+          "text" : "@user21 Since I only row on weekdays, my average so far is about 5 kilometers on weekdays. I'm using various patterns and an ergometer."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112201850099412432",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 4.901787996292114,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "come on nok, $3.74 let’s go.",
+          "source" : "来い、ノキア、3ドル74セント。行くぞ。",
+          "text" : "Come on, Nokia, 3 dollars and 74 cents. Let's go."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112259676538889296",
+      "language" : "ja",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.47105598449707,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "alright let's goooo!",
+          "source" : "よし、やるぞー！",
+          "text" : "Alright, let's do this!"
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "I hotboxed half my lettuce and arugula to death with a plastic tray cover but other than that seedlings are doing pretty good!",
+          "source" : "レタスとルッコラの半分をプラスチックトレーの蓋をして温めすぎて枯らしちゃったけど、それ以外の苗はかなり順調に育ってる！",
+          "text" : "Half the lettuce and arugula plants were overcooked and withered because I covered them in a plastic tray lid and left them too long, but the rest of the seedlings are growing quite well!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112270350852000848",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 3.4894039630889893,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ready for the plasterer next week",
+          "source" : "来週左官屋さんがきても大丈夫",
+          "text" : "The plasterer will be available next week."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-social_112294019357219888",
+      "language" : "ja",
+      "lineCount" : 2,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.844763994216919,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0,
+            1
+          ],
+          "reference" : "been really enjoying kneadatite (green stuff), it's like sculpting with bubble gum but you get used to that and it's tough and flexible when it cures more miniature stuff",
+          "source" : "エポキシパテ（Green Stuff）がすごく気に入ってる、風船ガムで彫刻してるみたいだけど、慣れるし、硬化すると丈夫で柔軟性があるミニチュアもっと作ってみた",
+          "text" : "I really like epoxy putty (Green Stuff); it's like sculpting with balloon gum. Once you get used to it, the hardened version is tough yet flexible, so I've made more miniatures."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_--4KfTiO-n0_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.286371946334839,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Okay, the next video will get roofing contractors mad at me, but it's not for them. It's for you. If you are that person that cannot afford a roofing contractor, then you have to watch this video. This will show you how you can do a cover over an existing old roof yourself. And it's very simple. It's a peel and stick system.",
+          "source" : "はい、この動画を見たら屋根修理業者は怒るでしょうが、業者のためじゃなく、視聴者のための動画ですから。修理業者を雇う余裕がない方は、この動画をご覧ください。ここでは、今ある古い屋根をご自身でどのように覆ったらよいかお見せします。しかも、とてもシンプルな、剥がして貼る方法です。",
+          "text" : "Yes, if you watch this video, the roof repair contractor might get angry, but this is a video for the viewers, not for the contractor. If you don't have the means to hire a contractor, please watch this video. Here, I will show you how to cover your existing old roof yourself. Moreover, it's a very simple method: peel and stick."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_-0KrV5WsZq8_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.38518500328064,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Venice, city on the water. A place of beauty and romance that attracts millions of visitors every year. Just a few steps from the well-trodden tourist routes, there's a very different Venice, one populated by fascinating creatures. This film explores a Venice that few people ever see, a city that has a surprising double life.",
+          "source" : "水の都、ベネチア。美とロマンのこの地には、毎年数百万人もの旅行者が訪れます。人気の観光地から少し足をのばせば、そこには、なんとも魅力的な生き物たちが住む全く違うベネチアがあります。この映画では、ほとんどの人が見たことのない、驚きの二つの世界を持つ都市としてのベネチアを探究します。",
+          "text" : "Venice, the city of water. Millions of travelers visit this land of beauty and romance every year. A short walk from the popular tourist spots reveals a completely different Venice where fascinating creatures live. This film explores Venice as a city with two surprising worlds that most people have never seen."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_-uigLE6EI1g_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.89427101612091,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "source" : "これは日本に実在したある巨人の本物の古い映像で、軍事パレードで歩いています。衝撃的なのは、その実際のサイズです。その背丈は少なくとも4メートルはあり、フィートにすると低くとも13フィートになります。ということは、実に、現役のNBA選手、例えばシャキール・オニールや他のどの選手よりも背が高く大柄だということになります。",
+          "text" : "This is a genuine, old video of a giant who actually existed in Japan, walking in a military parade. What's shocking is the actual size: his height was at least 4 meters, which converts to a minimum of 13 feet. That means he was indeed significantly taller and larger than any current NBA player, such as Shaquille O'Neal or any other player."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_07FOJFFqOYc_002",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.439152002334595,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "source" : "疑問なのは、数えられないほどの、他の新石器時代の遺跡と言われているものと同じように、どうやってこんな偉業を成し遂げたのか、ということです。どうやってそんな巨大な石を持ち上げたのでしょうか？それは、私たちが以前から何度もそう仮定しているように、かつて発展し、すでに滅亡した古代文明の遺物なのでしょうか。私たちはそのような可能性、とりわけ、ここアグラの人々に高い信憑性があるとみています。",
+          "text" : "The question is, how did they achieve such a feat, like countless other Neolithic sites, when there are so many? How did they lift such massive stones? Was it an artifact of an ancient civilization that once flourished and has since perished, as we have hypothesized before? We believe this possibility, especially regarding the people of this region, is highly credible."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_0EJ9bV6IAnM_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.760298013687134,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "So, I bought an Xbox Series X so that you don't have to. Or maybe you actually have to. In this video, I'm going to tell you all the pros and cons of choosing an Xbox Series X. I'm also going to go over the actual hardware, the controller, the games, just about everything that is my experience so far with the Xbox Series X. So I hope you will enjoy this video, and maybe even find it useful.",
+          "source" : "さて、XboxシリーズXを買いました、皆さんが買わなくてすむように。もしかしたら買わなきゃってなるかもしれませんが。この動画ではXboxシリーズXを買うメリットとデメリットについてお話しします。実際のハードウェア、コントローラーやゲームなど、XboxシリーズXを使ってわかったいろんなことについても説明します。では動画を楽しんでください。お役に立てればうれしいです。",
+          "text" : "Anyway, I bought the Xbox Series X so you don't have to. You might think you don't need to buy one, but this video covers the pros and cons of buying an Xbox Series X. I'll also explain various things I learned by using the actual hardware, controllers, games, and more with the Xbox Series X. Please enjoy the video. I'd be happy if it helps you in any way."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_1CWvFkncljw_003",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.114418983459473,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "All right, whoa, whoa, whoa, whoa, hold it down to a small riot, would you? Daddy, when are we going to be able to afford a larger car? When you're about 10 years older and can marry a millionaire. I had more room when I was in my baby buggy. Yeah, and I haven't finished paying for that either. In fact, I still owe two more payments to the hospital before I own you.",
+          "source" : "おい、おい、暴れないでくれるかい？ パパ、いつになったら大きな車が買えるの？ 10年後にお前が大金持ちと結婚できたらだよ。 ベビーカーの方が広かったよ。 あれのローンもまだ残ってるし、お前が生まれる前の病院代２回分も未払いさ。",
+          "text" : "Hey, hey, don't get violent. Dad, when will I be able to buy a big car? If you become rich and marry me in ten years, that's when it'll happen. The stroller was much bigger. That loan is still outstanding, and there are two months' worth of hospital bills from before you were born that haven't been paid."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_1R3j_apcikw_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.33898901939392,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Today we're going to talk about Ben Affleck defending an interview. Greg, why don't you to tell us about the video we're going to watch. Yeah, so a couple of weeks ago, Ben Affleck went on a two-hour interview with Howard Stern. He talked about his breakup with his ex-wife and family, and he had some fallout from it, so here we go. Here he is, Ben Affleck!",
+          "source" : "今日はインタビューに対するベン・アフレックの釈明について話します。グレッグ、これから見る動画について説明してくれますか？ はい。数週間前、ベン・アフレックはハワード・スターンとの２時間に渡るインタビューに臨みました。そこで元妻との破局や家族について話し、事態が悪くなりました。ではどうぞ。 ご当人の登場です。ベン・アフレック！",
+          "text" : "Today, we'll discuss Ben Affleck's explanation regarding the interview. Greg, could you explain the video we're about to watch? Yes. A few weeks ago, Ben Affleck appeared on a two-hour interview with Howard Stern. During it, he discussed his divorce from his ex-wife and his family, and things took a turn for the worse. Well, let's get started. Here comes the subject: Ben Affleck!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_1SqhIFgluMw_001",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.038207054138184,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "source" : "音楽の仕事を20年以上続けていて、その間に２つのアルバムをリリースしました。ドイツやポーランド、スウェーデンもツアーで巡りました。 とても若いときからずっとパフォーマーだったんですね？ ええ、そうです。 若いときに公演を行った代表的な場所はありますか？",
+          "text" : "I've been working in music for over 20 years, during which I released two albums and toured Germany, Poland, and Sweden."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_2Uo5zKrbips_001",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.85799491405487,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "A long time ago, their parents were killed by poachers, and Cheyenne and Kuyu were sold at the market. Taken in by the Help Congo organization, they grew up in semi-captivity with about 30 other orphans out on the islands. One after another, these young chimpanzees have been shown the way back to the forest. The association's scientists have given them each a name to identify them.",
+          "source" : "昔、親を密猟者に殺されたシャイアンとクユは市場で売られました。「ヘルプ・コンゴ」という団体に引き取られ、他の約30頭の孤児と共に島で半飼育状態で育ちました。この若いチンパンジーたちは一匹ずつ森へと返されていきました。同団体の科学者たちは一頭一頭に識別用の名前を付けています。",
+          "text" : "Long ago, Shaiyan and Kyu, whose parents were killed by poachers, were sold at a market. They were taken in by the Help Congo group and raised on an island in semi-captivity alongside approximately 30 other orphan chimpanzees. These young chimpanzees have now been returned to the forest one by one. The scientists of the group have given each one a unique identification name."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_36UVjSUk-wY_035",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.53634798526764,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Alexa, play It's My Party and I'll Cry if I Want To. Bo, Bo, we gotta spin around. Alexa, play It's My Party and I'll Cry if I Want To. You'd cry too if it happened to you. Woo! Alexa, play Midnight Train!",
+          "source" : "アレクサ、「涙のバースデイ・パーティ」と「アイル・クライ・イフ・アイ・ウォント・トゥ」を再生して。ボー、ボー、みんなで踊り回ろう。アレクサ、「涙のバースデイ・パーティ」と「アイル・クライ・イフ・アイ・ウォント・トゥ」を再生して。あんたも同じ目に遭ったら泣くだろうな。ウー！ アレクサ、「ミッドナイト・トレイン」を再生して！",
+          "text" : "Alexa, play \"Crying in the Club\" and \"Airplane.\" Bow, bow, let's all dance around. Alexa, play \"Crying in the Club\" and \"Airplane.\" You'd cry if you went through the same thing. Woo! Alexa, play \"Midnight Train to Georgia\"!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_3M_AGbXVb5s_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.311666011810303,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Now, talking about stars, Howard Jones appears as a special guest vocalist in a duet with you on the album, on the track, I Made a Case, who has offered you so much encouragement with your music. Was it by chance that he happened to appear on the track? As I hear you had to strip back the track, as didn't want anything being in the way of your voices telling the story.",
+          "source" : "さて、スターといえば、ハワード・ジョーンズがアルバムのデュエット曲「I Made a Case」に特別ゲストボーカリストとして参加していますね。あなたの音楽に大きな影響を与えたと聞いていますが、彼がこの曲に参加することになったのは偶然ですか？お二人の声によってストーリーを伝わりやすくするために、曲をシンプルにしたと伺いました。",
+          "text" : "Speaking of stars, Howard Jones joins the album's duet track \"I Made a Case\" as a special guest vocalist. I've heard he has had a significant influence on your music. Was it a coincidence that he agreed to participate in this song? It was said that the track was simplified so that the story could be conveyed more clearly through the voices of both artists."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_3S7FkKvesu8_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.164682984352112,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Water, the liquid that oceans are made of. And it fills endless depths. Only a few will venture out into the endless open ocean of this vast underwater world. Most of the ocean inhabitants live in the city, as it were, like human societies.",
+          "source" : "海を作り出す液体、水。それは深淵を満たす。この広大な水中世界で、果てしない大洋へと踏み出すものはほんの一握りに過ぎない。ほとんどの海洋生物は、まるで人間社会のように都市で生活している。",
+          "text" : "The liquid that creates the sea, water, fills the abyss. In this vast underwater world, only a handful venture out into the endless ocean. Most marine life lives in cities, much like humans do in society."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_4EXYb1KXvzM_002",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 8.69493305683136,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Starfire. The princess of Tamaran. Comfortable, I hope. Lord Bagrok! Oh! Such a formidable spirit. Your sister was wise to hand you over. Garbler neck!",
+          "source" : "スターファイア。 タマランの王女。くつろいでおるか？ ヴァブレルネルク卿！おお、なんとも勇ましい。妹がお前を引き渡したのは賢明だった。 ヴァブレルネルク！",
+          "text" : "Starfire, Princess Tamalan. Are you relaxing? Lord Vabrenelk! Oh, how brave. It was wise of your sister to hand you over. Vabrenelk!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_4cfsI4ZjTbU_001",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.750959992408752,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "We must recognize that the government of the People's Republic of China and the government of the United States have had great differences. We will have differences in the future. But what we must do is to find a way to see that we can have differences without being enemies in war.",
+          "source" : "中華人民共和国政府とアメリカ合衆国政府にこれまで大きな意見の相違があったことを認める必要があります。今後も意見の相違はあるでしょう。しかし、意見の相違を持ちながらも戦争における敵とならずにいられる方法を見出さねばなりません。",
+          "text" : "We must acknowledge that there have been significant disagreements between the governments of the People's Republic of China and the United States of America. Disagreements will likely continue in the future. However, we must find a way to remain enemies only in war despite our differences."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_5TqcJCKl34g_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.912710070610046,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "So, when did you first start writing and performing music after having your stage in front of your grandparents there? Well, basically, more performing. I did a bit of writing, but I left it to professionals, you know, when I was recording with professional writers and big, big hits around the world.",
+          "source" : "それでは、祖父母の前で歌を披露してから、初めて曲を書いて歌い始めたのはいつ頃ですか？ 基本的には歌の方がメインでしたね。作曲も少しはしましたが、プロの作曲家に任せていましたね。世界中で大ヒットを飛ばすようなプロの作曲家と一緒に録音していましたから。",
+          "text" : "So, when did you start writing and singing your first song after performing in front of your grandparents? Basically, singing was the main focus. I did compose a little bit, but I left it to professional composers. I recorded with professional composers who went on to become huge hits all over the world."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.688162088394165,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "source" : "確認しましょう。石はハサミに勝ち、ハサミは紙に勝ち、紙は石に勝ちます。あなたの勝ちです。負けた方は1つスターを失います。各ゲームの終了時に、審判はカードを再利用ボックスに戻します。もちろん、両方のプレイヤーが同じカードを選んだ場合はゲームは引き分けとなり、誰もスターを失いません。",
+          "text" : "Let's confirm: Rock beats scissors, scissors beat paper, and paper beats rock. You win; the loser loses one star. At the end of each game, the referee returns the cards to the reuse box. Of course, if both players choose the same card, it's a draw and no one loses a star."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 1,
+      "retryFixed" : 1,
+      "seconds" : 22.428038954734802,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "source" : "これからダニーとサムについて詳しく教えるよ。 準備はいい？ 準備OK。 ダニー・フェントンとサム・マンソンは親友で、タッカーと一緒にほとんどの時間を過ごしてる。ダニーはゴーストパワーを持つきっかけはサムだった。 ダニー、ゴーストゾーンだって？チェックしてみなきゃ。 そうだね、君の言う通りだ。",
+          "text" : "I'm going to tell you all about Danny and Sam now. Are you ready? Ready, OK. Danny Fenton and Sam Manson are best friends and spend most of their time together with Tucker. The reason Danny has ghost powers was Sam. Danny, the Ghost Zone too? I'll check it out. Yeah, you're right."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_6YeLsSSPNLQ_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 16.744683027267456,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Crime fighters' log 1.2747. Jump City is a cesspool. I can't bring justice to the streets alone. I need a sidekick, preferably several sidekicks. I'll call them teammates to be polite, but everyone will know their sidekicks. Networking apps. Welcome, RobDog_747. Let's put together a team. Team assemble mode. Not older than me.",
+          "source" : "犯罪撲滅者の日誌1.2747。ジャンプシティには犯罪が蔓延している。俺一人では街に正義を取り戻せない。相棒が必要だ、できれば複数。礼儀として彼らをチームメイトと呼ぶが、すぐにサプキャラだとわかるだろう。ネットワーキングアプリ。 ようこそ、RobDog_747。 チームを組もう。 チーム召集モード。 俺より年上じゃない人ね。",
+          "text" : "The Crime Eradicator's Log 1.2747. Crime is rampant in Jump City. I can't restore justice to the city alone. I need a partner, preferably more than one. As a courtesy, I'll call them teammates, though you'll quickly recognize them as sap characters. Networking app. Welcome, RobDog_747. Let's form a team. Team summon mode. No one older than me."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_6ji3tqZUynY_001",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.815650939941406,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kim Jong-il said to the officials, \"I shared a great leader's motor, served the working masses, and let flowers bloom even on a rock, if this is the people's desire. This is my alpha and omega. This idea has been embedded in every aspect of the people's living in the solution of traffic problem for one thing.\"",
+          "source" : "金正日は役人に言った。「私は偉大な指導者の精神を共有し、労働大衆に奉仕し、人民の願いならば、岩の上に花を咲かせることさえもする。これが私の信念である。この思想は例えば交通問題の解決など、人民の生活のあらゆる面に刻み込まれている」",
+          "text" : "Kim Jong-il told a government official, \"I share the spirit of our great leader, serve the working masses, and if the people's wishes are strong enough, I will even make flowers bloom on rocks. This is my belief. This ideology is embedded in every aspect of the people's lives, such as solving traffic problems.\""
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_7MQ3Yx2h3Rg_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.010555982589722,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "First of all, what we're going to do is just mix this paint up. It mixes one to one with a reducer. And we just mix it up like we normally would painting anything. So I have two ounces of paint here, so I'm going to put two ounces of reducer. We're going to stir it up. Now it's ready to put in the gun and spray.",
+          "source" : "まず最初に、この塗料を混ぜていきます。希釈剤と1対1の割合で、通常の塗装のように混ぜます。ここに2オンスの塗料があるので、2オンスの希釈剤を入れます。かき混ぜます。これで、スプレーガンで使う準備ができました。",
+          "text" : "First, let's mix this paint. We'll mix it with a 1-to-1 ratio of thinner, just like normal painting. Since there are 2 ounces of paint here, we add 2 ounces of thinner. We stir it well. Now we're ready to use the spray gun."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_8bbVFeTIIg8_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.647709012031555,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Initial applications to Harvard for a psychology master's were rejected, but was eventually admitted. The initial setbacks were due to Milgram not taking any undergraduate courses in psychology at Queens College. In 1961, Milgram received a PhD in social psychology. He became an assistant professor at Yale around the same time.",
+          "source" : "ハーバード大学の心理学修士課程への一回めの願書は受理されませんでしたが、最終的には受理されました。受理されなかった理由は、ミルグラムがクイーンズカレッジで心理学の学部課程を受講していなかったためです。ミルグラムは1961年に社会心理学の博士号を取得し、同時期にイェール大学の助教授になりました。",
+          "text" : "The first application to Harvard's graduate program in psychology was rejected, but it was eventually accepted. The reason for the initial rejection was that Milgram had not yet completed his undergraduate degree in psychology at Queens College. Milgram earned his Ph.D. in social psychology in 1961 and became an associate professor at Yale University at the same time."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_9GhGiB4KhTM_004",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.749869108200073,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "I didn't say that. You don't have to. You know better than anyone that violence begets violence every time. The Council made the decision. The Council is gone! We spend our entire lives, entire millennia devoted to protecting life.",
+          "source" : "そんなこと言ってないわ。 言わなくてもいい。 暴力は必ず暴力を生むって、誰よりも知ってるでしょ。 評議会が決定したんだ。 評議会はもう存在しない！ 俺たちは何千年もの間、命を守ることに人生を捧げてきた。",
+          "text" : "I never said that. You don't need to say it. Anyone who knows better than anyone else knows that violence always begets violence. The Council decided it. The Council no longer exists! For thousands of years, we have dedicated our lives to protecting life."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_9s2UyGBuvYw_003",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.896386027336121,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "And there's just something that evokes a serious sense of awe. And that's what I want to try to convey to you guys tonight. So I hope you're ready for a nice relaxing journey through some of the deeper history of ancient Egypt.",
+          "source" : "そこには強い畏敬の念を呼び起こす何かががあります。今夜皆さんにそれをお伝えしたいと思います。では、古代エジプトの深い歴史を巡る心地よい旅に出かけましょう。",
+          "text" : "There is something there that evokes deep reverence. Tonight, I would like to share that with you. Let us embark on a pleasant journey through the deep history of ancient Egypt."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.795277953147888,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "source" : "何ヶ月も経つのに、まだ彼の墓前に立っているような気がする。彼はいなくなってしまったのに、彼から離れられない。爆撃以来、制服姿の兵士を見るたびに彼を思い出してしまう。",
+          "text" : "It's been months, yet I still feel like I'm standing before his grave. Even though he's gone, I can't let go of him. Every time I see a soldier in uniform since the bombing, I think of him."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_BAvkbiKnFEY_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 10.075289011001587,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hello, everyone! If you don't know me, my name is Janica, and I am an expert from Finland, living in the Netherlands. Welcome to this vlog. Today we are in the city of Haarlem. Harlem is a really lovely city located in the province of North Holland.",
+          "source" : "こんにちは、みなさん！自己紹介をします。私はヤニカ。フィンランド人で、現在オランダに住んでいます。私のvlogへようこそ。今日はハールレムという街に来ています。北ホラント州にあるとても素敵な街です。",
+          "text" : "Hello everyone! Let me introduce myself. I'm Yanka, from Finland, and I currently live in the Netherlands. Welcome to my vlog. Today, I'm in Haarlem, a wonderful town located in the province of North Holland."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_BmgU6BTfNQM_001",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.015493035316467,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Battery is good. Now we can see this IC is dislocated from the PCB. We can see the condition of this IC. Now this track is coming here. This track is damaged.",
+          "source" : "バッテリーは良好です。このICチップが基板から外れているのが見えますね。このICチップの状態を確認しましょう。この配線がここに来ていて、この配線が損傷しています。",
+          "text" : "The battery is in good condition. You can see that this IC chip has come loose from the substrate. Let's check the status of this IC chip. This wiring has reached here, and this wiring is damaged."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_Lcdy6X5kMTs_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.641687035560608,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hey, everybody, this is TS Madison. And if you are trying to grow your business, brand, or a product, why not advertise with me? Email me at booktsmadison@gmail.com so that you can get in on our comprehensive advertisement packages. Unique visits, unique subscribers, honey, a broad demographic. Advertise with me today.",
+          "source" : "皆さん、こんにちは、TS Madisonです。ビジネスやブランド、商品の成長をお考えなら、うちで広告を出してみませんか？booktsmadison@gmail.comまでメールを送っていただければ、包括的な広告パッケージをご利用いただけますよ。訪問者もサブスクライバーもユニーク、幅広い年齢層。ぜひ今日から広告を始めましょう！",
+          "text" : "Hello everyone, this is TS Madison. If you're looking to grow your business, brand, or product, why not advertise with us? Just send an email to booktsmadison@gmail.com and you'll get access to our comprehensive advertising package. We reach visitors and subscribers alike—unique and diverse across a wide range of ages. Start advertising today!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_MBJ0dL68I_I_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.20896601676941,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "The documentary film you are about to see was shown to Mr. Alexander Kerensky, President of the Democratic Provisional Government of Russia overthrown by the Communists in 1917. Mr. Kerensky consented to make a few introductory remarks about our picture. We present 80-year-old Alexander Kerensky in his New York City apartment on October 10th, 1962.",
+          "source" : "これから上映するドキュメンタリー映画ですが、1971年に共産主義者によって倒されたロシア民主臨時政府のアレクサンドル・ケレンスキー首相にご覧いただきました。ケレンスキー氏より、冒頭でこの映画に関するコメントを述べていただいています。1962年10月10日、ニューヨーク市の自宅で撮影された80歳のアレクサンドル・ケレンスキー氏です。",
+          "text" : "The documentary film that will be shown next features Alexander Kerensky, the Prime Minister of the Russian Democratic Provisional Government, which was overthrown by communists in 1971. Mr. Kerensky has provided a comment at the beginning regarding this film."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_MG7hk2npXN0_005",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 6.949434995651245,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Your Honor, my client accepts the jury as presently constituted. The jury is satisfactory to both sides? We accept the jury. The jury is satisfactory to us. Swear the jury.",
+          "source" : "裁判長、依頼人は現在の陪審員を受け入れます。双方は陪審員に納得していますか？我々は受け入れます。我々も満足しています。陪審員は宣誓を。",
+          "text" : "Judge, the petitioner accepts the current jury. Do both parties accept the jury? We accept. We are satisfied. The jury will take the oath."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_MbW7DvLZ9Lg_005",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.724149942398071,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kid Durango of Arizona: The Dust Devils. The layer of dew that covered the prairie disappeared quickly as the sun rose over the foothills. The moon hung around for a while, and then sunk far below the ranges. The day began like a thousand other Arizona days. That was, until the cloud came.",
+          "source" : "アリゾナのキッド・デュランゴ: ダスト・デビル。丘陵から太陽が昇ると、大草原を覆っていた露の層はすぐに消えてしまった。月はしばらく空に浮かんでいたが、やがて山脈のはるか下に沈んだ。その日は、アリゾナのいつもの一日と同じように始まった。雲が出てくるまでは。",
+          "text" : "Kid Durango from Arizona: Dust Devil. As the sun rose over the hills, the layer of dew covering the prairie vanished instantly. The moon hung in the sky for a while before sinking far below the mountains. That day began like any other day in Arizona—until the clouds appeared."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_NEEXiMgmA74_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.174670934677124,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "source" : "最低ね、トム。 セリア、僕たちは情熱に従うべきだ。君にはロボット工学があるし、僕は宇宙で活躍したいだけなんだ。 なぜ私のロボットハンドにビビってるって認めないの？ ビビッてなんかないさ、ただ... そうさ、ビビってる。巨大なロボットの爪に追われる悪夢を見てるんだ。 もうどうでもいいわ、トム！",
+          "text" : "The lowest, Tom. Celia, we should follow our passion. You have robotics, and I just want to make my mark in space. Why won't you admit that you're scared of my robot hand? You're not scared at all... well, actually, you are. You're having nightmares about being chased by the claws of a giant robot. It doesn't matter anymore, Tom!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_O0ORxKse1s8_088",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.99495005607605,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hello. How about that Albany call? Busy? Well call the chief operator, tell her to keep the line open. Official business. It's a matter of life and death. I hope you are telling me the truth, Miss Kennedy. It won't go well with you if you're not. I tell you every word I told you's the truth. Dirken grabbed me. He tore my dress. We struggled.",
+          "source" : "もしもし。アルバニーの電話はどうなってる？話し中？チーフオペレーターに回線をつないだままにするように言ってくれ。公務だ。生死に関わる問題だ。真実を話されていますね、ケネディさん。さもないとマズいことになります。 すべて真実です。ディルケンにつかまれ、ドレスを引き裂かれました。もみ合いになって。",
+          "text" : "Hello. How is Albany? Are you on the line? Please keep the line connected to the chief operator. It's official business. It involves life and death. You're speaking the truth, Mr. Kennedy. Otherwise, it won't go well. Everything is true. They caught Dilken, tore his dress, and it turned into a scuffle."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_OExU5AL7RMM_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 13.93711507320404,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "source" : "ようこそ。ようこそ、皆さん。設定がうまくできているか確認しますね。少し時間がかかるので、早めに来ました。手を洗って、準備も整えて、設定完了。これで大丈夫だと思います。ミスをしそうな気がしますが、そういう日もありますね。それでは、皆さんの準備ができたら、始めましょう。",
+          "text" : "Welcome. Welcome, everyone. Let's check if the settings are working properly. It takes a little while, so I came early. Wash your hands, get ready, and complete the setup. I think that should be fine. I feel like I might make a mistake, but those days happen too. So, when you're all ready, let's begin."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_OPV8Gf1FFn8_021",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 7.74460506439209,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Mom says you don't want to visit us. She says that? Yeah. Everybody's got a story, son. I guess that's hers. Life's funny that way, you know?",
+          "source" : "ここに来たくないの？ ママが言ったのか？ うん。 皆それぞれの言い分がある。ママの言い分はそうかもな。人生とは不思議なものだ。",
+          "text" : "You don't want to come here? Did Mom say that? Yeah. Everyone has their own reasons. Maybe Mom's point is right. Life is such a strange thing."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_ORZdsMICbUM_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.955249905586243,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "source" : "45億年以上前、天の川銀河は近くの矮小銀河と衝突しました。この衝突で星の形成が早まりました。我々の太陽系は、天の川銀河の一部です。太陽系内では、物質循環が進行していました。",
+          "text" : "More than 4.5 billion years ago, the Milky Way galaxy collided with a nearby dwarf galaxy. This collision accelerated star formation. Our solar system is part of the Milky Way galaxy. Within our solar system, material recycling was progressing."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_OtKhIhSgy78_001",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.086350917816162,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Oh my God. You guys, listen, I'm so excited because this comedy special is about 23 years in the making, okay? Yeah, I'll tell you what I mean by that. 23 years ago is when I first came to the Comedy Store and became a regular, and became a comedian and disappointed my Iranian immigrant parents.",
+          "source" : "信じられない。いいかい、僕はとても興奮してるんだ。このコメディスペシャルは作るのに23年ぐらいかかってるからね。どういうことか説明するよ。23年前といえば、僕が初めてコメディストアに来て、常連になって、コメディアンになって、そしてイラン移民の両親を失望させた時なんだ。",
+          "text" : "I can't believe it. You know, I'm really excited. This comedy special took about 23 years to make. Let me explain what that means. Twenty-three years ago was when I first came to Comedy Store, became a regular, became a comedian, and disappointed my Iranian immigrant parents."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_QaueRRYecxo_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.035006999969482,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "source" : "レスキュー隊が街を巡回している間、俺たちは箱の中で美術館を監視しよう。 僕たちが待ちかまえているからには、悪党がカボニータを盗むのは得策じゃないからね。 金は全部使っちまった！あのダイヤモンドを盗んで売らなければ！そうしないと、サイダーで実験する羽目になる！ どうやってロボットを中に入れる？ それはもう片がついてる。",
+          "text" : "While the rescue team patrols the streets, we'll guard the museum from inside the box. Since we're waiting here, it's not in the thief's best interest to steal Cabonita. We've already spent all the money! We have to steal and sell that diamond! Otherwise, we'll end up experimenting with cider! How do we get the robot inside? That's already attached."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_RFcdOs5dgT4_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.480687975883484,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Time for the Scotty Kilmer channel. Does your car have faded paint on it? Then stay tuned, because today I'm going to show you how to polish off faded paint. And all it takes is a bucket of water, a polisher, and a bottle of this Meguiar's Ultimate Compound.",
+          "source" : "スコッティ・キルマーのチャンネルの時間です。車の塗装が剥げてきていませんか。それなら、ぜひご覧ください。今日は皆さんに、色あせたペイントを修復する方法を紹介します。準備するものは、バケツの水、つや出し、このマグアイアーズのアルティメット・コンパウンズ１本、これだけです。",
+          "text" : "This is Scott Kilmer's channel. Is your car's paint peeling? If so, be sure to watch this. Today, I'll show you how to repair faded paint. All you need is a bucket of water, a polish, one can of Meguiar's Ultimate Compound, and that's it."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.943372011184692,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "source" : "では説明します。問題は、この中を見てみると、木の羽目板が見えますか？ 古い羽目板があって、屋根板と接合しています。そしてこれを上に被せてみます。どうなるかというと、泥がこの雨押えに溜まります。",
+          "text" : "Let me explain. The problem is that if you look inside, you can see wooden planks. There are old planks joined to the roof sheathing, and when we cover this with it, mud gets trapped in this rain gutter."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_RpercXhgNXM_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.518669962882996,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hey guys, Thunder E here, and welcome to the video you've been waiting for. I am talking about gaming on the ASUS ROG Phone 5. Now, the ROG Phone series is well known for its gaming powers, but in this video, we're going to find out if the ROG Phone 5 is truly taking back the crown as the king of gaming phones.",
+          "source" : "どうも、サンダーEです。お待ちかねの動画へようこそ。ASUS ROG Phone5でのゲームについてお話しします。ROG Phoneシリーズはそのゲーム性能でよく知られていますが、この動画では、本当にROG Phone 5がゲーミングスマホの王の座を奪えるのか見ていきたいと思います。",
+          "text" : "Hello, I'm Thunder E. Welcome to a long-awaited video. Today, I'll talk about gaming on the ASUS ROG Phone 5. The ROG Phone series is well-known for its gaming performance, but in this video, we'll see if the ROG Phone 5 can truly take the throne of gaming smartphones."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_S9xH4qIE5D4_003",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.58086895942688,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "The next member of the 85 South Show. He needs no introduction. Where my ladies at?! We gonna give him an introduction anyway. He's out of Atlanta, by way of Mississippi. You might have seen him on MTV Wild 'n Out. Ladies, he is the coldest in the game right now. Your baby daddy, Karlous Miller's in the building!",
+          "source" : "85サウスショーの次のメンバーだ。説明は要らないよな。お嬢さんたちはどこへ行った?! とにかく彼を紹介するぜ。ミシシッピで生まれで、アトランタからやって来た。MTVのWild 'n Outで見たことがあるはずだ。お嬢さんたち、彼はいま一番、業界でイケてる男だぜ。みんなの恋人、カーラス・ミラーの登場だ！",
+          "text" : "He's the next member of 85 South Show. No need for an explanation, right? Where did the ladies go?! Anyway, let me introduce him. Born in Mississippi, he came from Atlanta. You must have seen him on MTV's Wild 'n Out. Ladies, he's currently the hottest guy in the industry. Here comes your love, Karas Miller!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.115885972976685,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "source" : "数分間そのままにして、水で戻します。この手間いらずな料理は、コンロ調理が不要です。食材を戻すために水を沸かすだけ。それがインスタントグリッツを使う理由でもあります。調理時間も燃料も節約できて、軽い。いいね。 さて、こんな感じになってきました。完璧なとろみです。",
+          "text" : "Leave it for a few minutes, then rinse with water. This hassle-free dish requires no stove cooking; you just boil water to rehydrate the ingredients. That's why we use instant grits. You save both cooking time and fuel, making it light and easy. I like that. Now, look how it has turned out. It has a perfect creamy texture."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_TBPP-za78BQ_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.250190019607544,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kaboom City is the city of heroes. The Super Things and the Kazoom Kids fight with their powers derived from Kazoom itself. It's the most potent energy source ever known, and now it's on display at the city museum for all to admire. And we're going to steal it! Isn't it dangerous to slip through here? Negative. This is the way the Kazooms are coming.",
+          "source" : "カブームシティはヒーローの街。スーパーシングスとカズームキッズは、カズームから出力されたパワーを使って戦うんだ。それは知られている限り最も強力なエネルギー源。現在、シティ美術館に展示中で、誰でも見ることができる。これからそれを盗みに行くぞー！ ここを通り抜けるのは危ないんじゃないの？ 大丈夫。カズームたちはここを通ってくるんだから。",
+          "text" : "Caboom City is the hero town. Super Sings and Zoom Kids fight using power output from the Zoom, which is the most powerful energy source known. It is currently on display at the City Museum and can be seen by anyone. We're going to steal it now! Is it dangerous to pass through here? No problem. The Zoms are coming through here."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_UL2vofFT7wQ_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.877628087997437,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Thirty million years ago, a monster roamed the landscape. Well, we're talking about one of the most ferocious animals that probably ever walked the earth. This was the biggest beast to live in North America since the dinosaurs. Look at the size of that skull. Look at all those teeth in there. There is no animal like this anywhere.",
+          "source" : "3千万年前、とある怪物がこの辺りを歩き回っていました。 地球上に生息していた生き物の中で最も獰猛な動物のうちのひとつでしょう。 それは恐竜時代以降、北米に生息した最も巨大な生き物でした。 この大きな頭蓋骨や歯を見てください。こんな生き物はどこにもいません。",
+          "text" : "Thirty million years ago, a certain monster roamed these lands. It was one of the most ferocious animals to have ever lived on Earth. It was the largest creature to inhabit North America after the dinosaur era. Please look at this massive skull and teeth. There is no such creature anywhere else."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_UVUatYPScjw_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 9.75515103340149,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "source" : "あっちのに乗ろうよ。 おい、君！この乗り物にはちょっと重た過ぎるな。安全第一だろ？ 30ドル？ぼったくりだ。 言っただろ？ 足元にご注意を！",
+          "text" : "Let's get on that one. Hey, you! That vehicle is a bit too heavy for you. Safety first, right? 30 dollars? That's a rip-off. Didn't I tell you? Watch your step!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_V63Xcec-5jE_004",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 12.334089994430542,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "I'm going to California. You're going to California. And why should you go to California? The United States ain't good enough for you? Ach! A fine citizen you are, yes? You don't even know that California is in the United States! But what are you laughing about? I gotta laugh, because you are so dumb, you didn't even know that I was making a joke with you.",
+          "source" : "カリフォルニアに行く。 カリフォルニアか。でもどうしてカリフォルニアなんだい？アメリカじゃダメなの？ ああ、君は立派な国民だろ？カリフォルニアがアメリカにあることすら知らないのか！何を笑ってるんだ？ そりゃ笑っちゃうよ、僕がからかってることすら気付かなかったじゃないか。",
+          "text" : "I'm going to California. California? But why California? Can't it be America? Oh, you're a fine citizen, are you? You don't even know that California is part of America! What are you laughing at? Of course it's funny; I didn't even realize I was being teased."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_Vi03zz6eCik_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.362201929092407,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "source" : "どうも、新シリーズのパイロット版へようこそ。世界最悪レベルのスキャンダルの歴史を掘り下げていきますが、中には知っているものもあれば、知らないものもあるでしょう。この新シリーズはScannálというRTEの番組から一部着想を得ています。ただし、アイルランドに関連する事件だけでなく、より広範囲の事件を扱う予定です。では早速始めましょう。",
+          "text" : "Hello and welcome to the pilot of the new series. We will dig into the history of scandals that are, by far, the worst in the world. Some of these may be familiar to you, while others might not be. This new series draws some inspiration from RTE's program Scannál. However, we will cover events beyond just those related to Ireland. So let's get right to it."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_W94uDJ55BmM_000",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 14.863685011863708,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "You, you the world! You're full of surprises, aren't you? I remember a few years back, watching some of those Resident Evil movies with Milla Jovovich and thinking, \"It can't get any worse than this!\" Yeah, it feels like a simpler time. But with 2021's final gasping breath, it came out with Resident Evil: Welcome to Raccoon City. AKA, Welcome to Hell.",
+          "source" : "君はすごい！いつも驚かせてくれるよね？数年前にミラ・ジョヴォヴィッチの『バイオハザード』シリーズを見て「これ以上ひどくはならないだろう」と思っていました。あの頃はもう少し単純でしたね。しかし、2021年が終わる頃、『バイオハザード: ウェルカム・トゥ・ラクーンシティ』が封切られたのです。まさに「地獄へようこそ」でした。",
+          "text" : "You're amazing! You always surprise me, don't you? A few years ago, after watching Mira Kovitch's Resident Evil series, I thought it couldn't get any worse. Back then, things were a bit simpler. However, around the end of 2021, Resident Evil: Welcome to Raccoon City was released. It was truly \"Welcome to Hell.\""
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_WtGHeibBKrA_007",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 11.704559922218323,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "source" : "猛禽類の専門家、ボブ・アンダーソンには、開拓者の態度はやや横柄で無知に思えました。 猛禽類はすべて害鳥とされていました。家禽の敵だと思われていたんです。ハゲワシもイヌワシもアカオノスリもすべて悪い鳥として撃たれていました。",
+          "text" : "To Bob Anderson, an expert on raptors, the pioneers' attitude seemed somewhat arrogant and ignorant. All raptors were considered vermin, enemies of poultry, and thought to be harmful. Bald eagles, hawks, and red-tailed hawks were all shot as \"bad birds.\""
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-ja-en-test-en-speech_XwIQLLbD7SI_001",
+      "language" : "ja",
+      "lineCount" : 1,
+      "retried" : 0,
+      "retryFixed" : 0,
+      "seconds" : 15.852360010147095,
+      "target" : "en",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "And I'd like to start by turning to Dr. Vishal Sikka, the CEO of Infosys. Vishal, you're the son of a railways engineer. You saw technology at that phase, and you're also a surfer, so you know all about dodging the waves. What's the disruption that we most need to pay attention to that's coming from the new technologies, and why? Why should we pay so much attention to the disruption?",
+          "source" : "では、早速、インフォシスのCEO、ヴィシャル・シッカ博士にお話しいただきます。ヴィシャルさん、あなたは鉄道エンジニアのお父様を持ち、その段階の技術を観察されましたね。また、サーファーであるあなたは波をうまくかわすことにも長けていますよね。新技術が引き起こす劇的な変化の中で、もっとも注目すべきものは何でしょうか？そして、その理由とは？なぜ、そうした変化に注目すべきなのでしょうか？",
+          "text" : "Let's begin by introducing Dr. Vishal Sikka, CEO of Infosys. Dr. Sikka, you have a father who was a railway engineer and you observed the technology at that stage. Also, as a surfer, you are skilled at navigating waves. In the midst of dramatic changes caused by new technologies, what is the most noteworthy aspect? And why? Why should we pay attention to such changes?"
+        }
+      ]
+    }
+  ]
+}

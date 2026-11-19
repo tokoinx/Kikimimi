@@ -1,0 +1,598 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+    "[wmt24pp-en-id-test-en-speech_UVUatYPScjw_000] numbers lost: 30 => Mari kita naik yang di sana. Wah, wah, wah, anak besar! Kamu agak terlalu gemuk untuk kendaraan ini. Keselamatan dulu, eh? Tiga puluh lembar? Itu penipuan. Aku sudah bilang. Hati-hati!"
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-id.json"
+  ],
+  "translation" : {
+    "cases" : 28,
+    "chrF" : 57.402155792377464,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        5665,
+        5635,
+        5605,
+        5575,
+        5545,
+        5515
+      ],
+      "matches" : [
+        4837,
+        3952,
+        3167,
+        2704,
+        2378,
+        2115
+      ],
+      "reference" : [
+        5611,
+        5581,
+        5551,
+        5521,
+        5491,
+        5461
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 30,
+    "lines" : 30,
+    "numbersChecked" : 5,
+    "numbersKept" : 4,
+    "repeated" : 0,
+    "seconds" : 297.8273160457611,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 30
+  },
+  "translationByTarget" : {
+    "id" : {
+      "cases" : 28,
+      "chrF" : 57.402155792377464,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          5665,
+          5635,
+          5605,
+          5575,
+          5545,
+          5515
+        ],
+        "matches" : [
+          4837,
+          3952,
+          3167,
+          2704,
+          2378,
+          2115
+        ],
+        "reference" : [
+          5611,
+          5581,
+          5551,
+          5521,
+          5491,
+          5461
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 30,
+      "lines" : 30,
+      "numbersChecked" : 5,
+      "numbersKept" : 4,
+      "repeated" : 0,
+      "seconds" : 297.8273160457611,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 30
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-id-test-en-social_111975537143453440",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 12.96100401878357,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Secara umum aku sangat suka interaksi antara kedua game ini. Keuntungan dari cerita yang pendek adalah kamu bisa \"lompat langsung ke bagian yang bagus\", sehingga membuat kita lebih cepat merasakan keseruan dan kepuasan. Keuntungan dari cerita yang panjang adalah kamu bisa meresapi apa pun yang terjadi dengan bobot emosional yang lebih besar, permainan jadi lebih lama tetapi imbalannya juga lebih besar.",
+          "source" : "In general I really like the interplay between the two games. The advantage of shortform stories is that you can \"skip to the good part\", they can be more immediately engrossing and satisfying. The advantage of longform stories is that you can imbue whatever happens with way more emotional weight, you lose the immediacy in exchange for stronger payoffs.",
+          "text" : "Secara umum, saya sangat menyukai interaksi antara kedua game tersebut. Keunggulan cerita pendek adalah Anda bisa \"melompat ke bagian terbaik\", sehingga lebih langsung menarik dan memuaskan. Keunggulan cerita panjang adalah Anda dapat memberikan beban emosional yang jauh lebih besar pada apa pun yang terjadi; Anda kehilangan kesan langsung demi imbalan yang lebih kuat."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_111976249663909024",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.740790009498596,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Situs status AT&T menyatakan bahwa tidak ada gangguan... meskipun berita melaporkan adanya gangguan 😠",
+          "source" : "the AT&T status site claims there's no outages...even though the news is reporting an outage 😠",
+          "text" : "Situs status AT&T mengklaim tidak ada gangguan... padahal berita melaporkan adanya gangguan 😠"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 3.4615219831466675,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Aku benci lava #firetemple",
+          "source" : "I hate lava #firetemple",
+          "text" : "Saya membenci lava #firetemple."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_111977766001055104",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 3.7962470054626465,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kenapa koordinat GPS-ku dibulatkan ke sudut penuh terdekat? Itu sangat tidak berharga.",
+          "source" : "Live feed says that they have a signal",
+          "text" : "Sinyal live feed menunjukkan bahwa mereka memiliki sinyal."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 7.732491970062256,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Aku merusak perapatnya beberapa kali, sepertinya karena aku menggerakkan wajahku, dan hidungku mulai berair karena entah apa yang ada di udara di sini.",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "Aku sempat membuka segel itu beberapa kali hanya dengan menggerakkan wajahku, sepertinya, dan hidungku mulai berair karena apa pun yang melayang-layang di sana."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.219120025634766,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "kenapa koordinat GPS-ku dibulatkan ke sudut penuh terdekat? Sangat tidak berguna.",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "text" : "Mengapa koordinat GPS dibulatkan ke derajat penuh terdekat? Itu benar-benar tidak berharga."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 3.8043580055236816,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Oh, ya, ini esai terbaru Sally Rooney",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "Oh benar, ini esai terbaru dari Sally Rooney."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 3,
+      "seconds" : 13.319316029548645,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kotak yang telah digunakan bersarang membuat wifi di rumah bocor.",
+          "source" : "The box that has already a nest in it is leeching off the wifi in the house.",
+          "text" : "Kotak yang sudah memiliki sarang di dalamnya sedang menguras sinyal wifi di rumah."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Kurasa dengan penambahan beberapa sensor lagi akan bagus.",
+          "source" : "A few more sensors in general would be nice I guess.",
+          "text" : "Sepertinya akan lebih baik jika ada beberapa sensor lagi."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Coba tebak: Hari ini mendung. Jadi aku tidak yakin apakah panel surya (yang mungkin rusak) mampu menghasilkan daya yang cukup untuk melakukan sesuatu.",
+          "source" : "Guess what: It's cloudy today. So I'm not sure if that (probably broken) solar panel is able to generate enough juice to achieve anything.",
+          "text" : "Tebak apa: Hari ini berawan. Jadi saya tidak yakin apakah panel surya (yang mungkin rusak) tersebut mampu menghasilkan cukup daya untuk mencapai apa pun."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 6.772205948829651,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Jika aku menghadiri acara, aku membawanya. Satu-satunya acara yang saat ini ada di kalenderku adalah:",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "text" : "Jika saya berada di sebuah acara, saya membawa mereka bersamaku. Satu-satunya acara yang akan datang dalam jadwal saya saat ini adalah:"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112121157211696272",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 7.08545196056366,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "MX saya alihkan ke Proton dan sekarang saya mendapatkan SPF, DKIM, dan DMARC lengkap tanpa harus membayar Google untuk validasi email dasar.",
+          "source" : "I transferred my MX to Proton and have now full SPF, DKIM and DMARC without having to pay Google for basic email validation.",
+          "text" : "Saya telah memindahkan MX saya ke Proton dan sekarang memiliki SPF, DKIM, dan DMARC lengkap tanpa harus membayar Google untuk validasi email dasar."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112132847725764752",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 6.9791179895401,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Aku baru melihat sistem pengenalan wajah saat akan naik ke penerbangan internasional dari IAH, Houston. Sepertinya itu untuk semacam hal yang berkaitan dengan bea cukai??",
+          "source" : "Just encountered a facial recognition system while boarding an intl flight from Houston's IAH. Apparently it's for some customs-related thing??",
+          "text" : "Baru saja menemukan sistem pengenalan wajah saat menaiki penerbangan internasional dari IAH Houston. Sepertinya itu untuk urusan terkait bea cukai??"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.424633026123047,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Selamat hari Sabtu, kawan-kawan. Selamat datang di 4.000 kaki.",
+          "source" : "Happy Saturday lovelies. Welcome to 4000ft.",
+          "text" : "Selamat pagi para pecinta. Selamat datang di 4000 kaki."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 6.126411080360413,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@pengguna20 jadi setiap hari kamu mendayung setidaknya 2,8 km? Di ergometer atau di air?",
+          "source" : "@user20 so every day you row at least 2.8km? Is that on the erg or on the water?",
+          "text" : "@user20 jadi setiap hari kamu berenang minimal 2,8 km? Apakah itu di erg atau di air?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 15.90402603149414,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ini adalah rekaman lama yang asli dan nyata dari seorang raksasa sungguhan dari Jepang yang berjalan di parade militer. Yang sukar dipercaya adalah ukuran tubuhnya. Posturnya setidaknya setinggi 4 meter, atau 13 kaki. Jadi, dia sungguh tinggi dan lebih besar dari pemain NBA sungguhan, seperti Shaquille O'Neal, atau",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "Ini adalah rekaman asli dan nyata dari seorang individu raksasa yang pasti berasal dari Jepang, sedang berjalan dalam sebuah parade militer. Yang mengejutkan tentangnya adalah ukuran aslinya. Ia memiliki tinggi setinggi minimal 4 meter, atau sekitar 13 kaki. Dengan demikian, ia benar-benar lebih tinggi dan lebih besar daripada setiap pemain NBA asli lainnya, misalnya seperti Shaquille O'Neal, atau"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.2132009267807,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Pertanyaannya adalah, seperti banyaknya reruntuhan lain yang diklaim dari zaman Neolitik, bagaimana cara mereka mengerjakan sesuatu yang sesulit itu? Bagaimana mereka mengangkat batu yang sangat besar itu? Apakah situs itu, seperti yang sudah sering kita katakan sebelumnya, sisa-sisa peradaban kuno yang maju tetapi kemudian hancur? Kita menganggap kemungkinan seperti itu, khususnya, untuk orang-orang Agra di sini, sangatlah mungkin.",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "Pertanyaannya adalah, seperti banyak other reruntuhan Neolitik yang diklaim, bagaimana mereka mencapai pencapaian sebegitu? Bagaimana mereka mengangkat batu-batu raksasa tersebut? Apakah mereka, seperti yang telah kami usulkan berkali-kali sebelumnya, sisa-sisa peradaban kuno yang pernah maju namun kemudian hancur? Kami menemukan kemungkinan-kemungkinan ini, khususnya para pria di Agra, sangat meyakinkan."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 14.126566052436829,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Jadi, saya sudah bermusik selama lebih dari 20 tahun, dan mengeluarkan dua album selama periode itu, dan mengadakan tur di seputar wilayah Jerman dan Polandia, dan tentu saja Swedia. Jadi, Anda sudah menjadi seniman sejak masih sangat muda? Ya, begitulah. Apakah ada tempat yang paling berkesan saat Anda tampil ketika masih muda?",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "Jadi, saya telah bekerja dengan musik selama lebih dari 20 tahun, merilis dua album pada masa itu, dan melakukan tur di Jerman, Polandia, dan tentu saja Swedia. Jadi, apakah Anda selalu menjadi seorang pengampil sejak sangat muda? Ya, saya memang demikian. Dan apakah ada tempat ikonik yang pernah Anda pertunjukkan saat masih muda?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 13.643929958343506,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Cek. Cek. Gunting kalah dari batu, kertas kalah dari gunting, dan batu kalah dari kertas. Kau menang. Yang kalah akan kehilangan satu bintang. Setiap permainan berakhir, wasit akan mengembalikan kartu ke kotak daur ulang. Tentu saja, kalau kedua pemain memilih kartu yang sama, hasilnya imbang, dan tidak ada yang kehilangan bintang.",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "Cek. Cek. Batu mengalahkan gunting, gunting mengalahkan kertas, dan kertas mengalahkan batu. Anda menang. Orang yang kalah akan kehilangan satu bintang. Pada akhir setiap permainan, wasit akan mengembalikan kartu ke dalam kotak daur ulang. Tentu saja, jika kedua pemain memilih kartu yang sama, permainan seri, dan tidak ada yang kehilangan bintang."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 13.273669958114624,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Inilah kisah lengkap Danny dan Sam. Siap? Siap. Danny Fenton dan Sam Manson adalah dua orang sahabat, dan bersama Tucker, mereka hampir selalu bersama-sama. Sam-lah yang membuat Danny memiliki kekuatan hantu. Ayo, Danny, dunia hantu? Kau harus lihat. Kau tahu? Kau benar.",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "Ini adalah kisah lengkap Danny dan Sam. Siap? Siap. Danny Fenton dan Sam Manson adalah teman terbaik, dan bersama Tucker, mereka menghabiskan sebagian besar waktu mereka bersama. Samlah alasan mengapa Danny memiliki kekuatan hantu pada awalnya. Ayo, Danny, zona hantu? Kamu harus mencobanya. Apa kata kamu? Kamu benar."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 12.928884029388428,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Beberapa bulan telah  berlalu dan aku merasa masih berdiri di makamnya. Aku tidak bisa jauh darinya. Dia sudah tiada, dan aku masih belum bisa jauh darinya. Aku melihatnya setiap kali berpapasan dengan tentara berseragam, dan mereka ada di mana-mana semenjak pengeboman itu.",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "Sudah berbulan-bulan, dan saya merasa masih berdiri di depan makamnya. Saya tidak bisa meninggalkannya. Ia sudah tiada, dan saya masih tidak bisa meninggalkannya. Saya melihatnya di setiap prajurit berpakaian seragam yang saya temui, dan mereka ada di mana-mana sejak terjadi bom."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.62436604499817,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kau brengsek, Tom. Dengar, Celia, kita harus mengikuti minat. Minatmu robot dan minatku hanyalah menjadi hebat di luar angkasa. Kenapa tak mengaku saja bahwa kau takut dengan tangan robotku? Aku tidak takut, hanya saja... Baiklah. Aku takut. Aku bermimpi buruk dikejar oleh cakar robot raksasa ini. Terserah kau, Tom!",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "Kamu orang jahat, Tom. Lihatlah, Celia, kita harus mengikuti passion kita. Kamu punya robotik dan aku hanya ingin menjadi luar biasa di luar angkasa. Mengapa kamu tidak mengakui bahwa kamu takut dengan tangan robotku? Aku tidak takut, itu... Baiklah, sudah. Aku memang takut. Aku bermimpi buruk tentang ditelancong oleh genggaman robot raksasa itu. Oh, whatever, Tom!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.886669993400574,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Selamat datang. Selamat datang, semuanya. Saya hanya akan memastikan bahwa semua ini berjalan dengan baik. Hanya satu menit. Baru saja mencuci tangan dan siap-siap berangkat. Saya baru saja menyelesaikan persiapan. Kita siap mulai. Saya akan membuat kesalahan. Saya bisa merasakannya. Ini salah satu hari sial. Jadi, saya akan menunggu lebih banyak orang hadir, lalu kita akan mulai.",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "Selamat datang. Selamat datang, semuanya. Saya hanya ingin memastikan bahwa semuanya berfungsi dengan baik. Hanya butuh satu menit. Jadi saya datang sedikit lebih awal hanya untuk memastikan. Baru saja mencuci tangan dan siap memulai. Jadi saya baru saja menyelesaikan pengaturan. Saya pikir kita sudah siap. Saya akan membuat kesalahan. Saya bisa merasakannya. Ini salah satu hari-harinya. Jadi saya hanya akan menunggu sampai orang-orang bergabung, lalu kita akan mulai."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 12.297989010810852,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Lebih dari 4,5 miliar tahun yang lalu, Galaksi Bima Sakti bertabrakan dengan galaksi kecil yang ada di dekatnya. Tumbukan ini akhirnya mempercepat terbentuknya bintang-bintang. Tata surya kita termasuk dalam Galaksi Bima Sakti. Di dalam tata surya ini, sirkulasi materi telah berprogresi.",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "Lebih dari 4,5 miliar tahun yang lalu, Galaksi Bima Sakti bertabrakan dengan galaksi kerdil terdekat. Tabrakan ini mempercepat pembentukan bintang. Sistem tata surya kita merupakan bagian dari Galaksi Bima Sakti. Di dalam sistem tata surya, sirkulasi materi telah berlangsung."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 14.92286503314972,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ketika Rescue Force berpatroli di kota, kita akan mengawasi museum ini dari tempat intaian. Para penjahat sebaiknya tidak mencuri Kaboonita selagi kita menunggu di dalam. Kita kehabisan uang! Kita harus curi permata itu dan menjualnya! Kalau tidak, kita harus bereksperimen dengan minuman soda! Bagaimana cara memasukkan robot ke dalam? Semua sudah disiapkan.",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "Saat pasukan penyelamat patroli kota, kami akan menjaga museum di dalam kotak. Tidak akan baik jika para penjahat mencoba mencuri Cabbonita sementara kami menunggu di dalamnya. Uang kita sudah habis! Kita harus mencuri berlian itu dan menjualnya! Jika tidak, kita akan melakukan eksperimen dengan minuman bersoda! Bagaimana cara kita memasukkan bot ke dalam sana? Semua sudah diatur."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 13.431149005889893,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Baiklah, biar kujelaskan. Masalahnya adalah, jika kalian lihat ke dalam sana... Kalian lihat lapisan kayunya? Ada lapisan lama di sana, dan tersambung dengan genteng. Jadi kalau saya lapisi di sini, kotorannya akan terkumpul di sini, ke flashing itu.",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "Baiklah, jadi izinkan saya menjelaskan. Oke, masalahnya adalah, jika Anda melihat ke dalam sana... Anda melihat dinding kayu? Itu adalah dinding lama, dan sambungannya bertemu dengan genteng di sana. Lalu saya menempelkan ini di atasnya. Dan yang terjadi adalah debu menumpuk di sana, pada bagian flashing tersebut."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 21.615956902503967,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Kami akan membiarkannya agar lembap kembali selama beberapa menit. Dengan cara masak ultralight ini, kita tidak benar-benar masak dengan kompor. Pertama, kami mendidihkan air supaya bisa menghidrasi makanan kami. Inilah salah satu alasan mengapa kami menggunakan olahan jagung instan. Waktu masaknya lebih cepat, hemat bahan bakar, dan lebih ringan. Oh ya. Jadi, ini hasilnya. Teksturnya pas.",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "Kami hanya akan biarkan itu duduk dan merehidrasi selama beberapa menit. Dengan memasak ultralight, kami sebenarnya tidak memasak di atas kompor. Kami terutama mendidihkan air agar kita bisa merehidrasi makanan kita. Ini juga salah satu alasan mengapa kami menggunakan grits instan. Waktu memasak lebih singkat, bahan bakar lebih sedikit, dan bobot lebih ringan. Oh ya. Jadi ini kira-kira apa yang sedang kita lakukan di sini. Konsistensi sempurna."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 10.968788027763367,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ayo kita naik wahana yang di sana. Wah, wah, wah, bocah besar! Kau agak terlalu berat untuk naik wahana ini. Keselamatan yang utama, 'kan? Harga tiketnya 30? Penipuan. Sudah kubilang. Perhatikan langkahmu!",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "Mari kita naik yang di sana. Wah, wah, wah, anak besar! Kamu agak terlalu gemuk untuk kendaraan ini. Keselamatan dulu, eh? Tiga puluh lembar? Itu penipuan. Aku sudah bilang. Hati-hati!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.502619028091431,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Halo dan selamat datang di episode perdana dari sebuah seri baru. Seri ini akan membahas sejarah beberapa skandal terburuk di dunia. Sebagiannya mungkin kalian sudah tahu, sebagian lagi mungkin belum. Seri ini terinspirasi di antaranya oleh sebuah program RTE yang disebut Scannál. Namun, saya ingin memperluas cakupannya, tidak hanya akan menyoroti skandal di Irlandia saja. Tanpa berlama-lama, mari kita mulai.",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "Halo dan selamat datang pada sebuah pilot dari seri baru."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-id-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 14.063966989517212,
+      "target" : "id",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Bagi pakar Raptor, Bob Anderson, para penduduk pertama itu terlalu sombong dan tidak mau tahu. Semua burung pemangsa dianggap hama. Maksudku, semua dianggap ancaman. Mereka semua burung jahat, termasuk Elang Kepala Botak, Elang Emas, Elang Ekor merah. Semuanya ditembaki.",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "Bagi Bob Anderson, spesialis Raptor, sikap para pelopor itu hanyalah sombong dan tidak tahu apa-apa. Semua burung pemangsa dianggap sebagai hama. Saya maksudnya, semuanya adalah ayam elang. Mereka semua burung yang buruk, baik Elang Putih, Elang Emas, maupun Elang Berbelakang Merah. Mereka semuanya ditembak."
+        }
+      ]
+    }
+  ]
+}

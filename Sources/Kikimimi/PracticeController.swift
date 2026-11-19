@@ -59,6 +59,9 @@ final class PracticeController {
     }
     /// 隠し方 (settings.hide の写し)。行はこれだけを見る (速さなど、ほかの設定を変えても行を描き直さない)
     private(set) var hideMode: PracticeSettings.Hide = .nothing
+    /// 一覧の結果の訳す先の言語 (この言語の行は隠さない)。一覧の見えない部品が、変わった時だけ入れる。
+    /// めったに変わらない (結果を選んだ・訳す先を変えた) ので、行が見てもよい
+    private(set) var target = TranslationTarget.fallback
     /// 結果の下に書き取りの欄を出す (UserDefaults の "practiceDictation")
     var showsDictation: Bool {
         didSet {
@@ -143,10 +146,12 @@ final class PracticeController {
     }
 
     /// 一覧が出た・一覧の行が変わった (一覧の見えない部品から)。行は次に要るときに作り直す
-    func rowsChanged(job: Job, bilingual: Bool) {
+    func rowsChanged(job: Job, bilingual: Bool, target: String) {
         if job.id != jobID { select(job) }
         self.job = job
         self.bilingual = bilingual
+        // 同じ値は書かない (書くと、見ている行がすべて描き直される)
+        if self.target != target { self.target = target }
         rowsStale = true
         // 続けて流している最中: いまの行がなくなっていれば、すぐ止める
         if sequencer.isActive { refreshRows() }
@@ -172,7 +177,8 @@ final class PracticeController {
     private func refreshRows() {
         rowsStale = false
         if let job, let transcript = job.transcript {
-            rows = rowCache.items(of: transcript, job: job.id, done: job.status == .done, bilingual: bilingual, query: "")
+            rows = rowCache.items(of: transcript, job: job.id, done: job.status == .done, bilingual: bilingual, query: "",
+                                  target: target)
         } else {
             rows = []
         }
@@ -274,12 +280,16 @@ final class PracticeController {
     /// 行の文字を隠すか (行の body から呼ぶ。隠し方と、隠す対象の行だけは、その行の見せたかを見る)
     func concealment(of item: TranscriptListItem) -> RowConcealment {
         let hide = hideMode
-        guard HiddenText.canHide(hide, language: item.language) else { return .visible }
+        // 隠さない時は、訳す先を見ない (隠さないあいだは、訳す先が変わっても行を描き直さない)
+        guard hide != .nothing else { return .visible }
+        let target = self.target
+        guard HiddenText.canHide(hide, language: item.language, target: target) else { return .visible }
         let revealed = reveal.cell(for: item.id).isRevealed
         return RowConcealment(canHide: true, revealed: revealed,
-                              hidesSource: HiddenText.hidesSource(hide, language: item.language, revealed: revealed),
+                              hidesSource: HiddenText.hidesSource(hide, language: item.language, revealed: revealed,
+                                                                  target: target),
                               hidesTranslation: HiddenText.hidesTranslation(hide, language: item.language,
-                                                                            revealed: revealed))
+                                                                            revealed: revealed, target: target))
     }
 
     // MARK: 再生の係と待ちからの知らせ
@@ -375,6 +385,12 @@ final class PracticeController {
         if player.duration > 0 { to = min(to, player.duration) }
         let rate = player.rate > 0 ? player.rate : 1.0
         return max(0, to - from) / rate
+    }
+
+    /// 練習の外から、一覧をその行へ動かしてもらう (対訳の見出しの「要確認 N」で、次の印の行へ跳ぶ)。
+    /// 一覧の外の部品から、一覧の ScrollViewProxy に届く口が、これ (CurrentLineTracker が見る) しか無いので使う
+    func requestListScroll(to id: UUID) {
+        requestScroll(id)
     }
 
     private func requestScroll(_ id: UUID) {

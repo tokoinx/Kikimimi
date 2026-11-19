@@ -10,8 +10,8 @@ public enum DownloadError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .http(let code): return "ダウンロードに失敗しました (HTTP \(code))。"
-        case .invalidFile: return "ダウンロードしたファイルがモデルではありませんでした。ネットワークの設定 (フィルタやプロキシ) を確認してください。"
+        case .http(let code): return L("Download failed (HTTP %d).", code)
+        case .invalidFile: return L("The downloaded file was not a model. Check your network settings (filters or proxies).")
         }
     }
 }

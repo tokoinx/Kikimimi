@@ -7,75 +7,145 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var model = model
         TabView(selection: $model.settingsTab) {
+            GeneralSettingsForm()
+                .tabItem { Label(L("General"), systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             TranscriptionSettingsForm()
-                .tabItem { Label("文字起こし", systemImage: "waveform") }
+                .tabItem { Label(L("Transcription"), systemImage: "waveform") }
                 .tag(SettingsTab.transcription)
             LLMSettingsForm()
-                .tabItem { Label("監査・翻訳", systemImage: "character.bubble") }
+                .tabItem { Label(L("Audit & translation"), systemImage: "character.bubble") }
                 .tag(SettingsTab.llm)
         }
         // 「監査・翻訳」のタブが、スクロールせずに収まる大きさ
         .frame(width: 600, height: 680)
+        // 画面の言語を変えた時の、開き直しの案内 (新しく選んだ言語の文で出す。
+        // 設定の画面は言語を変えると作り直すので、出すかどうかは AppModel が持つ)
+        .alert(L("The display language was changed"), isPresented: $model.showsLanguageChangedAlert) {
+            // バンドルでない起動 (swift run など) では開き直せないので、ボタンを出さない
+            if model.isBusy || !AppDelegate.canReopen {
+                Button(L("OK")) {}
+            } else {
+                Button(L("Reopen now")) { AppDelegate.shared?.reopenApp() }
+                Button(L("Later"), role: .cancel) {}
+            }
+        } message: {
+            Text(model.isBusy ? L("The text on screen has already changed. Standard menu bar items (Edit, Window, and so on) change when you reopen Kikimimi. Reopen Kikimimi after the current work finishes.")
+                 : L("The text on screen has already changed. Standard menu bar items (Edit, Window, and so on) change when you reopen Kikimimi."))
+        }
+    }
+}
+
+/// 設定の「一般」タブ (画面の言語)
+struct GeneralSettingsForm: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Form {
+            Section {
+                Picker(L("Display language"), selection: $model.uiLanguage) {
+                    ForEach(UILanguage.allCases) { language in
+                        Text(language.nativeName).tag(language)
+                    }
+                }
+                if model.needsReopenForLanguage {
+                    // 言語を変えてから、まだ開き直していない (元の言語に戻すと消える)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(L("The text on screen has already changed. Standard menu bar items (Edit, Window, and so on) change when you reopen Kikimimi."))
+                            .font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if AppDelegate.canReopen {
+                            Button(L("Reopen now")) { AppDelegate.shared?.reopenApp() }
+                                .disabled(model.isBusy)
+                        }
+                        if model.isBusy && AppDelegate.canReopen {
+                            Text(L("Work is in progress (transcription, audit, translation, recording, or download). You can reopen after it finishes."))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                Text(L("Standard menu bar items (Edit, Window, and so on) change after you reopen the app."))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Text(L("The spoken language for transcription is chosen in the “Transcription” tab."))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 
 /// 設定の「文字起こし」タブ
 struct TranscriptionSettingsForm: View {
     @Environment(AppModel.self) private var model
+    /// 語彙のヒントの欄の例 (固有の語なので、どの言語の画面でも同じ)
+    static let hintExample = "ロブロックス, Roblox Studio, ききみみ" // l10n: keep (固有の語の例)
 
     var body: some View {
         @Bindable var model = model
         Form {
-            Section("文字起こし") {
+            Section(L("Transcription")) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Picker("言語", selection: $model.languageCode) {
+                    Picker(L("Spoken language"), selection: $model.languageCode) {
                         ForEach(Languages.all) { language in
                             Text(language.name).tag(language.code)
                         }
                     }
                     if model.languageCode == Languages.japaneseEnglish.code {
-                        Text("日本語と英語が入れ替わる録音向けです。区切りごとに、話している言語を日本語か英語かで判定して、その言語で文字にします。判定のぶん、「日本語」の設定の 2〜4 倍ほどの時間がかかります (言語の入れ替わりや短い差し込みが多いほど長くなります)。どちらか一方だけの録音には、その言語を選んでください。")
+                        Text(L("For recordings that switch between Japanese and English. Each stretch of speech is checked to see whether it is Japanese or English, and is transcribed in that language. Because of the check, it takes about 2–4 times as long as the “Japanese” setting (longer when the language changes often or there are many short remarks in the other language). For a recording in only one of the two, choose that language."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Picker("モデル", selection: $model.modelID) {
+                Picker(L("Model"), selection: $model.modelID) {
                     ForEach(ModelCatalog.all) { spec in
-                        Text(spec.displayName + (spec.recommended ? " (おすすめ)" : "")).tag(spec.id)
+                        Text(spec.recommended ? L("%@ (recommended)", spec.displayName) : spec.displayName).tag(spec.id)
                     }
                 }
-                Toggle("精度を優先する (ビームサーチ)", isOn: $model.preferAccuracy)
-                Toggle("無音を飛ばす (VAD)", isOn: $model.useVAD)
-                Toggle("定番の誤認識と、同じ文の繰り返しを取り除く", isOn: $model.filterHallucinations)
+                Toggle(L("Prefer accuracy (beam search)"), isOn: $model.preferAccuracy)
+                Toggle(L("Skip silence (VAD)"), isOn: $model.useVAD)
                 VStack(alignment: .leading, spacing: 4) {
-                    Toggle("日本語と英語が混ざっている録音は、自動で「日本語＋英語」で文字にする", isOn: $model.autoMixedLanguage)
-                    Text("「日本語」「英語」「自動判定」のとき、文字にする前に録音のところどころの言語を確かめます (数秒〜数十秒)。混ざっていて切り替えたときは、「日本語」の 2〜4 倍ほどの時間がかかります。1 つの言語だけの録音は、確かめる時間のほかは変わりません。無音を飛ばす (VAD) が必要です。")
+                    Toggle(L("When there is continuous sound but very little text, transcribe again without skipping silence"), isOn: $model.autoVADOff)
+                    Text(L("With songs and music, skipping silence may not treat singing as speech, so the lyrics may be missing. When that happens, the audio is transcribed again automatically without skipping silence (this takes longer)."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Toggle("録音中にプレビューを出す", isOn: $model.livePreview)
+                .disabled(!model.useVAD)
+                Toggle(L("Remove common misrecognitions and repeated sentences"), isOn: $model.filterHallucinations)
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("語彙のヒント", text: $model.initialPrompt, prompt: Text("例: ロブロックス, Roblox Studio, ききみみ"))
-                    Text("固有名詞や専門用語を書いておくと、その表記で出やすくなります。空欄でも構いません。")
+                    Toggle(L("Automatically transcribe recordings that mix Japanese and English as “Japanese + English”"), isOn: $model.autoMixedLanguage)
+                    Text(L("With “Japanese”, “English”, or “Auto-detect”, the language is checked at several points in the recording before transcribing (a few seconds to a few tens of seconds). When the recording is mixed and the setting is switched, it takes about 2–4 times as long as “Japanese”. A recording in only one language takes no longer, apart from the check. “Skip silence (VAD)” must be on."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Toggle(L("Show a preview while recording"), isOn: $model.livePreview)
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField(L("Vocabulary hints"), text: $model.initialPrompt, prompt: Text(L("Example: %@", Self.hintExample)))
+                    Text(L("Write proper nouns and technical terms here, and they are more likely to come out with that spelling. You can leave this empty."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Section("モデル") {
+            Section(L("Models")) {
                 ForEach(ModelCatalog.all) { spec in
                     ModelRow(spec: spec)
                 }
                 HStack {
-                    Button("手元のファイルを追加…") { model.importModelFile() }
-                    Button("モデルのフォルダを開く") { model.revealModelsFolder() }
+                    Button(L("Add a local file…")) { model.importModelFile() }
+                    Button(L("Open the models folder")) { model.revealModelsFolder() }
                 }
             }
 
             Section {
-                Text("音声認識には、無料・オープンソースの whisper.cpp (OpenAI Whisper の C/C++ 実装) を使い、Mac の GPU (Metal) で動きます。音声も文字起こしの内容も Mac の外に送られません。インターネットを使うのは、モデルを初めて取得するときだけです。")
+                Text(L("Speech recognition uses whisper.cpp (a C/C++ implementation of OpenAI Whisper), which is free and open source, and runs on the Mac’s GPU (Metal). Neither the audio nor the transcription leaves your Mac. The internet is used only to download a model the first time."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -91,19 +161,31 @@ struct LLMSettingsForm: View {
     var body: some View {
         @Bindable var model = model
         Form {
-            Section("監査・翻訳 (ローカル LLM)") {
-                Toggle("文字起こしのあとに監査する (繰り返し・聞き取りミスの見直し)", isOn: $model.autoAudit)
-                Toggle("日本語以外の区間を、日本語に翻訳する", isOn: $model.autoTranslate)
-                Text("オフにしても、結果の行の「訳」で、読みたい文だけを 1 文ずつ訳せます (まとめて訳すより軽く済みます)。")
+            Section(L("Audit & translation (local LLM)")) {
+                Toggle(L("Audit after transcription (check for repetitions and mishearings)"), isOn: $model.autoAudit)
+                // 訳す先の言語 (13 言語)。もう訳してある結果は、その結果の言語のまま (結果の画面で訳し直せる)
+                Picker(L("Translate into"), selection: $model.translationLanguage) {
+                    ForEach(TranslationTarget.all, id: \.self) { code in
+                        Text(TranslationTarget.displayName(for: code)).tag(code)
+                    }
+                }
+                Text(L("Results that are already translated keep their language. To use another language, translate again on the result screen."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Toggle(L("Translate segments that are not in %1$@ into %2$@",
+                         TranslationTarget.displayName(for: model.translationLanguage),
+                         TranslationTarget.displayName(for: model.translationLanguage)), isOn: $model.autoTranslate)
+                Text(L("Even when this is off, you can translate only the sentences you want to read, one at a time, with “Translate” on a result line (lighter than translating everything)."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Picker("LLM", selection: $model.llmModelID) {
                     ForEach(LLMCatalog.all) { spec in
-                        Text(spec.displayName + (spec.recommended ? " (おすすめ)" : "")).tag(spec.id)
+                        Text(spec.recommended ? L("%@ (recommended)", spec.displayName) : spec.displayName).tag(spec.id)
                     }
                     ForEach(model.customLLMFiles, id: \.self) { name in
-                        Text("手持ち: \(name)").tag("file:" + name)
+                        Text(L("Your file: %@", name)).tag("file:" + name)
                     }
                 }
                 ForEach(LLMCatalog.all) { spec in
@@ -113,38 +195,42 @@ struct LLMSettingsForm: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(name)
-                            Text("取り込んだ GGUF").font(.caption).foregroundStyle(.secondary)
+                            Text(L("Added GGUF")).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("削除") { model.deleteLLMFile(name) }
+                        Button(L("Delete")) { model.deleteLLMFile(name) }
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Button("手元の GGUF を追加…") { model.importLLMFile() }
+                        Button(L("Add a local GGUF…")) { model.importLLMFile() }
                             .disabled(model.importingLLM)
-                        Button("LLM のフォルダを開く") { model.revealLLMFolder() }
+                        Button(L("Open the LLM folder")) { model.revealLLMFolder() }
                         if model.importingLLM {
                             ProgressView().controlSize(.small)
-                            Text("取り込み中…").foregroundStyle(.secondary)
+                            Text(L("Adding…")).foregroundStyle(.secondary)
                         }
                     }
-                    Text("保存先: \(model.llmFolderPath)")
+                    Text(L("Location: %@", model.llmFolderPath))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
-                Text("監査役は、同じ文の繰り返しと、文脈から見て明らかな聞き間違いを見つけます。自信のある直しだけを反映し、それ以外は「提案」として残すので、確かめてから反映できます。どの直しも元に戻せます。この Mac のメモリは \(MemoryBudget.physicalGB) GB です\(MemoryBudget.isTight ? " (少なめなので、文字起こしと LLM を交互に読み込みます)" : "")。")
+                Text(MemoryBudget.isTight
+                     ? L("The auditor finds repeated sentences and mishearings that are clear from the context. Only fixes it is sure of are applied; the rest are kept as “suggestions”, so you can check them before applying. Every fix can be undone. This Mac has %d GB of memory (on the low side, so transcription and the LLM are loaded in turn).", MemoryBudget.physicalGB)
+                     : L("The auditor finds repeated sentences and mishearings that are clear from the context. Only fixes it is sure of are applied; the rest are kept as “suggestions”, so you can check them before applying. Every fix can be undone. This Mac has %d GB of memory.", MemoryBudget.physicalGB))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             LearnedCorrectionsSection()
 
+            RememberedTranslationsSection()
+
             AdapterSection()
 
             Section {
-                Text("監査と翻訳には、無料・オープンソースの llama.cpp と Qwen3.5 を使い、Mac の GPU (Metal) で動きます。文字起こしの内容は Mac の外に送られません。インターネットを使うのは、LLM を初めて取得するときだけです。")
+                Text(L("Audit and translation use llama.cpp and Qwen3.5, which are free and open source, and run on the Mac’s GPU (Metal). The transcription does not leave your Mac. The internet is used only to download an LLM the first time."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -160,12 +246,12 @@ struct LLMModelRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(spec.displayName + (spec.recommended ? " (おすすめ)" : ""))
-                Text("\(spec.summary) 約 \(TimeFormat.bytes(Int64(spec.approxMB) * 1_000_000))・\(spec.license)")
+                Text(spec.recommended ? L("%@ (recommended)", spec.displayName) : spec.displayName)
+                Text(L("%1$@ About %2$@ · %3$@", spec.summary, TimeFormat.bytes(Int64(spec.approxMB) * 1_000_000), spec.license))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if spec.recommendedMemoryGB > MemoryBudget.physicalGB {
-                    Text("この Mac (メモリ \(MemoryBudget.physicalGB) GB) では重いかもしれません")
+                    Text(L("May be too heavy for this Mac (%d GB of memory)", MemoryBudget.physicalGB))
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -173,12 +259,12 @@ struct LLMModelRow: View {
             Spacer()
             switch model.llmAvailability(of: spec) {
             case .installed:
-                Label("取得済み", systemImage: "checkmark.circle.fill")
+                Label(L("Downloaded"), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                     .labelStyle(.titleAndIcon)
-                Button("削除") { model.deleteLLM(spec) }
+                Button(L("Delete")) { model.deleteLLM(spec) }
             case .notInstalled:
-                Button("ダウンロード") {
+                Button(L("Download")) {
                     // 使える LLM をまだ選んでいなければ、取得するものを選ぶ
                     // (始めの画面・結果の画面の案内がこの取得を示し、取得後の監査・翻訳もこれを使う)
                     if !model.isLLMInstalled { model.llmModelID = spec.id }
@@ -190,7 +276,7 @@ struct LLMModelRow: View {
                 Text("\(Int(fraction * 100))%")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                Button("中止") { model.cancelLLMDownload(spec) }
+                Button(L("Cancel download")) { model.cancelLLMDownload(spec) }
             }
         }
     }
@@ -203,20 +289,20 @@ struct ModelRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(spec.displayName + (spec.recommended ? " (おすすめ)" : ""))
-                Text("\(spec.summary) 約 \(spec.approxMB) MB")
+                Text(spec.recommended ? L("%@ (recommended)", spec.displayName) : spec.displayName)
+                Text(L("%1$@ About %2$d MB", spec.summary, spec.approxMB))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             switch model.availability(of: spec) {
             case .installed:
-                Label("取得済み", systemImage: "checkmark.circle.fill")
+                Label(L("Downloaded"), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                     .labelStyle(.titleAndIcon)
-                Button("削除") { model.deleteModel(spec) }
+                Button(L("Delete")) { model.deleteModel(spec) }
             case .notInstalled:
-                Button("ダウンロード") { model.download(spec) }
+                Button(L("Download")) { model.download(spec) }
             case .downloading(let fraction):
                 ProgressView(value: fraction)
                     .frame(width: 90)
@@ -234,36 +320,184 @@ struct AdapterSection: View {
 
     var body: some View {
         @Bindable var model = model
-        Section("追加学習 (LoRA)") {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(model.currentLLM.name) 用の差分")
-                    Text(model.hasAdapter ? "入っています" : "入っていません")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if model.importingAdapter {
-                    ProgressView().controlSize(.small)
-                }
-                if model.hasAdapter {
-                    Button("外す") { model.removeAdapter() }
-                }
-                Button(model.hasAdapter ? "入れ替える…" : "差分を追加…") { model.importAdapter() }
-                    .disabled(model.importingAdapter)
+        Section(L("Fine-tuning (LoRA)")) {
+            // 差分は、監査用と翻訳用の 2 つ。翻訳には翻訳用だけを使う (`AppModel.activeAdapterPath(for:)`)
+            row(L("Audit adapter for %@", model.currentLLM.name), kind: .audit, added: model.hasAdapter)
+            row(L("Translation adapter for %@", model.currentLLM.name), kind: .translation, added: model.hasTranslationAdapter)
+            if model.importingAdapter {
+                ProgressView().controlSize(.small)
             }
-            Toggle("監査・翻訳で、この差分を使う", isOn: $model.useAdapter)
-                .disabled(!model.hasAdapter)
+            Toggle(L("Use the adapters (the audit adapter for audit, the translation adapter for translation)"), isOn: $model.useAdapter)
+                .disabled(!model.hasAdapter && !model.hasTranslationAdapter)
+            Text(L("Translation uses only the translation adapter. Without one, translation runs without an adapter (an adapter trained for audit can garble names in translations)."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
             HStack {
-                Button("学習用のデータを書き出す…") { model.exportTrainingData() }
-                Text("学習した直し \(model.ledger.corrections.count) 件")
+                Button(L("Export training data…")) { model.exportTrainingData() }
+                Text(LPlural(model.ledger.corrections.count, one: "%d learned correction", other: "%d learned corrections"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Text("学習した直しがたまったら、LLM そのものに覚えさせることができます (追加学習)。学習用のデータを書き出し、ターミナルで tools/finetune/finetune.py を動かすと、この Mac の中で学習して「差分」(….lora.gguf) を作ります。差分は、元の LLM を書き換えずに重ねて使う小さなファイルで、いつでも外せます。学習の前後は同じ場面で比べ、直せる行が増えて、悪くなったところの無い差分だけを入れます。手順は README の「追加学習」にあります。数件の直しなら、追加学習をしなくても上の「学習した直し」がそのまま当てます。")
+            Text(L("When learned corrections build up, you can teach them to the LLM itself (fine-tuning). Export the training data and run tools/finetune/finetune.py in Terminal: it trains on this Mac and makes an “adapter” (….lora.gguf). An adapter is a small file used on top of the original LLM without changing it, and you can remove it at any time. Compare before and after training on the same cases, and add only an adapter that fixes more lines and makes nothing worse. The steps are in “Fine-tuning” in the README. For just a few corrections, “Learned corrections” above applies them as they are, without fine-tuning."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// 差分 1 つの行: 名前・入っているか・[外す]・[追加…] か [入れ替える…]
+    private func row(_ title: String, kind: AdapterKind, added: Bool) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(added ? L("Added") : L("Not added"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if added {
+                Button(L("Remove")) { model.removeAdapter(kind: kind) }
+            }
+            Button(added ? L("Replace…") : L("Add adapter…")) { model.importAdapter(kind: kind) }
+                .disabled(model.importingAdapter)
+        }
+    }
+}
+
+/// 設定の「覚えた訳」: 対訳の行で利用者が直した訳の記憶。次の翻訳に使うかの入・切、一覧・削除。
+/// 消すのは記憶だけ (結果に残っている直した訳は、そのまま)。
+/// 下に「訳語」(訳語の対) の小さな一覧を置く: 訳す先の言語・原文の語・訳語。足す行と、1 件ずつ消すボタン。
+/// その下に、利用者の判定から学んで「印を出さなくなった検査」の一覧を置く (1 つも無い時は出さない)
+struct RememberedTranslationsSection: View {
+    @Environment(AppModel.self) private var model
+    @State private var newTermSource = ""
+    @State private var newTermTranslation = ""
+    /// 足す訳語の訳す先 (nil の間は、設定の「訳す先の言語」を使う)
+    @State private var newTermTarget: String?
+
+    var body: some View {
+        @Bindable var model = model
+        Section(L("Remembered translations")) {
+            Toggle(L("Use remembered translations in the next translation"), isOn: $model.reuseTranslationMemory)
+            let sentences = model.translationMemory.sentences.sorted { $0.updated > $1.updated }
+            if sentences.isEmpty {
+                Text(L("None yet. When you edit a translation in the bilingual view, it is remembered here."))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(LPlural(sentences.count, one: "%d remembered translation", other: "%d remembered translations"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(sentences) { entry in
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(TranslationTarget.displayName(for: entry.target))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(entry.source)
+                            .textSelection(.enabled)
+                        Text(entry.translation)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    Spacer()
+                    Button(L("Delete")) { model.removeRememberedTranslation(entry.id) }
+                }
+            }
+            Text(L("When the same sentence comes up again in a translation into the same language, your translation is used without asking the LLM. Short sentences are always translated again, because their meaning depends on the scene. “Translate this sentence again” always asks the LLM. Deleting here removes only the remembered translation; translations in your results stay as they are. They are saved only on this Mac."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            terms
+            suppressedChecks
+        }
+    }
+
+    /// 印を出さなくなった検査の一覧 (訳す先の言語・検査の名前・判定の数)。1 件ずつ [元に戻す]。1 つも無ければ何も出さない
+    @ViewBuilder private var suppressedChecks: some View {
+        let counts = model.translationMemory.suppressedGate
+        if !counts.isEmpty {
+            Text(L("Checks that no longer mark lines"))
+                .font(.callout.weight(.semibold))
+            ForEach(counts, id: \.self) { count in
+                HStack {
+                    Text(TranslationTarget.displayName(for: count.target))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(Self.checkName(count.check))
+                    Text(L("Marked fine %1$d times / edited %2$d times", count.confirmed, count.edited))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(L("Undo")) { model.resetGateCheck(count.check, target: count.target) }
+                }
+            }
+            Text(L("When you mark most lines flagged by a check as fine, that check stops marking lines in that language. “Undo” turns it back on."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 検査の符号の、短い名前 (知らない符号は、符号のまま)
+    static func checkName(_ check: String) -> String {
+        switch check {
+        case TranslationGate.number: return L("Missing number")
+        case TranslationGate.language: return L("Wrong language")
+        case TranslationGate.copied: return L("Same as the original")
+        case TranslationGate.repeated: return L("Repeated words")
+        case TranslationGate.short: return L("Too short")
+        case TranslationGate.term: return L("Missing term")
+        default: return check
+        }
+    }
+
+    /// 訳語の対の一覧と、足す行
+    @ViewBuilder private var terms: some View {
+        Text(L("Terms"))
+            .font(.callout.weight(.semibold))
+        let pairs = model.translationMemory.termList()
+        if pairs.isEmpty {
+            Text(L("No terms yet."))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        ForEach(pairs) { pair in
+            HStack {
+                Text(TranslationTarget.displayName(for: pair.target))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("\(pair.source) → \(pair.translation)")
+                    .textSelection(.enabled)
+                Spacer()
+                Button(L("Delete")) { model.removeTerm(pair.id) }
+            }
+        }
+        let target = newTermTarget ?? model.translationLanguage
+        HStack {
+            Picker(L("Translate into"), selection: Binding(get: { target }, set: { newTermTarget = $0 })) {
+                ForEach(TranslationTarget.all, id: \.self) { code in
+                    Text(TranslationTarget.displayName(for: code)).tag(code)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+            TextField(L("Word in the original"), text: $newTermSource, prompt: Text(L("Word in the original")))
+                .labelsHidden()
+            Image(systemName: "arrow.right")
+                .foregroundStyle(.secondary)
+            TextField(L("Translation to use"), text: $newTermTranslation, prompt: Text(L("Translation to use")))
+                .labelsHidden()
+            Button(L("Add")) {
+                if model.addTerm(source: newTermSource, translation: newTermTranslation, target: target) {
+                    newTermSource = ""
+                    newTermTranslation = ""
+                }
+            }
+            .disabled(newTermSource.trimmingCharacters(in: .whitespaces).isEmpty
+                      || newTermTranslation.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        Text(L("In the next translations into that language, the LLM is told to translate the word as you decided. If a translation does not use it, the line is marked “Needs review”. Terms are used only while the switch above is on."))
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 }
 
@@ -275,11 +509,11 @@ struct LearnedCorrectionsSection: View {
 
     var body: some View {
         @Bindable var model = model
-        Section("学習した直し") {
-            Toggle("監査の一覧で決めた直しを覚えて、次から使う", isOn: $model.useLedger)
+        Section(L("Learned corrections")) {
+            Toggle(L("Remember the fixes decided in the audit list and use them from next time"), isOn: $model.useLedger)
             let corrections = model.ledger.corrections.sorted { $0.updated > $1.updated }
             if corrections.isEmpty {
-                Text("まだありません。監査の一覧で直しのチェックを入れたり外したりすると、ここに覚えます。")
+                Text(L("None yet. When you check or uncheck fixes in the audit list, they are remembered here."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -293,17 +527,17 @@ struct LearnedCorrectionsSection: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("削除") { model.removeCorrection(correction.id) }
+                    Button(L("Delete")) { model.removeCorrection(correction.id) }
                 }
             }
             HStack {
-                TextField("聞き間違えた語", text: $newWrong, prompt: Text("聞き間違えた語 (例: Roblocks)"))
+                TextField(L("Misheard term"), text: $newWrong, prompt: Text(L("Misheard term (e.g. Roblocks)")))
                     .labelsHidden()
                 Image(systemName: "arrow.right")
                     .foregroundStyle(.secondary)
-                TextField("正しい語", text: $newRight, prompt: Text("正しい語 (例: Roblox)"))
+                TextField(L("Right term"), text: $newRight, prompt: Text(L("Right term (e.g. Roblox)")))
                     .labelsHidden()
-                Button("追加") {
+                Button(L("Add")) {
                     if model.teachCorrection(wrong: newWrong, right: newRight) {
                         newWrong = ""
                         newRight = ""
@@ -312,17 +546,17 @@ struct LearnedCorrectionsSection: View {
                 .disabled(newWrong.trimmingCharacters(in: .whitespaces).isEmpty
                           || newRight.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            Text("反映した直しは、次の監査から LLM に聞く前に当てます。1 回反映しただけの直しは提案として出し、2 回反映すると自動で直します (数字や否定が変わる直し・かなを漢字にする直しは、いつも提案です)。一覧に「学習した直し」と出るので、いつでも元に戻せます。元に戻した直しは、LLM がまた出してきても使いません。正しい語は、語彙のヒントにも足します。ここで追加した直しは、いつも自動で当てます。保存先はこの Mac の中だけです。")
+            Text(L("Applied fixes are used from the next audit, before the LLM is asked. A fix applied once is shown as a suggestion; after it is applied twice, it is fixed automatically (fixes that change a number or a negation, or turn kana into kanji, are always suggestions). They are shown as “Learned corrections” in the list, so you can always undo them. A fix you undid is not used, even if the LLM suggests it again. The right term is also added to the vocabulary hints. Fixes you add here are always applied automatically. They are saved only on this Mac."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
 
     static func status(of correction: LearnedCorrection) -> String {
-        if correction.taught { return "いつも直す (自分で追加)" }
-        if correction.isAutomatic { return "次から自動で直す (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回)" }
-        if correction.isActive { return "次は提案として出す (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回。もう一度反映すると、自動で直す)" }
-        if correction.isBlocked { return "もう提案しない (元に戻す \(correction.rejected) 回・反映 \(correction.accepted) 回)" }
-        return "保留 (反映 \(correction.accepted) 回・元に戻す \(correction.rejected) 回)"
+        if correction.taught { return L("Always fix (added by you)") }
+        if correction.isAutomatic { return L("Fix automatically from now on (applied: %1$d, undone: %2$d)", correction.accepted, correction.rejected) }
+        if correction.isActive { return L("Suggest next time (applied: %1$d, undone: %2$d. Apply it once more to fix it automatically)", correction.accepted, correction.rejected) }
+        if correction.isBlocked { return L("No longer suggested (undone: %1$d, applied: %2$d)", correction.rejected, correction.accepted) }
+        return L("On hold (applied: %1$d, undone: %2$d)", correction.accepted, correction.rejected)
     }
 }

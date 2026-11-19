@@ -4,18 +4,25 @@ import Foundation
 public struct WhisperModelSpec: Hashable, Identifiable, Sendable {
     /// `large-v3-turbo-q5_0` のような whisper.cpp のモデル名
     public let id: String
-    public let displayName: String
-    public let summary: String
+    /// 名前と説明の鍵 (英語)。読む時に、今の画面の言語で引く (言語を切り替えたら変わるように)
+    let displayNameKey: String
+    let summaryKey: String
     public let approxMB: Int
     public let recommended: Bool
 
+    /// displayName と summary は鍵 (英語)。`LKey` で印を付けて渡す (訳の無い名前は、そのまま出る)
     public init(id: String, displayName: String, summary: String, approxMB: Int, recommended: Bool = false) {
         self.id = id
-        self.displayName = displayName
-        self.summary = summary
+        self.displayNameKey = displayName
+        self.summaryKey = summary
         self.approxMB = approxMB
         self.recommended = recommended
     }
+
+    /// 画面に出す名前 (今の画面の言語)
+    public var displayName: String { L10n.lookup(displayNameKey) }
+    /// 画面に出す説明 (今の画面の言語)
+    public var summary: String { L10n.lookup(summaryKey) }
 
     public var fileName: String { "ggml-\(id).bin" }
 
@@ -29,20 +36,20 @@ public enum ModelCatalog {
     public static let defaultModelID = "large-v3-turbo-q5_0"
 
     public static let all: [WhisperModelSpec] = [
-        WhisperModelSpec(id: "large-v3-turbo-q5_0", displayName: "Large v3 Turbo (軽量版)",
-                         summary: "日本語の精度と速度のバランスが最も良い。迷ったらこれ。", approxMB: 574, recommended: true),
+        WhisperModelSpec(id: "large-v3-turbo-q5_0", displayName: LKey("Large v3 Turbo (light)"),
+                         summary: LKey("Best balance of Japanese accuracy and speed. Pick this if unsure."), approxMB: 574, recommended: true),
         WhisperModelSpec(id: "large-v3-turbo", displayName: "Large v3 Turbo",
-                         summary: "軽量版より少しだけ高精度。メモリに余裕がある Mac 向け。", approxMB: 1620),
-        WhisperModelSpec(id: "large-v3-q5_0", displayName: "Large v3 (軽量版)",
-                         summary: "最高精度クラス。Turbo の数倍遅い。", approxMB: 1080),
-        WhisperModelSpec(id: "medium-q5_0", displayName: "Medium (軽量版)",
-                         summary: "中くらいの精度と速度。", approxMB: 539),
-        WhisperModelSpec(id: "small-q5_1", displayName: "Small (軽量版)",
-                         summary: "速いが日本語の精度は控えめ。", approxMB: 190),
-        WhisperModelSpec(id: "base-q5_1", displayName: "Base (軽量版)",
-                         summary: "とても速い。動作確認向け。", approxMB: 60),
+                         summary: LKey("Slightly more accurate than the light version. For Macs with plenty of memory."), approxMB: 1620),
+        WhisperModelSpec(id: "large-v3-q5_0", displayName: LKey("Large v3 (light)"),
+                         summary: LKey("Top accuracy. Several times slower than Turbo."), approxMB: 1080),
+        WhisperModelSpec(id: "medium-q5_0", displayName: LKey("Medium (light)"),
+                         summary: LKey("Medium accuracy and speed."), approxMB: 539),
+        WhisperModelSpec(id: "small-q5_1", displayName: LKey("Small (light)"),
+                         summary: LKey("Fast, but less accurate for Japanese."), approxMB: 190),
+        WhisperModelSpec(id: "base-q5_1", displayName: LKey("Base (light)"),
+                         summary: LKey("Very fast. For testing."), approxMB: 60),
         WhisperModelSpec(id: "tiny", displayName: "Tiny",
-                         summary: "最小。精度は低い。", approxMB: 78),
+                         summary: LKey("Smallest. Low accuracy."), approxMB: 78),
     ]
 
     public static func spec(id: String) -> WhisperModelSpec? {

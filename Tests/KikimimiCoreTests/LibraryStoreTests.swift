@@ -59,6 +59,36 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(store.load(id: doc.id), doc)
     }
 
+    func testVADSkippedMarkIsWrittenOnlyWhenSetAndRoundTrips() throws {
+        var doc = document()
+        try store.save(doc)
+        var json = try String(contentsOf: store.documentURL(for: doc.id), encoding: .utf8)
+        XCTAssertFalse(json.contains("vadSkippedAutomatically"), "the mark is not written when it is false")
+        XCTAssertEqual(store.load(id: doc.id)?.vadSkippedAutomatically, false)
+        doc.vadSkippedAutomatically = true
+        try store.save(doc)
+        json = try String(contentsOf: store.documentURL(for: doc.id), encoding: .utf8)
+        XCTAssertTrue(json.contains("\"vadSkippedAutomatically\" : true"))
+        XCTAssertEqual(store.load(id: doc.id), doc)
+    }
+
+    /// 訳した言語の記録: 入れた時だけ書き、読み直せる。記録の無い古い document.json は nil (その訳は日本語)
+    func testTranslationLanguageIsWrittenOnlyWhenSetAndRoundTrips() throws {
+        var doc = document()
+        try store.save(doc)
+        var json = try String(contentsOf: store.documentURL(for: doc.id), encoding: .utf8)
+        XCTAssertFalse(json.contains("translationLanguage"), "old documents and unset values have no key")
+        let old = try XCTUnwrap(store.load(id: doc.id))
+        XCTAssertNil(old.transcript.translationLanguage)
+        XCTAssertEqual(old.transcript.translationTarget(default: "en"), "ja", "an old result with translations was translated into Japanese")
+        doc.transcript.translationLanguage = "en"
+        try store.save(doc)
+        json = try String(contentsOf: store.documentURL(for: doc.id), encoding: .utf8)
+        XCTAssertTrue(json.contains("\"translationLanguage\" : \"en\""), json)
+        XCTAssertEqual(store.load(id: doc.id), doc)
+        XCTAssertEqual(store.load(id: doc.id)?.transcript.translationTarget(default: "ja"), "en")
+    }
+
     func testNotesLiveOnlyInNotesFile() throws {
         let notes = "メモの本文 > [00:01] quote\n"
         let doc = document(notes: notes)
@@ -162,6 +192,7 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertFalse(doc.isRecording)
         XCTAssertNil(doc.languageCode)
         XCTAssertNil(doc.autoMixedFrom)
+        XCTAssertFalse(doc.vadSkippedAutomatically)
         XCTAssertEqual(doc.updatedAt, doc.createdAt)
         XCTAssertEqual(doc.transcript.segments.map(\.text), ["Hello"])
         XCTAssertEqual(doc.notes, "")

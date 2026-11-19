@@ -6,13 +6,20 @@ struct TranscriptDetailView: View {
     @Environment(AppModel.self) private var model
     let job: Job
     @State private var cache = TranscriptRowCache()
+    /// 日本語で数えた翻訳の状況 (「日本語＋英語でやり直す」の案内が使う。訳す先が日本語でない時だけ使う)
+    @State private var japaneseCache = TranscriptRowCache()
     /// メモの欄と一覧を並べている欄の幅 (NotesSidebar だけが見る。この body では中を見ない)
     @State private var notesSpace = NotesSpace()
 
     var body: some View {
         // 翻訳の状況・言語の名前・一覧の行は、文字起こしが変わったときだけ作り直す (長い録音では区間が数千あるため。
         // 画面は、進み具合や検索欄の入力でも描き直される)。文字起こし中に区間が末尾に増えたときは、増えた分だけを足す
-        let summary = job.transcript.map { cache.summary(of: $0, job: job.id, done: job.status == .done) }
+        // 訳す先の言語 (その結果の言語。訳が無ければ設定の言語。めったに変わらない)。文字起こしの最中は訳せないので、
+        // 結果を見ずに設定の言語にする (区間が増えるたびに、全部の区間から訳の有無を探さないように)
+        let target = job.status == .done
+            ? job.transcript.map { model.translationTarget(for: $0) } ?? model.translationLanguage
+            : model.translationLanguage
+        let summary = job.transcript.map { cache.summary(of: $0, job: job.id, done: job.status == .done, target: target) }
         VStack(alignment: .leading, spacing: 0) {
             header
                 .padding(.horizontal, 20)
@@ -26,18 +33,24 @@ struct TranscriptDetailView: View {
             }
 
             if job.status == .failed {
-                Label(job.error ?? "エラー", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                HStack(spacing: 12) {
+                    Label(job.error ?? L("Error"), systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .textSelection(.enabled)
+                    RedoAgainButton(job: job)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             }
 
             if job.status == .cancelled {
-                Label("中止しました", systemImage: "xmark.circle")
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                HStack(spacing: 12) {
+                    Label(L("Canceled"), systemImage: "xmark.circle")
+                        .foregroundStyle(.secondary)
+                    RedoAgainButton(job: job)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             }
 
             if job.url != nil {
@@ -60,24 +73,39 @@ struct TranscriptDetailView: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
                 }
+                if job.status == .done, job.vadSkippedAutomatically, !job.vadSkippedNoticeDismissed {
+                    VADSkippedNotice(job: job)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                }
                 if job.status == .done, job.languageCode == "ja", job.url != nil, !job.mixedSuggestionDismissed,
-                   job.allowsAutoMixed, summary.spokenLanguages.isEmpty, stats.isMainlyForeign {
+                   job.allowsAutoMixed, summary.spokenLanguages.isEmpty,
+                   isMainlyNotJapanese(transcript, stats: stats, target: target) {
                     MixedLanguageSuggestion(job: job)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
                 }
                 if job.status == .done, !transcript.segments.isEmpty, !model.isLLMInstalled, !model.llmBannerDismissed,
                    (model.autoTranslate && stats.isMainlyForeign) || model.autoAudit {
-                    LLMNeededBanner(wantsTranslation: stats.isMainlyForeign)
+                    LLMNeededBanner(wantsTranslation: stats.isMainlyForeign, target: target)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
                 }
-                controls(transcript, stats)
+                // 設定の訳す先と違う言語に訳してある結果: 訳し直せることを知らせる (訳が在り、LLM が在る時だけ)。
+                // 訳がまだ無くても、訳す先の記録が残っている結果 (訳し直しの途中で終了した、など) にも出す (ほかに直す道が無い)
+                if job.status == .done, stats.hasTranslation || transcript.translationLanguage != nil,
+                   target != model.translationLanguage, model.isLLMInstalled,
+                   !job.translationLanguageNoticeDismissed {
+                    TranslationLanguageNotice(job: job, current: target, setting: model.translationLanguage)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                }
+                TranscriptControls(job: job, transcript: transcript, stats: stats, target: target)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
                 Divider()
                 let items = cache.items(of: transcript, job: job.id, done: job.status == .done,
-                                        bilingual: bilingual, query: model.searchText)
+                                        bilingual: bilingual, query: model.searchText, target: target)
                 // 右にメモの欄 (「メモ」を入れたときだけ)。メモの中身を見るのは NotesPane だけ (打つたびに一覧を作り直さない)。
                 // メモの欄の幅を見るのも NotesSidebar だけ (区切りを動かしても、この body は動かない)。
                 // 一覧は、メモを出しても消しても同じ場所に置く (置き場所を変えると一覧が作り直され、読んでいた位置が始めに戻る)。
@@ -86,7 +114,10 @@ struct TranscriptDetailView: View {
                 // 5〜21 秒。HSplitView の前は 0.13〜1.0 秒)
                 let space = notesSpace
                 HStack(spacing: 0) {
-                    transcriptColumn(items: items, bilingual: bilingual, languageLabel: summary.languageLabel)
+                    // 「要確認」の行 (行を作る時に 1 度だけ数えた物。ここでは数えない)
+                let flaggedIDs = cache.flaggedItemIDs
+                transcriptColumn(items: items, bilingual: bilingual, languageLabel: summary.languageLabel, target: target,
+                                 flaggedIDs: flaggedIDs)
                         .frame(minWidth: CGFloat(NotesSidebar.listMinWidth), maxWidth: .infinity, maxHeight: .infinity)
                     if model.showNotes {
                         NotesSidebar(job: job, space: space)
@@ -108,13 +139,21 @@ struct TranscriptDetailView: View {
         .navigationSubtitle(subtitle(summary))
     }
 
+    /// 日本語以外が主な文字起こしか (「日本語＋英語でやり直す」の案内。文字起こしの言語の話なので、訳す先によらず日本語で数える)。
+    /// 訳す先が日本語なら、一覧と同じ数え方 (stats) をそのまま使う
+    private func isMainlyNotJapanese(_ transcript: Transcript, stats: Transcript.TranslationStats, target: String) -> Bool {
+        if target == "ja" { return stats.isMainlyForeign }
+        return japaneseCache.summary(of: transcript, job: job.id, done: job.status == .done, target: "ja").stats.isMainlyForeign
+    }
+
     /// 対訳の見出しと一覧
     @ViewBuilder
-    private func transcriptColumn(items: [TranscriptListItem], bilingual: Bool, languageLabel: String?) -> some View {
+    private func transcriptColumn(items: [TranscriptListItem], bilingual: Bool, languageLabel: String?,
+                                  target: String, flaggedIDs: [UUID]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if bilingual {
-                BilingualHeader(label: languageLabel, showTimestamp: model.showTimestamps,
-                                showPlayMark: model.canPlayLines(of: job))
+                BilingualHeader(label: languageLabel, target: target, showTimestamp: model.showTimestamps,
+                                showPlayMark: model.canPlayLines(of: job), flaggedIDs: flaggedIDs)
                 Divider()
             }
             // 一覧はジョブごとに作り直す (.id): 別のジョブを選んだら、新しい ScrollView が一覧の始めから出て、
@@ -122,7 +161,8 @@ struct TranscriptDetailView: View {
             // .id が無いと ScrollView が前のジョブで動かした位置 (ずっと下) を残したまま中身だけが入れ替わり、LazyVStack が
             // その位置まで数千行を本当に並べた (GitHub の Mac で 3000 行のとき、文字起こし中のジョブを終わりまで出したあとに
             // 終わったジョブを選ぶ 1 回が 16.8 秒。ふだんは 0.2〜1.1 秒)
-            TranscriptListView(job: job, items: items, bilingual: bilingual, emptyMessage: emptyMessage)
+            // 訳す先 (target) は、行の説明の文 (「この文だけ〇〇語に訳す」) と練習の「隠す」に使う。めったに変わらない値
+            TranscriptListView(job: job, items: items, bilingual: bilingual, target: target, emptyMessage: emptyMessage)
                 .id(job.id)
             // 一覧の下の書き取りの欄 (「書き取りの欄を出す」のときだけ)。出すかどうかと中身を見るのは、この部品だけ
             // (この body が見ると、打つたびや設定を変えるたびに、一覧まで作り直すことになる)
@@ -139,13 +179,13 @@ struct TranscriptDetailView: View {
                 .truncationMode(.middle)
             Spacer()
             if let t = job.transcript, job.status == .done {
-                stat("長さ", TimeFormat.short(t.duration))
-                stat("処理", String(format: "%.1f 秒", t.elapsed))
+                stat(L("Length"), TimeFormat.short(t.duration))
+                stat(L("Processing"), L("%.1f s", t.elapsed))
                 if let rtf = t.realTimeFactor, rtf > 0 {
                     let speed = 1 / rtf
-                    stat("速度", speed >= 10 ? "\(Int(speed))倍速" : String(format: "%.1f倍速", speed))
+                    stat(L("Speed"), speed >= 10 ? L("%d×", Int(speed)) : L("%.1f×", speed))
                 }
-                stat("区間", "\(t.segments.count)")
+                stat(L("Segments"), "\(t.segments.count)")
             }
         }
     }
@@ -166,59 +206,233 @@ struct TranscriptDetailView: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: 操作列
-    private func controls(_ transcript: Transcript, _ stats: Transcript.TranslationStats) -> some View {
-        @Bindable var model = model
-        let canPost = job.status == .done && !transcript.segments.isEmpty
-        return HStack(spacing: 12) {
-            TextField("結果を検索", text: $model.searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 220)
-            Toggle("時刻", isOn: $model.showTimestamps)
-                .toggleStyle(.checkbox)
-            if stats.hasTranslation || stats.isMainlyForeign {
-                // 行の「訳」で対訳を出しているジョブでは、設定がオフでもチェックを付けて見せる
-                Toggle("対訳", isOn: Binding(
-                    get: { model.showsBilingual(job) },
-                    set: { model.setShowsBilingual($0, for: job) }
-                ))
-                    .toggleStyle(.checkbox)
-                    .help("原文と日本語訳を左右に並べる")
-            }
-            Toggle("メモ", isOn: $model.showNotes)
-                .toggleStyle(.checkbox)
-                .help("右にメモの欄を出す (理解したこと・覚えたい表現などを書ける。書いたものは自動で保存される)")
-            Spacer()
-            HistoryButton(job: job)
-            AuditButton(job: job, transcript: transcript)
-                .disabled(!canPost)
-            if stats.translatable > 0 {
-                Button {
-                    model.translate(job)
-                } label: {
-                    Label(stats.untranslated > 0 && stats.hasTranslation ? "残りを翻訳" : "翻訳",
-                          systemImage: "character.bubble")
+    private var emptyMessage: String {
+        if !model.searchText.isEmpty { return L("No matching segments") }
+        switch job.status {
+        case .running, .queued: return L("Sentences appear here as they are recognized…")
+        case .done: return L("No speech was detected. The audio may be silent, or the language setting may not match.")
+        default: return ""
+        }
+    }
+}
+
+/// 結果の画面の操作の列 (検索・チェック・ボタン)。ここは一覧の外。
+/// 画面の言語によって字の長さが違うので、並べ方を 3 つから選ぶ: 1 行 → 2 行 (下の行に字つきのボタン) → 2 行 (印だけ)。
+/// ViewThatFits は使わない: 文字起こし中は行が増えるたびにレイアウトが走り、そのたびに候補を測り直して重くなった
+/// (タイ語で、メインスレッドがふさがる割合が 6.9% から 26.0% に)。代わりに、使える幅 (幅が変わったときだけ変わる) と、
+/// 字の幅の見積もり (言語ごとに 1 度だけ測る) から 1 つを決め、それだけを描く。
+/// 使える幅を、結果の画面 (一覧を含む) の状態にしない: 幅を変えるたびに一覧まで描き直すことになる
+struct TranscriptControls: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    let transcript: Transcript
+    let stats: Transcript.TranslationStats
+    /// その結果の訳す先の言語 (説明の文と書き出しの名前に使う。ボタンの字には入れないので、並べ方の見積もりは変わらない)
+    let target: String
+    /// 操作の列に使える幅 (幅が変わったときだけ入れる。文字起こし中に行が増えても変わらない)
+    @State private var width: CGFloat?
+    @State private var textWidths = ControlsTextWidths()
+
+    var body: some View {
+        Group {
+            switch arrangement(for: width) {
+            case .oneLine:
+                HStack(spacing: ControlsMetrics.spacing) {
+                    // 1 行の形は、前と同じ見た目にする (検索の欄は 220 pt まで)
+                    searchField(maxWidth: 220)
+                    toggles
+                    Spacer()
+                    actions(iconOnly: false)
                 }
-                .help("日本語以外の区間を、Mac の中の LLM で日本語に訳す")
-                .disabled(!canPost || job.isPostActive || stats.untranslated == 0)
+            case .twoLines:
+                twoLines(iconOnly: false)
+            case .twoLinesIconOnly:
+                twoLines(iconOnly: true)
             }
-            Button {
-                model.copySelectedText()
-            } label: {
-                Label("コピー", systemImage: "doc.on.doc")
-            }
-            ExportMenu(hasTranslation: stats.hasTranslation, job: job)
-                .disabled(job.status != .done)
+        }
+        // minWidth: 0 = この列は、中身の幅を外へ求めない (与えられた幅をそのまま使う)。
+        // これが無いと、始めの 1 回の「1 行の形」が使える幅より広い言語 (英語など) で、その広さが結果の画面を
+        // ウインドウの外へ押し広げ、下で測る幅も押し広げた後の幅になるので、1 行の形のまま抜けられない
+        // (2026-11-19、英語の画面で、右端の「Export」と印の列・左のサイドバーが切れた)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newWidth in
+            width = newWidth
         }
     }
 
-    private var emptyMessage: String {
-        if !model.searchText.isEmpty { return "一致する区間はありません" }
-        switch job.status {
-        case .running, .queued: return "認識した文から順にここへ出ます…"
-        case .done: return "言葉を検出できませんでした。無音か、言語の設定が合っていない可能性があります。"
-        default: return ""
+    /// 2 行の形: 上に検索とチェック、下に右寄せのボタン
+    private func twoLines(iconOnly: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: ControlsMetrics.spacing) {
+                searchField(maxWidth: .infinity)
+                toggles
+            }
+            HStack(spacing: ControlsMetrics.spacing) {
+                Spacer()
+                actions(iconOnly: iconOnly)
+            }
         }
+    }
+
+    /// 検索の欄。残りの幅を使うが、140 pt より細くしない
+    private func searchField(maxWidth: CGFloat) -> some View {
+        @Bindable var model = model
+        return TextField(L("Search results"), text: $model.searchText)
+            .textFieldStyle(.roundedBorder)
+            .frame(minWidth: 140, maxWidth: maxWidth)
+    }
+
+    /// 「時刻」「対訳」「メモ」のチェック。字は 1 行のまま、縮めない
+    @ViewBuilder
+    private var toggles: some View {
+        @Bindable var model = model
+        Toggle(L("Timestamps"), isOn: $model.showTimestamps)
+            .toggleStyle(.checkbox)
+            .lineLimit(1)
+            .fixedSize()
+        if showsBilingualToggle {
+            // 行の「訳」で対訳を出しているジョブでは、設定がオフでもチェックを付けて見せる
+            Toggle(L("Bilingual"), isOn: Binding(
+                get: { model.showsBilingual(job) },
+                set: { model.setShowsBilingual($0, for: job) }
+            ))
+                .toggleStyle(.checkbox)
+                .lineLimit(1)
+                .fixedSize()
+                .help(L("Show the original and the %@ translation side by side", TranslationTarget.displayName(for: target)))
+        }
+        Toggle(L("Notes"), isOn: $model.showNotes)
+            .toggleStyle(.checkbox)
+            .lineLimit(1)
+            .fixedSize()
+            .help(L("Show a notes pane on the right (for what you understood, phrases to remember, and so on. What you write is saved automatically)"))
+    }
+
+    /// 操作の列のボタンとメニュー。iconOnly のときは印だけにする (字は読み上げと .help に出す)。字は 1 行のまま、縮めない
+    @ViewBuilder
+    private func actions(iconOnly: Bool) -> some View {
+        let canPost = job.status == .done && !transcript.segments.isEmpty
+        RedoMenu(job: job, iconOnly: iconOnly)
+        // 履歴のボタンは別のファイルの部品なので、印だけにするのは外から掛ける (中にポップオーバーは無い)
+        HistoryButton(job: job)
+            .actionLabelStyle(iconOnly: iconOnly)
+            .accessibilityLabel(Text(L("History")))
+            .lineLimit(1)
+            .fixedSize()
+        AuditButton(job: job, transcript: transcript, iconOnly: iconOnly)
+            .lineLimit(1)
+            .fixedSize()
+            .disabled(!canPost)
+        if stats.translatable > 0 {
+            let title = translateTitle
+            Button {
+                model.translate(job)
+            } label: {
+                Label(title, systemImage: "character.bubble")
+                    .actionLabelStyle(iconOnly: iconOnly)
+                    .accessibilityLabel(Text(title))
+            }
+            .lineLimit(1)
+            .fixedSize()
+            .help(L("Translate segments that are not in %1$@ into %2$@ with the LLM on your Mac",
+                    TranslationTarget.displayName(for: target), TranslationTarget.displayName(for: target)))
+            .disabled(!canPost || job.isPostActive || stats.untranslated == 0)
+        }
+        Button {
+            model.copySelectedText()
+        } label: {
+            Label(L("Copy"), systemImage: "doc.on.doc")
+                .actionLabelStyle(iconOnly: iconOnly)
+                .accessibilityLabel(Text(L("Copy")))
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .iconOnlyHelp(iconOnly, L("Copy"))
+        ExportMenu(hasTranslation: stats.hasTranslation, target: target, job: job, iconOnly: iconOnly)
+            .disabled(job.status != .done)
+    }
+
+    /// 翻訳のボタンの字 (並べ方の見積もりと、ボタンの両方で使う)
+    private var translateTitle: String {
+        stats.untranslated > 0 && stats.hasTranslation ? L("Translate the rest") : L("Translate")
+    }
+
+    /// 「対訳」のチェックを出す
+    private var showsBilingualToggle: Bool {
+        stats.hasTranslation || stats.isMainlyForeign
+    }
+
+    /// 使える幅に収まる並べ方を、見積もりで選ぶ。字の幅は ControlsTextWidths が覚えているので、ここでは足し算だけ
+    private func arrangement(for width: CGFloat?) -> ControlsArrangement {
+        // 幅をまだ測っていない始めの 1 回は、1 行にしておく (日本語の画面のふだんの形)
+        guard let width else { return .oneLine }
+        let m = ControlsMetrics.self
+        var toggleTitles = [L("Timestamps")]
+        if showsBilingualToggle { toggleTitles.append(L("Bilingual")) }
+        toggleTitles.append(L("Notes"))
+        let toggles = toggleTitles.map { textWidths.width(of: $0) + m.checkbox }
+
+        var buttons: [CGFloat] = []
+        if job.url != nil { buttons.append(textWidths.width(of: L("Transcribe again")) + m.button + m.menuIndicator) }
+        buttons.append(textWidths.width(of: L("History")) + m.button)
+        buttons.append(textWidths.width(of: transcript.audit.map { AuditButton.title(of: $0) } ?? L("Audit")) + m.button)
+        if stats.translatable > 0 { buttons.append(textWidths.width(of: translateTitle) + m.button) }
+        buttons.append(textWidths.width(of: L("Copy")) + m.button)
+        buttons.append(textWidths.width(of: L("Export")) + m.button + m.menuIndicator)
+
+        let buttonsWidth = buttons.reduce(0, +) + m.spacing * CGFloat(buttons.count - 1)
+        // 1 行: 検索・チェック・Spacer・ボタン。間隔は (チェックの数 + ボタンの数 + 1) 個
+        let oneLine = m.searchMin + toggles.reduce(0, +) + m.spacerMin + buttonsWidth
+            + m.spacing * CGFloat(toggles.count + 2) + m.safety
+        if oneLine <= width { return .oneLine }
+        // 2 行の下の行: Spacer・ボタン
+        let bottomLine = m.spacerMin + m.spacing + buttonsWidth + m.safety
+        if bottomLine <= width { return .twoLines }
+        return .twoLinesIconOnly
+    }
+}
+
+/// 操作の列の並べ方
+enum ControlsArrangement {
+    /// 1 行 (検索・チェック・ボタンが、字つきで並ぶ)
+    case oneLine
+    /// 2 行 (上に検索とチェック、下に字つきのボタン)
+    case twoLines
+    /// 2 行 (下のボタンは印だけ)
+    case twoLinesIconOnly
+}
+
+/// 操作の列の並べ方を見積もるための、字以外の幅 (pt)。足りないと字が切れるので、少し多めにしてある
+enum ControlsMetrics {
+    /// 部品の間隔 (HStack の spacing)
+    static let spacing: CGFloat = 12
+    /// 検索の欄の最小の幅
+    static let searchMin: CGFloat = 140
+    /// Spacer の最小の幅 (macOS)
+    static let spacerMin: CGFloat = 8
+    /// チェックの箱と、箱と字の間
+    static let checkbox: CGFloat = 20
+    /// ボタンの縁の内側の余白 (左右)・印・印と字の間
+    static let button: CGFloat = 34
+    /// メニューの矢印と、その前の間 (「やり直す」「書き出す」)
+    static let menuIndicator: CGFloat = 14
+    /// 見積もりの余り (迷う幅のときは、次の並べ方に落とす)
+    static let safety: CGFloat = 12
+}
+
+/// 操作の列の字の幅。AppKit で、操作の列が使う字 (システムの 13 pt) で測り、同じ字は 1 度だけ測る。
+/// 画面の言語を変えると、ウインドウの中身が .id(model.uiLanguage) で作り直されるので、ここも作り直される
+final class ControlsTextWidths {
+    private var widths: [String: CGFloat] = [:]
+    private let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+
+    func width(of text: String) -> CGFloat {
+        if let width = widths[text] { return width }
+        let width = ceil((text as NSString).size(withAttributes: [.font: font]).width)
+        widths[text] = width
+        return width
     }
 }
 
@@ -241,7 +455,7 @@ struct JobProgressBar: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            Button("中止") { model.cancel(job) }
+            Button(L("Stop")) { model.cancel(job) }
         }
     }
 }
@@ -251,12 +465,13 @@ struct LanguageTagLabel: View {
     let tag: String?
 
     var body: some View {
-        if let tag {
-            Text(tag)
+        // tag は言語のコード (en・ja)。出す印は、今の画面の言語で作る
+        if let tag, let label = LanguageTag.short(tag) {
+            Text(label)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
-                .help(tag == "英" ? "英語で話している区間" : "日本語で話している区間")
+                .help(tag == "en" ? L("A segment spoken in English") : L("A segment spoken in Japanese"))
         }
     }
 }
@@ -291,6 +506,8 @@ struct TranscriptListView: View {
     let job: Job
     let items: [TranscriptListItem]
     let bilingual: Bool
+    /// その結果の訳す先の言語 (めったに変わらない値。行の説明の文と、練習の「隠す」に使う)
+    let target: String
     let emptyMessage: String
     /// 行の色 (1 行だけ再生している行・いまの位置の行)。行と CurrentLineTracker が使い、この body では中を見ない
     @State private var highlight = RowHighlight()
@@ -318,7 +535,8 @@ struct TranscriptListView: View {
         GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView {
-                    TranscriptRows(job: job, items: items, bilingual: bilingual, emptyMessage: emptyMessage,
+                    TranscriptRows(job: job, items: items, bilingual: bilingual,
+                                   targetName: TranslationTarget.displayName(for: target), emptyMessage: emptyMessage,
                                    canPlay: canPlay, translating: translating, showTimestamps: showTimestamps,
                                    highlightText: highlightText, running: running, highlight: highlight, follow: follow)
                 }
@@ -326,7 +544,7 @@ struct TranscriptListView: View {
                 .background(Color(nsColor: .controlBackgroundColor))
                 .background(CurrentLineTracker(job: job, items: items, highlight: highlight, follow: follow, proxy: proxy))
                 // 練習の行を、一覧の行に合わせる (一覧が変わったときだけ知らせる)
-                .background(PracticeRowsFeeder(job: job, items: items, bilingual: bilingual))
+                .background(PracticeRowsFeeder(job: job, items: items, bilingual: bilingual, target: target))
                 .background(
                     GeometryReader { geometry in
                         // ホイールの操作が、この一覧の上かを見分けるための、一覧の位置 (ウインドウの中の横の範囲)
@@ -367,6 +585,8 @@ private struct TranscriptRows: View {
     let job: Job
     let items: [TranscriptListItem]
     let bilingual: Bool
+    /// 訳す先の言語の名前 (行の「訳」と右クリックの説明の文に使う)
+    let targetName: String
     let emptyMessage: String
     let canPlay: Bool
     let translating: Bool
@@ -389,13 +609,14 @@ private struct TranscriptRows: View {
         ForEach(items) { item in
             // 行と、その下の区切りの線 (行の背景の外に、行の余白と同じだけ内側へ寄せて引く。最後の行の下には引かない)
             VStack(alignment: .leading, spacing: 0) {
-                PlayableRow(item: item, job: job, canPlay: canPlay, highlight: highlight) {
+                PlayableRow(item: item, job: job, canPlay: canPlay, highlight: highlight, targetName: targetName,
+                            bilingual: bilingual) {
                     if bilingual {
                         BilingualRow(item: item, isTranslating: translating, showTimestamp: showTimestamps,
-                                     highlight: highlightText, job: job)
+                                     highlight: highlightText, job: job, targetName: targetName)
                     } else {
                         SegmentRow(item: item, showTimestamp: showTimestamps,
-                                   highlight: highlightText, job: job)
+                                   highlight: highlightText, job: job, targetName: targetName)
                     }
                 }
                 if item.id != lastID {
@@ -442,11 +663,11 @@ private struct FollowButton: View {
                 follow.isOn = true
                 if let lastID { proxy.scrollTo(lastID, anchor: .bottom) }
             } label: {
-                Label("末尾へ", systemImage: "arrow.down.to.line")
+                Label(L("To the end"), systemImage: "arrow.down.to.line")
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
-            .help("一覧の終わりへ移り、文字起こしの続きを追いかける")
+            .help(L("Go to the end of the list and follow the transcription as it continues"))
             .padding(12)
         }
     }
@@ -708,18 +929,23 @@ private struct PracticeRowsFeeder: View {
     let job: Job
     let items: [TranscriptListItem]
     let bilingual: Bool
+    /// 訳す先の言語 (練習は、この言語の行を隠さない)
+    let target: String
 
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
             .onAppear {
-                model.practice.rowsChanged(job: job, bilingual: bilingual)
+                model.practice.rowsChanged(job: job, bilingual: bilingual, target: target)
             }
             .onChange(of: items) { _, _ in
-                model.practice.rowsChanged(job: job, bilingual: bilingual)
+                model.practice.rowsChanged(job: job, bilingual: bilingual, target: target)
             }
             .onChange(of: bilingual) { _, on in
-                model.practice.rowsChanged(job: job, bilingual: on)
+                model.practice.rowsChanged(job: job, bilingual: on, target: target)
+            }
+            .onChange(of: target) { _, code in
+                model.practice.rowsChanged(job: job, bilingual: bilingual, target: code)
             }
     }
 }
@@ -749,16 +975,22 @@ struct PlayableRow<Content: View>: View {
     let canPlay: Bool
     /// 行の色 (この行だけを再生している・ふつうの再生でいまの位置がこの行にある)。この行の Cell だけを見る
     let highlight: RowHighlight
+    /// 訳す先の言語の名前 (右クリックの「この文だけ〇〇語に訳す」)
+    let targetName: String
+    /// 対訳の行 (右クリックに「訳を直す…」を出す)
+    let bilingual: Bool
     let content: Content
     @State private var hovering = false
 
     @MainActor
-    init(item: TranscriptListItem, job: Job, canPlay: Bool, highlight: RowHighlight,
-         @ViewBuilder content: () -> Content) {
+    init(item: TranscriptListItem, job: Job, canPlay: Bool, highlight: RowHighlight, targetName: String,
+         bilingual: Bool = false, @ViewBuilder content: () -> Content) {
         self.item = item
         self.job = job
         self.canPlay = canPlay
         self.highlight = highlight
+        self.targetName = targetName
+        self.bilingual = bilingual
         self.content = content()
         // 画面の重さの確認が、一覧が作った行の数を数える (ふだんは Bool を 1 つ見るだけ)。一覧が終わりへ飛ぶと、
         // LazyVStack はすべての行を作るが (1 つ 0.1 ms ほど)、並べるのは見える分だけなので、重さは body の数 (下) で見る
@@ -773,7 +1005,7 @@ struct PlayableRow<Content: View>: View {
         let isPlaying = tint == .playing
         // 原文を隠している行は、読み上げにも文を出さない
         let hidden = model.practice.concealment(of: item).hidesSource
-        let spoken = hidden ? "隠している行" : item.text
+        let spoken = hidden ? L("Hidden line") : item.text
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
             if canPlay {
                 Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle")
@@ -796,30 +1028,38 @@ struct PlayableRow<Content: View>: View {
         .help(canPlay ? hint(isPlaying) : "")
         .contextMenu {
             if canPlay {
-                Button(isPlaying ? "この行の再生を止める" : "この行だけを再生") { toggle() }
-                Button("ここから続けて再生") {
+                Button(isPlaying ? L("Stop playing this line") : L("Play only this line")) { toggle() }
+                Button(L("Play from here")) {
                     model.player.seek(to: item.start, andPlay: true)
                 }
                 Divider()
             }
-            Button("この行をコピー") {
-                model.copyLine(item.text, japanese: item.japanese)
+            Button(L("Copy this line")) {
+                model.copyLine(item.text, japanese: item.translation)
             }
-            Button("メモに引用") {
+            Button(L("Quote in notes")) {
                 model.quoteToNotes(text: item.text, time: item.start, in: job)
             }
             // 行の「訳」と同じ (VoiceOver では行が 1 つの要素になるので、ここからも訳せるように)
             if item.canTranslate || item.isTranslated {
                 Divider()
-                Button(item.isTranslated ? "この文を訳し直す" : "この文だけ日本語に訳す") {
+                Button(item.isTranslated ? L("Translate this sentence again") : L("Translate only this sentence into %@", targetName)) {
                     model.translateLine(item.id, in: job, redo: item.isTranslated)
                 }
                 .disabled(job.lineQueue.contains(item.id) || job.postState.task == .translate
                           || job.postQueue.contains(.translate))
             }
+            // 対訳の行の訳を、利用者が直す (訳がまだ無い行でも、自分で書ける)。直す画面は一覧の外のシート
+            // (翻訳の途中は行が作り直されるので、行の中の入力欄では下書きが消える)。もともと訳す先の言語の行には出さない
+            if bilingual && !item.isOriginalInTarget && job.status == .done {
+                if !(item.canTranslate || item.isTranslated) { Divider() }
+                Button(L("Edit translation…")) {
+                    model.requestTranslationEdit(item.id, in: job)
+                }
+            }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(canPlay ? spoken + "。" + hint(isPlaying) : spoken))
+        .accessibilityLabel(Text(canPlay ? L("%1$@. %2$@", spoken, hint(isPlaying)) : spoken))
         .accessibilityAddTraits(canPlay ? .isButton : [])
         .accessibilityAction {
             if canPlay { toggle() }
@@ -829,7 +1069,7 @@ struct PlayableRow<Content: View>: View {
     }
 
     private func hint(_ isPlaying: Bool) -> String {
-        isPlaying ? "クリックで停止" : "クリックで、この行だけを再生"
+        isPlaying ? L("Click to stop") : L("Click to play only this line")
     }
 
     private func background(_ tint: RowTint) -> Color {
@@ -863,6 +1103,8 @@ struct SegmentRow: View {
     let showTimestamp: Bool
     let highlight: String
     let job: Job
+    /// 訳す先の言語の名前 (行の「訳」の説明の文)
+    let targetName: String
 
     var body: some View {
         // 練習で隠すか (隠し方と、隠す行ならその行の「見せた」だけを見る)
@@ -882,30 +1124,32 @@ struct SegmentRow: View {
             ForEach(item.changes) { change in
                 AuditBadge(change: change, job: job)
             }
-            TranslateLineButton(item: item, job: job)
+            TranslateLineButton(item: item, job: job, targetName: targetName)
         }
         .padding(.vertical, 3)
     }
 }
 
-/// 行の「訳」: その行を含む 1 文だけを日本語に訳す (まとめて訳すより軽い)。行の再生とは別のボタンで、押しても再生しない。
-/// 文が訳されるのを待っているあいだ・訳しているあいだは、くるくるに変わる
+/// 行の「訳」: その行を含む 1 文だけを、その結果の訳す先の言語に訳す (まとめて訳すより軽い)。
+/// 行の再生とは別のボタンで、押しても再生しない。文が訳されるのを待っているあいだ・訳しているあいだは、くるくるに変わる
 struct TranslateLineButton: View {
     @Environment(AppModel.self) private var model
     let item: TranscriptListItem
     let job: Job
+    /// 訳す先の言語の名前 (説明の文)
+    let targetName: String
 
     var body: some View {
         if job.lineQueue.contains(item.id) {
             ProgressView()
                 .controlSize(.small)
-                .help("この文を訳しています (順番待ちを含む)")
+                .help(L("Translating this sentence (or waiting to)"))
         } else if item.canTranslate && job.postState.task != .translate && !job.postQueue.contains(.translate) {
             // まとめての「翻訳」を待っている・動いているあいだは出さない (その「翻訳」がこの行も訳す)
             Button {
                 model.translateLine(item.id, in: job)
             } label: {
-                Text("訳")
+                Text(L("Translate line"))
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -913,7 +1157,7 @@ struct TranslateLineButton: View {
                     .foregroundStyle(Color.accentColor)
             }
             .buttonStyle(.plain)
-            .help("この文だけ日本語に訳す")
+            .help(L("Translate only this sentence into %@", targetName))
         }
     }
 }
@@ -930,13 +1174,17 @@ struct TimestampLabel: View {
     }
 }
 
-/// 対訳表示の見出し (左: 原文 / 右: 日本語訳)
+/// 対訳表示の見出し (左: 原文 / 右: 訳。「日本語訳」など、その結果の訳す先の言語の名前で出す)
 struct BilingualHeader: View {
     /// 原文の言語の名前 (「英語」「英語＋日本語」など)
     let label: String?
+    /// 訳す先の言語のコード
+    let target: String
     let showTimestamp: Bool
     /// 行の頭に再生の印がある (その幅だけ空ける)
     var showPlayMark = false
+    /// 「要確認」の行の id (一覧の順。空なら「要確認 N」を出さない)
+    var flaggedIDs: [UUID] = []
 
     var body: some View {
         HStack(spacing: 12) {
@@ -946,10 +1194,15 @@ struct BilingualHeader: View {
             if showTimestamp {
                 Color.clear.frame(width: 52, height: 1)
             }
-            Label("原文" + (label.map { "（\($0)）" } ?? ""), systemImage: "text.quote")
+            Label(label.map { L("Original (%@)", $0) } ?? L("Original"), systemImage: "text.quote")
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Label("日本語訳", systemImage: "character.bubble")
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                Label(L("%@ translation", TranslationTarget.displayName(for: target)), systemImage: "character.bubble")
+                if !flaggedIDs.isEmpty {
+                    ReviewJumpButton(ids: flaggedIDs)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.callout.weight(.semibold))
         .foregroundStyle(.secondary)
@@ -958,7 +1211,34 @@ struct BilingualHeader: View {
     }
 }
 
-/// 対訳表示の 1 行 (左: 原文 / 右: 日本語訳)。文がいくつかの区間にまたがるときは、まとめて 1 行
+/// 対訳の見出しの「要確認 N」。押すたびに、次の「要確認」の行へ一覧を動かす (最後の次は初めに戻る)。
+/// 一覧の外に在るので、一覧を動かすのは練習の口 (`PracticeController.requestListScroll`) を通す。
+/// どこまで跳んだかは、この部品の @State に持つ (一覧の body は見ない)
+struct ReviewJumpButton: View {
+    @Environment(AppModel.self) private var model
+    let ids: [UUID]
+    @State private var last: UUID?
+
+    var body: some View {
+        Button {
+            guard !ids.isEmpty else { return }
+            let next = last.flatMap { ids.firstIndex(of: $0) }.map { ($0 + 1) % ids.count } ?? 0
+            last = ids[next]
+            model.practice.requestListScroll(to: ids[next])
+        } label: {
+            Text(LPlural(ids.count, one: "%d needs review", other: "%d need review"))
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(Color.orange.opacity(0.15), in: Capsule())
+                .foregroundStyle(.orange)
+        }
+        .buttonStyle(.plain)
+        .help(L("Go to the next translation that needs review"))
+    }
+}
+
+/// 対訳表示の 1 行 (左: 原文 / 右: 訳)。文がいくつかの区間にまたがるときは、まとめて 1 行
 struct BilingualRow: View {
     @Environment(AppModel.self) private var model
     let item: TranscriptListItem
@@ -966,6 +1246,8 @@ struct BilingualRow: View {
     let showTimestamp: Bool
     let highlight: String
     let job: Job
+    /// 訳す先の言語の名前 (行の「訳」の説明の文)
+    let targetName: String
 
     var body: some View {
         // 練習で隠すか (隠し方と、隠す行ならその行の「見せた」だけを見る)
@@ -990,22 +1272,69 @@ struct BilingualRow: View {
             // 訳の列。まだ訳がない行は、訳が入る所に「訳」を出す
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Group {
-                    if let japanese = item.japanese {
+                    if let japanese = item.translation {
                         Text(highlighted(japanese, highlight))
-                            .foregroundStyle(item.isOriginalJapanese ? Color.secondary : Color.primary)
+                            .foregroundStyle(item.isOriginalInTarget ? Color.secondary : Color.primary)
                             .redacted(reason: conceal.hidesTranslation ? .placeholder : [])
+                    } else if !isTranslating, !job.lineQueue.contains(item.id), item.hasUntranslatedReason {
+                        // 訳せなかった理由の覚えが在る行: 理由を、マウスを載せると出る文で添える (行の値を出すだけ)
+                        Text(L("Not translated"))
+                            .foregroundStyle(.tertiary)
+                            .italic()
+                            .help(item.review?.reasonTexts.joined(separator: "\n") ?? "")
                     } else {
-                        Text(isTranslating || job.lineQueue.contains(item.id) ? "翻訳中…" : "未翻訳")
+                        Text(isTranslating || job.lineQueue.contains(item.id) ? L("Translating…") : L("Not translated"))
                             .foregroundStyle(.tertiary)
                             .italic()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                TranslateLineButton(item: item, job: job)
+                // 利用者が直した訳の印 (行の値を出すだけ。押すと、訳を直す画面を開く)
+                if item.isEditedTranslation {
+                    EditedTranslationBadge(id: item.id, job: job)
+                } else if item.needsTranslationReview {
+                    // 訳の関門の印が付いた機械の訳 (同じ部品。橙色。押すと、理由を見て直す・「この訳でよい」を選べる)
+                    EditedTranslationBadge(id: item.id, job: job, title: L("Needs review"),
+                                           help: L("This translation may have a problem. Click to see why and check it."),
+                                           tint: .orange)
+                } else if item.isRememberedTranslation {
+                    // 訳の記憶から置いた訳の印 (同じ部品。文と説明だけ違う)
+                    EditedTranslationBadge(id: item.id, job: job, title: L("Remembered"),
+                                           help: L("This is your earlier translation of the same sentence. Click to change it."))
+                }
+                TranslateLineButton(item: item, job: job, targetName: targetName)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 3)
+    }
+}
+
+/// 利用者が直した訳の行の、灰色の小さな印「直した」。押すと、訳を直す画面 (一覧の外のシート) を開く。
+/// 訳の記憶から置いた訳の行の印「覚えた訳」、関門の印が付いた訳の橙色の印「要確認」にも使う (title・help・tint を渡す)
+struct EditedTranslationBadge: View {
+    @Environment(AppModel.self) private var model
+    let id: UUID
+    let job: Job
+    /// 印の文と説明 (nil なら「直した」の物)
+    var title: String? = nil
+    var help: String? = nil
+    /// 印の色 (nil なら灰色。「要確認」は橙色)
+    var tint: Color? = nil
+
+    var body: some View {
+        Button {
+            model.requestTranslationEdit(id, in: job)
+        } label: {
+            Text(title ?? L("Edited"))
+                .font(.caption2.weight(.semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background((tint ?? Color.secondary).opacity(0.15), in: Capsule())
+                .foregroundStyle(tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.secondary))
+        }
+        .buttonStyle(.plain)
+        .help(help ?? L("You edited this translation. Click to change it."))
     }
 }
 
@@ -1023,8 +1352,8 @@ struct RevealLineButton: View {
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
-        .help(revealed ? "この行を隠す" : "この行を見る")
-        .accessibilityLabel(Text(revealed ? "この行を隠す" : "この行を見る"))
+        .help(revealed ? L("Hide this line") : L("Show this line"))
+        .accessibilityLabel(Text(revealed ? L("Hide this line") : L("Show this line")))
     }
 }
 
@@ -1055,8 +1384,8 @@ struct AuditBadge: View {
     }
 
     private var title: String {
-        if change.isApplied { return change.kind == .fix ? "修正済み" : "削除済み" }
-        return change.kind == .fix ? "修正の提案" : "削除の提案"
+        if change.isApplied { return change.kind == .fix ? L("Fixed") : L("Deleted") }
+        return change.kind == .fix ? L("Suggested fix") : L("Suggested deletion")
     }
 
     private var color: Color {
@@ -1073,7 +1402,7 @@ struct AuditChangeDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label(change.kind == .fix ? "聞き取りミスの修正" : "区間の削除",
+                Label(change.kind == .fix ? L("Mishearing fix") : L("Segment deletion"),
                       systemImage: change.kind == .fix ? "pencil" : "trash")
                     .font(.headline)
                 Spacer()
@@ -1096,15 +1425,15 @@ struct AuditChangeDetail: View {
                 }
             }
             HStack {
-                Text(change.origin == .llm ? "見つけた: ローカル LLM"
-                     : (change.origin == .ledger ? "見つけた: 学習した直し" : "見つけた: 繰り返しの規則"))
+                Text(change.origin == .llm ? L("Found by: local LLM")
+                     : (change.origin == .ledger ? L("Found by: learned corrections") : L("Found by: repetition rules")))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 Spacer()
                 if change.isApplied {
-                    Button("元に戻す") { model.setAuditChange(change, applied: false, in: job) }
+                    Button(L("Undo")) { model.setAuditChange(change, applied: false, in: job) }
                 } else {
-                    Button(change.kind == .fix ? "この修正を反映" : "この区間を消す") {
+                    Button(change.kind == .fix ? L("Apply this fix") : L("Delete this segment")) {
                         model.setAuditChange(change, applied: true, in: job)
                     }
                     .buttonStyle(.borderedProminent)
@@ -1120,6 +1449,8 @@ struct AuditButton: View {
     @Environment(AppModel.self) private var model
     let job: Job
     let transcript: Transcript
+    /// 印だけにする (操作の列が狭いとき)。字は読み上げに出す
+    var iconOnly = false
     @State private var showing = false
 
     var body: some View {
@@ -1127,9 +1458,12 @@ struct AuditButton: View {
             Button {
                 showing = true
             } label: {
-                Label(summary(audit), systemImage: "checkmark.seal")
+                // 印だけの形は、ボタンの字にだけ掛ける (ポップオーバーの中の字まで消さないため)
+                Label(Self.title(of: audit), systemImage: "checkmark.seal")
+                    .actionLabelStyle(iconOnly: iconOnly)
+                    .accessibilityLabel(Text(Self.title(of: audit)))
             }
-            .help("監査の結果を見る (直した所・直す提案)")
+            .help(L("See the audit results (fixes made and suggested fixes)"))
             .popover(isPresented: $showing, arrowEdge: .bottom) {
                 AuditPanel(job: job, transcript: transcript)
                     .frame(width: 460, height: 420)
@@ -1138,21 +1472,28 @@ struct AuditButton: View {
             Button {
                 model.audit(job)
             } label: {
-                Label("監査", systemImage: "checkmark.seal")
+                Label(L("Audit"), systemImage: "checkmark.seal")
+                    .actionLabelStyle(iconOnly: iconOnly)
+                    .accessibilityLabel(Text(L("Audit")))
             }
             .help(model.isLLMInstalled
-                  ? "繰り返しと聞き取りミスを、Mac の中の LLM で見直す"
-                  : "繰り返しを見直す (聞き取りミスも見直すには、設定から LLM を取得)")
+                  ? L("Check for repetitions and mishearings with the LLM on your Mac")
+                  : L("Check for repetitions (to also check for mishearings, download an LLM in Settings)"))
             .disabled(job.isPostActive)
         }
     }
 
-    private func summary(_ audit: AuditReport) -> String {
+    /// ボタンの字 (操作の列の並べ方の見積もりでも使う)
+    static func title(of audit: AuditReport) -> String {
         var parts: [String] = []
-        if audit.appliedFixes > 0 { parts.append("修正 \(audit.appliedFixes)") }
-        if audit.appliedDeletes > 0 { parts.append("削除 \(audit.appliedDeletes)") }
-        if audit.pendingSuggestions > 0 { parts.append("提案 \(audit.pendingSuggestions)") }
-        return parts.isEmpty ? "監査: 問題なし" : "監査: " + parts.joined(separator: " · ")
+        if audit.appliedFixes > 0 { parts.append(LPlural(audit.appliedFixes, one: "%d fix", other: "%d fixes")) }
+        if audit.appliedDeletes > 0 {
+            parts.append(LPlural(audit.appliedDeletes, one: "%d deletion", other: "%d deletions"))
+        }
+        if audit.pendingSuggestions > 0 {
+            parts.append(LPlural(audit.pendingSuggestions, one: "%d suggestion", other: "%d suggestions"))
+        }
+        return parts.isEmpty ? L("Audit: no issues") : L("Audit: %@", parts.joined(separator: " · "))
     }
 }
 
@@ -1165,15 +1506,17 @@ struct AuditPanel: View {
         let audit = transcript.audit
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("監査の結果").font(.headline)
+                Text(L("Audit results")).font(.headline)
                 Spacer()
                 if let audit {
-                    Text((audit.model.map { "LLM: \($0)" } ?? "規則のみ") + (audit.isPartial == true ? " (途中まで)" : ""))
+                    let partial = audit.isPartial == true
+                    Text(audit.model.map { partial ? L("LLM: %@ (partial)", $0) : L("LLM: %@", $0) }
+                         ?? (partial ? L("Rules only (partial)") : L("Rules only")))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            Text("自信のある直しだけを反映しています。「提案」は確かめてから反映してください。どれもいつでも元に戻せます。")
+            Text(L("Only confident fixes are applied. Check each “suggestion” before you apply it. You can undo any of them at any time."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if let audit, !audit.changes.isEmpty {
@@ -1190,7 +1533,7 @@ struct AuditPanel: View {
                                 Text(TimeFormat.short(change.original.start))
                                     .monospacedDigit()
                                     .foregroundStyle(Color.accentColor)
-                                Text(change.kind == .fix ? "修正" : "削除")
+                                Text(change.kind == .fix ? L("Fix") : L("Deletion"))
                                     .font(.caption.weight(.semibold))
                                 Text(change.reason)
                                     .font(.caption)
@@ -1211,16 +1554,16 @@ struct AuditPanel: View {
                 .listStyle(.inset)
             } else {
                 Spacer()
-                Text("直す所は見つかりませんでした。")
+                Text(L("Nothing to fix was found."))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                 Spacer()
             }
             HStack {
-                Button("すべて元に戻す") { model.revertAudit(of: job) }
+                Button(L("Undo all")) { model.revertAudit(of: job) }
                     .disabled((audit?.appliedFixes ?? 0) + (audit?.appliedDeletes ?? 0) == 0)
                 Spacer()
-                Button("監査をやり直す") { model.audit(job) }
+                Button(L("Audit again")) { model.audit(job) }
                     .disabled(job.isPostActive)
             }
         }
@@ -1245,14 +1588,14 @@ struct PostProcessBar: View {
                         } else {
                             ProgressView().progressViewStyle(.linear)
                         }
-                        Text(message + (job.postQueue.isEmpty ? "" : "（このあと: " + queued + "）"))
+                        Text(job.postQueue.isEmpty ? message : L("%1$@ (next: %2$@)", message, queued))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
-                    Button("中止") { model.cancelPost(job) }
+                    Button(L("Stop")) { model.cancelPost(job) }
                 }
             } else if !job.postQueue.isEmpty {
-                Label("順番待ち: " + queued, systemImage: "clock")
+                Label(L("Waiting: %@", queued), systemImage: "clock")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -1270,11 +1613,11 @@ struct PostProcessBar: View {
     private var queued: String {
         job.postQueue.map { task in
             switch task {
-            case .audit: return "監査"
-            case .translate: return "翻訳"
-            case .translateLines: return "選んだ文の翻訳"
+            case .audit: return L("Audit")
+            case .translate: return L("Translation")
+            case .translateLines: return L("Translation of the selected sentences")
             }
-        }.joined(separator: "・")
+        }.joined(separator: L(", "))
     }
 }
 
@@ -1290,14 +1633,14 @@ struct MixedLanguageSuggestion: View {
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 2) {
-                Text("英語の多い録音でした。日本語と英語が入れ替わるなら、「日本語＋英語」で文字起こしし直せます")
+                Text(L("This recording has a lot of English. If Japanese and English take turns, you can transcribe it again with “Japanese + English”"))
                     .font(.callout.weight(.semibold))
-                Text("区切りごとに日本語か英語かを判定し、その言語で文字にします。言語を 1 つに決めたときに崩れた行が直ることがあります。時間は 2〜4 倍ほどかかります。")
+                Text(L("It decides Japanese or English for each part and transcribes it in that language. Lines that broke with a single language may come out right. It takes about 2 to 4 times as long."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button("日本語＋英語でやり直す") {
+            Button(L("Transcribe again with Japanese + English")) {
                 model.retranscribe(job, languageCode: Languages.japaneseEnglish.code)
             }
             .buttonStyle(.borderedProminent)
@@ -1307,7 +1650,7 @@ struct MixedLanguageSuggestion: View {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.borderless)
-            .help("閉じる (言語は、上の言語のメニューや設定でも選べます)")
+            .help(L("Close (you can also choose the language in the language menu above or in Settings)"))
         }
         .padding(12)
         .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
@@ -1328,9 +1671,9 @@ struct AutoMixedLanguageNotice: View {
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 2) {
-                Text("日本語と英語が混ざっていたので、「日本語＋英語」で文字にしました。")
+                Text(L("Japanese and English were mixed, so it was transcribed with “Japanese + English”."))
                     .font(.callout.weight(.semibold))
-                Text("区切りごとに日本語か英語かを判定し、その言語で文字にしています。自動で切り替えないようにするには、設定の「文字起こし」で変えられます。")
+                Text(L("It decides Japanese or English for each part and transcribes it in that language. To stop switching automatically, change it in the “Transcription” tab of Settings."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1346,22 +1689,166 @@ struct AutoMixedLanguageNotice: View {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.borderless)
-            .help("閉じる")
+            .help(L("Close"))
         }
         .padding(12)
         .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var retryTitle: String {
-        from == Languages.auto.code ? "「日本語＋英語」を使わずにやり直す" : "「\(Languages.name(for: from))」だけでやり直す"
+        from == Languages.auto.code
+            ? L("Transcribe again without “Japanese + English”")
+            : L("Transcribe again with only “%@”", Languages.name(for: from))
+    }
+}
+
+/// 音が続いているのに文字が少なかったので、自動で無音を飛ばさずに (VAD なしで) 文字起こししたことを知らせる。
+/// 無音を飛ばしてやり直すこともできる (やり直しでは、自動で VAD なしにしない)
+struct VADSkippedNotice: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "music.note")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            Text(L("There was continuous sound but very little text, so it was transcribed without skipping silence (it seems to be singing or music)."))
+                .font(.callout.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if job.url != nil {
+                Button(L("Transcribe again, skipping silence")) {
+                    model.redo(job, vad: true)
+                }
+                .disabled(!model.canRedo(job))
+            }
+            Button {
+                job.vadSkippedNoticeDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help(L("Close"))
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// 設定の訳す先と違う言語に訳してある結果に出す案内。設定の言語で訳し直せる (確かめてから。今の状態は履歴の版に残る)。
+/// 閉じると、この起動のあいだ、この結果では出さない。
+/// 監査・翻訳の最中か (版を残せるか) は、この部品の中で見る (結果の画面が見ると、進み具合が変わるたびに一覧まで描き直す)
+struct TranslationLanguageNotice: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    /// この結果が訳した言語のコード
+    let current: String
+    /// 設定の訳す先の言語のコード
+    let setting: String
+    @State private var confirming = false
+
+    var body: some View {
+        let currentName = TranslationTarget.displayName(for: current)
+        let settingName = TranslationTarget.displayName(for: setting)
+        // 版を残せない時 (保存していない結果・監査や翻訳の最中) は、訳し直せない (「戻す」と同じ)
+        let blocked = model.versionBlockedReason(job)
+        HStack(spacing: 12) {
+            Image(systemName: "character.bubble")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            Text(L("This result is translated into %1$@. The language set to translate into is %2$@.", currentName, settingName))
+                .font(.callout.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button(L("Translate again into %@…", settingName)) {
+                confirming = true
+            }
+            .disabled(blocked != nil)
+            .help(blocked ?? "")
+            Button {
+                job.translationLanguageNoticeDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help(L("Close"))
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .alert(L("Translate again into %@?", settingName), isPresented: $confirming) {
+            Button(L("Translate again")) {
+                model.retranslate(job, into: setting)
+            }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L("The current %1$@ translation will be removed, and the result will be translated again into %2$@. The current state is kept as a version in the history.", currentName, settingName))
+        }
+    }
+}
+
+/// 「やり直す」のメニュー (結果の画面の操作の列)。録音中か・音声ファイルが在るかは、この部品の中で見る
+/// (結果の画面が見ると、録音を始めた・止めたときに一覧まで描き直す)
+struct RedoMenu: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    /// 印だけにする (操作の列が狭いとき)。字は読み上げに出す
+    var iconOnly = false
+
+    var body: some View {
+        if job.url != nil {
+            Menu {
+                RedoMenuItems(job: job)
+            } label: {
+                Label(L("Transcribe again"), systemImage: "arrow.clockwise")
+                    .actionLabelStyle(iconOnly: iconOnly)
+                    .accessibilityLabel(Text(L("Transcribe again")))
+            }
+            .menuStyle(.button)
+            .fixedSize()
+            .help(L("Transcribe this audio again. The original result is kept"))
+            .disabled(!model.canRedo(job))
+        }
+    }
+}
+
+/// 「やり直す」の中身 (結果の画面とメニューバーの両方で使う)
+struct RedoMenuItems: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        Button(L("Transcribe again with the same settings")) { model.redo(job) }
+        Button(L("Transcribe again without skipping silence (for singing and music)")) { model.redo(job, vad: false) }
+        Button(L("Transcribe again, skipping silence")) { model.redo(job, vad: true) }
+        Divider()
+        Menu(L("Transcribe again in another language")) {
+            ForEach(Languages.all) { language in
+                Button(language.name) { model.redo(job, languageCode: language.code) }
+            }
+        }
+    }
+}
+
+/// 失敗・中止した結果の「もう一度文字起こしする」(同じ設定でやり直す)。録音中か・音声ファイルが在るかは、この部品の中で見る
+struct RedoAgainButton: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+
+    var body: some View {
+        if job.url != nil {
+            Button(L("Try transcribing again")) { model.redo(job) }
+                .disabled(!model.canRedo(job))
+                .help(L("Transcribe this audio again with the same settings. The original result is kept"))
+        }
     }
 }
 
 /// 翻訳・監査に LLM が必要なことを知らせる
 struct LLMNeededBanner: View {
     @Environment(AppModel.self) private var model
-    /// 日本語以外が主な文字起こし (翻訳も案内する)
+    /// 訳す先の言語以外が主な文字起こし (翻訳も案内する)
     let wantsTranslation: Bool
+    /// 訳す先の言語のコード
+    let target: String
 
     var body: some View {
         let selection = model.currentLLM
@@ -1371,10 +1858,13 @@ struct LLMNeededBanner: View {
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 2) {
                 Text(wantsTranslation
-                     ? "日本語訳と聞き取りミスの監査には、Mac の中で動く LLM を使います"
-                     : "聞き取りミスの監査には、Mac の中で動く LLM を使います (いまは繰り返しだけを見直しています)")
+                     ? L("The %@ translation and the mishearing audit use an LLM that runs on your Mac",
+                         TranslationTarget.displayName(for: target))
+                     : L("The mishearing audit uses an LLM that runs on your Mac (for now, only repetitions are checked)"))
                     .font(.callout.weight(.semibold))
-                Text("\(selection.name) (約 \(selection.spec.map { TimeFormat.bytes(Int64($0.approxMB) * 1_000_000) } ?? "—")) を一度だけダウンロードします。文字起こしの内容は Mac の外に出ません。")
+                Text(L("%1$@ (about %2$@) is downloaded only once. Your transcriptions never leave your Mac.",
+                       selection.name,
+                       selection.spec.map { TimeFormat.bytes(Int64($0.approxMB) * 1_000_000) } ?? "—"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1387,7 +1877,7 @@ struct LLMNeededBanner: View {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.borderless)
-            .help("閉じる (設定の「監査・翻訳」タブから、いつでも取得できます)")
+            .help(L("Close (you can download it at any time in the “Audit & translation” tab of Settings)"))
         }
         .padding(12)
         .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
@@ -1407,13 +1897,13 @@ struct LLMDownloadControls: View {
             case .downloading(let fraction):
                 ProgressView(value: fraction).frame(width: 90)
                 Text("\(Int(fraction * 100))%").monospacedDigit().foregroundStyle(.secondary)
-                Button("中止") { model.cancelLLMDownload(spec) }
+                Button(L("Stop")) { model.cancelLLMDownload(spec) }
             case .notInstalled:
                 if prominent {
-                    Button("ダウンロード") { model.downloadLLM(spec) }
+                    Button(L("Download")) { model.downloadLLM(spec) }
                         .buttonStyle(.borderedProminent)
                 } else {
-                    Button("ダウンロード") { model.downloadLLM(spec) }
+                    Button(L("Download")) { model.downloadLLM(spec) }
                         .buttonStyle(.bordered)
                 }
             case .installed:
@@ -1421,34 +1911,66 @@ struct LLMDownloadControls: View {
             }
         }
         // 設定の「監査・翻訳」タブを開く (メモリ 8 GB の Mac で軽い 2B を選ぶときなど)
-        Button("設定で選ぶ…") {
+        Button(L("Choose in Settings…")) {
             model.settingsTab = .llm
             openSettings()
         }
-        .help("設定の「監査・翻訳」タブを開きます。軽い 2B や高精度の 9B も選べます")
+        .help(L("Opens the “Audit & translation” tab of Settings. You can also choose the light 2B or the accurate 9B"))
     }
 }
 
-/// 書き出し (原文 / 日本語訳 / 対訳 × 形式)
+/// 書き出し (原文 / 訳 / 対訳 × 形式)
 struct ExportMenu: View {
     let hasTranslation: Bool
+    /// その結果の訳す先の言語のコード (訳・対訳の名前に使う)
+    let target: String
     /// メモが空かどうかは、この部品の中で見る (結果の画面が見ると、メモを書き始めたときに一覧まで描き直す)
     let job: Job
+    /// 印だけにする (操作の列が狭いとき)。字は読み上げと .help に出す
+    var iconOnly = false
 
     var body: some View {
         Menu {
-            ExportMenuItems(hasTranslation: hasTranslation, hasNotes: job.hasNotes)
+            ExportMenuItems(hasTranslation: hasTranslation, target: target, hasNotes: job.hasNotes)
         } label: {
-            Label("書き出す", systemImage: "square.and.arrow.up")
+            Label(L("Export"), systemImage: "square.and.arrow.up")
+                .actionLabelStyle(iconOnly: iconOnly)
+                .accessibilityLabel(Text(L("Export")))
         }
         .menuStyle(.button)
         .fixedSize()
+        .iconOnlyHelp(iconOnly, L("Export"))
+    }
+}
+
+/// 操作の列の、印だけの形 (狭いとき)
+extension View {
+    /// iconOnly のときは、ボタンやメニューの字を隠して印だけにする。そうでないときは、今のまま
+    @ViewBuilder
+    func actionLabelStyle(iconOnly: Bool) -> some View {
+        if iconOnly {
+            labelStyle(.iconOnly)
+        } else {
+            self
+        }
+    }
+
+    /// 印だけのときに、字を .help に出す (ほかに .help が無いボタン用)
+    @ViewBuilder
+    func iconOnlyHelp(_ iconOnly: Bool, _ text: String) -> some View {
+        if iconOnly {
+            help(text)
+        } else {
+            self
+        }
     }
 }
 
 struct ExportMenuItems: View {
     @Environment(AppModel.self) private var model
     let hasTranslation: Bool
+    /// その結果の訳す先の言語のコード (「日本語訳」「対訳 (原文 + 日本語)」の名前に使う)
+    let target: String
     /// メモが空でない (「メモ (.md)」も出す)
     let hasNotes: Bool
 
@@ -1456,7 +1978,7 @@ struct ExportMenuItems: View {
         formats
         if hasNotes {
             Divider()
-            Button("メモ (.md)") { model.exportNotes() }
+            Button(L("Notes (.md)")) { model.exportNotes() }
         }
     }
 
@@ -1464,7 +1986,7 @@ struct ExportMenuItems: View {
     private var formats: some View {
         if hasTranslation {
             ForEach(ExportContent.allCases) { content in
-                Section(content.displayName) {
+                Section(content.displayName(target: target)) {
                     ForEach(ExportFormat.allCases.filter { ExportContent.available(for: $0).contains(content) }) { format in
                         Button(format.displayName) { model.export(as: format, content: content) }
                     }
@@ -1488,14 +2010,14 @@ struct MissingAudioNotice: View {
         HStack(spacing: 8) {
             Image(systemName: "questionmark.folder")
                 .foregroundStyle(.secondary)
-            Text("音声ファイルが見つかりません: " + path)
+            Text(L("Audio file not found: %@", path))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .textSelection(.enabled)
             Spacer()
-            Button("音声を選び直す…") { model.relocateAudio(of: job) }
+            Button(L("Choose the audio again…")) { model.relocateAudio(of: job) }
                 .controlSize(.small)
         }
     }
@@ -1518,7 +2040,7 @@ struct PlayerBar: View {
                     .frame(width: 16)
             }
             .buttonStyle(.bordered)
-            .help("再生 / 一時停止 (スペースキー)")
+            .help(L("Play / pause (Space)"))
             Text(TimeFormat.short(p.currentTime))
                 .monospacedDigit()
                 .font(.callout)

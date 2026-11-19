@@ -1,0 +1,123 @@
+// 日本語の表: 設定の画面 (SettingsView) と、言語を変えた時の開き直しの案内。
+// 鍵 = 英語、値 = 日本語。値は、英語の画面にする前の文と一字も変えない。
+extension JA {
+    static let settings: [String: String] = tabs.merging(llm) { first, _ in first }
+
+    /// タブの名前・「一般」の開き直しの案内・「文字起こし」タブ・モデルの行
+    private static let tabs: [String: String] = [
+        // タブの名前
+        "Transcription": "文字起こし",
+        "Audit & translation": "監査・翻訳",
+        // 「一般」タブ: 画面の言語を変えた時の、開き直しの案内
+        "The display language was changed": "言語を切り替えました",
+        "The text on screen has already changed. Standard menu bar items (Edit, Window, and so on) change when you reopen Kikimimi.": "画面の文は、もう切り替わりました。メニューバーの決まりの項目 (編集・ウインドウなど) は、ききみみを開き直すと切り替わります。",
+        "The text on screen has already changed. Standard menu bar items (Edit, Window, and so on) change when you reopen Kikimimi. Reopen Kikimimi after the current work finishes.": "画面の文は、もう切り替わりました。メニューバーの決まりの項目 (編集・ウインドウなど) は、ききみみを開き直すと切り替わります。作業が終わってから、ききみみを開き直してください。",
+        "Reopen now": "今すぐ開き直す",
+        "Later": "あとで",
+        "OK": "OK",
+        "Work is in progress (transcription, audit, translation, recording, or download). You can reopen after it finishes.": "作業 (文字起こし・監査・翻訳・録音・ダウンロード) の途中です。終わってから開き直せます。",
+        // 「文字起こし」タブ
+        "Spoken language": "言語",
+        "For recordings that switch between Japanese and English. Each stretch of speech is checked to see whether it is Japanese or English, and is transcribed in that language. Because of the check, it takes about 2–4 times as long as the “Japanese” setting (longer when the language changes often or there are many short remarks in the other language). For a recording in only one of the two, choose that language.": "日本語と英語が入れ替わる録音向けです。区切りごとに、話している言語を日本語か英語かで判定して、その言語で文字にします。判定のぶん、「日本語」の設定の 2〜4 倍ほどの時間がかかります (言語の入れ替わりや短い差し込みが多いほど長くなります)。どちらか一方だけの録音には、その言語を選んでください。",
+        "Model": "モデル",
+        "%@ (recommended)": "%@ (おすすめ)",
+        "Prefer accuracy (beam search)": "精度を優先する (ビームサーチ)",
+        "Skip silence (VAD)": "無音を飛ばす (VAD)",
+        "When there is continuous sound but very little text, transcribe again without skipping silence": "音が続いているのに文字が少ない時は、無音を飛ばさずにやり直す",
+        "With songs and music, skipping silence may not treat singing as speech, so the lyrics may be missing. When that happens, the audio is transcribed again automatically without skipping silence (this takes longer).": "歌や音楽では、無音を飛ばす機能が歌声を声と見なさず、歌詞が出ない事があります。その時は、自動で、無音を飛ばさずにもう一度文字起こしします (時間は長くなります)。",
+        "Remove common misrecognitions and repeated sentences": "定番の誤認識と、同じ文の繰り返しを取り除く",
+        "Automatically transcribe recordings that mix Japanese and English as “Japanese + English”": "日本語と英語が混ざっている録音は、自動で「日本語＋英語」で文字にする",
+        "With “Japanese”, “English”, or “Auto-detect”, the language is checked at several points in the recording before transcribing (a few seconds to a few tens of seconds). When the recording is mixed and the setting is switched, it takes about 2–4 times as long as “Japanese”. A recording in only one language takes no longer, apart from the check. “Skip silence (VAD)” must be on.": "「日本語」「英語」「自動判定」のとき、文字にする前に録音のところどころの言語を確かめます (数秒〜数十秒)。混ざっていて切り替えたときは、「日本語」の 2〜4 倍ほどの時間がかかります。1 つの言語だけの録音は、確かめる時間のほかは変わりません。無音を飛ばす (VAD) が必要です。",
+        "Show a preview while recording": "録音中にプレビューを出す",
+        "Vocabulary hints": "語彙のヒント",
+        "Example: %@": "例: %@",
+        "Write proper nouns and technical terms here, and they are more likely to come out with that spelling. You can leave this empty.": "固有名詞や専門用語を書いておくと、その表記で出やすくなります。空欄でも構いません。",
+        "Models": "モデル",
+        "Add a local file…": "手元のファイルを追加…",
+        "Open the models folder": "モデルのフォルダを開く",
+        "Speech recognition uses whisper.cpp (a C/C++ implementation of OpenAI Whisper), which is free and open source, and runs on the Mac’s GPU (Metal). Neither the audio nor the transcription leaves your Mac. The internet is used only to download a model the first time.": "音声認識には、無料・オープンソースの whisper.cpp (OpenAI Whisper の C/C++ 実装) を使い、Mac の GPU (Metal) で動きます。音声も文字起こしの内容も Mac の外に送られません。インターネットを使うのは、モデルを初めて取得するときだけです。",
+        // モデルの行 (ModelRow・LLMModelRow)
+        "%1$@ About %2$d MB": "%1$@ 約 %2$d MB",
+        "%1$@ About %2$@ · %3$@": "%1$@ 約 %2$@・%3$@",
+        "May be too heavy for this Mac (%d GB of memory)": "この Mac (メモリ %d GB) では重いかもしれません",
+        "Downloaded": "取得済み",
+        "Delete": "削除",
+        "Download": "ダウンロード",
+        "Cancel download": "中止",
+    ]
+
+    /// 「監査・翻訳」タブ (LLM・学習した直し・追加学習)
+    private static let llm: [String: String] = [
+        "Audit & translation (local LLM)": "監査・翻訳 (ローカル LLM)",
+        "Audit after transcription (check for repetitions and mishearings)": "文字起こしのあとに監査する (繰り返し・聞き取りミスの見直し)",
+        // 訳す先の言語 (%1$@・%2$@ は、どちらも設定の訳す先の言語の名前)
+        "Translate into": "訳す先の言語",
+        "Results that are already translated keep their language. To use another language, translate again on the result screen.": "もう訳してある結果は、その結果の言語のまま続きます。別の言語にするには、結果の画面で訳し直します。",
+        "Translate segments that are not in %1$@ into %2$@": "%1$@以外の区間を、%2$@に翻訳する",
+        "Even when this is off, you can translate only the sentences you want to read, one at a time, with “Translate” on a result line (lighter than translating everything).": "オフにしても、結果の行の「訳」で、読みたい文だけを 1 文ずつ訳せます (まとめて訳すより軽く済みます)。",
+        "Your file: %@": "手持ち: %@",
+        "Added GGUF": "取り込んだ GGUF",
+        "Add a local GGUF…": "手元の GGUF を追加…",
+        "Open the LLM folder": "LLM のフォルダを開く",
+        "Adding…": "取り込み中…",
+        "Location: %@": "保存先: %@",
+        "The auditor finds repeated sentences and mishearings that are clear from the context. Only fixes it is sure of are applied; the rest are kept as “suggestions”, so you can check them before applying. Every fix can be undone. This Mac has %d GB of memory.": "監査役は、同じ文の繰り返しと、文脈から見て明らかな聞き間違いを見つけます。自信のある直しだけを反映し、それ以外は「提案」として残すので、確かめてから反映できます。どの直しも元に戻せます。この Mac のメモリは %d GB です。",
+        "The auditor finds repeated sentences and mishearings that are clear from the context. Only fixes it is sure of are applied; the rest are kept as “suggestions”, so you can check them before applying. Every fix can be undone. This Mac has %d GB of memory (on the low side, so transcription and the LLM are loaded in turn).": "監査役は、同じ文の繰り返しと、文脈から見て明らかな聞き間違いを見つけます。自信のある直しだけを反映し、それ以外は「提案」として残すので、確かめてから反映できます。どの直しも元に戻せます。この Mac のメモリは %d GB です (少なめなので、文字起こしと LLM を交互に読み込みます)。",
+        "Audit and translation use llama.cpp and Qwen3.5, which are free and open source, and run on the Mac’s GPU (Metal). The transcription does not leave your Mac. The internet is used only to download an LLM the first time.": "監査と翻訳には、無料・オープンソースの llama.cpp と Qwen3.5 を使い、Mac の GPU (Metal) で動きます。文字起こしの内容は Mac の外に送られません。インターネットを使うのは、LLM を初めて取得するときだけです。",
+        // 追加学習 (AdapterSection)
+        "Fine-tuning (LoRA)": "追加学習 (LoRA)",
+        "Audit adapter for %@": "%@ 用の監査の差分",
+        "Translation adapter for %@": "%@ 用の翻訳の差分",
+        "Added": "入っています",
+        "Not added": "入っていません",
+        "Remove": "外す",
+        "Replace…": "入れ替える…",
+        "Add adapter…": "差分を追加…",
+        "Use the adapters (the audit adapter for audit, the translation adapter for translation)": "差分を使う (監査には監査の差分、翻訳には翻訳の差分)",
+        "Translation uses only the translation adapter. Without one, translation runs without an adapter (an adapter trained for audit can garble names in translations).": "翻訳には、翻訳の差分だけを使います。翻訳の差分が無い時は、差分なしで訳します (監査を学習した差分は、訳の名前を崩す事があります)。",
+        "Export training data…": "学習用のデータを書き出す…",
+        "%d learned correction": "学習した直し %d 件",
+        "%d learned corrections": "学習した直し %d 件",
+        "When learned corrections build up, you can teach them to the LLM itself (fine-tuning). Export the training data and run tools/finetune/finetune.py in Terminal: it trains on this Mac and makes an “adapter” (….lora.gguf). An adapter is a small file used on top of the original LLM without changing it, and you can remove it at any time. Compare before and after training on the same cases, and add only an adapter that fixes more lines and makes nothing worse. The steps are in “Fine-tuning” in the README. For just a few corrections, “Learned corrections” above applies them as they are, without fine-tuning.": "学習した直しがたまったら、LLM そのものに覚えさせることができます (追加学習)。学習用のデータを書き出し、ターミナルで tools/finetune/finetune.py を動かすと、この Mac の中で学習して「差分」(….lora.gguf) を作ります。差分は、元の LLM を書き換えずに重ねて使う小さなファイルで、いつでも外せます。学習の前後は同じ場面で比べ、直せる行が増えて、悪くなったところの無い差分だけを入れます。手順は README の「追加学習」にあります。数件の直しなら、追加学習をしなくても上の「学習した直し」がそのまま当てます。",
+        // 覚えた訳 (RememberedTranslationsSection)
+        "Remembered translations": "覚えた訳",
+        "Use remembered translations in the next translation": "覚えた訳を、次の翻訳に使う",
+        "None yet. When you edit a translation in the bilingual view, it is remembered here.": "まだありません。対訳の行で訳を直すと、ここに覚えます。",
+        // 訳語の対 (U5)
+        "Terms": "訳語",
+        "No terms yet.": "まだありません。",
+        "Word in the original": "原文の語",
+        "Translation to use": "使う訳語",
+        "Always translate a word as (optional)": "語を、いつもこう訳す (任意)",
+        "When both are filled in, “Save” also remembers this term for translations into %@. Lines already translated are not translated again.": "2 つとも入れると、「保存」で、%@への翻訳の訳語としても覚えます。もう訳した行は、訳し直しません。",
+        "In the next translations into that language, the LLM is told to translate the word as you decided. If a translation does not use it, the line is marked “Needs review”. Terms are used only while the switch above is on.": "次からその言語に訳す時、LLM に、その語を決めた訳語に訳すよう伝えます。訳にその訳語が無い行には「要確認」の印が付きます。訳語も、上の入・切に従います。",
+        "%d remembered translation": "覚えた訳 %d 件",
+        "%d remembered translations": "覚えた訳 %d 件",
+        "When the same sentence comes up again in a translation into the same language, your translation is used without asking the LLM. Short sentences are always translated again, because their meaning depends on the scene. “Translate this sentence again” always asks the LLM. Deleting here removes only the remembered translation; translations in your results stay as they are. They are saved only on this Mac.": "同じ言語へ訳す時に、同じ文がまた出たら、LLM に頼まずに自分で直した訳を置きます。短い文は場面で訳が変わるので、いつも訳し直します。「この文を訳し直す」は、いつも LLM に頼みます。ここで消すのは覚えた訳だけで、結果に残っている訳はそのままです。保存先はこの Mac の中だけです。",
+        // 印を出さなくなった検査 (U6)
+        "Checks that no longer mark lines": "印を出さなくなった検査",
+        "Marked fine %1$d times / edited %2$d times": "この訳でよい %1$d 回 / 直した %2$d 回",
+        "When you mark most lines flagged by a check as fine, that check stops marking lines in that language. “Undo” turns it back on.": "印の付いた行の多くを「この訳でよい」とした検査は、その言語では印を出さなくなります。「元に戻す」で、また印を出します。",
+        "Missing number": "数の抜け",
+        "Wrong language": "言語の違い",
+        "Same as the original": "原文の写し",
+        "Repeated words": "繰り返し",
+        "Too short": "短すぎる訳",
+        "Missing term": "訳語の抜け",
+        // 学習した直し (LearnedCorrectionsSection)
+        "Learned corrections": "学習した直し",
+        "Remember the fixes decided in the audit list and use them from next time": "監査の一覧で決めた直しを覚えて、次から使う",
+        "None yet. When you check or uncheck fixes in the audit list, they are remembered here.": "まだありません。監査の一覧で直しのチェックを入れたり外したりすると、ここに覚えます。",
+        "Misheard term": "聞き間違えた語",
+        "Misheard term (e.g. Roblocks)": "聞き間違えた語 (例: Roblocks)",
+        "Right term": "正しい語",
+        "Right term (e.g. Roblox)": "正しい語 (例: Roblox)",
+        "Add": "追加",
+        "Applied fixes are used from the next audit, before the LLM is asked. A fix applied once is shown as a suggestion; after it is applied twice, it is fixed automatically (fixes that change a number or a negation, or turn kana into kanji, are always suggestions). They are shown as “Learned corrections” in the list, so you can always undo them. A fix you undid is not used, even if the LLM suggests it again. The right term is also added to the vocabulary hints. Fixes you add here are always applied automatically. They are saved only on this Mac.": "反映した直しは、次の監査から LLM に聞く前に当てます。1 回反映しただけの直しは提案として出し、2 回反映すると自動で直します (数字や否定が変わる直し・かなを漢字にする直しは、いつも提案です)。一覧に「学習した直し」と出るので、いつでも元に戻せます。元に戻した直しは、LLM がまた出してきても使いません。正しい語は、語彙のヒントにも足します。ここで追加した直しは、いつも自動で当てます。保存先はこの Mac の中だけです。",
+        "Always fix (added by you)": "いつも直す (自分で追加)",
+        "Fix automatically from now on (applied: %1$d, undone: %2$d)": "次から自動で直す (反映 %1$d 回・元に戻す %2$d 回)",
+        "Suggest next time (applied: %1$d, undone: %2$d. Apply it once more to fix it automatically)": "次は提案として出す (反映 %1$d 回・元に戻す %2$d 回。もう一度反映すると、自動で直す)",
+        "No longer suggested (undone: %1$d, applied: %2$d)": "もう提案しない (元に戻す %1$d 回・反映 %2$d 回)",
+        "On hold (applied: %1$d, undone: %2$d)": "保留 (反映 %1$d 回・元に戻す %2$d 回)",
+    ]
+}

@@ -1,0 +1,598 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-fr.json"
+  ],
+  "translation" : {
+    "cases" : 28,
+    "chrF" : 58.409251952863606,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        5292,
+        5262,
+        5232,
+        5202,
+        5172,
+        5142
+      ],
+      "matches" : [
+        4693,
+        3839,
+        3227,
+        2875,
+        2606,
+        2376
+      ],
+      "reference" : [
+        5753,
+        5723,
+        5693,
+        5663,
+        5633,
+        5603
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 30,
+    "lines" : 30,
+    "numbersChecked" : 5,
+    "numbersKept" : 5,
+    "repeated" : 0,
+    "seconds" : 323.6398162841797,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 30
+  },
+  "translationByTarget" : {
+    "fr" : {
+      "cases" : 28,
+      "chrF" : 58.409251952863606,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          5292,
+          5262,
+          5232,
+          5202,
+          5172,
+          5142
+        ],
+        "matches" : [
+          4693,
+          3839,
+          3227,
+          2875,
+          2606,
+          2376
+        ],
+        "reference" : [
+          5753,
+          5723,
+          5693,
+          5663,
+          5633,
+          5603
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 30,
+      "lines" : 30,
+      "numbersChecked" : 5,
+      "numbersKept" : 5,
+      "repeated" : 0,
+      "seconds" : 323.6398162841797,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 30
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_111975537143453440",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.577679991722107,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "De manière générale, j'aime vraiment le chevauchement entre les deux jeux. L'avantage des histoires courtes est que vous pouvez \"vite passer à la partie intéressante\", cela les rend immédiatement satisfaisantes. L'avantage des histoires longues est que vous pouvez vous imprégner de tout ce qui se passe avec bien plus d'émotions, vous perdez la spontanéité en échange de quelque chose de plus fort.",
+          "source" : "In general I really like the interplay between the two games. The advantage of shortform stories is that you can \"skip to the good part\", they can be more immediately engrossing and satisfying. The advantage of longform stories is that you can imbue whatever happens with way more emotional weight, you lose the immediacy in exchange for stronger payoffs.",
+          "text" : "En général, j'aime vraiment l'interaction entre les deux jeux. L'avantage des histoires courtes est que vous pouvez « aller droit au but », elles peuvent être plus immédiatement captivantes et satisfaisantes. L'avantage des histoires longues est que vous pouvez accorder un poids émotionnel bien plus important à ce qui se passe ; vous perdez l'immédiateté en échange de retombées plus fortes."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_111976249663909024",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 7.0964120626449585,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "d'après le site d'AT&T, il n'y a pas de panne, alors qu'aux infos, ils en parlent 😠",
+          "source" : "the AT&T status site claims there's no outages...even though the news is reporting an outage 😠",
+          "text" : "Le site de statut d'AT&T prétend qu'il n'y a pas de pannes... alors que les nouvelles signalent une panne 😠."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 3.6426849365234375,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Je déteste la lave #templedufeu",
+          "source" : "I hate lava #firetemple",
+          "text" : "Je déteste la lave #firetemple."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_111977766001055104",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 3.807026982307434,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Le flux en direct dit qu'ils ont un signal",
+          "source" : "Live feed says that they have a signal",
+          "text" : "Le flux en direct indique qu'ils ont un signal."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 8.72009003162384,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "J'ai rompu l'étanchéité plusieurs fois juste en bougeant le visage je pense, et mon nez s'est mis à couler à cause de ce qui flotte dans l'air ici.",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "J'ai brisé le sceau à plusieurs fois juste en bougeant le visage, je suppose, et mon nez a commencé à couler de ce qui flotte n'importe où là-haut."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.83289098739624,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "pourquoi est-ce que les coordonnées GPS sont arrondies au degré entier près, c'est totalement inutile",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "text" : "Pourquoi les coordonnées GPS sont-elles arrondies au degré entier le plus proche ? C'est absolument inutile."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.499901056289673,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "C'est vrai, voici le tout dernier essai de Sally Rooney",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "Oh, c'est bien, voici le dernier essai de Sally Rooney."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 3,
+      "seconds" : 16.38528299331665,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "La boîte qui contient déjà un nichoir profite du Wi-Fi de la maison.",
+          "source" : "The box that has already a nest in it is leeching off the wifi in the house.",
+          "text" : "La boîte qui contient déjà un nid est en train de se nourrir du wifi de la maison."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "Quelques capteurs de plus, ce serait bien, je pense.",
+          "source" : "A few more sensors in general would be nice I guess.",
+          "text" : "Il faudrait probablement quelques capteurs supplémentaires, en général."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Devinez quoi : le temps est nuageux aujourd'hui. Donc je ne suis pas sûr que ce panneau solaire (probablement cassé) soit capable de générer assez d'énergie pour faire quoi que ce soit.",
+          "source" : "Guess what: It's cloudy today. So I'm not sure if that (probably broken) solar panel is able to generate enough juice to achieve anything.",
+          "text" : "Devinez quoi : il fait nuageux aujourd'hui. Je ne suis donc pas sûr que cette (probablement défectueuse) panneau solaire soit capable de générer assez d'énergie pour accomplir quoi que ce soit."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 6.092586994171143,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Lorsque je participe à un événement, j'en ai sur moi. Les seuls événements à venir sur mon agenda sont :",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "text" : "Si je suis à un événement, je les ai avec moi. Les seuls événements à venir dans mon calendrier actuellement sont :"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112121157211696272",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 8.052070021629333,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "J'ai transféré mon MX vers Proton et je profite maintenant entièrement de SPF, DKIM et DMAR, sans avoir à payer Google pour une validation de base des adresses e-mail.",
+          "source" : "I transferred my MX to Proton and have now full SPF, DKIM and DMARC without having to pay Google for basic email validation.",
+          "text" : "J'ai transféré mon MX chez Proton et j'ai maintenant un SPF, DKIM et DMARC complets sans avoir à payer Google pour une validation d'email de base."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112132847725764752",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 9.026299953460693,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Je viens juste d'avoir affaire à un système de reconnaissance faciale au moment d'embarquer sur un vol international à l'aéroport de Houston. Apparemment, c'est en rapport avec les douanes ??",
+          "source" : "Just encountered a facial recognition system while boarding an intl flight from Houston's IAH. Apparently it's for some customs-related thing??",
+          "text" : "Je viens tout juste de rencontrer un système de reconnaissance faciale lors de l'embarquement pour un vol international depuis Houston (IAH). Il semble s'agir d'une mesure liée à la douane ??"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.507374048233032,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Bon samedi mes trésors. Bienvenue à 4 000 pieds.",
+          "source" : "Happy Saturday lovelies. Welcome to 4000ft.",
+          "text" : "Bon samedi mes chéries. Bienvenue à 4000 pieds."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 7.132785081863403,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user20 donc chaque jour tu rames au moins 2,8 km ? Est-ce que c'est sur machine ou sur l'eau ?",
+          "source" : "@user20 so every day you row at least 2.8km? Is that on the erg or on the water?",
+          "text" : "@user20 donc chaque jour tu rame au moins 2,8 km ? Est-ce sur l'érgomètre ou sur l'eau ?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.613888025283813,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ceci est un authentique reportage d'époque montrant un véritable géant au Japon, filmé en train de défiler dans ce qui semble être une parade militaire. Ce qui est choquant ici, c'est sa taille. Il mesure au moins 4 mètres, soit au minimum 13 pieds. Il est donc plus grand et imposant que n'importe quel joueur de NBA, comme Shaquille O'Neal ou",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "Voici un authentique et réel vieux film d'un véritable géant individuel du Japon, marchant dans une parade militaire. Ce qui est choquant, c'est sa taille réelle. Il a une stature d'au moins 4 mètres de haut, soit un minimum de 13 pieds. Ainsi, il est vraiment plus grand et plus massif que chaque autre joueur NBA original, par exemple, comme Shaquille O'Neal, ou"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 18.05852496623993,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "La question, c'est, comme pour beaucoup d'autres ruines supposément du Néolithique, comment ont-ils réussi de telles prouesses ? Comment ont-ils soulevé des pierres aussi énormes ? Étaient-elles, comme nous l'avons souvent supposé, les vestiges d'une civilisation ancienne avancée, mais disparue ? Ces possibilités nous paraissent tout à fait fascinantes, en particulier les hommes d'Agra, ici.",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "La question est, comme pour nombre d'autres ruines néolithiques prétendues, comment ont-ils accompli de telles prouesses ? Comment ont-ils soulevé de telles pierres énormes ? Ont-ils été, comme nous l'avons posé à maintes reprises auparavant, les vestiges d'une ancienne civilisation une fois avancée mais détruite ? Nous trouvons de telles possibilités, en particulier les hommes d'Agra présents ici, hautement convaincantes."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 15.033586025238037,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Je travaille dans le milieu de la musique depuis plus de 20 ans, durant lesquels j'ai sorti deux albums et tourné en Allemagne, en Pologne et en Suède, bien sûr. Vous avez toujours été une artiste, depuis votre plus jeune âge ? Oui, en effet. Et y a-t-il des lieux emblématiques où vous vous êtes produite quand vous étiez plus jeune ?",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "Donc, je travaille dans la musique depuis plus de 20 ans, j'ai sorti deux albums durant cette période, et je suis allé en tournée en Allemagne, en Pologne, bien sûr en Suède. Donc vous étiez toujours un artiste depuis très jeune ? Oui, c'est vrai. Et y a-t-il des lieux emblématiques où vous avez joué quand vous étiez jeune ?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.464829921722412,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Check. Check. La pierre bat le ciseau, le ciseau bat le papier et le papier bat la pierre. Vous gagnez. Le perdant perdra une étoile. À la fin de chaque partie, l'arbitre replacera les cartes dans la boîte. Bien entendu, si les deux joueurs choisissent la même carte, il y a match nul et personne ne perd d'étoile.",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "Vérification. Vérification. Le rocher bat les ciseaux, les ciseaux battent le papier, et le papier bat le rocher. Vous gagnez. Le perdant perd une étoile. À la fin de chaque partie, l'arbitre remet les cartes dans la boîte de recyclage. Bien sûr, si les deux joueurs choisissent la même carte, le match est nul et personne ne perd d'étoile."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 14.90538501739502,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Voici toute l'histoire de Danny et Sam. Prête ? Prêt. Danny Fenton et Sam Manson sont meilleurs amis, et avec Tucker, ils passent presque tout leur temps ensemble. C'est grâce à Sam que Danny a des pouvoirs de fantôme à la base. J'y crois pas, Danny, une zone fantôme ? Il faut que tu vois ça. Tu sais quoi ? T'as raison.",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "Voici l'histoire complète de Danny et Sam. Prêt ? Prêt. Danny Fenton et Sam Manson sont de meilleurs amis, et avec Tucker, ils passent presque tout leur temps ensemble. C'est Sam qui a donné à Danny ses pouvoirs de fantôme en premier lieu. Allez, Danny, une zone fantôme ? Tu dois y aller. Tu sais quoi ? Tu as raison."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 12.692999005317688,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Cela fait des mois, et c'est comme si je me tenais toujours devant sa tombe. Je n'arrive pas à le quitter. Il est parti, et je n'arrive toujours pas à le quitter. Je le reconnais dans chaque soldat en uniforme que je croise, et ils sont partout depuis le bombardement.",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "Il s'écoule des mois, et je me sens toujours là, debout devant sa tombe. Je ne peux pas le quitter. Il est parti, et je ne peux quand même pas le quitter. Je le vois dans chaque soldat en uniforme que je croise, et ils sont partout depuis l'attaque."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 19.940081000328064,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "T'es un imbécile, Tom. Écoute, Celia, il faut qu'on suive nos passions. Toi, tu as ta robotique, et moi je veux juste être génial dans l'espace. Pourquoi est-ce que tu n'admets pas juste que ma main de robot te fait flipper ? Ta main ne me fait pas... Ok, t'as gagné, elle me fait flipper. Je fais des cauchemars où je suis poursuivi par cette pince géante. Franchement, Tom !",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "Tu es un con, Tom. Écoute, Celia, nous devons suivre nos passions. Tu as ta robotique et moi je veux juste être génial dans l'espace. Pourquoi ne reconnais-tu pas que tu es terrifié par ma main robotique ? Je ne suis pas terrifié par... Bon d'accord, d'accord. Je suis terrifié. J'ai des cauchemars où je suis poursuivi par cette griffe robotique géante. Oh, peu importe, Tom !"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 3.790858030319214,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Bienvenue. Bienvenue à tous. Je vais juste m'assurer que tout fonctionne. Ça ne prend qu'une minute. Je suis arrivée un peu plus tôt juste pour vérifier. Je viens de me laver les mains et je me prépare. Je finis juste la mise en place. Je pense que c'est bon. Je vais me tromper, je le sens. Il y a des jours comme ça. Alors, je vais juste attendre que les gens se connectent et après, on commence.",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "Bienvenue. Bienvenue à tous."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 14.753310084342957,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Il y a plus de 4,5 milliards d'années, la Voie lactée est entrée en collision avec une galaxie naine voisine. Cette rencontre a accéléré la formation des étoiles. Notre système solaire fait partie de la Voie lactée. Au sein du système solaire, la circulation de matière avait progressé.",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "Il y a plus de 4,5 milliards d'années, la galaxie de la Voie lacte a heurté une petite galaxie voisine. Ce choc a accéléré la formation des étoiles. Notre système solaire fait partie de la galaxie de la Voie lacte. Au sein du système solaire, la circulation des matériaux progressait."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 19.978832960128784,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Tandis que la Rescue Force patrouillera dans la ville, nous nous occuperons de veiller sur le musée dans la boîte. Ce ne serait pas une bonne idée que les méchants essaient de voler le Cabbonita pendant que nous attendons à l'intérieur. Nous sommes à court d'argent ! Nous devrons voler ce diamant et le vendre ! Autrement, nous devrons faire nos expériences avec du soda ! Comment allons-nous faire rentrer les robots à l'intérieur ? Tout est prévu.",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "Pendant que la Force de Sauvegarde patrouille dans la ville, nous nous occupons de surveiller le musée dans la boîte. Ce ne serait pas une bonne idée pour les méchants d'essayer de voler le Cabbonita alors qu'on attend dedans. On a épuisé nos fonds ! Il va falloir voler ce diamant et le vendre ! Sinon, nous devrons faire nos expériences avec des sodas ! Comment allons-nous faire pour introduire les robots à l'intérieur ? Tout est réglé."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.491666078567505,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "OK, laissez-moi vous expliquer. Le problème, c'est que si vous regardez à l'intérieur, là... Vous voyez le parement en bois ? Il y a l'ancien parement qui s'arrête au niveau des bardeaux ici. Ensuite, je mets ça par-dessus. Et ce qu'il se passe, c'est que la poussière s'accumule ici, sur cette bande d'étanchéité.",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "D'accord, alors laissez-moi expliquer. Bon, le problème est que si vous regardez à l'intérieur... Vous voyez la bardage en bois ? C'est l'ancien bardage, et il butte contre les ardoises là-bas. Ensuite, j'ai posé ceci par-dessus. Et ce qui se passe, c'est que la poussière s'accumule là, sur cette flashings."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.291960000991821,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Nous allons laisser ça reposer et se réhydrater pendant quelques minutes. Dans la cuisine ultra légère, on ne cuisine pas vraiment sur le réchaud. On fait surtout bouillir l'eau qui va venir réhydrater notre nourriture. C'est aussi une des raisons pour lesquelles on utilise du gruau instantané. Moins de temps de cuisson, moins d'énergie et c'est moins lourd. Excellent ! Voilà ce que ça donne. La consistance est parfaite.",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "Nous allons simplement laisser cela reposer et se réhydrater pendant quelques minutes."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 11.542585015296936,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Allons faire celui-là, là-bas. Hop, hop, hop, mon grand ! Tu es un peu trop lourd pour ce manège. La sécurité avant tout. Quoi ? 30 balles ? C'est du vol. Je te l'avais dit. Attention à la marche !",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "Montons sur celui-là. Oh là là, oh là là, grand garçon ! Tu es un peu trop lourd pour ce véhicule. La sécurité d'abord, hein ? 30 billets ? Quelle arnaque. Je vous l'avais dit. Attention aux pas !"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 19.94191002845764,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Bonjour et bienvenue dans ce pilote disons d'une nouvelle série. Elle va nous plonger dans l'histoire des pires scandales au monde. Certains que vous connaissez peut-être, et d'autres, pas. Elle s'inspire en partie d'un programme de la RTÉ intitulé Scannal. Sauf qu'au lieu de me concentrer sur les événements en Irlande, je pense élargir la couverture. Bien, commençons sans attendre.",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "Bonjour et bienvenue à une sorte de pilote pour une nouvelle série. Elle plongera dans l'histoire de certains des scandales les plus graves au monde – certains que vous connaissez, d'autres que vous ne connaissez pas. Elle a été inspirée en partie par un programme de RTE appelé Scannál. Bien que, plutôt que de se concentrer sur les événements liés à l'Irlande, je prévois d'élargir le champ de ce que je couvrirai. Sans plus tarder, commençons."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-fr-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.76631498336792,
+      "target" : "fr",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Pour le spécialiste des rapaces, Bob Anderson, l'attitude des pionniers était juste arrogante et ignorante. Tous les oiseaux de proie étaient considérés comme de la vermine. C'était tous des voleurs de poules. C'était tous de méchants oiseaux, que ce soit les pygargues à tête blanche, les aigles royaux ou les buses à queue rousse. Ils étaient tous abattus.",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "Pour Bob Anderson, spécialiste du rapace, l'attitude du pionnier était simplement arrogante et ignorante. Tous les oiseaux de proie étaient considérés comme des vermines. Je veux dire, ce sont tous des chapons de poule. Ce sont tous de mauvais oiseaux, que ce soit un aigle blanc, un aigle royal ou un faucon à queue rousse. Ils ont tous été abattus."
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import KikimimiCore
 
 enum RecorderError: LocalizedError {
     case microphoneDenied
@@ -9,9 +10,9 @@ enum RecorderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .microphoneDenied:
-            return "マイクの使用が許可されていません。システム設定 › プライバシーとセキュリティ › マイク で「ききみみ」をオンにしてください。"
-        case .noInputDevice: return "入力デバイス (マイク) が見つかりません。"
-        case .formatUnsupported: return "マイクの音声形式に対応できませんでした。"
+            return L("Microphone access is not allowed. Turn on “ききみみ” in System Settings › Privacy & Security › Microphone.")
+        case .noInputDevice: return L("No input device (microphone) was found.")
+        case .formatUnsupported: return L("The microphone’s audio format is not supported.")
         }
     }
 }

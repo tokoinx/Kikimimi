@@ -32,6 +32,23 @@ final class DeletionPlanTests: XCTestCase {
         XCTAssertNil(p.keptAudioReason)
     }
 
+    /// 録音の印を失った結果 (録音を「やり直す」と印が写らなかった古い結果) でも、録音のフォルダの中の音声は録音として扱う
+    func testFileInTheRecordingsFolderIsARecordingEvenWithoutTheMark() {
+        let p = plan(recording: false, path: recordingPath)
+        XCTAssertEqual(p.libraryFolder, folder)
+        XCTAssertEqual(p.recording?.path, recordingPath)
+        XCTAssertNil(p.keptAudio)
+        XCTAssertNil(p.keptAudioReason)
+        // ほかの結果も使っていれば残す (録音として)
+        let shared = plan(recording: false, path: recordingPath, shared: true)
+        XCTAssertNil(shared.recording)
+        XCTAssertEqual(shared.keptAudioReason, .sharedRecording)
+        // 保存していなければ消さない
+        XCTAssertEqual(plan(saved: false, recording: false, path: recordingPath).keptAudioReason, .notSaved)
+        // 録音のフォルダの外の、開いたファイルは今までどおり元のファイル
+        XCTAssertEqual(plan(recording: false, path: importedPath).keptAudioReason, .original)
+    }
+
     func testRecordingUsedByAnotherJobIsKept() {
         let p = plan(recording: true, path: recordingPath, shared: true)
         XCTAssertEqual(p.libraryFolder, folder)

@@ -77,10 +77,14 @@ final class LLMService: @unchecked Sendable {
             lock.unlock()
             return engine
         }
+        // 同じモデルを、差分だけが違うので読み直す (監査 → 翻訳と続き、監査用と翻訳用の差分が違う時など)。掛かった秒をログに出す
+        let previousAdapter = engine?.modelPath == path ? loadedAdapter : nil
+        let reloadingForAdapter = engine?.modelPath == path
         engine = nil // 先に古いモデルを手放す
         loadedAdapter = nil
         lock.unlock()
 
+        let started = Date()
         let loaded: LlamaEngine
         var applied = adapter
         do {
@@ -98,6 +102,11 @@ final class LLMService: @unchecked Sendable {
         // 前に読み込めなかった差分が、作り直されて読み込めた: 「読み込めなかった」の記録を消す
         if let applied, rejectedAdapter?.path == applied.path { rejectedAdapter = nil }
         lock.unlock()
+        if reloadingForAdapter {
+            func name(_ id: AdapterID?) -> String { id.map { ($0.path as NSString).lastPathComponent } ?? "none" }
+            LaunchLog.note("llm: reloaded \((path as NSString).lastPathComponent) for a different adapter ("
+                + "\(name(previousAdapter)) -> \(name(applied))) in " + String(format: "%.2f s", Date().timeIntervalSince(started)))
+        }
         return loaded
     }
 

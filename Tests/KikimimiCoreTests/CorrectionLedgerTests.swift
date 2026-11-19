@@ -3,6 +3,18 @@ import XCTest
 
 /// 学習した直しの台帳 (利用者の決定を覚えて、監査で使う)
 final class CorrectionLedgerTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     private func segment(_ text: String, at start: Double = 0, language: String? = nil) -> TranscriptSegment {
         TranscriptSegment(start: start, end: start + 3, text: text, language: language)
     }
@@ -559,17 +571,19 @@ final class LLMEvalTests: XCTestCase {
                                     keep: ["Roblox"])
         var result = LLMEval.score(c, translations: ["Roblox のおもちゃを 1500 個売りました。", "それは３０パーセント多いです。"])
         XCTAssertEqual(result.score.translated, 2)
-        XCTAssertEqual(result.score.japanese, 2)
+        XCTAssertEqual(result.score.inTarget, 2)
         XCTAssertEqual(result.score.numbersKept, 2)
         XCTAssertEqual(result.score.numbersChecked, 2)
         XCTAssertEqual(result.score.termsKept, 1)
         XCTAssertTrue(result.details.isEmpty)
         // 数字と固有名詞を落とした訳・日本語でない訳
         result = LLMEval.score(c, translations: ["おもちゃをたくさん売りました。", "That is 30 percent more."])
-        XCTAssertEqual(result.score.japanese, 1)
+        XCTAssertEqual(result.score.inTarget, 1)
         XCTAssertEqual(result.score.numbersKept, 1)
         XCTAssertEqual(result.score.termsKept, 0)
-        XCTAssertEqual(result.details.count, 3)
+        // 数字・語を落とした・日本語でない、に加えて、原文をそのまま写した行も書く
+        XCTAssertEqual(result.details.count, 4)
+        XCTAssertEqual(result.score.copied, 1)
     }
 
     func testTheSeedSetLoadsAndIsWellFormed() throws {

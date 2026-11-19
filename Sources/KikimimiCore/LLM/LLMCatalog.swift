@@ -4,8 +4,9 @@ import Foundation
 public struct LLMModelSpec: Hashable, Identifiable, Sendable {
     /// 保存名にも使う ID (`qwen3.5-4b` など)
     public let id: String
-    public let displayName: String
-    public let summary: String
+    /// 名前と説明の鍵 (英語)。読む時に、今の画面の言語で引く (言語を切り替えたら変わるように)
+    let displayNameKey: String
+    let summaryKey: String
     public let approxMB: Int
     /// 快適に動かすのに必要なメモリ (GB)
     public let recommendedMemoryGB: Int
@@ -23,8 +24,8 @@ public struct LLMModelSpec: Hashable, Identifiable, Sendable {
                 quantizations: [String] = ["Q4_K_M", "Q4_K_S", "IQ4_XS", "UD-Q4_K_XL", "Q5_K_M", "Q8_0"],
                 license: String, recommended: Bool = false) {
         self.id = id
-        self.displayName = displayName
-        self.summary = summary
+        self.displayNameKey = displayName
+        self.summaryKey = summary
         self.approxMB = approxMB
         self.recommendedMemoryGB = recommendedMemoryGB
         self.repositories = repositories
@@ -33,6 +34,11 @@ public struct LLMModelSpec: Hashable, Identifiable, Sendable {
         self.license = license
         self.recommended = recommended
     }
+
+    /// 画面に出す名前 (今の画面の言語。init の displayName は鍵で、`LKey` で印を付けて渡す)
+    public var displayName: String { L10n.lookup(displayNameKey) }
+    /// 画面に出す説明 (今の画面の言語)
+    public var summary: String { L10n.lookup(summaryKey) }
 
     /// Mac に保存するときの名前
     public var fileName: String { "\(id).gguf" }
@@ -111,21 +117,21 @@ public enum LLMCatalog {
     public static let all: [LLMModelSpec] = [
         LLMModelSpec(
             id: "qwen3.5-4b", displayName: "Qwen3.5 4B",
-            summary: "監査と翻訳のバランスが良い。迷ったらこれ。メモリ 8 GB の Mac でも動く。",
+            summary: LKey("Good balance for audit and translation. Pick this if unsure. Runs on Macs with 8 GB of memory."),
             approxMB: 2741, recommendedMemoryGB: 8,
             repositories: ["unsloth/Qwen3.5-4B-GGUF", "bartowski/Qwen_Qwen3.5-4B-GGUF"],
             fallbackFileName: "Qwen3.5-4B-Q4_K_M.gguf",
             license: "Apache-2.0", recommended: true),
         LLMModelSpec(
-            id: "qwen3.5-2b", displayName: "Qwen3.5 2B (軽量)",
-            summary: "速くて軽い。精度は 4B より控えめ。",
+            id: "qwen3.5-2b", displayName: LKey("Qwen3.5 2B (light)"),
+            summary: LKey("Fast and light. Less accurate than 4B."),
             approxMB: 1281, recommendedMemoryGB: 8,
             repositories: ["unsloth/Qwen3.5-2B-GGUF", "bartowski/Qwen_Qwen3.5-2B-GGUF"],
             fallbackFileName: "Qwen3.5-2B-Q4_K_M.gguf",
             license: "Apache-2.0"),
         LLMModelSpec(
-            id: "qwen3.5-9b", displayName: "Qwen3.5 9B (高精度)",
-            summary: "いちばん賢いが遅い。メモリ 16 GB 以上の Mac 向け。",
+            id: "qwen3.5-9b", displayName: LKey("Qwen3.5 9B (accurate)"),
+            summary: LKey("Smartest, but slow. For Macs with 16 GB of memory or more."),
             approxMB: 5681, recommendedMemoryGB: 16,
             repositories: ["unsloth/Qwen3.5-9B-GGUF", "bartowski/Qwen_Qwen3.5-9B-GGUF"],
             fallbackFileName: "Qwen3.5-9B-Q4_K_M.gguf",

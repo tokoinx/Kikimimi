@@ -18,8 +18,8 @@ enum AudioDecoder {
 
         var errorDescription: String? {
             switch self {
-            case .noAudioTrack(let name): return "「\(name)」に音声トラックがありません。"
-            case .cannotRead(let name): return "「\(name)」を音声として読み込めませんでした。対応していない形式の可能性があります。"
+            case .noAudioTrack(let name): return L("“%@” has no audio track.", name)
+            case .cannotRead(let name): return L("Could not read “%@” as audio. The format may not be supported.", name)
             }
         }
     }

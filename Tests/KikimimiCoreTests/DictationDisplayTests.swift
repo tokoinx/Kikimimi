@@ -4,6 +4,18 @@ import XCTest
 
 /// 書き取りの結果の並べ方 (DictationDisplay) の試験
 final class DictationDisplayTests: XCTestCase {
+    // このクラスは、日本語の画面の文 (言語の名前・書き出しの見出し・監査の理由など) を比べる。
+    // 画面の言語を日本語にしておき、終わったら英語 (初めの値) に戻す
+    override func setUp() {
+        super.setUp()
+        L10n.language = .ja
+    }
+
+    override func tearDown() {
+        L10n.language = .en
+        super.tearDown()
+    }
+
     func testWordsWithWrongMissingExtra() {
         let result = DictationCheck.check(typed: "I has a red dog today", expected: "I have a big red dog.")
         let spans = DictationDisplay.spans(result)

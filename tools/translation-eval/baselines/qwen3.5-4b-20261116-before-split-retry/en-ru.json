@@ -1,0 +1,598 @@
+{
+  "audit" : {
+    "cases" : 0,
+    "cleanLines" : 0,
+    "errorLines" : 0,
+    "falseSuggestions" : 0,
+    "fixedAutomatically" : 0,
+    "fixedBySuggestion" : 0,
+    "harmed" : 0,
+    "missed" : 0,
+    "seconds" : 0,
+    "wrongFixes" : 0
+  },
+  "details" : [
+
+  ],
+  "ledgerEntries" : 0,
+  "model" : "qwen3.5-4b.gguf",
+  "sets" : [
+    "en-ru.json"
+  ],
+  "translation" : {
+    "cases" : 28,
+    "chrF" : 48.193204347041814,
+    "chrFStatistics" : {
+      "hypothesis" : [
+        4810,
+        4780,
+        4750,
+        4720,
+        4690,
+        4660
+      ],
+      "matches" : [
+        4065,
+        2987,
+        2320,
+        1988,
+        1757,
+        1559
+      ],
+      "reference" : [
+        5215,
+        5185,
+        5155,
+        5125,
+        5095,
+        5065
+      ]
+    },
+    "copied" : 0,
+    "inTarget" : 30,
+    "lines" : 30,
+    "numbersChecked" : 5,
+    "numbersKept" : 5,
+    "repeated" : 0,
+    "seconds" : 319.50817704200745,
+    "termsChecked" : 0,
+    "termsKept" : 0,
+    "translated" : 30
+  },
+  "translationByTarget" : {
+    "ru" : {
+      "cases" : 28,
+      "chrF" : 48.193204347041814,
+      "chrFStatistics" : {
+        "hypothesis" : [
+          4810,
+          4780,
+          4750,
+          4720,
+          4690,
+          4660
+        ],
+        "matches" : [
+          4065,
+          2987,
+          2320,
+          1988,
+          1757,
+          1559
+        ],
+        "reference" : [
+          5215,
+          5185,
+          5155,
+          5125,
+          5095,
+          5065
+        ]
+      },
+      "copied" : 0,
+      "inTarget" : 30,
+      "lines" : 30,
+      "numbersChecked" : 5,
+      "numbersKept" : 5,
+      "repeated" : 0,
+      "seconds" : 319.50817704200745,
+      "termsChecked" : 0,
+      "termsKept" : 0,
+      "translated" : 30
+    }
+  },
+  "translationOutputs" : [
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_111975537143453440",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.34975004196167,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "В целом, мне очень нравится взаимосвязь этих двух игр. Короткие сюжеты хороши тем, что можно \"проскочить побольше\", отыграть эпизод сразу и получить удовольствие. В длинных сюжетах хорошо то, что события воспринимаются как более насыщенные эмоционально, а награду получаешь пусть не сразу, зато более крупную.",
+          "source" : "In general I really like the interplay between the two games. The advantage of shortform stories is that you can \"skip to the good part\", they can be more immediately engrossing and satisfying. The advantage of longform stories is that you can imbue whatever happens with way more emotional weight, you lose the immediacy in exchange for stronger payoffs.",
+          "text" : "В целом мне очень нравится взаимодействие между этими двумя жанрами. Преимущество коротких историй в том, что их можно «перепрыгнуть к лучшему месту», они могут быть более захватывающими и удовлетворяющими сразу же. Преимущество длинных историй заключается в том, что вы можете придать любому событию гораздо больший эмоциональный вес; вы теряете непосредственность ради более сильных финалов."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_111976249663909024",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.764703989028931,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "На странице AT&T, где можно проверять состояние сети, пишут, что все работает, хотя в новостях сообщили о сбоях 😠",
+          "source" : "the AT&T status site claims there's no outages...even though the news is reporting an outage 😠",
+          "text" : "Сайт статуса AT&T утверждает, что нет сбоев..., хотя новости сообщают о сбое 😠."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_111977498791056432",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 3.945160984992981,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ненавижу лаву #храмогня",
+          "source" : "I hate lava #firetemple",
+          "text" : "Я ненавижу лаву #firetemple."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_111977766001055104",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.2088130712509155,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "В трансляции написали, что сигнал появился",
+          "source" : "Live feed says that they have a signal",
+          "text" : "Прямой эфир сообщает, что у них есть сигнал."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112109186993725712",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 8.544054985046387,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "У меня респиратор пару раз сбивался просто из-за того, что я двигала головой, и у меня начинало течь из носа из-за всей этой дряни в воздухе.",
+          "source" : "I broke the seal on it a few times just moving my face I guess and my nose started running from whatever the heck is floating around up there.",
+          "text" : "Я разрывал печать на нём несколько раз, просто двигая лицом, я думаю, и у меня начался насморк от того, что бы там ни парило вверху."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112109432154590752",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.424785017967224,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Что? Почему координаты GPS округляются до ближайшего полного градуса? Это абсолютно бессмысленно",
+          "source" : "what why are the GPS coordinates getting rounded to the nearest full degree that's absolutely worthless",
+          "text" : "Почему координаты GPS округляются до ближайшего полного градуса — это абсолютно бесполезно."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112110250600185424",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.338817000389099,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Итак, вот последняя статья Салли Руни",
+          "source" : "Oh right, here is Sally Rooney latest essay",
+          "text" : "О, верно, вот последнее эссе Салли Руни."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112111193384667328",
+      "language" : "en",
+      "lineCount" : 3,
+      "seconds" : 15.331906080245972,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "В одном скворечнике уже есть гнездо, и он подключился к домашнему вай-фаю.",
+          "source" : "The box that has already a nest in it is leeching off the wifi in the house.",
+          "text" : "Коробка, в которой уже есть гнездо, отбирает у дома Wi-Fi."
+        },
+        {
+          "lines" : [
+            1
+          ],
+          "reference" : "По-моему, не помешала бы еще пара-тройка датчиков.",
+          "source" : "A few more sensors in general would be nice I guess.",
+          "text" : "Мне, думаю, было бы неплохо добавить еще несколько датчиков."
+        },
+        {
+          "lines" : [
+            2
+          ],
+          "reference" : "Нет, вы представляете? Небо затянуло. Так и не пойму, может ли эта (похоже сломанная) солнечная панель выжать из себя столько, чтобы хватило хоть на что-то.",
+          "source" : "Guess what: It's cloudy today. So I'm not sure if that (probably broken) solar panel is able to generate enough juice to achieve anything.",
+          "text" : "Угадайте что: сегодня пасмурно. Так что я не уверен, сможет ли (скорее всего сломанная) солнечная панель выработать достаточно энергии для достижения чего-либо."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112111346044907536",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 6.248849987983704,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Когда меня зовут на фестивали и прочие ивенты, я беру с собой стикеры. На ближайшее время планы только такие:",
+          "source" : "If I'm at an event I have them on me. The only upcoming events in my calendar currently are:",
+          "text" : "Если я на мероприятии, они со мной. Единственные предстоящие мероприятия в моем календаре сейчас:"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112121157211696272",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 7.395971059799194,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Переключил почту на Proton, теперь мне доступны SPF, DKIM и DMARC, и больше не надо платить Google за простейшую проверку почты.",
+          "source" : "I transferred my MX to Proton and have now full SPF, DKIM and DMARC without having to pay Google for basic email validation.",
+          "text" : "Я перевел свой MX на Proton и теперь имею полный SPF, DKIM и DMARC без необходимости платить Google за базовую проверку электронной почты."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112132847725764752",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 8.233599066734314,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Только что столкнулся с системой распознавания лиц при посадке на международный рейс в аэропорту Хьюстона (IAH). Это вроде как-то связано с таможенным досмотром?",
+          "source" : "Just encountered a facial recognition system while boarding an intl flight from Houston's IAH. Apparently it's for some customs-related thing??",
+          "text" : "Только что столкнулся с системой распознавания лиц при посадке на международный рейс из Хьюстона (IAH). Похоже, это для какой-то таможенной процедуры??"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112152593528184304",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.544782996177673,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Всех с субботой, мои хорошие! Добро пожаловать на 1200 метров.",
+          "source" : "Happy Saturday lovelies. Welcome to 4000ft.",
+          "text" : "Счастливого субботы, мои любимые. Добро пожаловать на 4000 футов."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-social_112198063182209776",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 7.238581895828247,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "@user20 Получается, что каждый день ты проходишь минимум 2,8 км? На тренажере или на воде?",
+          "source" : "@user20 so every day you row at least 2.8km? Is that on the erg or on the water?",
+          "text" : "@user20 так, вы каждый день проплываете хотя бы 2,8 км? Это на эргометре или на воде?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_-uigLE6EI1g_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 17.633835911750793,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Это реальные старые документальные кадры того, как вполне опрделенный человек-гигант из Японии участвует в каком-то военном параде. И поражает здесь его настоящий размер. Его рост - минимум 4 метра, то есть минимум 13 футов. То есть он по-настоящему выше и тяжелее абсолютно любого игрока НБА, например, Шакила о'Нила.",
+          "source" : "This is an authentic and real old footage of a true certain giant individual from Japan, walking in some military parade. What's shocking about it is his actual size. He has a stature of at least 4 meters high, which is minimum 13 in feet. Thus, he is genuinely taller and more massive than each and every other original NBA player, for example, like Shaquille O'Neal, or",
+          "text" : "Это подлинный и настоящий архивный материал о действительно огромном человеке из Японии, который шел на каком-то военном параде. То, что поражает, — это его реальный размер. Его рост составляет не менее 4 метров, то есть минимум 13 футов. Таким образом, он действительно выше и массивнее любого другого настоящего игрока NBA, например, Шакилла О'Нила, или..."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_07FOJFFqOYc_002",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.80509603023529,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Вопрос в том, а этот вопрос относится и к бесчетному количеству других памятников неолита, как они достигали таких масштабов? Как они поднимали такие огромные камни? Были ли они, как мы многократно предполагали ранее, наследниками однажды великой, но потом исчезнувшей древней цивилизации? Нам кажется, что такое крайне вероятно, в частности, в отношении людей здесь, в Агре.",
+          "source" : "The question is, like countless other claimed Neolithic ruins, how did they achieve such feats? How did they lift such enormous stones? Were they, like we have posited many times before, the remnants of a once-advanced-yet-destroyed ancient civilization? We find such possibilities, in particular, the men here of Agra, highly compelling.",
+          "text" : "Вопрос в том, как, подобно бесчисленному количеству других так называемых неолитических руин, они достигли таких свершений? Как они поднимали такие огромные камни? Были ли они, как мы неоднократно предполагали ранее, остатками некогда развитой, но уничтоженной древней цивилизации? Мы находим такие возможности, в частности, мужчин из Агры, крайне убедительными."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_1SqhIFgluMw_001",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 14.490010023117065,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Я работаю в музыкальной сфере уже более 20 лет, выпустил два альбома за это время, и езжу с турами по Германии и Польше, и, конечно, Швеции. То есть вы всегда выступали, с раннего возраста? Да. Есть какие-то знаковые места, где вы выступали в молодости?",
+          "source" : "So, I have been working with music for over 20 years, and released two albums during that time, and touring around Germany and Poland, and Sweden, of course. So you've always been a performer from a very young age? Yeah, I have. And is there any iconic places that you performed at when you were younger?",
+          "text" : "Так что я занимаюсь музыкой уже более 20 лет, выпустил два альбома за это время и гастролировал по Германии, Польше, а также, конечно, Швеции. Так что вы всегда выступали с очень раннего возраста? Да, я так. И есть ли какие-то знаковые места, где вы выступали в молодости?"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_5mzS5ZJPAsM_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.593731999397278,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Раз. Раз. Камень побеждает ножницы, ножницы побеждают бумагу, бумага побеждает камень. Вы выигрываете. Проигравший теряет одну звезду. После каждого раунда судья возвращает карты в ящик. Конечно, если оба игрока вытаскивают одинаковые карты, будет ничья и никто не потеряет звезду.",
+          "source" : "Check. Check. Rock defeats scissors, scissor defeats paper, and paper defeats rock. You win. The loser will lose one star. At the end of each game, the referee will put the cards back into the recycling box. Of course, if both players choose the same card, the game is tied, and no one will lose a star.",
+          "text" : "Проверка. Проверка. Камень побеждает ножницы, ножницы победят бумагу, а бумага побеждает камень. Вы выиграли. Проигравший потеряет одну звезду. В конце каждой игры судья вернет карты в коробку для переработки. Конечно, если оба игрока выберут одну и ту же карту, игра будет ничьей, и никто не потеряет звезду."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_6JeSS_CODZ0_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 17.74837303161621,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Вот полная история Дэнни и Сэма. Готовы? Готовы. Дэнни Фэлтон и Сэм Мэнсон - лучшие друзья, и вместе с Такером они проводят почти все время вместе. Это из-за Сэма у Дэна есть сверхъестественные силы. Да ладно, Дэнни, сверхъестественная френдзона? Ты должен это заценить. Знаешь что? Ты прав.",
+          "source" : "Here's the full story of Danny and Sam. Ready? Ready. Danny Fenton and Sam Manson are best friends, and along with Tucker, they spend pretty much all their time together. Sam's the reason Danny has ghost powers in the first place. Come on, Danny, a ghost zone? You gotta check it out. You know what? You're right.",
+          "text" : "Вот полная история Дэнни и Сэма. Готовы? Готовы. Дэнни Фентон и Сэм Мэнсон — лучшие друзья, и вместе с Тьюкером они проводят большую часть своего времени вместе. Именно Сэм стал причиной того, что у Дэнни есть способности призрака. Ладно, Дэнни, зона призраков? Тебе стоит это проверить. Знаешь что? Ты прав."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_Aevb1Pl1iic_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 14.51879596710205,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Прошли месяцы, а я чувствую, как будто я еще стою у его могилы. Я не могу его оставить. Он ушел, но я все еще не могу его оставить. Я вижу его в каждом солдате в форме, мимо которого прохожу, а солдаты сейчас везде со времени бомбардировки.",
+          "source" : "It's been months, and I feel like I'm still standing there at his grave. I can't leave him. He's gone, and I still can't leave him. I see him in every uniformed soldier I pass, and they're everywhere since the bombing.",
+          "text" : "Прошло месяцы, и я чувствую, что все еще стою у его могилы. Я не могу оставить его. Он ушел, а я все равно не могу его оставить. Я вижу его в каждом вооруженном солдате, которого прохожу, и они повсюду с тех пор, как началась бомбардировка."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_NEEXiMgmA74_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 22.560567021369934,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Ты мудак, Том. Селия, мы должны следовать за своими увлечениями. У тебя есть робототехника, а я хочу быть офигенным в космосе. Почему ты просто не признаешь, что тебя до усрачки пугает моя роборука? Я не боюсь её, она... Ладно, ладно. Я боюсь. У меня кошмары, что меня преследует эта огромная робоклешня. Ой всё, Том.",
+          "source" : "You're a jerk, Tom. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space. Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out by, it's... All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by this giant, robotic claw. Oh, whatever, Tom!",
+          "text" : "Ты идиот, Том. Слушай, Селия, нам нужно следовать своим страстям. У тебя робототехника, а я просто хочу быть великим в космосе. Почему ты не признаёшь, что меня пугает мой роботизированная рука? Я не пугаюсь от неё, это... Ладно, ладно. Я пугаюсь. Мне снятся кошмары, где меня преследует этот огромный роботизированный коготь. Ох, всё равно, Том!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_OExU5AL7RMM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 4.450360059738159,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Добро пожаловать. Добро пожаловать всем! Я просто проверю, что всё работает. Одну минуту. Я начал немного заранее, чтобы проверить. Помыл руки и готов начинать. Я просто заканчиваю все настраивать. Думаю, всё хорошо. Я буду совершать ошибки. Я знаю это. Сегодня один из таких дней. Но я просто подожду, пока люди подключатся, и мы начнём.",
+          "source" : "Welcome. Welcome, everyone. I'm just going to make sure that all of this is working. It just takes a minute. So I came on a bit early just to make sure. Just washed my hands and getting ready to go. So I'm just finishing setting up. I think we're good. I'm going to make mistakes. I can feel it. It's one of those days. So I'll just wait till people get on, and then we'll get started.",
+          "text" : "Добро пожаловать. Добро пожаловать, всем."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_ORZdsMICbUM_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 14.350530982017517,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Более 4,5 миллиардов лет назад галактика Млечного пути столкнулась с расположенной рядом карликовой галактикой. Это столкновение ускорило формирование звёзд. Наша Солнечная система – часть галактики Млечного пути. Внутри Солнечной системы прогрессировала циркуляция вещества.",
+          "source" : "More than 4.5 billion years ago, the Milky Way Galaxy collided with a nearby dwarf galaxy. This encounter hastened the formation of stars. Our solar system is a part of the Milky Way Galaxy. Within the solar system, material circulation had been progressing.",
+          "text" : "Более 4,5 миллиарда лет назад галактика Млечный Путь столкнулась с близкой карликовой галактикой. Это столкновение ускорило формирование звезд. Наша Солнечная система является частью галактики Млечный Путь. Внутри Солнечной системы циркуляция материи продолжалась."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_QaueRRYecxo_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.44444501399994,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Пока Спасательный отряд патрулирует город, мы позаботимся о том, чтобы наблюдать за музеем в ящике. Злодеям не стоит пытаться украсть Каббониту, когда мы ждем внутри! У нас закончились деньги! Нам придется украсть этот бриллиант и продать его! Иначе нам придется проводить наши эксперименты с газировкой! Как мы доставим ботов внутрь? Обо всём уже позаботились.",
+          "source" : "While the Rescue Force patrols the city, we'll take care of watching over the museum in the box. It wouldn't be a good idea for the villains to try and steal the Cabbonita with us waiting inside. We've run out of money! We'll have to steal that diamond and sell it! Otherwise, we'll have to do our experiments with soda pop! How are we going to get the bots inside? It's all taken care of.",
+          "text" : "Пока Сила Спасения патрулирует город, мы займемся охраной музея в коробке. Не стоит плохим героям пытаться украсть Кабониту, пока мы ждем внутри. Мы закончились с деньгами! Нам придется украсть этот алмаз и продать его! Иначе мы будем проводить свои эксперименты на газировке! Как мы попадем внутрь роботов? Все уже решено."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_RfoVF8wcZRI_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 13.899143934249878,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Хорошо, давайте я объясню. Так вот, проблема в том, что если вы посмотрите внутрь... Вы видите деревянный сайдинг? Это старый сайдинг, и он упирается в черепицу. И если я его вот так накрываю, то там собирается грязь, рядом с этой планкой.",
+          "source" : "Okay, so let me explain. All right, so the problem is, if you look inside there... You see the wood siding? There's the old siding, and it butts up to the shingles there. And then I put this over it. And what happens is the dirt collects there, to that flashing.",
+          "text" : "Хорошо, давайте я объясню. Ладно, вот в чём проблема: если посмотреть внутрь... Вы видите деревянную обшивку? Это старая обшивка, которая примыкает к черепице там. А затем я наложил это сверху. И происходит следующее: грязь собирается там, на эту фальцевую ленту."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_SVWbCPnd0Wc_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 18.038444995880127,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Мы просто оставим её постоять и напитаться водой. Во время ультралегкой готовки мы практически не готовим на плите. В первую очередь мы кипятим воду, чтобы она могла восстановить влажность продукта. И поэтому мы используем гритс быстрого приготовления. Меньше времени готовки, меньше топлива, и меньше веса. О да. И вот примерно то, что у нас получается. Идеальная консистенция.",
+          "source" : "We're just going to let that sit and rehydrate for a couple minutes. With ultralight cooking, we're not actually cooking on the stove. We're primarily boiling water so that we can rehydrate our food. It's also one of the reasons why we use instant grits. Less cooking time, less fuel, and less weight. Oh yeah. So this is about what we've got going on here. Perfect consistency.",
+          "text" : "Мы просто дадим ему постоять и впитать влагу пару минут. При ультралегкой готовке мы на самом деле не варим на плите. Мы в основном кипятим воду, чтобы затем восстановить форму нашей пищи. Это также одна из причин, по которой мы используем готовые хлопья. Меньше времени на готовку, меньше топлива и меньше веса. О да. Так что вот примерно то, что у нас здесь происходит. Идеальная консистенция."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_UVUatYPScjw_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 11.518595933914185,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Давай покатаемся на той штуке. Воу-воу-воу, парень! Ты слишком огромный для такого. В первую очередь безопасность, ок? Целых 30? Это грабеж! Я же говорил. Смотри, куда идешь!",
+          "source" : "Let's ride that one over there. Whoa, whoa, whoa, big boy! You're a little too hefty for this ride. Safety first, eh? 30 bills? What a rip-off. I told you. Watch your step!",
+          "text" : "Давайте проедем на той. Ого, ого, ого, большой мальчик! Вы немного слишком тяжеловаты для этой поездки. Безопасность прежде всего, да? 30 билл? Какое обманство. Я вам говорил. Осторожно!"
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_Vi03zz6eCik_000",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 5.038295030593872,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Здравствуйте и добро пожаловать в пилотный выпуск новой серии. Она погрузит вас в историю нескольких худших в мире скандалов – как известных вам, так и неизвестных. Эта серия была отчасти вдохновлена программой Scannál канала RTE. Но, в отличие от этой программы, я не буду фокусироваться только на событиях, имеющих отношение к Ирландии, а затрону и другие скандалы. Ну что же, давайте не будем затягивать и начнем.",
+          "source" : "Hello and welcome to a pilot of sorts of a new series. It will delve into the history of some of the world's worst scandals--some you may know, and some you may not. It's been inspired in part by an RTE program called Scannál. Although, rather than focusing on events linked to Ireland, I plan to widen the scope of what I'll cover. Well, without further delay, let's get started.",
+          "text" : "Здравствуйте и добро пожаловать на пилотный выпуск новой серии."
+        }
+      ]
+    },
+    {
+      "id" : "wmt24pp-en-ru-test-en-speech_WtGHeibBKrA_007",
+      "language" : "en",
+      "lineCount" : 1,
+      "seconds" : 16.848174929618835,
+      "target" : "ru",
+      "units" : [
+        {
+          "lines" : [
+            0
+          ],
+          "reference" : "Боб Андерсон, специалист фонда Раптор, считал такое отношение первопроходцев высокомерным и невежественным. Все хищные птицы считались вредными. То есть считалось, что они охотятся на цыплят. Они все были плохими: и белоголовый орлан, и беркут, и краснохвостый ястреб. Их всех пристреливали.",
+          "source" : "For Raptor specialist Bob Anderson, the pioneer's attitude was simply arrogant and ignorant. All birds of prey were just considered vermin. I mean, they were all chickenhawks. They were all bad birds, be it a Bald Eagle, a Golden Eagle, a Red-tailed Hawk. They were all shot.",
+          "text" : "Для специалиста по рипорам Боба Андерсона, пионера, отношение было просто высокомерным и невежественным. Все хищные птицы считались лишь вредителями. Я имею в виду, что все они — куриные ястребы. Все они — плохие птицы, будь то белый орлан, золотой орлан или краснохвостый ястреб. Их всех стреляли."
+        }
+      ]
+    }
+  ]
+}

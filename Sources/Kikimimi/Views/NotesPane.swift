@@ -1,4 +1,5 @@
 import AppKit
+import KikimimiCore
 import SwiftUI
 
 /// 結果の右のメモの欄。メモ (job.notes) を見るのは、この部品だけにする
@@ -10,12 +11,12 @@ struct NotesPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("メモ")
+                Text(L("Notes"))
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
                 if job.notesSaved {
-                    Text("保存しました")
+                    Text(L("Saved"))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -29,7 +30,7 @@ struct NotesPane: View {
                 .overlay(alignment: .topLeading) {
                     if job.notes.isEmpty {
                         // 押せない飾り (押すと、下の入力欄に届く)
-                        Text("理解したこと、覚えたい表現などを書けます。行を右クリックして「メモに引用」を選ぶと、その文を貼れます。")
+                        Text(L("Write what you understood, phrases to remember, and so on. Right-click a line and choose “Quote in notes” to paste that sentence."))
                             .font(.body)
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 11)

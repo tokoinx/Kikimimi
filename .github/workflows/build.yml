@@ -141,10 +141,37 @@ jobs:
       # 3000 行では、47 秒の録音で 1 行を本当に再生し、行の終わりで止まるかも確かめる (音を出せない Mac では飛ばす)。
       # そのあと、練習 (速さ・繰り返し・間・自動で次へ・キー) の確認 (PRACTICE CHECK、30 秒ほど) も行う
       # 目安 (UILoadSelfTest.Limits) を超えたら失敗にするのは、この 3000 行だけ。ウインドウの絵は build/ui-shots に残す
+      #
+      # 「重い」(終了コード 5) の時だけ、もう 1 回だけ測り直す。2 回続けて「重い」の時に失敗にする。
+      # 理由: GitHub の実行機が一時止まると、コードを変えていなくても、8 回しか測らない操作の最大が 1 回だけ跳ねる
+      # (2026-11-17、"one-line stop" max 415 ms。ふだんの最大は 91〜152 ms。docs/HANDOFF.md)。
+      # 一覧の決まりを破った時の重さ (5〜20 秒) は、何回測っても出るので、2 回目でも落ちる。
+      # 1 回目の SLOW の行は、警告としてログと実行の画面に残す。1 回目の出力は build/ui-load-3000-run1.log に残す。
+      # ほかの終了コード (止まった・保存の確認・練習の確認など) は、測り直さず、そのまま失敗にする
       - name: UI load self-test (3000 lines, one line played from a recording, practice check)
-        timeout-minutes: 7
+        timeout-minutes: 10
         run: |
-          build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000.txt --screenshots build/ui-shots
+          run_check() {
+            build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio "$PWD/Tests/Fixtures/mixed-en-ja.wav" --report build/ui-load-3000.txt --screenshots build/ui-shots
+          }
+          set +e
+          run_check 2>&1 | tee build/ui-load-3000-run1.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -eq 5 ]; then
+            grep -a "UI LOAD: SLOW" build/ui-load-3000-run1.log | while IFS= read -r line; do
+              echo "::warning title=UI load was SLOW on the first run::$line"
+            done || true
+            echo "UI LOAD RETRY: the first run was SLOW (exit code 5); measuring once more"
+            code=0
+            run_check || code=$?
+            if [ "$code" -eq 0 ]; then
+              echo "UI LOAD RETRY: the second run passed (the first run's SLOW lines are kept above as warnings)"
+            else
+              echo "UI LOAD RETRY: the second run ended with exit code $code"
+            fi
+          fi
+          exit "$code"
 
       # 画面の重さの確認が残したウインドウの絵。確認が失敗しても残す
       - uses: actions/upload-artifact@v7

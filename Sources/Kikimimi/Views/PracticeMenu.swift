@@ -9,7 +9,7 @@ struct SpeedMenu: View {
     var body: some View {
         let practice = model.practice
         Menu {
-            Picker("速さ", selection: Binding(
+            Picker(L("Playback speed"), selection: Binding(
                 get: { practice.settings.rate },
                 set: { practice.setRate($0) }
             )) {
@@ -25,7 +25,7 @@ struct SpeedMenu: View {
         }
         .menuStyle(.button)
         .fixedSize()
-        .help("再生の速さ (声の高さは変わりません)")
+        .help(L("Playback speed (the pitch of the voice stays the same)"))
     }
 }
 
@@ -38,38 +38,38 @@ struct PracticeMenu: View {
         @Bindable var practice = model.practice
         let customized = practice.isCustomized
         Menu {
-            Section("繰り返し") {
-                Picker("繰り返し", selection: $practice.settings.repeatCount) {
+            Section(L("Repeat")) {
+                Picker(L("Repeat"), selection: $practice.settings.repeatCount) {
                     ForEach(PracticeSettings.repeatCounts, id: \.self) { count in
-                        Text("\(count) 回").tag(count)
+                        Text(LPlural(count, one: "%d time", other: "%d times")).tag(count)
                     }
-                    Text("止めるまで").tag(PracticeSettings.untilStopped)
+                    Text(L("Until stopped")).tag(PracticeSettings.untilStopped)
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
             }
-            Section("行のあとの間") {
-                Picker("行のあとの間", selection: $practice.settings.gap) {
-                    Text("空けない").tag(PracticeSettings.Gap.off)
-                    Text("行と同じ長さだけ空ける").tag(PracticeSettings.Gap.lineLength)
+            Section(L("Pause after the line")) {
+                Picker(L("Pause after the line"), selection: $practice.settings.gap) {
+                    Text(L("No pause")).tag(PracticeSettings.Gap.off)
+                    Text(L("As long as the line")).tag(PracticeSettings.Gap.lineLength)
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
             }
-            Toggle("自動で次の行へ進む", isOn: $practice.settings.autoAdvance)
-            Section("隠す") {
-                Picker("隠す", selection: $practice.settings.hide) {
-                    Text("隠さない").tag(PracticeSettings.Hide.nothing)
-                    Text("原文を隠す").tag(PracticeSettings.Hide.source)
-                    Text("原文と訳を隠す").tag(PracticeSettings.Hide.sourceAndTranslation)
+            Toggle(L("Go on to the next line automatically"), isOn: $practice.settings.autoAdvance)
+            Section(L("Hide")) {
+                Picker(L("Hide"), selection: $practice.settings.hide) {
+                    Text(L("Hide nothing")).tag(PracticeSettings.Hide.nothing)
+                    Text(L("Hide the original")).tag(PracticeSettings.Hide.source)
+                    Text(L("Hide the original and the translation")).tag(PracticeSettings.Hide.sourceAndTranslation)
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
             }
             Divider()
-            Toggle("書き取りの欄を出す", isOn: $practice.showsDictation)
+            Toggle(L("Show the dictation box"), isOn: $practice.showsDictation)
         } label: {
-            Label("練習", systemImage: "repeat")
+            Label(L("Practice"), systemImage: "repeat")
         }
         .menuStyle(.button)
         .fixedSize()
@@ -83,7 +83,7 @@ struct PracticeMenu: View {
                 .strokeBorder(customized ? Color.accentColor : Color.clear, lineWidth: 1)
                 .allowsHitTesting(false)
         }
-        .help(customized ? "練習の設定 (決まりの設定から変えています)" : "練習の設定: 繰り返し・行のあとの間・自動で次へ・隠す・書き取り")
+        .help(customized ? L("Practice settings (changed from the defaults)") : L("Practice settings: repeat, pause after the line, go on to the next line, hide, dictation"))
     }
 }
 
@@ -93,7 +93,7 @@ struct PracticeGapNote: View {
 
     var body: some View {
         if model.practice.isWaiting {
-            Text("間 (声に出してみましょう)")
+            Text(L("Pause: try saying it aloud"))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

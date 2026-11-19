@@ -413,6 +413,35 @@ enum UILoadSelfTest {
         }
     }
 
+    /// 訳のある行の 4 つに 1 つを、利用者が直した訳にする ("edited" の覚えを付ける)。
+    /// 別の 4 つに 1 つには、訳の関門の印 ("llm" + 数の抜け) の覚えを付ける (「要確認」の橙の印が出る)。
+    /// 印つきの行が在っても重さを測るため。区間は訳のまとまりを作らない (1 区間 1 訳) ので、原文はその区間の文だけ
+    fileprivate static func markEditedTranslations(_ transcript: inout Transcript) {
+        var notes: [TranslationNote] = []
+        var translated = 0
+        for i in transcript.segments.indices {
+            guard let machine = transcript.segments[i].translation else { continue }
+            defer { translated += 1 }
+            if translated % 4 == 2 {
+                // 訳は変えない (機械の訳に、印だけを付ける)
+                let source = Transcript.join([transcript.segments[i].text])
+                notes.append(TranslationNote(head: transcript.segments[i].id,
+                                             signature: Transcript.reviewSignature(source: source, translation: machine),
+                                             flags: [TranslationGate.number], detail: "number: 2025",
+                                             origin: TranslationNote.llm))
+                continue
+            }
+            guard translated % 4 == 0 else { continue }
+            let edited = machine + "（直した訳）"
+            transcript.segments[i].translation = edited
+            let source = Transcript.join([transcript.segments[i].text])
+            notes.append(TranslationNote(head: transcript.segments[i].id,
+                                         signature: Transcript.reviewSignature(source: source, translation: edited),
+                                         origin: TranslationNote.edited, machine: machine))
+        }
+        transcript.translationReview = notes.isEmpty ? nil : notes
+    }
+
     private static let englishLines = [
         "So the first thing I want to talk about today is how the system behaves when the input gets really large.",
         "Right, and that is exactly the point where most of the people in this room have run into trouble before.",
@@ -824,8 +853,11 @@ private final class LoadRun {
 
     func insertJobs() {
         let duration = Double(rows) * UILoadSelfTest.rowSpacing
-        doneBilingual.transcript = Transcript(sourceName: doneBilingual.name, segments: UILoadSelfTest.makeSegments(0..<rows),
-                                              language: "en", duration: duration, elapsed: 1)
+        var bilingual = Transcript(sourceName: doneBilingual.name, segments: UILoadSelfTest.makeSegments(0..<rows),
+                                   language: "en", duration: duration, elapsed: 1)
+        // 一部の行を、利用者が直した訳にする (一覧に「直した」の印が出る)
+        UILoadSelfTest.markEditedTranslations(&bilingual)
+        doneBilingual.transcript = bilingual
         // 対訳で出す (設定は変えない: 行の「訳」を押したときと同じ、このジョブだけの対訳)
         doneBilingual.showsLineTranslations = true
         // 日本語だけ: 訳す行が無いので、対訳の設定によらず、ふつうに出る
@@ -854,7 +886,7 @@ private final class LoadRun {
 
     func isShownBilingual(_ job: Job) -> String {
         guard let transcript = job.transcript else { return "no" }
-        let stats = job.status == .done ? transcript.translationStats : Transcript.TranslationStats()
+        let stats = job.status == .done ? model.translationStats(of: transcript) : Transcript.TranslationStats()
         return model.isBilingual(stats, in: job) ? "yes" : "no"
     }
 
@@ -1578,7 +1610,7 @@ extension LoadRun {
             let newest = job.versions.first
             step("restore version A, notes only",
                  restored && job.notes == notesA && job.transcript == transcriptBefore && job.versions.count == 3
-                    && newest?.origin == .beforeRestore && newest?.label == AppModel.beforeRestoreLabel,
+                    && newest?.origin == .beforeRestore,
                  "notes of A \(job.notes == notesA), transcript unchanged \(job.transcript == transcriptBefore),"
                  + " versions \(job.versions.count) (expected 3), newest origin \(newest.map { "\($0.origin)" } ?? "none")")
             // 自動で残した版には、戻す前のメモ (C) が入っている
@@ -1588,6 +1620,116 @@ extension LoadRun {
         } else {
             step("restore version A, notes only", false, "version A is missing")
         }
+
+        // 3b. 訳を直す・機械の訳に戻す (ふだんと同じ AppModel の関数で)。確認用の起動では、利用者の本物の訳の記憶を
+        // 読まず・書かない (保存先が無い)。確かめる間だけ、記憶を一時のファイルにし、終わったら消して保存先を外す
+        let valid = job.transcript?.validTranslationNotes.values
+        let edited = valid?.filter(\.isEdited).count ?? 0
+        let flagged = valid?.filter(\.isFlagged).count ?? 0
+        let marked = job.transcript?.translationReview?.count ?? 0
+        step("rows with edited and flagged translations", edited > 0 && flagged > 0 && edited + flagged == marked,
+             "valid edited notes \(edited), flagged \(flagged) of \(marked) (expected the sum, both more than 0)")
+        // 「要確認」の数は、行を作る時に数えた物 (一覧の見出しが出す数) と、結果の覚えの数が同じ
+        if let transcript = job.transcript {
+            let cache = TranscriptRowCache()
+            let counted = cache.items(of: transcript, job: job.id, done: true, bilingual: true, query: "",
+                                      target: model.translationTarget(for: transcript)).filter(\.needsTranslationReview).count
+            step("count rows that need review", cache.flaggedItemIDs.count == flagged && counted == flagged,
+                 "row cache \(cache.flaggedItemIDs.count), rows \(counted), notes \(flagged) (expected the same)")
+        }
+        // 印の付いた訳に「この訳でよい」: 印が消え、覚えの出どころが "confirmed" になる (印の符号は残る)。
+        // 絵 13 のために、印の付いた行を 1 つは残す (確かめるのは 2 つめの印の行)
+        let flaggedHeads = job.transcript.map { t in t.segments.map(\.id).filter { t.translationNote(for: $0)?.isFlagged == true } } ?? []
+        if flaggedHeads.count >= 2 {
+            let head = flaggedHeads[1]
+            let confirmed = model.confirmTranslation(head: head, in: job)
+            let note = job.transcript?.translationNote(for: head)
+            let left = job.transcript?.flaggedTranslationCount ?? -1
+            step("confirm a flagged translation through the model",
+                 confirmed && note?.origin == TranslationNote.confirmed && note?.isFlagged == false
+                    && note?.flags == [TranslationGate.number] && left == flaggedHeads.count - 1,
+                 "confirmed \(confirmed), note \(note?.origin ?? "none"), flags \(note?.flags ?? []), "
+                    + "left \(left) (expected \(flaggedHeads.count - 1))")
+            // 「この訳でよい」は、その印の検査の「誤りの印」の数に 1 つ足す (保存先が無いので、数は記憶の中だけ)
+            let counted = job.transcript.map { t in
+                model.translationMemory.gate.first {
+                    $0.check == TranslationGate.number && $0.target == model.translationTarget(for: t)
+                }?.confirmed ?? 0
+            } ?? 0
+            step("count “this translation is fine” for the check", counted >= 1 && note?.vote == TranslationNote.confirmed,
+                 "confirmed count \(counted), vote \(note?.vote ?? "none") (expected 1 or more, confirmed)")
+        } else {
+            step("confirm a flagged translation through the model", false,
+                 "\(flaggedHeads.count) flagged rows (expected 2 or more)")
+        }
+        step("the self-test does not use the real translation memory", model.translationMemoryURL == nil,
+             "memory file \(model.translationMemoryURL?.path ?? "none") (expected none)")
+        let memoryURL = root.deletingLastPathComponent()
+            .appendingPathComponent("kikimimi-ui-load-memory-\(UUID().uuidString).json")
+        model.useTranslationMemory(at: memoryURL)
+        if let transcript = job.transcript,
+           let target = transcript.segments.first(where: { $0.translation != nil && transcript.translationNote(for: $0.id) == nil }) {
+            let text = "確認用に直した訳"
+            let saved = model.setTranslation(text, head: target.id, in: job)
+            let note = job.transcript?.translationNote(for: target.id)
+            let remembered = TranslationMemory.load(from: memoryURL).sentences
+            step("edit a translation through the model",
+                 saved && note?.isEdited == true && note?.machine == target.translation
+                    && remembered.count == 1 && remembered.first?.translation == text,
+                 "saved \(saved), note \(note?.origin ?? "none"), memory \(remembered.count) (expected 1)")
+            // 直した訳の再利用: 写しの上でその文の訳を外し、記憶だけで訳し直す (LLM は使わない: generator は nil)。
+            // 記憶に在る文は訳が入り、覚えが "memory" になる。ジョブの結果は変えない
+            if let current = job.transcript {
+                var copy = current
+                copy.segments = Translator.clearingTranslations(of: [target.id], in: current.segments)
+                copy.translationReview = nil
+                let sources = Dictionary(copy.segments.map { ($0.id, $0.text) }, uniquingKeysWith: { a, _ in a })
+                var results: [TranslationResult] = []
+                let summary = try? Translator.translateSummarizing(
+                    copy.segments, language: copy.language, target: model.translationTarget(for: current), only: [target.id],
+                    memory: model.translationMemory.lookup(target: model.translationTarget(for: current)), generator: nil,
+                    shouldCancel: { false }) { batch, _, _ in results += batch }
+                for result in results { copy.apply(result, sources: sources) }
+                let reused = copy.segments.first { $0.id == target.id }?.translation
+                let reusedNote = copy.translationNote(for: target.id)
+                step("reuse a remembered translation without the LLM",
+                     summary?.fromMemory == 1 && summary?.sentToLLM == 0 && reused == text && reusedNote?.isRemembered == true,
+                     "from memory \(summary?.fromMemory ?? -1), sent \(summary?.sentToLLM ?? -1), "
+                        + "note \(reusedNote?.origin ?? "none") (expected 1, 0, memory)")
+            }
+            model.revertTranslation(head: target.id, in: job)
+            let restored = job.transcript?.segments.first { $0.id == target.id }?.translation
+            let after = TranslationMemory.load(from: memoryURL).sentences
+            step("restore the machine translation through the model",
+                 restored == target.translation && job.transcript?.translationNote(for: target.id) == nil && after.isEmpty,
+                 "restored \(restored == target.translation), memory \(after.count) (expected 0)")
+        } else {
+            step("edit a translation through the model", false, "no translated row without a note")
+        }
+        // 関門が判定から学ぶ: 「この訳でよい」を 5 回数えると、その検査 (数の抜け) が、その訳す先で止まる。
+        // [元に戻す] で数を 0 に戻すと、また印を出す (一時の記憶のファイルで。結果の一覧には触らない)
+        if let transcript = job.transcript {
+            let gateTarget = model.translationTarget(for: transcript)
+            for _ in 0..<TranslationMemory.gateMinimumJudgements {
+                model.countGateVote(flags: [TranslationGate.number], target: gateTarget, confirmed: 1)
+            }
+            let stopped = model.translationMemory.suppressedChecks(target: gateTarget)
+            let lookup = model.translationMemory.lookup(target: gateTarget, reuse: false)
+            step("a check stops after five “this translation is fine”",
+                 stopped == [TranslationGate.number] && lookup?.suppressedChecks == [TranslationGate.number]
+                    && model.translationMemory.suppressedGate.count == 1,
+                 "suppressed \(stopped.sorted()), lookup \(lookup?.suppressedChecks.sorted() ?? []), "
+                    + "listed \(model.translationMemory.suppressedGate.count) (expected number, number, 1)")
+            model.resetGateCheck(TranslationGate.number, target: gateTarget)
+            let saved = TranslationMemory.load(from: memoryURL)
+            step("undo a stopped check",
+                 model.translationMemory.suppressedChecks(target: gateTarget).isEmpty && saved.gate.isEmpty
+                    && model.translationMemory.lookup(target: gateTarget, reuse: false) == nil,
+                 "suppressed \(model.translationMemory.suppressedChecks(target: gateTarget).sorted()), "
+                    + "saved counts \(saved.gate.count) (expected none)")
+        }
+        model.useTranslationMemory(at: nil)
+        try? fm.removeItem(at: memoryURL)
 
         // 4. 書き終えてから、新しい LibraryStore で読み直して比べる
         model.flushLibrary()
@@ -1737,6 +1879,47 @@ extension LoadRun {
         // 履歴の画面が閉じきるまで待つ (次のシートを出せるように)
         await UILoadSelfTest.sleep(0.6)
         await settle()
+
+        // 12. 同じジョブの、訳を直す画面 (直した訳の行を開いたところ。機械の訳と「機械の訳に戻す」が出る)。撮ったら閉じる
+        Self.live("scene 12: the translation edit sheet")
+        if let head = job.transcript?.translationReview?.first(where: \.isEdited)?.head {
+            model.requestTranslationEdit(head, in: job)
+            await settle()
+            await UILoadSelfTest.sleep(0.6)
+            await settle()
+            if let sheet = window.attachedSheet, model.translationEdit != nil {
+                lines.append(shot("12-translation-edit", in: sheet, to: directory))
+            } else {
+                lines.append("UI LOAD: screenshot failed 12-translation-edit.png: the translation edit sheet is not shown")
+            }
+            model.translationEdit = nil
+            await settle()
+            await UILoadSelfTest.sleep(0.6)
+            await settle()
+        } else {
+            lines.append("UI LOAD: screenshot failed 12-translation-edit.png: no edited translation in the job")
+        }
+
+        // 13. 同じジョブの、「要確認」の行を開いた訳を直す画面 (上に理由の行と、「この訳でよい」が出る)。撮ったら閉じる
+        Self.live("scene 13: the translation edit sheet of a flagged row")
+        if let transcript = job.transcript,
+           let head = transcript.segments.first(where: { transcript.translationNote(for: $0.id)?.isFlagged == true })?.id {
+            model.requestTranslationEdit(head, in: job)
+            await settle()
+            await UILoadSelfTest.sleep(0.6)
+            await settle()
+            if let sheet = window.attachedSheet, model.translationEdit != nil {
+                lines.append(shot("13-translation-check", in: sheet, to: directory))
+            } else {
+                lines.append("UI LOAD: screenshot failed 13-translation-check.png: the translation edit sheet is not shown")
+            }
+            model.translationEdit = nil
+            await settle()
+            await UILoadSelfTest.sleep(0.6)
+            await settle()
+        } else {
+            lines.append("UI LOAD: screenshot failed 13-translation-check.png: no flagged translation in the job")
+        }
 
         // 11. 同じジョブの、ゴミ箱に入れるかの確かめの画面 (保存した結果と、残る元の音声ファイル)。
         // 撮ったら閉じる (このジョブは消さない)

@@ -41,7 +41,8 @@ public struct DeletionPlan: Equatable, Sendable {
     /// 計画を作る。
     /// - isSaved: 保存した結果か (保存していなければ、フォルダも録音もゴミ箱に入れない)
     /// - libraryFolder: この結果の保存のフォルダ (`<ライブラリ>/<UUID>`。ライブラリが無ければ nil)
-    /// - isRecording: マイクの録音から作った結果か
+    /// - isRecording: マイクの録音から作った結果か (false でも、音声がアプリの録音フォルダの中に在れば録音として扱う。
+    ///   録音を「やり直す」と印を失っていた古い結果でも、録音がゴミ箱へ移るように)
     /// - sourcePath: 音声ファイルの場所
     /// - recordingsDirectory: アプリの録音フォルダ
     /// - audioUsedByOtherJobs: ほかの結果も同じ音声ファイルを使っている
@@ -52,6 +53,7 @@ public struct DeletionPlan: Equatable, Sendable {
         let folder = isSaved ? libraryFolder : nil
         let isSaved = folder != nil
         let audio = sourcePath.map { URL(fileURLWithPath: $0).standardizedFileURL }
+        let isRecording = isRecording || recordingInAppFolder(sourcePath, recordingsDirectory: recordingsDirectory) != nil
         var recording: URL?
         var reason: KeptAudioReason?
         if audio != nil {

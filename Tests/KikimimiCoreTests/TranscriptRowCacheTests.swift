@@ -72,8 +72,14 @@ final class TranscriptRowCacheTests: XCTestCase {
         let after = cache.items(of: t, job: job, done: false, bilingual: false, query: "")
         // 2 つめの言語が出たので、すべての行に印が付く (作り直す)
         XCTAssertFalse(cache.lastItemsWasAppend)
-        XCTAssertEqual(after.first?.languageTag, "英")
-        XCTAssertEqual(after.last?.languageTag, "日")
+        // 行が持つのは言語のコード。画面に出す印は、読む時に今の画面の言語で作る
+        XCTAssertEqual(after.first?.languageTag, "en")
+        XCTAssertEqual(after.last?.languageTag, "ja")
+        XCTAssertEqual(LanguageTag.short(after.first?.languageTag), "EN")
+        L10n.language = .ja
+        defer { L10n.language = .en }
+        XCTAssertEqual(LanguageTag.short(after.first?.languageTag), "英")
+        XCTAssertEqual(LanguageTag.short(after.last?.languageTag), "日")
         XCTAssertEqual(cache.summary(of: t, job: job, done: false).spokenLanguages, ["en", "ja"])
         // そのあとは、また足すだけ (印はそのまま)
         t.segments.append(segment(11, language: "ja"))

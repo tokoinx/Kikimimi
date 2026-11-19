@@ -21,22 +21,51 @@ public struct AuditEvalCase: Codable, Hashable, Sendable {
     }
 }
 
+/// 評価の問題の訳語の対 1 つ (原文の語と、その訳語)
+public struct TranslationEvalTerm: Codable, Hashable, Sendable {
+    public var source: String
+    public var translation: String
+
+    public init(source: String, translation: String) {
+        self.source = source
+        self.translation = translation
+    }
+}
+
 /// 評価用の場面 (翻訳): 訳す行と、訳に残っているべき語 (固有名詞など)。
 public struct TranslationEvalCase: Codable, Hashable, Sendable {
     public var id: String
+    /// 原文の言語
     public var language: String
     public var glossary: String?
     public var lines: [String]
     /// 訳のどこかに、そのまま出てくるべき語 (例: "Roblox")
     public var keep: [String]?
+    /// 訳す先の言語 (無ければ日本語)
+    public var target: String?
+    /// 人の訳 (lines と同じ数)。在れば chrF を出す
+    public var references: [String]?
+    /// 文の種類 (例: "speech"・"social")。数えるのには使わない
+    public var domain: String?
+    /// 訳語の対 (無い問題は今までと同じ)。翻訳に渡し (`--no-terms` なら渡さない)、採点は原文に出る対で行う
+    public var terms: [TranslationEvalTerm]?
 
-    public init(id: String, language: String, glossary: String? = nil, lines: [String], keep: [String]? = nil) {
+    public init(id: String, language: String, glossary: String? = nil, lines: [String], keep: [String]? = nil,
+                target: String? = nil, references: [String]? = nil, domain: String? = nil,
+                terms: [TranslationEvalTerm]? = nil) {
+        self.terms = terms
         self.id = id
         self.language = language
         self.glossary = glossary
         self.lines = lines
         self.keep = keep
+        self.target = target
+        self.references = references
+        self.domain = domain
     }
+
+    /// 訳す先の言語のコード (13 言語のどれか。無い・知らないコードなら日本語)
+    public var targetLanguage: String { TranslationTarget.normalized(target) }
 }
 
 /// 評価用の場面のまとまり (JSON のファイル 1 つ)
@@ -119,39 +148,106 @@ public struct AuditEvalScore: Codable, Hashable, Sendable {
     }
 }
 
-/// 翻訳の成績 (形の点検だけ。訳の良し悪しは、人が読むか、追加学習の前後で比べる)
+/// 翻訳の成績。形の点検 (訳せたか・その言語か・数と語が残ったか・写し・繰り返し) と、人の訳が在れば chrF
 public struct TranslationEvalScore: Codable, Hashable, Sendable {
     public var cases = 0
     public var lines = 0
     /// 訳が付いた行 (文ごとにまとめて訳した行も数える)
     public var translated = 0
-    /// 日本語の文になっている (かな・漢字があり、日本語に無い漢字が無い)
-    public var japanese = 0
+    /// 訳が、訳す先の言語だった行 (日本語は、かな・漢字があり日本語に無い漢字が無い。ほかは言語の判定。
+    /// 短すぎて判定できない訳は、合っていると数える)。古い結果の `japanese` は、これとして読む
+    public var inTarget = 0
     /// 原文の数字 (2 桁以上) が、訳にも残っている場面
     public var numbersKept = 0
     public var numbersChecked = 0
     /// 残っているべき語 (固有名詞) が、訳に残っている数
     public var termsKept = 0
     public var termsChecked = 0
+    /// 訳が、原文をそのまま写しただけだった行 (原文の言語が訳す先と違う時だけ数える)
+    public var copied = 0
+    /// 同じ語句の繰り返しが異常に多い訳の行 (決め方は `LLMEval.isRepetitive`)
+    public var repeated = 0
+    /// chrF の統計 (人の訳の在る行だけ)。無ければ nil
+    public var chrFStatistics: ChrF.Statistics?
+    /// chrF (コーパスの点、0〜100)。人の訳が無ければ nil
+    public var chrF: Double?
     public var seconds = 0.0
+    /// 訳の後ろが抜けて (関門の `short`)、文に分けて訳し直したまとまりの数と、そのうち入れ替えた数。
+    /// 古い結果には無い (0 と読む)
+    public var retried = 0
+    public var retryFixed = 0
+    /// 訳の記憶 (`--memory`) に当たって、LLM を呼ばずに記憶の訳を置いた行の数。古い結果には無い (0 と読む)
+    public var reused = 0
+    /// 似た文の手本 (`--examples`) を 1 件以上足した LLM の呼び出しの数。古い結果には無い (0 と読む)
+    public var examplesUsed = 0
 
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case cases, lines, translated, inTarget, numbersKept, numbersChecked, termsKept, termsChecked
+        case copied, repeated, chrFStatistics, chrF, seconds, retried, retryFixed, reused, examplesUsed
+    }
+
+    /// 日本語だけを採点していた頃の項目の名前
+    private enum LegacyKeys: String, CodingKey { case japanese }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        cases = try c.decodeIfPresent(Int.self, forKey: .cases) ?? 0
+        lines = try c.decodeIfPresent(Int.self, forKey: .lines) ?? 0
+        translated = try c.decodeIfPresent(Int.self, forKey: .translated) ?? 0
+        if let value = try c.decodeIfPresent(Int.self, forKey: .inTarget) {
+            inTarget = value
+        } else {
+            inTarget = try decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(Int.self, forKey: .japanese) ?? 0
+        }
+        numbersKept = try c.decodeIfPresent(Int.self, forKey: .numbersKept) ?? 0
+        numbersChecked = try c.decodeIfPresent(Int.self, forKey: .numbersChecked) ?? 0
+        termsKept = try c.decodeIfPresent(Int.self, forKey: .termsKept) ?? 0
+        termsChecked = try c.decodeIfPresent(Int.self, forKey: .termsChecked) ?? 0
+        copied = try c.decodeIfPresent(Int.self, forKey: .copied) ?? 0
+        repeated = try c.decodeIfPresent(Int.self, forKey: .repeated) ?? 0
+        chrFStatistics = try c.decodeIfPresent(ChrF.Statistics.self, forKey: .chrFStatistics)
+        chrF = try c.decodeIfPresent(Double.self, forKey: .chrF)
+        seconds = try c.decodeIfPresent(Double.self, forKey: .seconds) ?? 0
+        retried = try c.decodeIfPresent(Int.self, forKey: .retried) ?? 0
+        retryFixed = try c.decodeIfPresent(Int.self, forKey: .retryFixed) ?? 0
+        reused = try c.decodeIfPresent(Int.self, forKey: .reused) ?? 0
+        examplesUsed = try c.decodeIfPresent(Int.self, forKey: .examplesUsed) ?? 0
+    }
 
     public mutating func add(_ other: TranslationEvalScore) {
         cases += other.cases
         lines += other.lines
         translated += other.translated
-        japanese += other.japanese
+        inTarget += other.inTarget
         numbersKept += other.numbersKept
         numbersChecked += other.numbersChecked
         termsKept += other.termsKept
         termsChecked += other.termsChecked
+        copied += other.copied
+        repeated += other.repeated
+        if let stats = other.chrFStatistics {
+            var sum = chrFStatistics ?? ChrF.Statistics()
+            sum.add(stats)
+            chrFStatistics = sum
+            chrF = sum.score
+        }
         seconds += other.seconds
+        retried += other.retried
+        retryFixed += other.retryFixed
+        reused += other.reused
+        examplesUsed += other.examplesUsed
     }
 
     public var summary: String {
-        String(format: "translation: %d cases, %d lines: translated %d, Japanese %d, numbers kept %d/%d, terms kept %d/%d, %.1f s",
-               cases, lines, translated, japanese, numbersKept, numbersChecked, termsKept, termsChecked, seconds)
+        let points = chrF.map { String(format: "%.2f", $0) } ?? "-"
+        return String(format: "translation: %d cases, %d lines: translated %d, in the target language %d, numbers kept %d/%d, "
+                      + "terms kept %d/%d, copied %d, repeated %d, ",
+                      cases, lines, translated, inTarget, numbersKept, numbersChecked, termsKept, termsChecked, copied, repeated)
+            + "chrF \(points), " + String(format: "split retries %d (used %d), %.1f s", retried, retryFixed, seconds)
+            + (reused > 0 ? ", from memory \(reused) lines" : "")
+            + (examplesUsed > 0 ? ", calls with examples \(examplesUsed)" : "")
     }
 }
 
@@ -241,9 +337,44 @@ public enum LLMEval {
         return (total, details)
     }
 
-    /// 2 桁以上の数字の並び (全角は半角にそろえる)
-    static func numbers(in text: String) -> [String] {
-        let half = text.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? text
+    /// 千の区切りに使う字 (4,000・4.000・4 000・4'000。空白は、ふつうの空白・NBSP・狭い NBSP)
+    private static let thousandsSeparators: Set<Character> = [",", ".", " ", "'", "\u{00A0}", "\u{202F}"]
+
+    /// 千の区切りを外す (「4,000」→「4000」)。外すのは、1〜3 桁の数の後ろに「区切り + ちょうど 3 桁」が続く所だけ
+    /// (「3.14」・「2024 100」は、そのまま)。言語ごとに区切りの書き方が違うので、原文と訳の両方をそろえるのに使う。
+    /// ふつうの空白は、区切り (「15 200」= 15200) の時も、2 つの数 (「15 200 人」= 15 と 200) の時も在る。
+    /// `joiningSpaces` が false なら、ふつうの空白は区切りと見ない (2 つの読み方は `numbersLost` が比べる)
+    static func removingThousandsSeparators(_ text: String, joiningSpaces: Bool = true) -> String {
+        let separators = joiningSpaces ? thousandsSeparators : thousandsSeparators.subtracting([" "])
+        let chars = Array(text)
+        func isDigit(_ k: Int) -> Bool { k >= 0 && k < chars.count && chars[k].isASCII && chars[k].isNumber }
+        var out = ""
+        var i = 0
+        while i < chars.count {
+            guard isDigit(i), !isDigit(i - 1) else {
+                out.append(chars[i])
+                i += 1
+                continue
+            }
+            var j = i
+            while isDigit(j) { j += 1 }
+            out.append(contentsOf: chars[i..<j])
+            if j - i <= 3 {
+                while j < chars.count, separators.contains(chars[j]),
+                      isDigit(j + 1), isDigit(j + 2), isDigit(j + 3), !isDigit(j + 4) {
+                    out.append(contentsOf: chars[(j + 1)...(j + 3)])
+                    j += 4
+                }
+            }
+            i = j
+        }
+        return out
+    }
+
+    /// 2 桁以上の数字の並び (全角は半角にそろえ、千の区切りは外す)
+    static func numbers(in text: String, joiningSpaces: Bool = true) -> [String] {
+        let half = removingThousandsSeparators(
+            text.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? text, joiningSpaces: joiningSpaces)
         var out: [String] = []
         var current = ""
         for ch in half {
@@ -258,82 +389,637 @@ public enum LLMEval {
         return out
     }
 
-    /// 翻訳の結果を採点する (translations は、区間の順の訳。訳さなかった区間は nil)
-    public static func score(_ c: TranslationEvalCase, translations: [String?]) -> (score: TranslationEvalScore, details: [String]) {
-        var score = TranslationEvalScore()
-        score.cases = 1
-        score.lines = c.lines.count
-        var details: [String] = []
-        let joined = translations.compactMap { $0 }.joined(separator: "\n")
-        for (index, line) in c.lines.enumerated() {
-            guard index < translations.count, let translation = translations[index] else { continue }
-            score.translated += 1
-            if Script.isJapanese(translation), !Script.containsNonJapaneseHan(translation) {
-                score.japanese += 1
-            } else {
-                details.append("[\(c.id) \(index + 1)] not Japanese: \(line) => \(translation)")
+    /// 原文の数のうち、訳に無い物を数える。ふつうの空白を千の区切りと読む・読まないの 2 通りで原文の数を取り、
+    /// 訳に無い数の少ないほうを採る (同じなら、区切りと読むほう)。訳の数は、2 通りの読み方を合わせた物
+    /// (「15,200」→「15 200」も、「15 200 people」→「15 に 200 人」も、数が消えたと数えない)
+    /// - target: 訳す先の言語のコード。在る時は、消えたと見た数のうち、その言語で数を言葉で書いた形
+    ///   (例: 中国語の「三十」・インドネシア語の "tiga puluh") が訳に在る物を、消えていないと見る。
+    ///   nil の時は、言葉の形を見ない (前からの決まりのまま)
+    static func numbersLost(sources: [String], translation: String,
+                            target: String? = nil) -> (checked: Int, lost: [String]) {
+        let have = Set(numbers(in: translation)).union(numbers(in: translation, joiningSpaces: false))
+        var best: (checked: Int, lost: [String])?
+        for joiningSpaces in [true, false] {
+            let wanted = Set(sources.flatMap { numbers(in: $0, joiningSpaces: joiningSpaces) })
+            let lost = wanted.subtracting(have).sorted()
+            if let current = best, current.lost.count <= lost.count { continue }
+            best = (wanted.count, lost)
+        }
+        guard var result = best else { return (0, []) }
+        if let target, !result.lost.isEmpty {
+            result.lost = result.lost.filter { !isSpelledOut($0, in: translation, target: target) }
+        }
+        return result
+    }
+
+    /// 空白で語を区切る、訳す先の言語 (数の言葉は、語の切れ目で当てる)
+    static let spacedNumberWordLanguages: Set<String> = ["en", "de", "es", "fr", "id", "it", "pt", "ru", "vi"]
+    /// 空白で語を区切らない、訳す先の言語 (数の言葉は、空白を除いた文の中で当てる)
+    static let unspacedNumberWordLanguages: Set<String> = ["ja", "zh", "ko", "th"]
+
+    /// 数の言葉の形を作るロケール (zh は簡体字と繁体字の 2 つ。pt はブラジルのポルトガル語)
+    static func spellOutLocales(for target: String) -> [String] {
+        switch target {
+        case "zh": return ["zh-Hans", "zh-Hant"]
+        case "pt": return ["pt-BR"]
+        default: return [target]
+        }
+    }
+
+    /// 数字の並び (2 桁以上) を、訳す先の言語で言葉にした形が、訳に在るか。
+    /// 先頭が 0 の物・9 桁を超える物・知らない言語は、見ない (false)
+    static func isSpelledOut(_ digits: String, in translation: String, target: String) -> Bool {
+        let target = target.lowercased()
+        let spaced = spacedNumberWordLanguages.contains(target)
+        guard spaced || unspacedNumberWordLanguages.contains(target),
+              !digits.hasPrefix("0"), digits.count <= 9, let value = Int(digits) else { return false }
+        let forms: [String] = spellOutLocales(for: target).compactMap { identifier in
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .spellOut
+            formatter.locale = Locale(identifier: identifier)
+            return formatter.string(from: NSNumber(value: value))
+        }
+        if spaced {
+            let text = " " + numberWords(translation).joined(separator: " ") + " "
+            return forms.contains { form in
+                let words = numberWords(form)
+                return !words.isEmpty && text.contains(" " + words.joined(separator: " ") + " ")
             }
         }
-        // 文ごとにまとめて訳すので、数字と語は場面の訳全体で確かめる
-        let wanted = Set(c.lines.flatMap(numbers(in:)))
-        if !wanted.isEmpty, !joined.isEmpty {
-            score.numbersChecked = wanted.count
-            let have = Set(numbers(in: joined))
-            score.numbersKept = wanted.filter(have.contains).count
-            let lost = wanted.subtracting(have).sorted()
-            if !lost.isEmpty { details.append("[\(c.id)] numbers lost: \(lost.joined(separator: ", ")) => \(joined)") }
+        let text = withoutSpaces(translation)
+        // ja と zh は、当たった所のすぐ前と後ろが漢数字でない事を求める (「三十人」の中の「十」で 10 に当てない)。
+        // ko と th は前後を見ない: 韓国語の数の字 (이・일・만 など) は、ふつうの語にも多いので、前後で絞ると正しい訳に印が付く
+        let bounded = target == "ja" || target == "zh"
+        return forms.contains { form in
+            let f = withoutSpaces(form)
+            guard !f.isEmpty else { return false }
+            guard bounded else { return text.contains(f) }
+            var start = text.startIndex
+            while let r = text.range(of: f, range: start..<text.endIndex) {
+                let before = r.lowerBound > text.startIndex ? text[text.index(before: r.lowerBound)] : nil
+                let after = r.upperBound < text.endIndex ? text[r.upperBound] : nil
+                if !isKanjiNumeral(before), !isKanjiNumeral(after) { return true }
+                start = text.index(after: r.lowerBound)
+            }
+            return false
         }
-        if let keep = c.keep, !joined.isEmpty {
+    }
+
+    /// 漢数字の字 (前後を見る時に使う)
+    private static let kanjiNumerals = Set<Character>("〇零一二三四五六七八九十百千万萬億亿兆两兩廿") // l10n: keep (画面に出さない、字の一覧)
+
+    private static func isKanjiNumeral(_ c: Character?) -> Bool {
+        guard let c else { return false }
+        return kanjiNumerals.contains(c)
+    }
+
+    /// 語の並びにする: 小文字にし、見えない字 (やわらかいハイフンなど) を除き、
+    /// ハイフン類・句読点などの、字でも数字でもない物を語の切れ目と見る
+    private static func numberWords(_ text: String) -> [String] {
+        var out = ""
+        for scalar in text.precomposedStringWithCanonicalMapping.lowercased().unicodeScalars {
+            let p = scalar.properties
+            if p.generalCategory == .format { continue }
+            if p.isAlphabetic || p.numericType != nil || p.generalCategory == .nonspacingMark
+                || p.generalCategory == .spacingMark {
+                out.unicodeScalars.append(scalar)
+            } else {
+                out.append(" ")
+            }
+        }
+        return out.split(separator: " ").map(String.init)
+    }
+
+    /// 空白と見えない字 (ゼロ幅の空白など) を除く
+    private static func withoutSpaces(_ text: String) -> String {
+        var out = ""
+        for scalar in text.precomposedStringWithCanonicalMapping.lowercased().unicodeScalars {
+            let p = scalar.properties
+            if p.isWhitespace || p.generalCategory == .format { continue }
+            out.unicodeScalars.append(scalar)
+        }
+        return out
+    }
+
+    /// 判定に使う文の、文字の数の下限。これより短い訳は判定せず「訳す先の言語だった」と数える (短い語句は判定が外れやすい)
+    public static let minimumLettersToDetect = 8
+    /// 「繰り返しが異常に多い」の決め方: 空白を除いて、この字数以上の同じ並びが、この回数以上続く
+    public static let repetitionMinimumLength = 3
+    public static let repetitionMinimumCount = 5
+    /// 比べる時、chrF がこれより大きく下がったら「悪くなった」
+    public static let chrFTolerance = 1.0
+
+    /// 既定の言語の判定 (Apple の環境では NaturalLanguage。ほかでは無し = 文字の種類で見る)
+    public static var defaultLanguageDetector: LanguageDetector? {
+        #if canImport(NaturalLanguage)
+        return SystemLanguageDetector.detector
+        #else
+        return nil
+        #endif
+    }
+
+    /// 同じ語句の繰り返しが異常に多いか (空白を除いて、3 字以上の同じ並びが 5 回以上続く。並びには文字が 1 つ以上在る)。
+    /// 空白を除くので、"the the the the the" のように空白で区切った繰り返しも数える
+    public static func isRepetitive(_ text: String) -> Bool {
+        let chars = text.filter { !$0.isWhitespace }.map { $0 }
+        let minLength = repetitionMinimumLength, times = repetitionMinimumCount
+        guard chars.count >= minLength * times else { return false }
+        for period in minLength...(chars.count / times) {
+            // chars[i] == chars[i + period] が続く長さが period * (times - 1) に届けば、times 回続いている
+            var run = 0
+            for i in 0..<(chars.count - period) {
+                if chars[i] == chars[i + period] {
+                    run += 1
+                    if run >= period * (times - 1) {
+                        let start = i + 1 - run
+                        if chars[start..<(start + period)].contains(where: \.isLetter) { return true }
+                    }
+                } else {
+                    run = 0
+                }
+            }
+        }
+        return false
+    }
+
+    /// 訳が、訳す先の言語か。日本語は今までの検査。ほかは言語の判定 (判定が無ければ文字の種類で見る)
+    static func isInTarget(_ text: String, target: String, detector: LanguageDetector?) -> Bool {
+        if target == "ja" { return Script.isJapanese(text) && !Script.containsNonJapaneseHan(text) }
+        // 文字の種類で分かる言語 (ko・ru・th・zh) は、その言語の文字が在れば合っている。
+        // 言語の判定は、固有名詞やハッシュタグの多い訳を別の言語 (ru → kk、ko → en) と判定する事がある
+        if hasTargetScript(text, target: target) { return true }
+        // 短すぎる訳は判定しない
+        guard text.filter(\.isLetter).count >= minimumLettersToDetect else { return true }
+        if let detector {
+            // 分からない (nil) 時は、外れとは数えない
+            guard let detected = detector(text) else { return true }
+            return detected.lowercased() == target
+        }
+        switch target {
+        case "ko", "ru", "th", "zh": return false
+        default: return true
+        }
+    }
+
+    /// 訳が、原文をそのまま写しただけか (原文の言語が訳す先と違う時だけ。空白の違いは見ない)。
+    /// 原文の言語が分からない (nil) 時は、違うと見る。採点 (`score`) と訳の関門 (`TranslationGate`) の両方が使う
+    static func isCopy(_ text: String, source: String, sourceLanguage: String?, target: String) -> Bool {
+        sourceLanguage?.lowercased() != target && normalized(text) == normalized(source)
+    }
+
+    /// 訳す先の言語の文字が在るか (ko: ハングル、ru: キリル文字、th: タイ文字、zh: 漢字が在り、かなが無い)。
+    /// ほかの言語は、文字の種類では見分けられないので false
+    static func hasTargetScript(_ text: String, target: String) -> Bool {
+        switch target {
+        case "ko", "ru", "th": return Script.hasLetters(text, of: target)
+        case "zh": return Script.hasHan(text) && !Script.hasKanaLetters(text)
+        default: return false
+        }
+    }
+
+    /// 1 つの訳 (文ごと): 原文の行の位置 (先頭から順) と、その訳 (訳せなかったら nil)。
+    /// asSource は、訳す必要が無い行 (文字の無い行・もう訳す先の言語の行) で、原文をそのまま訳とした物
+    public struct TranslationUnit: Hashable, Sendable {
+        public var lines: [Int]
+        public var text: String?
+        public var asSource: Bool
+
+        public init(lines: [Int], text: String?, asSource: Bool = false) {
+            self.lines = lines
+            self.text = text
+            self.asSource = asSource
+        }
+    }
+
+    /// 1 つの問題の、LLM の訳そのもの (評価の結果に残す。採点の決まりを直した時に、LLM を回さずに採点し直せる)
+    public struct TranslationOutput: Codable, Hashable, Sendable {
+        /// 訳の単位 (文ごと)
+        public struct Unit: Codable, Hashable, Sendable {
+            /// 原文の行の番号 (0 始まり、先頭から順)
+            public var lines: [Int]
+            /// 原文 (いくつかの行をまとめた訳は、その行をつないだ文)
+            public var source: String
+            /// 訳 (訳せなかった時は無し)
+            public var text: String?
+            /// 人の訳 (在れば。行をまとめた訳は、その行の人の訳をつないだ文)
+            public var reference: String?
+            /// 訳す必要が無い行で、原文をそのまま訳とした (true の時だけ書く)
+            public var asSource: Bool?
+
+            public init(lines: [Int], source: String, text: String?, reference: String?, asSource: Bool? = nil) {
+                self.lines = lines
+                self.source = source
+                self.text = text
+                self.reference = reference
+                self.asSource = asSource
+            }
+        }
+
+        /// 問題の id
+        public var id: String
+        /// 訳す先の言語
+        public var target: String
+        /// 原文の言語
+        public var language: String
+        /// 問題の行の数
+        public var lineCount: Int
+        public var units: [Unit]
+        /// 訳に残っているべき語
+        public var keep: [String]?
+        /// 用語集 (語彙のヒント)
+        public var glossary: String?
+        /// 訳すのにかかった秒 (採点し直しても、そのまま使う)
+        public var seconds: Double?
+        /// 文に分けて訳し直したまとまりの数と、そのうち入れ替えた数 (採点し直しても、そのまま使う。古い結果には無い)
+        public var retried: Int?
+        public var retryFixed: Int?
+        /// 訳の記憶に当たった行の数 (採点し直しても、そのまま使う。古い結果・`--memory` の無い測りには無い)
+        public var reused: Int?
+        /// 似た文の手本を足した LLM の呼び出しの数 (採点し直しても、そのまま使う。古い結果・`--examples` の無い測りには無い)
+        public var examplesUsed: Int?
+        /// 問題の訳語の対 (古い結果・対の無い問題には無い)
+        public var terms: [TranslationEvalTerm]?
+
+        public init(id: String, target: String, language: String, lineCount: Int, units: [Unit], keep: [String]? = nil,
+                    glossary: String? = nil, seconds: Double? = nil, terms: [TranslationEvalTerm]? = nil) {
+            self.terms = terms
+            self.id = id
+            self.target = target
+            self.language = language
+            self.lineCount = lineCount
+            self.units = units
+            self.keep = keep
+            self.glossary = glossary
+            self.seconds = seconds
+        }
+    }
+
+    /// 問題と訳の単位から、残す訳 (`TranslationOutput`) を作る。問題の行に無い番号は外す。人の訳は、行の数が合う時だけ入れる
+    public static func output(_ c: TranslationEvalCase, units: [TranslationUnit], seconds: Double? = nil) -> TranslationOutput {
+        let references = c.references.flatMap { $0.count == c.lines.count ? $0 : nil }
+        let kept: [TranslationOutput.Unit] = units.compactMap { unit in
+            let indices = unit.lines.filter { c.lines.indices.contains($0) }
+            guard !indices.isEmpty else { return nil }
+            return TranslationOutput.Unit(lines: indices, source: Transcript.join(indices.map { c.lines[$0] }),
+                                          text: unit.text,
+                                          reference: references.map { r in Transcript.join(indices.map { r[$0] }) },
+                                          asSource: unit.asSource ? true : nil)
+        }
+        return TranslationOutput(id: c.id, target: c.targetLanguage, language: c.language, lineCount: c.lines.count,
+                                 units: kept, keep: c.keep, glossary: c.glossary, seconds: seconds, terms: c.terms)
+    }
+
+    /// 翻訳の結果を採点する (translations は、行の順の訳。訳さなかった行は nil。1 行ずつの訳として数える)
+    public static func score(_ c: TranslationEvalCase, translations: [String?],
+                             detector: LanguageDetector? = nil) -> (score: TranslationEvalScore, details: [String]) {
+        let units = c.lines.indices.map { TranslationUnit(lines: [$0], text: $0 < translations.count ? translations[$0] : nil) }
+        return score(c, units: units, detector: detector)
+    }
+
+    /// 翻訳の結果を採点する (units は、文ごとの訳。いくつかの行をまとめた訳は、その行ぶんの原文・人の訳とつないで比べる)
+    public static func score(_ c: TranslationEvalCase, units: [TranslationUnit],
+                             detector: LanguageDetector? = nil) -> (score: TranslationEvalScore, details: [String]) {
+        var result = score(output(c, units: units), detector: detector)
+        if let references = c.references, references.count != c.lines.count {
+            result.details.insert("[\(c.id)] references ignored: \(references.count) references for \(c.lines.count) lines", at: 0)
+        }
+        return result
+    }
+
+    /// 残した訳 (`TranslationOutput`) を採点する。問題から採点する時も、採点し直す時も、ここを通る (決め方を 1 つにする)
+    public static func score(_ o: TranslationOutput,
+                             detector: LanguageDetector? = nil) -> (score: TranslationEvalScore, details: [String]) {
+        let target = TranslationTarget.normalized(o.target)
+        var score = TranslationEvalScore()
+        score.cases = 1
+        score.lines = o.lineCount
+        score.seconds = o.seconds ?? 0
+        score.retried = o.retried ?? 0
+        score.retryFixed = o.retryFixed ?? 0
+        score.reused = o.reused ?? 0
+        score.examplesUsed = o.examplesUsed ?? 0
+        var details: [String] = []
+        var chrF: ChrF.Statistics?
+        var texts: [String] = []
+        for unit in o.units {
+            let indices = unit.lines
+            guard let first = indices.first else { continue }
+            let label = "[\(o.id) \(first + 1)\(indices.count > 1 ? "-\(indices[indices.count - 1] + 1)" : "")]"
+            let source = unit.source
+            let asSource = unit.asSource == true
+            // 訳す必要の無い行は、原文をそのまま訳とする (アプリも、原文のまま見せる)
+            let text = asSource ? source : unit.text.flatMap { $0.isEmpty ? nil : $0 }
+            if let reference = unit.reference {
+                var stats = chrF ?? ChrF.Statistics()
+                stats.add(ChrF.statistics(hypothesis: text ?? "", reference: reference))
+                chrF = stats
+            }
+            guard let text else { continue }
+            texts.append(text)
+            score.translated += indices.count
+            // 訳す必要の無い行は、訳す先の言語・写し・繰り返しを見ない (原文そのものなので)
+            if asSource {
+                score.inTarget += indices.count
+                continue
+            }
+            if isInTarget(text, target: target, detector: detector) {
+                score.inTarget += indices.count
+            } else {
+                details.append("\(label) not in \(target): \(source) => \(text)")
+            }
+            if isCopy(text, source: source, sourceLanguage: o.language, target: target) {
+                score.copied += indices.count
+                details.append("\(label) copied: \(text)")
+            }
+            if isRepetitive(text) {
+                score.repeated += indices.count
+                details.append("\(label) repeated: \(text)")
+            }
+        }
+        score.chrFStatistics = chrF
+        score.chrF = chrF?.score
+        // 文ごとにまとめて訳すので、数字と語は場面の訳全体で確かめる
+        let joined = texts.joined(separator: "\n")
+        // 採点は、前に測った値と比べられるように、言葉で書いた数を見ない (target を渡さない)
+        let numberCheck = numbersLost(sources: o.units.map(\.source), translation: joined)
+        if numberCheck.checked > 0, !joined.isEmpty {
+            score.numbersChecked = numberCheck.checked
+            score.numbersKept = numberCheck.checked - numberCheck.lost.count
+            let lost = numberCheck.lost
+            if !lost.isEmpty { details.append("[\(o.id)] numbers lost: \(lost.joined(separator: ", ")) => \(joined)") }
+        }
+        if let keep = o.keep, !joined.isEmpty {
             score.termsChecked = keep.count
             for term in keep {
                 if joined.range(of: term, options: .caseInsensitive) != nil {
                     score.termsKept += 1
                 } else {
-                    details.append("[\(c.id)] term lost: \(term) => \(joined)")
+                    details.append("[\(o.id)] term lost: \(term) => \(joined)")
+                }
+            }
+        }
+        // 訳語の対: 原文に原語が出る対を数え、訳に訳語が在るかを見る (当て方は関門と同じ `TermPair.occurs`・`TermPair.kept`)。
+        // keep と同じ欄に足す (keep だけの問題の点は変わらない)
+        if let terms = o.terms, !terms.isEmpty, !joined.isEmpty {
+            let sourceText = o.units.map(\.source).joined(separator: "\n")
+            for term in terms where !term.source.isEmpty && !term.translation.isEmpty
+                && TermPair.occurs(term.source, in: sourceText) {
+                score.termsChecked += 1
+                if TermPair.kept(term.translation, in: joined, target: target) {
+                    score.termsKept += 1
+                } else {
+                    details.append("[\(o.id)] term lost: \(term.source) => \(term.translation): \(joined)")
                 }
             }
         }
         return (score, details)
     }
 
-    /// 翻訳の場面をひと通り動かして採点する
-    public static func runTranslation(_ cases: [TranslationEvalCase], generator: any TextGenerating,
-                                      ledger: CorrectionLedger? = nil, shouldCancel: () -> Bool = { false },
-                                      onCase: (_ done: Int, _ total: Int) -> Void = { _, _ in }) throws -> (score: TranslationEvalScore, details: [String]) {
+    /// 残した訳を、今の採点の決まりで採点し直す (LLM は使わない)。訳す先ごとにも集計する
+    public static func rescore(_ outputs: [TranslationOutput], detector: LanguageDetector? = LLMEval.defaultLanguageDetector)
+        -> (score: TranslationEvalScore, byTarget: [String: TranslationEvalScore], details: [String]) {
         var total = TranslationEvalScore()
+        var byTarget: [String: TranslationEvalScore] = [:]
         var details: [String] = []
+        for o in outputs {
+            let result = score(o, detector: detector)
+            total.add(result.score)
+            byTarget[TranslationTarget.normalized(o.target), default: TranslationEvalScore()].add(result.score)
+            details += result.details
+        }
+        return (total, byTarget, details)
+    }
+
+    /// 翻訳の場面をひと通り動かして採点する。場面ごとの訳す先 (`target`) で訳し、訳す先ごとにも集計する。
+    /// アプリと同じ `Translator.translateSummarizing` を通す (訳の後ろが抜けた時の訳し直しも同じに働く)。
+    /// splitRetry が false なら、訳し直しを切る (`--no-split-retry`)。
+    /// useTerms が false なら、問題の訳語の対を翻訳に渡さない (`--no-terms`。採点は対で行う)。
+    /// memory を渡すと (`--memory`)、その記憶 (覚えた文・訳語の対・止める検査) を翻訳に渡す (`caseLookup`)。
+    /// ただし問題の行と同じ文 (そろえた原文が同じ) は記憶から抜く (答えを見て訳す事になるため。`memoryExclusions`)。
+    /// examples が 1 以上なら (`--examples N`。memory が要る)、記憶の似た文を、多くて N 件手本として指示文に足す
+    /// (`TranslationOptions.memoryExamples`。問題の行と同じ文は、手本にも使わない)
+    public static func runTranslation(_ cases: [TranslationEvalCase], generator: any TextGenerating,
+                                      ledger: CorrectionLedger? = nil, splitRetry: Bool = true, useTerms: Bool = true,
+                                      memory: TranslationMemory? = nil, examples: Int = 0,
+                                      detector: LanguageDetector? = LLMEval.defaultLanguageDetector,
+                                      shouldCancel: () -> Bool = { false },
+                                      onCase: (_ done: Int, _ total: Int) -> Void = { _, _ in })
+        throws -> (score: TranslationEvalScore, byTarget: [String: TranslationEvalScore], details: [String],
+                   outputs: [TranslationOutput]) {
+        var total = TranslationEvalScore()
+        var byTarget: [String: TranslationEvalScore] = [:]
+        var details: [String] = []
+        var outputs: [TranslationOutput] = []
         for (done, c) in cases.enumerated() {
             let started = Date()
             let segments = segments(c.lines, language: c.language)
             var byHead: [UUID: TranslationResult] = [:]
             let glossary = ledger?.glossary(adding: c.glossary) ?? c.glossary
-            _ = try Translator.translate(segments, language: c.language, options: TranslationOptions(glossary: glossary),
-                                         generator: generator, shouldCancel: shouldCancel) { batch, _, _ in
+            let lookup = caseLookup(c, memory: memory, useTerms: useTerms)
+            let excluded = lookup.map { memoryExclusions(segments, memory: $0) } ?? []
+            let run = try Translator.translateSummarizing(segments, language: c.language, target: c.targetLanguage,
+                                                          options: TranslationOptions(glossary: glossary,
+                                                                                      splitRetry: splitRetry,
+                                                                                      memoryExamples: memory == nil ? 0 : examples),
+                                                          memory: lookup, memoryExcluding: excluded,
+                                                          generator: generator, shouldCancel: shouldCancel) { batch, _, _ in
                 for result in batch { byHead[result.head] = result }
             }
-            // 文ごとの訳は、先頭の区間に付く。まとめられた後ろの区間は「訳済み」として数える
-            var translations = [String?](repeating: nil, count: segments.count)
+            // 記憶に当たった行 (まとまりの先頭と、まとめた後ろの区間)
+            let reused = byHead.values.filter(\.fromMemory).reduce(0) { $0 + 1 + $1.covers.count }
+            // 文ごとの訳は、先頭の区間に付く。まとめられた後ろの区間も、その訳の行として数える
             let position = Dictionary(segments.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
-            for (head, result) in byHead {
-                guard let index = position[head] else { continue }
-                translations[index] = result.text
-                for covered in result.covers {
-                    if let k = position[covered] { translations[k] = "" }
+            var units: [TranslationUnit] = []
+            var covered = Set<Int>()
+            for result in byHead.values {
+                guard let head = position[result.head] else { continue }
+                let lines = [head] + result.covers.compactMap { position[$0] }
+                units.append(TranslationUnit(lines: lines, text: result.text))
+                covered.formUnion(lines)
+            }
+            // 訳の無い行。訳す必要が無い行 (文字の無い行・もう訳す先の言語の行) は、アプリと同じく原文をそのまま訳とする。
+            // ほかは訳せなかった行
+            for index in segments.indices where !covered.contains(index) {
+                if Translator.needsTranslation(segments[index], transcriptLanguage: c.language, target: c.targetLanguage) {
+                    units.append(TranslationUnit(lines: [index], text: nil))
+                } else {
+                    units.append(TranslationUnit(lines: [index], text: segments[index].text, asSource: true))
                 }
             }
-            var result = score(c, translations: translations.map { $0 == "" ? nil : $0 })
-            result.score.translated = translations.filter { $0 != nil }.count
-            // まとめて訳した後ろの区間は、先頭の訳が日本語なら日本語として数える (「訳した数」と同じ数え方にそろえる)
-            for (head, unit) in byHead {
-                guard let index = position[head], let text = translations[index], !text.isEmpty,
-                      Script.isJapanese(text), !Script.containsNonJapaneseHan(text) else { continue }
-                result.score.japanese += unit.covers.filter { $0 != head && position[$0] != nil }.count
-            }
-            result.score.seconds = Date().timeIntervalSince(started)
+            units.sort { ($0.lines.first ?? 0) < ($1.lines.first ?? 0) }
+            var result = score(c, units: units, detector: detector)
+            let seconds = Date().timeIntervalSince(started)
+            result.score.seconds = seconds
+            result.score.retried = run.retried
+            result.score.retryFixed = run.retryFixed
+            result.score.reused = reused
+            result.score.examplesUsed = run.examplesUsed
+            var saved = output(c, units: units, seconds: seconds)
+            saved.retried = run.retried
+            saved.retryFixed = run.retryFixed
+            if memory != nil { saved.reused = reused }
+            if memory != nil, examples > 0 { saved.examplesUsed = run.examplesUsed }
+            outputs.append(saved)
             total.add(result.score)
+            byTarget[c.targetLanguage, default: TranslationEvalScore()].add(result.score)
             details += result.details
             onCase(done + 1, cases.count)
         }
-        return (total, details)
+        return (total, byTarget, details, outputs)
+    }
+
+    /// 問題 c の翻訳に渡す写し。memory が無ければ `termLookup` と同じ (useTerms が false なら nil)。
+    /// memory が在れば、その訳す先の覚えた文・止める検査と、訳語の対 (問題の対 + 記憶の対。同じ原語は問題の対を使う。
+    /// useTerms が false なら記憶の対だけ) を持つ写し
+    static func caseLookup(_ c: TranslationEvalCase, memory: TranslationMemory?, useTerms: Bool) -> TranslationMemoryLookup? {
+        let own = useTerms ? termLookup(c) : nil
+        guard let memory else { return own }
+        let target = c.targetLanguage
+        let base = memory.lookup(target: target)
+        let ownTerms = own?.terms ?? []
+        let ownSources = Set(ownTerms.map { $0.source.lowercased() })
+        let terms = ownTerms + base.terms.filter { !ownSources.contains($0.source.lowercased()) }
+        let sentences = memory.sentences.filter { TranslationMemory.normalizedTarget($0.target) == base.target }
+        return TranslationMemoryLookup(target: target, sentences: sentences, terms: terms,
+                                       suppressedChecks: base.suppressedChecks)
+    }
+
+    /// 記憶から抜く区間: 問題の行のうち、記憶に同じ文 (そろえた原文が同じ) が在る行。
+    /// その行を含む文のまとまりは、記憶を引かずに LLM に送る (`Translator.translateSummarizing` の memoryExcluding)
+    static func memoryExclusions(_ segments: [TranscriptSegment], memory: TranslationMemoryLookup) -> Set<UUID> {
+        guard !memory.isEmpty else { return [] }
+        return Set(segments.filter { memory.translations[TranslationMemory.normalizedSource($0.text)] != nil }.map(\.id))
+    }
+
+    /// 問題の訳語の対だけを持つ写し (覚えた文は持たない)。対が無ければ nil (アプリの「記憶が無い」時と同じに訳す)
+    static func termLookup(_ c: TranslationEvalCase) -> TranslationMemoryLookup? {
+        let pairs = (c.terms ?? []).map { TermPair(source: TermPair.cleaned($0.source), translation: TermPair.cleaned($0.translation),
+                                                   target: c.targetLanguage) }
+            .filter { !$0.source.isEmpty && !$0.translation.isEmpty }
+        guard !pairs.isEmpty else { return nil }
+        return TranslationMemoryLookup(target: c.targetLanguage, sentences: [], terms: pairs)
+    }
+
+    /// 前の結果と比べて、訳す先ごとに悪くなった所を返す (空なら悪くなっていない)。前の結果に無い訳す先は比べない。
+    /// 悪くなった: 訳せた行・その言語だった行・残った数字・残った語のどれかが減った、写し・繰り返しが増えた、
+    /// chrF が `chrFTolerance` より大きく下がった。
+    /// 問題の数か行の数が違う (別の問題の結果) なら、ほかは比べず「比べられない」の 1 行を返す (悪くなった扱いにして知らせる)
+    public static func translationRegressions(_ now: [String: TranslationEvalScore],
+                                              baseline before: [String: TranslationEvalScore]) -> [String] {
+        var out: [String] = []
+        for target in now.keys.sorted() {
+            guard let a = now[target], let b = before[target] else { continue }
+            guard a.lines == b.lines, a.cases == b.cases else {
+                out.append("\(target): not comparable (cases \(b.cases) -> \(a.cases), lines \(b.lines) -> \(a.lines))")
+                continue
+            }
+            func fewer(_ name: String, _ x: Int, _ y: Int) { if x < y { out.append("\(target): \(name) \(y) -> \(x)") } }
+            func more(_ name: String, _ x: Int, _ y: Int) { if x > y { out.append("\(target): \(name) \(y) -> \(x)") } }
+            fewer("translated", a.translated, b.translated)
+            fewer("in the target language", a.inTarget, b.inTarget)
+            fewer("numbers kept", a.numbersKept, b.numbersKept)
+            fewer("terms kept", a.termsKept, b.termsKept)
+            more("copied", a.copied, b.copied)
+            more("repeated", a.repeated, b.repeated)
+            if let x = a.chrF, let y = b.chrF, x < y - chrFTolerance {
+                out.append("\(target): chrF " + String(format: "%.2f -> %.2f", y, x))
+            }
+        }
+        return out
+    }
+
+    /// 訳す先ごとの表 (1 行目は見出し)。訳す先・行・訳せた・その言語だった・数・語・写し・繰り返し・chrF・1 行あたりの秒・
+    /// 訳し直した数 (入れ替えた数 / 訳し直した数)
+    public static func translationTable(_ byTarget: [String: TranslationEvalScore]) -> [String] {
+        func pad(_ s: String, _ width: Int) -> String { s.count >= width ? s : s + String(repeating: " ", count: width - s.count) }
+        let widths = [6, 6, 10, 9, 9, 9, 6, 8, 7, 7, 7]
+        func row(_ cells: [String]) -> String { zip(cells, widths).map { pad($0, $1) }.joined(separator: " ") }
+        var out = [row(["target", "lines", "translated", "inTarget", "numbers", "terms", "copied", "repeated", "chrF", "s/line",
+                        "retry"])]
+        for target in byTarget.keys.sorted() {
+            guard let s = byTarget[target] else { continue }
+            out.append(row([target, "\(s.lines)", "\(s.translated)", "\(s.inTarget)", "\(s.numbersKept)/\(s.numbersChecked)",
+                            "\(s.termsKept)/\(s.termsChecked)", "\(s.copied)", "\(s.repeated)",
+                            s.chrF.map { String(format: "%.2f", $0) } ?? "-",
+                            String(format: "%.2f", s.lines > 0 ? s.seconds / Double(s.lines) : 0),
+                            "\(s.retryFixed)/\(s.retried)"]))
+        }
+        return out
+    }
+}
+
+/// 評価ハーネス (`--eval-llm`) の結果 (`--report` に書く JSON)。古い結果 (項目の足りない物) も読める
+public struct LLMEvalReport: Codable, Sendable {
+    public var model: String
+    public var adapter: String?
+    public var ledgerEntries: Int
+    public var sets: [String]
+    public var audit: AuditEvalScore
+    /// 翻訳の全体の合計
+    public var translation: TranslationEvalScore
+    /// 翻訳の、訳す先ごとの成績 (鍵は言語のコード)
+    public var translationByTarget: [String: TranslationEvalScore]
+    public var details: [String]
+    /// 翻訳の問題ごとの、LLM の訳そのもの (採点し直しに使う)。古い結果には無い
+    public var translationOutputs: [LLMEval.TranslationOutput]?
+    /// 採点し直した結果なら、元の結果のファイルの名前
+    public var rescoredFrom: String?
+
+    public init(model: String, adapter: String?, ledgerEntries: Int, sets: [String], audit: AuditEvalScore,
+                translation: TranslationEvalScore, translationByTarget: [String: TranslationEvalScore], details: [String],
+                translationOutputs: [LLMEval.TranslationOutput]? = nil, rescoredFrom: String? = nil) {
+        self.model = model
+        self.adapter = adapter
+        self.ledgerEntries = ledgerEntries
+        self.sets = sets
+        self.audit = audit
+        self.translation = translation
+        self.translationByTarget = translationByTarget
+        self.details = details
+        self.translationOutputs = translationOutputs
+        self.rescoredFrom = rescoredFrom
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case model, adapter, ledgerEntries, sets, audit, translation, translationByTarget, details
+        case translationOutputs, rescoredFrom
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        model = try c.decode(String.self, forKey: .model)
+        adapter = try c.decodeIfPresent(String.self, forKey: .adapter)
+        ledgerEntries = try c.decodeIfPresent(Int.self, forKey: .ledgerEntries) ?? 0
+        sets = try c.decodeIfPresent([String].self, forKey: .sets) ?? []
+        audit = try c.decode(AuditEvalScore.self, forKey: .audit)
+        translation = try c.decodeIfPresent(TranslationEvalScore.self, forKey: .translation) ?? TranslationEvalScore()
+        details = try c.decodeIfPresent([String].self, forKey: .details) ?? []
+        if let byTarget = try c.decodeIfPresent([String: TranslationEvalScore].self, forKey: .translationByTarget) {
+            translationByTarget = byTarget
+        } else {
+            // 訳す先ごとの成績が無い古い結果は、日本語へ訳す場合だけを採点していた
+            translationByTarget = translation.lines > 0 ? ["ja": translation] : [:]
+        }
+        translationOutputs = try c.decodeIfPresent([LLMEval.TranslationOutput].self, forKey: .translationOutputs)
+        rescoredFrom = try c.decodeIfPresent(String.self, forKey: .rescoredFrom)
+    }
+
+    /// 翻訳の点を、残した訳から今の採点の決まりで計算し直した結果。監査の点と、監査の細かい所はそのまま。
+    /// 訳が残っていなければ (古い結果) nil
+    public func rescored(from name: String, detector: LanguageDetector? = LLMEval.defaultLanguageDetector) -> LLMEvalReport? {
+        guard let outputs = translationOutputs else { return nil }
+        let result = LLMEval.rescore(outputs, detector: detector)
+        // 翻訳の細かい所は、計算し直した物にする。翻訳の行は「[問題の id 」か「[問題の id]」で始まる
+        // (監査の場面に、翻訳の問題と同じ id が在ると、その監査の行も外れる)
+        let ids = Set(outputs.map(\.id))
+        let auditDetails = details.filter { line in
+            !ids.contains(where: { line.hasPrefix("[\($0) ") || line.hasPrefix("[\($0)]") })
+        }
+        var out = self
+        out.translation = result.score
+        out.translationByTarget = result.byTarget
+        out.details = auditDetails + result.details
+        out.rescoredFrom = name
+        return out
     }
 }

@@ -1,0 +1,160 @@
+import KikimimiCore
+import SwiftUI
+
+/// 訳を直す画面 (対訳の行の右クリックの「訳を直す…」・「直した」の印)。
+/// 一覧の外のシートに置く: 翻訳の途中は一覧の行が作り直されるので、行の中の入力欄では下書きが消える。
+/// 下書きはこの画面の @State に持ち、結果が変わっても (翻訳が進んでも) そのまま残す。
+/// 原文・直す前の機械の訳は、body の中で今の結果から読む。
+/// 訳の関門の印 (「要確認」・訳せなかった理由) が在る行は、上に理由を 1 行ずつ出す。
+/// 下に任意の 1 行「語を、いつもこう訳す」(訳語の対) を置く。2 つとも入っている時だけ、保存で、
+/// その結果の訳す先の言語の対として記憶に入れる (訳を変えずに、対だけを足してもよい。ほかの行は訳し直さない)
+struct TranslationEditSheet: View {
+    @Environment(AppModel.self) private var model
+    let job: Job
+    /// 開いた行の区間 (行のどの区間でもよい。保存する時に、その区間を含む訳のまとまりに置く)
+    let segmentID: UUID
+    @State private var draft = ""
+    @State private var started = false
+    /// 訳語の対の下書き (原文の語・訳語)
+    @State private var termSource = ""
+    @State private var termTranslation = ""
+
+    /// 今の結果から読んだ、その行の訳のまとまり
+    private struct Current {
+        var source: String
+        var translation: String?
+        var note: TranslationNote?
+
+        var isEdited: Bool { note?.isEdited == true }
+        /// 「要確認」の訳 (印の付いた機械の訳が出ている。「この訳でよい」を出す)
+        var needsReview: Bool { translation != nil && note?.isFlagged == true }
+        /// 出す理由の文 (印の付いた機械の訳・訳せなかった行だけ)
+        var reasons: [String] { note?.isFlagged == true ? note?.reasonTexts ?? [] : [] }
+        /// 直す前の機械の訳 (直した訳なら覚えの物、直していなければ今の訳)。
+        /// 訳の記憶から置いた訳は、機械の訳ではないので出さない (nil)
+        var machine: String? {
+            if note?.isRemembered == true { return nil }
+            return isEdited ? note?.machine : translation
+        }
+    }
+
+    private var current: Current? {
+        guard let transcript = job.transcript,
+              let head = Translator.translationGroupIDs(of: segmentID, in: transcript.segments).first,
+              let segment = transcript.segments.first(where: { $0.id == head }) else { return nil }
+        return Current(source: transcript.translationSource(ofHead: head) ?? segment.text,
+                       translation: segment.translation, note: transcript.translationNote(for: head))
+    }
+
+    var body: some View {
+        let current = self.current
+        let cleaned = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let termReady = !termSource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !termTranslation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L("Edit translation"))
+                .font(.headline)
+            if let reasons = current?.reasons, !reasons.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(reasons, id: \.self) { reason in
+                        Label(reason, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .font(.callout)
+            }
+            section(L("Original")) {
+                Text(current?.source ?? "")
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let machine = current?.machine {
+                section(L("Machine translation")) {
+                    Text(machine)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            section(L("Your translation")) {
+                // 枠つきの決まりの見た目 (.roundedBorder) は、macOS では 1 行のままで折り返さない。
+                // 長い訳を全部見て直せるよう、枠を自分で描き、3〜8 行に広がる入力欄にする
+                TextField("", text: $draft, axis: .vertical)
+                    .lineLimit(3...8)
+                    .textFieldStyle(.plain)
+                    .padding(6)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
+                    .accessibilityLabel(Text(L("Your translation")))
+            }
+            section(L("Always translate a word as (optional)")) {
+                HStack {
+                    TextField(L("Word in the original"), text: $termSource, prompt: Text(L("Word in the original")))
+                        .labelsHidden()
+                    Image(systemName: "arrow.right")
+                        .foregroundStyle(.secondary)
+                    TextField(L("Translation to use"), text: $termTranslation, prompt: Text(L("Translation to use")))
+                        .labelsHidden()
+                }
+                if let transcript = job.transcript {
+                    Text(L("When both are filled in, “Save” also remembers this term for translations into %@. Lines already translated are not translated again.",
+                           model.translationTargetName(for: transcript)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack {
+                if let current, current.isEdited {
+                    Button(current.machine == nil ? L("Remove your translation") : L("Restore machine translation")) {
+                        model.revertTranslation(head: segmentID, in: job)
+                        close()
+                    }
+                }
+                Spacer()
+                if let current, current.needsReview {
+                    Button(L("This translation is fine")) {
+                        model.confirmTranslation(head: segmentID, in: job)
+                        close()
+                    }
+                }
+                Button(L("Cancel")) { close() }
+                    .keyboardShortcut(.cancelAction)
+                Button(L("Save")) {
+                    // 訳語の対は、訳す先を訳を置く前に決める (訳の無い結果に初めて訳を置くと、訳す先の決め方が変わりうるため)
+                    if termReady, let transcript = job.transcript {
+                        model.addTerm(source: termSource, translation: termTranslation,
+                                      target: model.translationTarget(for: transcript))
+                    }
+                    // 訳の欄が空なら、対だけを足して閉じる (setTranslation は、今の訳と同じなら何もしない)
+                    if !cleaned.isEmpty { model.setTranslation(draft, head: segmentID, in: job) }
+                    close()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(current == nil || (cleaned.isEmpty && !termReady))
+            }
+        }
+        .padding(20)
+        .frame(width: 520)
+        .onAppear {
+            // 下書きは、開いた時の訳から始める (結果が変わっても、書きかけは変えない)
+            guard !started else { return }
+            started = true
+            draft = current?.translation ?? ""
+        }
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func close() {
+        model.translationEdit = nil
+    }
+}

@@ -66,15 +66,15 @@ public struct LLMModelStore: Sendable {
         public var errorDescription: String? {
             switch self {
             case .notGGUF:
-                return "GGUF 形式の LLM ではありません。llama.cpp で動く .gguf ファイルを選んでください。"
+                return L("This is not an LLM in GGUF format. Choose a .gguf file that runs on llama.cpp.")
             case .multimodalProjector:
-                return "これは画像を読むための補助ファイル (mmproj) です。本体の .gguf を選んでください。"
+                return L("This is a helper file for reading images (mmproj). Choose the main .gguf file.")
             case .notAdapter:
-                return "追加学習の差分 (LoRA アダプタ) の GGUF ではありません。tools/finetune/finetune.py が作る「….lora.gguf」を選んでください。"
+                return L("This is not a GGUF fine-tuning adapter (LoRA). Choose the “….lora.gguf” file made by tools/finetune/finetune.py.")
             case .adapterForAnotherModel(let adapter, let model):
-                return "この差分は別の種類のモデル用です (差分: \(adapter)、選んでいる LLM: \(model))。選んでいる LLM から作った差分を選んでください。"
+                return L("This adapter is for a different kind of model (adapter: %1$@, selected LLM: %2$@). Choose an adapter made from the selected LLM.", adapter, model)
             case .adapterInsteadOfModel:
-                return "これは追加学習の差分 (LoRA アダプタ) です。LLM の本体ではないので、「差分を追加…」から選んでください。"
+                return L("This is a fine-tuning adapter (LoRA), not an LLM. Choose it with “Add adapter…”.")
             }
         }
     }
@@ -86,18 +86,24 @@ public struct LLMModelStore: Sendable {
         directory.appendingPathComponent("Adapters", isDirectory: true)
     }
 
-    /// モデルごとの差分のファイル。key は、一覧のモデルの ID (`qwen3.5-2b`) か、取り込んだ GGUF の名前 (拡張子なし)
-    public func adapterURL(forModelKey key: String) -> URL {
-        let safe = key.map { $0 == "/" || $0 == ":" ? "-" : $0 }
-        return adaptersDirectory.appendingPathComponent(String(safe) + ".lora.gguf")
+    /// 差分の置き場での出し入れ (種類ごとに名前が分かれる。`AdapterFiles`)
+    public var adapterFiles: AdapterFiles {
+        AdapterFiles(directory: adaptersDirectory)
     }
 
-    public func hasAdapter(forModelKey key: String) -> Bool {
-        GGUFFile.isGGUF(at: adapterURL(forModelKey: key), minimumBytes: 1_000)
+    /// モデルごと・種類ごとの差分のファイル。key は、一覧のモデルの ID (`qwen3.5-2b`) か、取り込んだ GGUF の名前 (拡張子なし)。
+    /// 監査用は `<key>.lora.gguf`、翻訳用は `<key>.translation.lora.gguf`
+    public func adapterURL(forModelKey key: String, kind: AdapterKind) -> URL {
+        adapterFiles.url(forModelKey: key, kind: kind)
     }
 
-    /// 差分を取り込む。差分の GGUF であること、モデルの種類 (architecture) が modelURL と同じことを確かめる
-    public func importAdapter(from source: URL, forModelKey key: String, modelURL: URL) throws {
+    public func hasAdapter(forModelKey key: String, kind: AdapterKind) -> Bool {
+        adapterFiles.has(forModelKey: key, kind: kind)
+    }
+
+    /// 差分を、その種類の置き場に取り込む。差分の GGUF であること、モデルの種類 (architecture) が modelURL と同じことを確かめる
+    /// (検査は、監査用・翻訳用で同じ)
+    public func importAdapter(from source: URL, forModelKey key: String, kind: AdapterKind, modelURL: URL) throws {
         guard GGUFFile.isGGUF(at: source, minimumBytes: 1_000) else { throw ImportError.notGGUF }
         let adapter = GGUFFile.stringMetadata(at: source)
         guard adapter["general.type"] == "adapter" else { throw ImportError.notAdapter }
@@ -109,28 +115,12 @@ public struct LLMModelStore: Sendable {
         if let a = adapter["kikimimi.base.size_label"], let m = model["general.size_label"], a != m {
             throw ImportError.adapterForAnotherModel(adapter: a, model: m)
         }
-        let fm = FileManager.default
-        try fm.createDirectory(at: adaptersDirectory, withIntermediateDirectories: true)
-        let dest = adapterURL(forModelKey: key)
-        if source.resolvingSymlinksInPath().standardizedFileURL.path == dest.resolvingSymlinksInPath().standardizedFileURL.path {
-            return
-        }
-        let tmp = adaptersDirectory.appendingPathComponent(".import-\(UUID().uuidString).part")
-        do {
-            try fm.copyItem(at: source, to: tmp)
-            if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
-            try fm.moveItem(at: tmp, to: dest)
-        } catch {
-            try? fm.removeItem(at: tmp)
-            throw error
-        }
+        try adapterFiles.install(from: source, forModelKey: key, kind: kind)
     }
 
-    public func deleteAdapter(forModelKey key: String) throws {
-        let url = adapterURL(forModelKey: key)
-        if FileManager.default.fileExists(atPath: url.path) {
-            try FileManager.default.removeItem(at: url)
-        }
+    /// その種類の差分だけを外す
+    public func deleteAdapter(forModelKey key: String, kind: AdapterKind) throws {
+        try adapterFiles.remove(forModelKey: key, kind: kind)
     }
 
     /// 手元の GGUF を取り込む。名前が一覧のモデルと同じなら、そのモデルとして扱う。戻り値は置いたファイル名
@@ -175,7 +165,7 @@ public enum HuggingFaceResolver {
         public var errorDescription: String? {
             switch self {
             case .notFound(let name):
-                return "\(name) のファイルが配布元で見つかりませんでした。設定の「監査・翻訳」タブの「手元の GGUF を追加…」から取り込むこともできます。"
+                return L("The file for %@ was not found at the source. You can also add it with “Add a local GGUF…” in the “Audit & translation” tab of Settings.", name)
             }
         }
     }
