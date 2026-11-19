@@ -120,7 +120,8 @@ public enum TranslationGate {
         if weight(source) >= shortSentenceWeight,
            LLMEval.isCopy(t, source: source, sourceLanguage: sourceLanguage, target: target) { flags.insert(copied) }
         if !LLMEval.isInTarget(t, target: target, detector: detector) { flags.insert(language) }
-        let lost = LLMEval.numbersLost(sources: [source], translation: t).lost
+        // 数を言葉で書いた訳 (例: "30" →「三十」) は、消えたと見ない
+        let lost = LLMEval.numbersLost(sources: [source], translation: t, target: target).lost
         if !lost.isEmpty {
             flags.insert(number)
             details.append("number: " + lost.joined(separator: ", "))

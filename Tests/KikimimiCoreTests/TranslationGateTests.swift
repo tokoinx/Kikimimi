@@ -103,7 +103,7 @@ final class TranslationGateTests: XCTestCase {
         let source = "We sold 4,000 units in 15 days."
         XCTAssertFalse(flags(source, "Nous avons vendu 4.000 unités en 15 jours.", to: "fr").contains("number"))
         XCTAssertFalse(flags(source, "Nous avons vendu 4 000 unités en 15 jours.", to: "fr").contains("number"))
-        let f = TranslationGate.assess(source: source, translation: "Nous avons vendu des unités en quinze jours.",
+        let f = TranslationGate.assess(source: source, translation: "Nous avons vendu des unités en quelques jours.",
                                        sourceLanguage: "en", target: "fr", detector: nil)
         XCTAssertTrue(f.flags.contains("number"))
         XCTAssertEqual(f.detail, "number: 15, 4000")
@@ -152,6 +152,74 @@ final class TranslationGateTests: XCTestCase {
         XCTAssertFalse(broken?.contains("4.000") == true && broken?.contains("15") == true)
         XCTAssertNil(TranslationGateEval.removingNumber(from: "Nous avons vendu des unités.", source: source))
         XCTAssertNil(TranslationGateEval.removingNumber(from: "Bonjour.", source: "Hello."))
+    }
+
+    // MARK: 言葉で書いた数
+
+    private func hasNumberFlag(_ source: String, _ translation: String, _ target: String) -> Bool {
+        TranslationGate.assess(source: source, translation: translation, sourceLanguage: nil, target: target,
+                               detector: nil).flags.contains("number")
+    }
+
+    func testSpelledOutNumbersInChineseAreNotLost() {
+        XCTAssertFalse(hasNumberFlag("I waited 10 minutes, then 30 more.", "我等了十分钟，然后又等了三十分钟。", "zh"))
+        // 繁体字の形も当たる (一萬 は簡体字では 一万)
+        XCTAssertFalse(hasNumberFlag("About 10000 people came.", "大約一萬人來了。", "zh"))
+        // target を渡さなければ、前のまま「消えた」
+        XCTAssertEqual(LLMEval.numbersLost(sources: ["I waited 10 minutes, then 30 more."],
+                                           translation: "我等了十分钟，然后又等了三十分钟。").lost, ["10", "30"])
+    }
+
+    func testSpelledOutNumbersInOtherLanguagesAreNotLost() {
+        XCTAssertFalse(hasNumberFlag("It takes 30 minutes.", "三十分かかります。", "ja"))
+        XCTAssertFalse(hasNumberFlag("It takes 30 minutes.", "Tiga puluh menit.", "id"))
+        XCTAssertFalse(hasNumberFlag("35人が来ました。", "Thirty-five people came.", "en"))
+        XCTAssertFalse(hasNumberFlag("35人が来ました。", "thirty five people came.", "en"))
+        XCTAssertFalse(hasNumberFlag("It takes 30 minutes.", "삼십 분 걸립니다.", "ko"))
+        XCTAssertFalse(hasNumberFlag("It takes 30 minutes.", "ใช้เวลาสามสิบนาที", "th"))
+        // やわらかいハイフン入りの形 (fünf­und­dreißig) と、ふつうの書き方が当たる
+        XCTAssertFalse(hasNumberFlag("35 people came.", "Fünfunddreißig Leute kamen.", "de"))
+        XCTAssertFalse(hasNumberFlag("21 people came.", "Vingt et un personnes sont venues.", "fr"))
+        XCTAssertFalse(hasNumberFlag("21 people came.", "Пришли двадцать один человек.", "ru"))
+        XCTAssertFalse(hasNumberFlag("It takes 30 minutes.", "Mất ba mươi phút.", "vi"))
+    }
+
+    func testSpelledOutNumbersMatchOnlyWholeWords() {
+        // "often" の中の "ten" では当たらない
+        XCTAssertTrue(hasNumberFlag("10人が来た。", "People often came.", "en"))
+        // 言葉の形も数字も無い
+        XCTAssertTrue(hasNumberFlag("I waited 30 minutes.", "我等了很久。", "zh"))
+        XCTAssertTrue(hasNumberFlag("It takes 30 minutes.", "Butuh beberapa menit.", "id"))
+        // 先頭が 0 の数は、言葉では救わない
+        XCTAssertTrue(hasNumberFlag("Room 07 is open.", "七号室が開いている。", "ja"))
+        XCTAssertTrue(hasNumberFlag("Room 07 is open.", "Room seven is open.", "en"))
+    }
+
+    func testKanjiNumbersMustNotBePartOfALargerNumber() {
+        // 「三十人」の中の「十」では 10 に当てない
+        XCTAssertTrue(hasNumberFlag("10 people came.", "三十人が来た。", "ja"))
+        XCTAssertTrue(hasNumberFlag("10 people came.", "来了三十人。", "zh"))
+        XCTAssertFalse(hasNumberFlag("30 people came.", "三十人が来た。", "ja"))
+        XCTAssertFalse(hasNumberFlag("30 people came.", "来了三十人。", "zh"))
+        XCTAssertTrue(hasNumberFlag("30 people came.", "百三十人が来た。", "ja"))
+        XCTAssertTrue(hasNumberFlag("30 people came.", "来了一百三十人。", "zh"))
+        XCTAssertFalse(hasNumberFlag("It was on the 31st.", "十二月三十一日だった。", "ja"))
+        XCTAssertFalse(hasNumberFlag("It was on the 31st.", "那是十二月三十一日。", "zh"))
+        // 1 か所でも、前後が漢数字でない当たり方が在れば救う
+        XCTAssertFalse(hasNumberFlag("10 people came.", "十人と三十人が来た。", "ja"))
+        XCTAssertFalse(hasNumberFlag("10 people came.", "来了十人和三十人。", "zh"))
+    }
+
+    func testRemovingNumberAgreesWithTheGateOnSpelledOutNumbers() {
+        let source = "We waited 30 minutes, then 15 more."
+        let translation = "我们等了30分钟，又等了十五分钟。"
+        let broken = TranslationGateEval.removingNumber(from: translation, source: source, target: "zh")
+        XCTAssertNotNil(broken)
+        XCTAssertTrue(hasNumberFlag(source, broken ?? "", "zh"))
+        // 数字を消しても言葉の形が残るなら、関門と同じく「消えた」と見ない
+        let both = "我们等了30分钟（三十分钟），又等了十五分钟。"
+        XCTAssertNotNil(TranslationGateEval.removingNumber(from: both, source: source))
+        XCTAssertNil(TranslationGateEval.removingNumber(from: both, source: source, target: "zh"))
     }
 
     func testOtherLanguageSentenceAvoidsTargetAndSource() {

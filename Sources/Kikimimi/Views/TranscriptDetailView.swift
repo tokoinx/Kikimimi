@@ -250,7 +250,11 @@ struct TranscriptControls: View {
                 twoLines(iconOnly: true)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // minWidth: 0 = この列は、中身の幅を外へ求めない (与えられた幅をそのまま使う)。
+        // これが無いと、始めの 1 回の「1 行の形」が使える幅より広い言語 (英語など) で、その広さが結果の画面を
+        // ウインドウの外へ押し広げ、下で測る幅も押し広げた後の幅になるので、1 行の形のまま抜けられない
+        // (2026-11-19、英語の画面で、右端の「Export」と印の列・左のサイドバーが切れた)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.width
         } action: { newWidth in

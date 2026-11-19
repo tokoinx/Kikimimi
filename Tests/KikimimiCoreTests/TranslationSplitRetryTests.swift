@@ -123,10 +123,10 @@ final class TranslationSplitRetryTests: XCTestCase {
         let pieces = Translator.sentencePieces(source, language: "en")
         XCTAssertEqual(pieces.count, 2)
         let g = fake([source: "Bienvenue.", pieces[0]: "Bienvenue à tous dans ce direct.",
-                      pieces[1]: "Nous avons vendu beaucoup de produits cette année en quinze jours."])
+                      pieces[1]: "Nous avons vendu beaucoup de produits cette année en quelques jours."])
         let (summary, results) = try run([seg(0, source)], g)
         let result = try XCTUnwrap(results.first)
-        XCTAssertEqual(result.text, "Bienvenue à tous dans ce direct. Nous avons vendu beaucoup de produits cette année en quinze jours.")
+        XCTAssertEqual(result.text, "Bienvenue à tous dans ce direct. Nous avons vendu beaucoup de produits cette année en quelques jours.")
         XCTAssertEqual(result.flags, ["number"], "入れ替えた訳の、ほかの印は残す")
         XCTAssertEqual(result.detail, "number: 15, 4000")
         XCTAssertEqual(summary.retryFixed, 1)

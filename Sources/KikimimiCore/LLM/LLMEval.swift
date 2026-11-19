@@ -392,7 +392,11 @@ public enum LLMEval {
     /// 原文の数のうち、訳に無い物を数える。ふつうの空白を千の区切りと読む・読まないの 2 通りで原文の数を取り、
     /// 訳に無い数の少ないほうを採る (同じなら、区切りと読むほう)。訳の数は、2 通りの読み方を合わせた物
     /// (「15,200」→「15 200」も、「15 200 people」→「15 に 200 人」も、数が消えたと数えない)
-    static func numbersLost(sources: [String], translation: String) -> (checked: Int, lost: [String]) {
+    /// - target: 訳す先の言語のコード。在る時は、消えたと見た数のうち、その言語で数を言葉で書いた形
+    ///   (例: 中国語の「三十」・インドネシア語の "tiga puluh") が訳に在る物を、消えていないと見る。
+    ///   nil の時は、言葉の形を見ない (前からの決まりのまま)
+    static func numbersLost(sources: [String], translation: String,
+                            target: String? = nil) -> (checked: Int, lost: [String]) {
         let have = Set(numbers(in: translation)).union(numbers(in: translation, joiningSpaces: false))
         var best: (checked: Int, lost: [String])?
         for joiningSpaces in [true, false] {
@@ -401,7 +405,100 @@ public enum LLMEval {
             if let current = best, current.lost.count <= lost.count { continue }
             best = (wanted.count, lost)
         }
-        return best ?? (0, [])
+        guard var result = best else { return (0, []) }
+        if let target, !result.lost.isEmpty {
+            result.lost = result.lost.filter { !isSpelledOut($0, in: translation, target: target) }
+        }
+        return result
+    }
+
+    /// 空白で語を区切る、訳す先の言語 (数の言葉は、語の切れ目で当てる)
+    static let spacedNumberWordLanguages: Set<String> = ["en", "de", "es", "fr", "id", "it", "pt", "ru", "vi"]
+    /// 空白で語を区切らない、訳す先の言語 (数の言葉は、空白を除いた文の中で当てる)
+    static let unspacedNumberWordLanguages: Set<String> = ["ja", "zh", "ko", "th"]
+
+    /// 数の言葉の形を作るロケール (zh は簡体字と繁体字の 2 つ。pt はブラジルのポルトガル語)
+    static func spellOutLocales(for target: String) -> [String] {
+        switch target {
+        case "zh": return ["zh-Hans", "zh-Hant"]
+        case "pt": return ["pt-BR"]
+        default: return [target]
+        }
+    }
+
+    /// 数字の並び (2 桁以上) を、訳す先の言語で言葉にした形が、訳に在るか。
+    /// 先頭が 0 の物・9 桁を超える物・知らない言語は、見ない (false)
+    static func isSpelledOut(_ digits: String, in translation: String, target: String) -> Bool {
+        let target = target.lowercased()
+        let spaced = spacedNumberWordLanguages.contains(target)
+        guard spaced || unspacedNumberWordLanguages.contains(target),
+              !digits.hasPrefix("0"), digits.count <= 9, let value = Int(digits) else { return false }
+        let forms: [String] = spellOutLocales(for: target).compactMap { identifier in
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .spellOut
+            formatter.locale = Locale(identifier: identifier)
+            return formatter.string(from: NSNumber(value: value))
+        }
+        if spaced {
+            let text = " " + numberWords(translation).joined(separator: " ") + " "
+            return forms.contains { form in
+                let words = numberWords(form)
+                return !words.isEmpty && text.contains(" " + words.joined(separator: " ") + " ")
+            }
+        }
+        let text = withoutSpaces(translation)
+        // ja と zh は、当たった所のすぐ前と後ろが漢数字でない事を求める (「三十人」の中の「十」で 10 に当てない)。
+        // ko と th は前後を見ない: 韓国語の数の字 (이・일・만 など) は、ふつうの語にも多いので、前後で絞ると正しい訳に印が付く
+        let bounded = target == "ja" || target == "zh"
+        return forms.contains { form in
+            let f = withoutSpaces(form)
+            guard !f.isEmpty else { return false }
+            guard bounded else { return text.contains(f) }
+            var start = text.startIndex
+            while let r = text.range(of: f, range: start..<text.endIndex) {
+                let before = r.lowerBound > text.startIndex ? text[text.index(before: r.lowerBound)] : nil
+                let after = r.upperBound < text.endIndex ? text[r.upperBound] : nil
+                if !isKanjiNumeral(before), !isKanjiNumeral(after) { return true }
+                start = text.index(after: r.lowerBound)
+            }
+            return false
+        }
+    }
+
+    /// 漢数字の字 (前後を見る時に使う)
+    private static let kanjiNumerals = Set<Character>("〇零一二三四五六七八九十百千万萬億亿兆两兩廿") // l10n: keep (画面に出さない、字の一覧)
+
+    private static func isKanjiNumeral(_ c: Character?) -> Bool {
+        guard let c else { return false }
+        return kanjiNumerals.contains(c)
+    }
+
+    /// 語の並びにする: 小文字にし、見えない字 (やわらかいハイフンなど) を除き、
+    /// ハイフン類・句読点などの、字でも数字でもない物を語の切れ目と見る
+    private static func numberWords(_ text: String) -> [String] {
+        var out = ""
+        for scalar in text.precomposedStringWithCanonicalMapping.lowercased().unicodeScalars {
+            let p = scalar.properties
+            if p.generalCategory == .format { continue }
+            if p.isAlphabetic || p.numericType != nil || p.generalCategory == .nonspacingMark
+                || p.generalCategory == .spacingMark {
+                out.unicodeScalars.append(scalar)
+            } else {
+                out.append(" ")
+            }
+        }
+        return out.split(separator: " ").map(String.init)
+    }
+
+    /// 空白と見えない字 (ゼロ幅の空白など) を除く
+    private static func withoutSpaces(_ text: String) -> String {
+        var out = ""
+        for scalar in text.precomposedStringWithCanonicalMapping.lowercased().unicodeScalars {
+            let p = scalar.properties
+            if p.isWhitespace || p.generalCategory == .format { continue }
+            out.unicodeScalars.append(scalar)
+        }
+        return out
     }
 
     /// 判定に使う文の、文字の数の下限。これより短い訳は判定せず「訳す先の言語だった」と数える (短い語句は判定が外れやすい)
@@ -643,6 +740,7 @@ public enum LLMEval {
         score.chrF = chrF?.score
         // 文ごとにまとめて訳すので、数字と語は場面の訳全体で確かめる
         let joined = texts.joined(separator: "\n")
+        // 採点は、前に測った値と比べられるように、言葉で書いた数を見ない (target を渡さない)
         let numberCheck = numbersLost(sources: o.units.map(\.source), translation: joined)
         if numberCheck.checked > 0, !joined.isEmpty {
             score.numbersChecked = numberCheck.checked

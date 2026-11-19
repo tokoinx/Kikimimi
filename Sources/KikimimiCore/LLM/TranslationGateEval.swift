@@ -165,8 +165,9 @@ public enum TranslationGateEval {
     }
 
     /// 訳から、原文にも在る数 (2 桁以上) を 1 つ消す (千の区切りを含めて、その数の書かれた所を全部消す)。
-    /// 消すと `LLMEval.numbersLost` が「消えた」と見る物だけを返す。消せる数が無ければ nil
-    public static func removingNumber(from translation: String, source: String) -> String? {
+    /// 消すと `LLMEval.numbersLost` が「消えた」と見る物だけを返す。消せる数が無ければ nil。
+    /// target (訳す先の言語) を渡すと、関門と同じく、言葉で書いた数が残る訳は「消えた」と見ない
+    public static func removingNumber(from translation: String, source: String, target: String? = nil) -> String? {
         let wanted = Set(LLMEval.numbers(in: source)).union(LLMEval.numbers(in: source, joiningSpaces: false))
         guard !wanted.isEmpty,
               let regex = try? NSRegularExpression(pattern: "[0-9０-９]+(?:[,.'\u{00A0}\u{202F} ][0-9]{3})*") else { return nil }
@@ -186,7 +187,7 @@ public enum TranslationGateEval {
                 guard let range = Range(m.range, in: out) else { continue }
                 out.removeSubrange(range)
             }
-            if !LLMEval.numbersLost(sources: [source], translation: out).lost.isEmpty { return out }
+            if !LLMEval.numbersLost(sources: [source], translation: out, target: target).lost.isEmpty { return out }
         }
         return nil
     }
@@ -247,7 +248,7 @@ public enum TranslationGateEval {
                     guard finding.flags.allSatisfy({ !mutation.caughtBy.contains($0) }) else { continue }
                     let broken: String?
                     switch mutation.name {
-                    case "number": broken = removingNumber(from: reference, source: unit.source)
+                    case "number": broken = removingNumber(from: reference, source: unit.source, target: target)
                     case "copied": broken = c.language.lowercased() != target ? unit.source : nil
                     case "language": broken = otherLanguageSentence(target: target, sourceLanguage: c.language, index: index)
                     case "repeated": broken = repeatingHead(reference)
