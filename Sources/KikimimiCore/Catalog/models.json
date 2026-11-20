@@ -1,0 +1,93 @@
+{
+  "whisper": {
+    "fileNameTemplate": "ggml-{id}.bin",
+    "downloadURLTemplate": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{fileName}",
+    "defaultModelID": "large-v3-turbo-q5_0",
+    "models": [
+      {
+        "id": "large-v3-turbo-q5_0",
+        "displayNameKey": "Large v3 Turbo (light)",
+        "summaryKey": "Best balance of Japanese accuracy and speed. Pick this if unsure.",
+        "approxMB": 574
+      },
+      {
+        "id": "large-v3-turbo",
+        "displayName": "Large v3 Turbo",
+        "summaryKey": "Slightly more accurate than the light version. For Macs with plenty of memory.",
+        "approxMB": 1620
+      },
+      {
+        "id": "large-v3-q5_0",
+        "displayNameKey": "Large v3 (light)",
+        "summaryKey": "Top accuracy. Several times slower than Turbo.",
+        "approxMB": 1080
+      },
+      {
+        "id": "medium-q5_0",
+        "displayNameKey": "Medium (light)",
+        "summaryKey": "Medium accuracy and speed.",
+        "approxMB": 539
+      },
+      {
+        "id": "small-q5_1",
+        "displayNameKey": "Small (light)",
+        "summaryKey": "Fast, but less accurate for Japanese.",
+        "approxMB": 190
+      },
+      {
+        "id": "base-q5_1",
+        "displayNameKey": "Base (light)",
+        "summaryKey": "Very fast. For testing.",
+        "approxMB": 60
+      },
+      {
+        "id": "tiny",
+        "displayName": "Tiny",
+        "summaryKey": "Smallest. Low accuracy.",
+        "approxMB": 78
+      }
+    ]
+  },
+  "vad": {
+    "fileName": "ggml-silero-v6.2.0.bin",
+    "url": "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin"
+  },
+  "llm": {
+    "treeURLTemplate": "https://huggingface.co/api/models/{repository}/tree/main",
+    "downloadURLTemplate": "https://huggingface.co/{repository}/resolve/main/{path}",
+    "defaultModelID": "qwen3.5-4b",
+    "defaultQuantizations": ["Q4_K_M", "Q4_K_S", "IQ4_XS", "UD-Q4_K_XL", "Q5_K_M", "Q8_0"],
+    "models": [
+      {
+        "id": "qwen3.5-4b",
+        "displayName": "Qwen3.5 4B",
+        "summaryKey": "Good balance for audit and translation. Pick this if unsure. Runs on Macs with 8 GB of memory.",
+        "approxMB": 2741,
+        "recommendedMemoryGB": 8,
+        "repositories": ["unsloth/Qwen3.5-4B-GGUF", "bartowski/Qwen_Qwen3.5-4B-GGUF"],
+        "fallbackFileName": "Qwen3.5-4B-Q4_K_M.gguf",
+        "license": "Apache-2.0"
+      },
+      {
+        "id": "qwen3.5-2b",
+        "displayNameKey": "Qwen3.5 2B (light)",
+        "summaryKey": "Fast and light. Less accurate than 4B.",
+        "approxMB": 1281,
+        "recommendedMemoryGB": 8,
+        "repositories": ["unsloth/Qwen3.5-2B-GGUF", "bartowski/Qwen_Qwen3.5-2B-GGUF"],
+        "fallbackFileName": "Qwen3.5-2B-Q4_K_M.gguf",
+        "license": "Apache-2.0"
+      },
+      {
+        "id": "qwen3.5-9b",
+        "displayNameKey": "Qwen3.5 9B (accurate)",
+        "summaryKey": "Smartest, but slow. For Macs with 16 GB of memory or more.",
+        "approxMB": 5681,
+        "recommendedMemoryGB": 16,
+        "repositories": ["unsloth/Qwen3.5-9B-GGUF", "bartowski/Qwen_Qwen3.5-9B-GGUF"],
+        "fallbackFileName": "Qwen3.5-9B-Q4_K_M.gguf",
+        "license": "Apache-2.0"
+      }
+    ]
+  }
+}

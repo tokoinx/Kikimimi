@@ -21,7 +21,7 @@ public struct LLMModelSpec: Hashable, Identifiable, Sendable {
 
     public init(id: String, displayName: String, summary: String, approxMB: Int, recommendedMemoryGB: Int,
                 repositories: [String], fallbackFileName: String,
-                quantizations: [String] = ["Q4_K_M", "Q4_K_S", "IQ4_XS", "UD-Q4_K_XL", "Q5_K_M", "Q8_0"],
+                quantizations: [String] = LLMCatalog.defaultQuantizations,
                 license: String, recommended: Bool = false) {
         self.id = id
         self.displayNameKey = displayName
@@ -35,7 +35,7 @@ public struct LLMModelSpec: Hashable, Identifiable, Sendable {
         self.recommended = recommended
     }
 
-    /// 画面に出す名前 (今の画面の言語。init の displayName は鍵で、`LKey` で印を付けて渡す)
+    /// 画面に出す名前 (今の画面の言語。init の displayName は鍵。表に無い名前は、そのまま出る)
     public var displayName: String { L10n.lookup(displayNameKey) }
     /// 画面に出す説明 (今の画面の言語)
     public var summary: String { L10n.lookup(summaryKey) }
@@ -43,17 +43,20 @@ public struct LLMModelSpec: Hashable, Identifiable, Sendable {
     /// Mac に保存するときの名前
     public var fileName: String { "\(id).gguf" }
 
-    /// ファイル一覧 (Hugging Face の tree API)
+    /// ファイル一覧 (Hugging Face の tree API。作り方は models.json の llm.treeURLTemplate)
     public static func treeURL(repository: String) -> URL? {
-        URL(string: "https://huggingface.co/api/models/\(repository)/tree/main")
+        ModelCatalogData.fill(ModelCatalogData.embedded.llm.treeURLTemplate, [("repository", repository)])
+            .flatMap { URL(string: $0) }
     }
 
-    /// ファイルの取得元
+    /// ファイルの取得元 (作り方は models.json の llm.downloadURLTemplate。path は、/ で区切った所ごとに % で書き換える)
     public static func downloadURL(repository: String, path: String) -> URL? {
         let encoded = path.split(separator: "/").map {
             String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0)
         }.joined(separator: "/")
-        return URL(string: "https://huggingface.co/\(repository)/resolve/main/\(encoded)")
+        return ModelCatalogData.fill(ModelCatalogData.embedded.llm.downloadURLTemplate,
+                                     [("repository", repository), ("path", encoded)])
+            .flatMap { URL(string: $0) }
     }
 
     /// リポジトリのファイル一覧から、取る GGUF を選ぶ (量子化の優先順。画像用の mmproj と分割ファイルは除く)
@@ -110,33 +113,14 @@ public struct HFFileEntry: Decodable, Hashable, Sendable {
     }
 }
 
+/// LLM の一覧。中身は models.json (`ModelCatalogData.embedded`) から来る
 public enum LLMCatalog {
-    public static let defaultModelID = "qwen3.5-4b"
+    public static let defaultModelID = ModelCatalogData.embedded.llm.defaultModelID
 
-    // 大きさは Hugging Face の一覧 (2026-11) の Q4_K_M の値。unsloth の方が少し小さいので先に試す
-    public static let all: [LLMModelSpec] = [
-        LLMModelSpec(
-            id: "qwen3.5-4b", displayName: "Qwen3.5 4B",
-            summary: LKey("Good balance for audit and translation. Pick this if unsure. Runs on Macs with 8 GB of memory."),
-            approxMB: 2741, recommendedMemoryGB: 8,
-            repositories: ["unsloth/Qwen3.5-4B-GGUF", "bartowski/Qwen_Qwen3.5-4B-GGUF"],
-            fallbackFileName: "Qwen3.5-4B-Q4_K_M.gguf",
-            license: "Apache-2.0", recommended: true),
-        LLMModelSpec(
-            id: "qwen3.5-2b", displayName: LKey("Qwen3.5 2B (light)"),
-            summary: LKey("Fast and light. Less accurate than 4B."),
-            approxMB: 1281, recommendedMemoryGB: 8,
-            repositories: ["unsloth/Qwen3.5-2B-GGUF", "bartowski/Qwen_Qwen3.5-2B-GGUF"],
-            fallbackFileName: "Qwen3.5-2B-Q4_K_M.gguf",
-            license: "Apache-2.0"),
-        LLMModelSpec(
-            id: "qwen3.5-9b", displayName: LKey("Qwen3.5 9B (accurate)"),
-            summary: LKey("Smartest, but slow. For Macs with 16 GB of memory or more."),
-            approxMB: 5681, recommendedMemoryGB: 16,
-            repositories: ["unsloth/Qwen3.5-9B-GGUF", "bartowski/Qwen_Qwen3.5-9B-GGUF"],
-            fallbackFileName: "Qwen3.5-9B-Q4_K_M.gguf",
-            license: "Apache-2.0"),
-    ]
+    /// 量子化の既定の優先順 (models.json の llm.defaultQuantizations。モデルに書いていない時に使う)
+    public static let defaultQuantizations: [String] = ModelCatalogData.embedded.llm.defaultQuantizations
+
+    public static let all: [LLMModelSpec] = ModelCatalogData.embedded.llm.models
 
     public static func spec(id: String) -> LLMModelSpec? {
         all.first { $0.id == id }

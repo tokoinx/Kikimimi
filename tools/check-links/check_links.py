@@ -2,7 +2,7 @@
 """リンク切れと、古くなった依存に、早く気づくための検査。
 
 調べる物:
-  (a) アプリが実行時に使う URL (tools/check-links/runtime-urls.txt)
+  (a) アプリが実行時に使う URL (モデルの一覧 Sources/KikimimiCore/Catalog/models.json から作る)
   (b) 文書・CI・道具のファイルの中に書いてある https:// の URL
   (参考) Package.swift の binaryTarget の版と、GitHub の最新の版の違い
 
@@ -25,7 +25,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-RUNTIME_LIST = HERE / "runtime-urls.txt"
+# モデルの一覧 (アプリが埋め込むのと同じ JSON)。実行時の URL は、ここのテンプレートから作る
+CATALOG = ROOT / "Sources/KikimimiCore/Catalog/models.json"
 IGNORE_LIST = HERE / "ignore.txt"
 
 USER_AGENT = "Kikimimi-link-check"
@@ -81,6 +82,45 @@ def rel(path: Path) -> str:
 def collect_list(path: Path) -> dict[str, list[tuple[str, int]]]:
     found: dict[str, list[tuple[str, int]]] = {}
     for url, n in read_list(path):
+        found.setdefault(url, []).append((rel(path), n))
+    return found
+
+
+def fill(template: str, values: dict[str, str]) -> str:
+    """テンプレートの {名前} を、そのまま置き換える (アプリの ModelCatalogData.fill と同じやり方)"""
+    for name, value in values.items():
+        template = template.replace("{" + name + "}", value)
+    return template
+
+
+def catalog_urls(path: Path = CATALOG) -> list[tuple[str, int]]:
+    """モデルの一覧から、アプリが実行時に使う URL を作る。(URL, JSON の中の行番号) を返す。
+    並び: Whisper (一覧の順) → VAD → LLM の tree API (モデルの順 × リポジトリの順)。
+    LLM は、アプリがファイルの一覧を読む tree API の URL を載せる (取るファイルは、その一覧から選ぶため)"""
+    text = path.read_text(encoding="utf-8")
+    data = json.loads(text)
+    lines = text.splitlines()
+
+    def line_of(needle: str) -> int:
+        # 注釈に出す行 (見つからなければ 1 行目)
+        return next((n for n, line in enumerate(lines, start=1) if needle in line), 1)
+
+    whisper, vad, llm = data["whisper"], data["vad"], data["llm"]
+    items = []
+    for model in whisper["models"]:
+        file_name = fill(whisper["fileNameTemplate"], {"id": model["id"]})
+        url = fill(whisper["downloadURLTemplate"], {"fileName": file_name})
+        items.append((url, line_of(json.dumps(model["id"]))))
+    items.append((vad["url"], line_of(vad["url"])))
+    for model in llm["models"]:
+        for repository in model["repositories"]:
+            items.append((fill(llm["treeURLTemplate"], {"repository": repository}), line_of(json.dumps(repository))))
+    return items
+
+
+def collect_catalog(path: Path = CATALOG) -> dict[str, list[tuple[str, int]]]:
+    found: dict[str, list[tuple[str, int]]] = {}
+    for url, n in catalog_urls(path):
         found.setdefault(url, []).append((rel(path), n))
     return found
 
@@ -379,12 +419,20 @@ def annotate(kind: str, where: tuple[str, int] | None, message: str) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Check links used by the app and written in the docs.")
     group = ap.add_mutually_exclusive_group()
-    group.add_argument("--runtime-only", action="store_true", help="check only runtime-urls.txt")
+    group.add_argument("--runtime-only", action="store_true",
+                       help="check only the runtime URLs (built from Sources/KikimimiCore/Catalog/models.json)")
     group.add_argument("--docs-only", action="store_true", help="check only URLs found in the repository files")
     group.add_argument("--urls-file", type=Path, help="check only the URLs in this file (one per line)")
+    group.add_argument("--list-runtime", action="store_true",
+                       help="print the runtime URLs built from models.json (one per line) and exit; no network")
     ap.add_argument("--no-deps", action="store_true", help="skip the dependency freshness check")
     ap.add_argument("--report", type=Path, help="write a JSON report to this file")
     args = ap.parse_args()
+
+    if args.list_runtime:
+        for url, _ in catalog_urls():
+            print(url)
+        return 0
 
     ignore = [p for p, _ in read_list(IGNORE_LIST)]
 
@@ -402,7 +450,7 @@ def main() -> int:
         add(collect_list(args.urls_file), True)
     else:
         if not args.docs_only:
-            add(collect_list(RUNTIME_LIST), True)
+            add(collect_catalog(), True)
         if not args.runtime_only:
             add(collect_docs(), False)
 

@@ -455,7 +455,7 @@ python3 tools/translation-eval/evaluate.py --model ~/Library/Application\ Suppor
 | LLM とのチャット (設定を変える案・リサーチ。2026-11-20、1ef6407) | 印 `[[set 鍵=値]]` の読み取り・指示の組み立て・ページの文の取り出し・URL の検査は、ユニットテストで確認。手元の `swift test` は「Executed 509 tests, with 0 failures」(479 → 509。チャットで 28 件、下のリンクの一覧で 2 件)。`make check-ui` (手元) は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`CHAT CHECK OK`・`ADAPTER MESSAGE CHECK OK`・`UI LOAD OK`、終了コード 0、`UI LOAD: SLOW` は出ていない。CHAT CHECK (LLM もネットワークも使わない) が見る事: 窓が開く、リサーチが始めは切で、`requestResearchOn()` だけでは入らない、決めた答え「…[[set useVAD=off]]」で札が 1 つ出て、押すまで設定が変わらない、`chatResearch` の印と一覧に無い鍵は断る、ページを読んだ回は札にならない、20 項目の全部が読めて当てられる、切の時は URL 入りの発言でも読みに行く回数が 0。落ちると `CHAT CHECK FAILED: <段>`、終了コード 9。絵は 14 (空のチャット)・15 (確認のシート)・16 (入の帯)・17 (札)。ドイツ語・タイ語の画面でも同じ確認が終了コード 0 で、14〜17 に字の切れは無かった。本物の Qwen3.5 4B での測り (`make check-chat LLM=…`): `CHAT STREAM OK` (71 回の書き換え)、`CHAT EVAL: 14/16` (日本語 8・英語 8 の問題。落ちた 2 つは「VAD って何？」「What is beam search?」の類の質問に、頼んでいない `[[set …]]` を付けた物。アプリでは札が出るだけで、押すまで変わらない)。手で通した事 (一時のフォルダの確認用の起動、本物の Qwen3.5 4B): ⇧⌘L で窓が開く、スペース入りの文が打てる、Return で送れる、答えが少しずつ出る、「無音を飛ばすのを切にして」に「もうこの値です」の札 (この Mac の値が既に切)、「メモの欄を出して」に「メモ: オフ → オン」の札と「変える」「キャンセル」、「キャンセル」で「変えていません」、確認のシートは「キャンセル」が既定、「自己責任で入れる」で橙の帯、`https://example.com/` を読んで「「Example Domain」(https://example.com/) を読みました」、切ると「リサーチが切なので、ページは読んでいません。」、「中止」で「止めました。」。CI: このコミット (1ef6407) は 9a98c83 と一緒に push したので、走ったのは 9a98c83 の 1 回 (run 44663878948)。ビルドは Xcode 16.2・26.3 の 2 列とも success で、どちらも「Executed 509 tests, with 0 failures」、`CHAT CHECK OK`・`UI LOAD OK` (3000 行と 8000 行の 2 回)、`UI LOAD: SLOW` なし。未確認: 札の「変える」を本物の窓で押す事 (本物の設定に書かれるため。当たる事は CHAT CHECK が見ている)、日本語入力の変換を確定する Return で送られない事 (実機の IME では見ていない)、転送・2 MB の打ち切り・文字コード・待ち切れの実際の動き (読んだのは example.com だけ)、悪い指示を入れたページでの動き、日本語・英語・ドイツ語・タイ語のほかの 9 言語のチャットの画面、新しい 47 個の鍵の 11 言語の訳 (AI の訳。その言語を話す人の確認は無い)、監査・翻訳の最中のチャット、メモリの少ない Mac |
 | 確認用の起動 (`--selftest-…`) が、本物の設定に書かない事 (2026-11-20、1ef6407) | 直す前は、確認用の起動でも `AppModel.save` と `PracticeController` が設定 (UserDefaults) に書いていた。`--selftest-ui-load` は終わりに練習の設定 (速さ・回数・間・自動で次へ) と書き取りの欄を既定の値へ戻す作りだったので、それまでの「アプリの確認」を走らせるたびに、本物の練習の設定が既定の値に書き換わっていた (メモの欄は元の値へ戻していた)。直した後は、確認用の起動は設定を読むだけで書かない。2026-11-20 の `make check-ui` の前後で、本物の `showNotes`・`useVAD` が変わらない事を `defaults read` で見た。練習の設定の、ほかの項目の前後は見ていない |
 | 結果の画面の操作の列 (13 言語) | 2026-11-19 の直しの後のアプリで、2026-11-20 に `--selftest-ui-load 3000 --ui-language <コード>` を zh・ko・es・fr・it・pt・ru・vi・id で走らせ、9 言語とも終了コード 0。絵 01 と 04 (計 18 枚) で、左の一覧と右端の「書き出し」のメニューが窓の中に全部見えた。操作の列は、zh・ko は 1 行、ほかは 2 行 (字つき)。字が「…」で省かれていたのは、ツールバーのモデル名と左の一覧の副題 (幅に合わせて省く作りの所)。英語・ドイツ語・タイ語・日本語は 2026-11-19 に見た。横 1200 pt 未満の窓では見ていない |
-| リンク切れと古い依存に気づく仕組み (2026-11-20、9a98c83) | `make check-links` (`tools/check-links/check_links.py`) は、アプリが実行時に使う URL 14 本 (`tools/check-links/runtime-urls.txt`: Whisper 7・VAD 1・LLM のリポジトリ 6) と、README・docs・Package.swift・workflow・tools の中の URL を調べ、切れが在ると終了コード 1 (転送の `MOVED` と、相手の一時の都合の `UNSURE` は失敗にしない)。whisper.cpp・llama.cpp の今の版と最新の版も出す (参考)。手元の結果 (2026-11-20): OK 30・MOVED 1 (README の clone の行の `https://github.com/tokoinx/Kikimimi.git` → `.git` なし)・BROKEN 0、`LINK CHECK OK (31 urls)`。無い URL を入れた一覧では、終了コード 1 と `BROKEN … HTTP 404` が出る事を見た。`LinkListTests` (実行時の URL の一覧が `ModelCatalog`・`LLMCatalog` と順番も含めて同じ・llama.cpp の版が `Package.swift` と `build.yml` で同じ) は、一覧の 1 行を書き換えると落ちる事を見た。`.github/workflows/links.yml` は、週 1 回 (月曜 03:17 UTC) と、関わるファイルが変わった push で走る。週 1 回の実行は main に入ってから動くので、まだ動いていない。このコミットの CI (run 番号は 9a98c83 の分): build (44663878948) は 2 列とも success (どちらも「Executed 509 tests, with 0 failures」、`CHAT CHECK OK`・`UI LOAD OK` が 3000 行と 8000 行の 2 回、`UI LOAD: SLOW` なし)、links (44663879095) は success (GitHub の上で初めて走った)。finetune (44663879033。Python の版を固定した後の初めての実行) も success。追加学習の CI の Python の部品は `tools/requirements-finetune.txt` で版を固定した (成功した実行 44540422570 の版)。`build.yml` の Python の部品 (gguf 0.19.0・numpy 2.5.5。上の build の実行で入った版) も、`tools/requirements-ci.txt` で固定した (`pip install -r tools/requirements-ci.txt`。この固定での実行は、次の push の CI で初めて走る) |
+| リンク切れと古い依存に気づく仕組み (2026-11-20、9a98c83) | `make check-links` (`tools/check-links/check_links.py`) は、アプリが実行時に使う URL 14 本 (モデルの一覧 `Sources/KikimimiCore/Catalog/models.json` から作る: Whisper 7・VAD 1・LLM のリポジトリ 6。2026-11-20 までは手書きの `runtime-urls.txt`) と、README・docs・Package.swift・workflow・tools の中の URL を調べ、切れが在ると終了コード 1 (転送の `MOVED` と、相手の一時の都合の `UNSURE` は失敗にしない)。whisper.cpp・llama.cpp の今の版と最新の版も出す (参考)。手元の結果 (2026-11-20): OK 30・MOVED 1 (README の clone の行の `https://github.com/tokoinx/Kikimimi.git` → `.git` なし)・BROKEN 0、`LINK CHECK OK (31 urls)`。無い URL を入れた一覧では、終了コード 1 と `BROKEN … HTTP 404` が出る事を見た。`LinkListTests` (実行時の URL の一覧が `ModelCatalog`・`LLMCatalog` と順番も含めて同じ・llama.cpp の版が `Package.swift` と `build.yml` で同じ) は、一覧の 1 行を書き換えると落ちる事を見た。`.github/workflows/links.yml` は、週 1 回 (月曜 03:17 UTC) と、関わるファイルが変わった push で走る。週 1 回の実行は main に入ってから動くので、まだ動いていない。このコミットの CI (run 番号は 9a98c83 の分): build (44663878948) は 2 列とも success (どちらも「Executed 509 tests, with 0 failures」、`CHAT CHECK OK`・`UI LOAD OK` が 3000 行と 8000 行の 2 回、`UI LOAD: SLOW` なし)、links (44663879095) は success (GitHub の上で初めて走った)。finetune (44663879033。Python の版を固定した後の初めての実行) も success。追加学習の CI の Python の部品は `tools/requirements-finetune.txt` で版を固定した (成功した実行 44540422570 の版)。`build.yml` の Python の部品 (gguf 0.19.0・numpy 2.5.5。上の build の実行で入った版) も、`tools/requirements-ci.txt` で固定した (`pip install -r tools/requirements-ci.txt`。この固定での実行は、次の push の CI で初めて走る) |
 | 依存の版を上げた事 (2026-11-20。whisper.cpp v1.9.2 → b5454、llama.cpp b12211 → b12556) | b5454 は v1.9.5 と同じコミット (d1be6fde)。v1.9.3 からは、XCFramework の zip が vN.N.N の release でなく bNNNN の release に付く。`Package.swift` の URL とチェックサム、`build.yml` の語彙のファイル (ggml-vocab-qwen2.gguf) のタグを合わせた。コードの直しは無く、コンパイルは通った。上げてよいかを、先に決めた基準 (`swift test` 失敗 0、`make check-ui` の 4 つの OK と終了コード 0、文字起こしに悪くなった行が無い、翻訳の chrF がどの言語も 1.0 より大きく下がらない、`--selftest-chat` が `CHAT STREAM OK` で 12/16 以上) で測った (手元、Apple Silicon の同じ Mac)。`swift test`: 「Executed 509 tests, with 0 failures」。`make check-ui`: `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`CHAT CHECK OK`・`UI LOAD OK`、終了コード 0、`UI LOAD: SLOW` なし。翻訳 (Qwen3.5 4B、5 言語 × 100 行、上げる前と同じ問題・設定): chrF は de 57.17・ja 29.06・ko 28.73・th 42.76・zh 35.52 で、5 言語とも上げる前と同じ値。訳の文も、475 行のうち変わった行は 0 (かかった時間は 37 分。前は 94 分だが、前の回はほかの作業と同時に走っていたので、どれだけ速くなったかは確かめていない)。`--selftest-llm`: 訳 4 行と監査 2 件は前と同じ、`SELFTEST OK`。`--selftest-chat`: `CHAT STREAM OK`、`CHAT EVAL: 14/16` (前と同じ点)。文字起こし (`--selftest-whisper`、large-v3-turbo-q5_0、silero VAD、`Tests/Fixtures/mixed-en-ja.wav`、日本語＋英語、47 秒): 文は 1 字も変わらない。区間の分け方が 1 か所だけ変わった (前は 2 つの区間 00:26-00:30 と 00:30-00:33 だった英語の 1 文が、1 つの区間 00:26-00:34 になった)。ほかの 8 区間は文も時刻も同じで、抜け・くり返し・言語の取り違えは無い。リンクの検査 (文書の側): `LINK CHECK OK (19 urls)`、新しい 2 つの zip と新しいタグの語彙のファイルは OK、`DEPENDENCY: whisper.cpp b5454 is the latest`・`DEPENDENCY: llama.cpp b12556 is the latest`。新しい版で出る事: `LlamaEngine.swift` に llama.cpp の非推奨の警告が 4 つ (エラーではない。直していない)。確かめていない事: 翻訳の測りは 5 言語だけ (ほかの 8 言語は測っていない)、whisper.cpp を上げた後の長い録音・ほかのモデル・ほかの言語での文字起こし (見たのは 47 秒の 1 つの音声だけ)、Intel Mac。この版での CI は、次の push で初めて走る |
 
 ## テスト
@@ -484,7 +484,7 @@ build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm ~/Library/Application\
 make check-chat LLM=~/Library/Application\ Support/Kikimimi/Models/LLM/qwen3.5-4b.gguf
 ```
 
-文書とアプリが使うリンクが切れていないかを見る道具もあります (ネットにつなぎます)。アプリが実行時に使う URL の一覧は `tools/check-links/runtime-urls.txt` で、`ModelCatalog`・`LLMCatalog` と同じである事を `swift test` の `LinkListTests` が見ます。切れが在ると終了コード 1 です。
+文書とアプリが使うリンクが切れていないかを見る道具もあります (ネットにつなぎます)。アプリが実行時に使う URL は、モデルの一覧 `Sources/KikimimiCore/Catalog/models.json` から作ります (`--list-runtime` で一覧だけ出せます)。アプリが作る URL と同じである事を `swift test` の `LinkListTests` が見ます。切れが在ると終了コード 1 です。
 
 ```bash
 make check-links
@@ -499,7 +499,8 @@ Sources/
     Transcript.swift     区間・結果のモデル、時刻フォーマット
     TranscriptRowCache.swift  結果の一覧の行と、翻訳の状況・言語の名前を覚えておく所 (文字起こし中は、増えた区間の分だけ足す)
     Exporter.swift       txt / srt / vtt / md / csv / json
-    ModelCatalog.swift   モデル一覧と配布元 URL、モデルファイルの検証
+    ModelCatalog.swift   モデル一覧と配布元 URL (中身は Catalog/models.json から)、モデルファイルの検証
+    Catalog/             モデルの一覧のデータ models.json (ただ 1 つの元)、読んで確かめる所、台本が作る埋め込みのファイル
     MediaImport.swift    読み込める (音声・動画の) ファイルかどうかの決め方
     HallucinationFilter.swift  定番の誤認識の除去
     VADDropCheck.swift   無音を飛ばす機能 (VAD) が、大事な音まで飛ばしたらしいかの判定
@@ -532,7 +533,7 @@ Sources/
       TranslationMemory.swift  訳の記憶 (自分で直した訳・訳語の対・関門の判定の数。translation-memory.json) と、次の翻訳で引く写し、似た文の手本の選び方 (実験。既定は切)
       TranslationReview.swift  対訳の行ごとの訳の覚え (直した・覚えた訳・要確認・この訳でよい)
       Grammar.swift      出力の形を縛る GBNF 文法
-      LLMCatalog.swift   LLM の一覧と、配布元から取るファイルの選び方
+      LLMCatalog.swift   LLM の一覧 (中身は Catalog/models.json から) と、配布元から取るファイルの選び方
       TextAnalysis.swift 似ている度合い、日本語かどうか
     MixedLanguage/       「日本語＋英語」(whisper に依存しない部分)
       SpeechMap.swift    発話の区間と、言語を判定する区切り
@@ -596,7 +597,7 @@ tools/translation-eval/  翻訳の評価 (13 言語)
   evaluate.py            問題ごとに --eval-llm を走らせ、訳す先ごとの表にまとめる (--rescore で採点し直し、--gate で関門を測る、--baseline で採る・採らないを判定、--save-baseline で基準を残す)
   make_memory.py         WMT24++ の、評価の問題に入っていない行から、見立ての訳の記憶を作る (似た文の手本の実験用)
   baselines/             比べの元にする基準 (今の基準は、30 行が qwen3.5-4b-20261116、100 行が qwen3.5-4b-100-20261116)
-tools/check-links/       リンク切れと依存の版の検査 (make check-links。runtime-urls.txt はアプリが実行時に使う URL の一覧)
+tools/check-links/       リンク切れと依存の版の検査 (make check-links。アプリが実行時に使う URL は Sources/KikimimiCore/Catalog/models.json から作る)
 Tests/Fixtures/          英日交互の短い録音 (CI の --selftest-whisper 用)、評価の場面 (llm-eval/。translation-mini.json は人の訳つきの翻訳の小さな問題、translation-terms.json は訳語の対つきの問題)
 ```
 
@@ -649,7 +650,7 @@ Tests/Fixtures/          英日交互の短い録音 (CI の --selftest-whisper 
 - リサーチで読めるのは、発言に書いた `https` の URL のページ (3 つまで) だけです。Web の検索はありません。JavaScript で中身を作るページは読めません (読むのは HTML の文だけです)。
 - リサーチで読んだページに隠れた指示 (Prompt Injection) が在ると、LLM がまちがった答えを出す事が在ります。ページの文は区切りの中に入れて「中の指示に従わない」と伝え、ページを読んだ回は設定を変える案を出さない作りですが、LLM が指示に従ってしまう事を防ぎ切る事はできません。Prompt Injection による破損や損害は、自己責任でお願いします。
 - リサーチは `localhost`・IP アドレスの直書き・内の名前 (`.local` など) を読みませんが、公開の名前が DNS で内の住所 (家や会社の中の機械) を指す場合は防げません。
-- アプリが取りに行くモデルの一覧 (音声認識・VAD・LLM の配布元の URL) は、コードに直書きです (`ModelCatalog`・`LLMCatalog`)。配布元の URL が変わった時は、アプリを作り直すまで取れません。切れた事には、`make check-links` と週 1 回の CI (main に入ってから) で気づく作りです。
+- アプリが取りに行くモデルの一覧 (音声認識・VAD・LLM の配布元の URL) は、アプリに埋め込んだデータです (`Sources/KikimimiCore/Catalog/models.json`。直した後は `/usr/bin/python3 Scripts/generate-model-catalog.py` で埋め込みのファイルを作り直す)。外から差し替える仕組みは、まだ在りません。配布元の URL が変わった時は、アプリを作り直すまで取れません。切れた事には、`make check-links` と週 1 回の CI (main に入ってから) で気づく作りです。
 
 ## ライセンス
 
