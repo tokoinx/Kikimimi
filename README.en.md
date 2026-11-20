@@ -153,7 +153,7 @@ You can talk with the same LLM that runs on your Mac for the audit and translati
 - **Opening it**: "File" › "Chat with the LLM" (⇧⌘L) in the menu bar, or the speech-bubble icon button in the main window's toolbar. The chat opens in its own window.
 - **Answers**: the answer appears little by little. "Stop" stops it. The fine-tuned adapter (LoRA) is not used.
 - **Conversations are not saved**: they are gone when you quit the app. "New chat" clears the window.
-- **During an audit or translation**: the LLM does one job at a time, so the chat waits until the running audits and translations have all finished (meanwhile it shows "Waiting for the LLM…").
+- **During an audit or translation**: the LLM does one job at a time, but the chat slips in between the chunks of an audit or translation (one chunk = one call to the LLM) and answers first. It waits only until the current chunk is done (meanwhile it shows "Waiting for the LLM…"; on an M1 Mac with Qwen3.5 4B this was about 40 seconds including loading). While the chat answers, the audit or translation pauses, and it continues after the answer. During an audit or translation that uses a fine-tuning adapter (LoRA), and for a short result that fits in one call (up to about 10 lines), the chat still waits until it has finished.
 - **Proposals to change a setting**: when you ask, for example, "Turn on the notes pane", a card such as "Notes: Off → On" appears under the answer. **A setting changes only when you press "Change" on the card.** With "Cancel" nothing changes. 20 settings can be changed from the chat (display language, spoken language, transcription model, Skip silence (VAD), vocabulary hints, LLM model, the language to translate into, automatic translation, the notes pane, the dictation box and more; the list is `ChatSettingsCatalog` in `Sources/KikimimiCore/Chat/ChatSettings.swift`). Settings not on the list, and values a setting cannot take, never become cards. A proposal to open a page of Settings only appears as a button; Settings is never opened by itself.
   - The LLM sometimes proposes a change you did not ask for (this happened in answers to questions such as "What is beam search?"). A card changes nothing until you press it, so read it before you press.
 
@@ -558,7 +558,7 @@ Sources/
   Kikimimi/              The macOS app (SwiftUI + AVFoundation)
     AppModel.swift       State, job queue, settings
     TranscriptionService.swift  Dedicated inference thread, model reuse
-    LLMService.swift     Dedicated LLM thread, model reuse
+    LLMService.swift     Dedicated LLM thread, model reuse, letting the chat slip in
     LLMSelfTest.swift    --selftest-llm (diagnostics and CI)
     LLMEvalRunner.swift  --eval-llm (evaluation harness), --export-translation-eval (turns the edits set aside into a set)
     TrainingExport.swift --export-training (audit fine-tuning data export), --export-translation-training (for translation)
@@ -573,6 +573,7 @@ Sources/
     ChatController.swift The chat conversation, research on/off, and the setting cards
     ChatWebFetcher.swift Reading web pages for research (no cookies, GET only, 2 MB, 15 s, 5 redirects)
     ChatSelfTest.swift   --selftest-chat (measures the chat with the real LLM)
+    LLMQueueSelfTest.swift --selftest-llm-queue (checks with the real LLM that the chat can slip in during an audit or translation)
     Views/               UI
       ChatView.swift     The chat window (research banner and confirmation sheet, cards)
       PracticeMenu.swift The speed and "Practice" buttons of the player bar, the pause note
@@ -644,7 +645,7 @@ Tests/Fixtures/          A short English/Japanese recording (for --selftest-whis
 - For dropped files, the format is judged by the file type (extension). Aliases and symbolic links are not loaded (drop the original file). A file with an audio extension whose contents are not audio fails after it is loaded.
 - Chat conversations with the LLM are not saved. They are gone when you quit the app.
 - The chat's LLM only proposes setting changes. It sometimes proposes a change you did not ask for (2 of 16 cases in the measurement with the real Qwen3.5 4B, in answers to questions such as "VAD って何？" (what is VAD?)). Nothing changes until you press "Change" on the card.
-- While an audit or translation is running, the chat waits until all of it has finished (the LLM does one job at a time; for the translation of a long recording, the wait is long).
+- While an audit or translation is running, the chat can only slip in between chunks (one chunk = one call to the LLM). It waits until the current chunk is done (this can be tens of seconds). During an audit or translation that uses a fine-tuning adapter (LoRA), the chat cannot slip in and waits until that job has finished (the chat runs without an adapter, so the LLM would have to be reloaded). A short result that fits in one call also makes the chat wait until it has finished. While the chat answers, the progress shown for the audit or translation stays still (no notice such as "answering the chat" is shown).
 - Research can read only the pages of the `https` URLs you wrote in your message (up to 3). There is no web search. Pages whose content is built with JavaScript cannot be read (only the HTML text is read).
 - If a page read by research contains hidden instructions (Prompt Injection), the LLM may give wrong answers. The page text is put inside delimiters with an instruction not to follow what is inside, and an answer for which pages were read never offers setting changes, but the LLM following such instructions cannot be fully prevented. You are responsible for any breakage or damage caused by Prompt Injection.
 - Research does not read `localhost`, literal IP addresses or internal names (such as `.local`), but it cannot stop a public name whose DNS points to an internal address (a machine inside your home or company network).

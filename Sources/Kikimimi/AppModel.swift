@@ -182,8 +182,7 @@ enum SettingsTab: Hashable {
 
 /// 画面の言語を、起動の一番初め (画面や文を作る前) に決める
 enum UILanguageSetting {
-    /// UserDefaults のキー
-    static let defaultsKey = "uiLanguage"
+    // 保存の鍵は SettingKey.uiLanguage
 
     struct Startup: Equatable, Sendable {
         let language: UILanguage
@@ -199,7 +198,8 @@ enum UILanguageSetting {
     /// - 確認用の起動 (`--selftest-…`) は、日本語 (絵の説明が日本語の画面を前提にしているため。設定を読まず・書かない)。
     /// - ほかは、保存した言語。無ければ、macOS の言語が 13 の中に在ればそれ、無ければ英語
     static func resolve(arguments: [String], defaults: UserDefaults, preferredLanguages: [String]) -> Startup {
-        let selfTest = arguments.contains { $0.hasPrefix("--selftest-") }
+        let mode = LaunchMode(arguments: arguments)
+        let selfTest = mode.isSelfTest
         if let i = arguments.firstIndex(of: "--ui-language") {
             let code = i + 1 < arguments.count ? arguments[i + 1] : ""
             if let language = UILanguage(rawValue: code) {
@@ -208,7 +208,8 @@ enum UILanguageSetting {
             LaunchLog.note("unknown --ui-language \"\(code)\"; ignored")
         }
         if selfTest { return Startup(language: .ja, persists: false) }
-        if let saved = defaults.string(forKey: defaultsKey).flatMap(UILanguage.init(rawValue:)) {
+        // 読む口は、一覧に無い言語を nil にする (この後で macOS の言語から決める)
+        if let saved = SettingsReader(defaults: defaults, mode: mode).string(.uiLanguage).flatMap(UILanguage.init(rawValue:)) {
             return Startup(language: saved, persists: true)
         }
         return Startup(language: UILanguage.initial(preferredLanguages: preferredLanguages), persists: true)
@@ -247,8 +248,9 @@ final class AppModel {
             L10n.language = uiLanguage
             // 確認用の起動と、--ui-language で言語を決めた起動では、保存しない
             guard UILanguageSetting.startup.persists else { return }
-            save(uiLanguage.rawValue, UILanguageSetting.defaultsKey)
-            save([uiLanguage.localeIdentifier], "AppleLanguages")
+            save(uiLanguage.rawValue, .uiLanguage)
+            // macOS の鍵 (この app の設定ではないので、SettingKey には入れない)
+            SettingsWriter.set([uiLanguage.localeIdentifier], forKey: "AppleLanguages")
             // 開き直しの案内を、作り直した設定の画面に出す (作り直しの後に出すので、少し後にする)。
             // 起動した時の言語に戻した時は出さない
             showsLanguageChangedAlert = false
@@ -268,31 +270,29 @@ final class AppModel {
     var needsReopenForLanguage: Bool {
         UILanguageSetting.startup.persists && uiLanguage != launchUILanguage
     }
-    var languageCode: String { didSet { save(languageCode, "languageCode") } }
-    var modelID: String { didSet { save(modelID, "modelID") } }
-    var preferAccuracy: Bool { didSet { save(preferAccuracy, "preferAccuracy") } }
-    var useVAD: Bool { didSet { save(useVAD, "useVAD") } }
+    var languageCode: String { didSet { save(languageCode, .languageCode) } }
+    var modelID: String { didSet { save(modelID, .modelID) } }
+    var preferAccuracy: Bool { didSet { save(preferAccuracy, .preferAccuracy) } }
+    var useVAD: Bool { didSet { save(useVAD, .useVAD) } }
     /// 無音を飛ばした (VAD) 結果が、音が続いているのに文字が少ない時は、自動で無音を飛ばさずにやり直す (歌・音楽のため)
-    var autoVADOff: Bool { didSet { save(autoVADOff, "autoVADOff") } }
-    var filterHallucinations: Bool { didSet { save(filterHallucinations, "filterHallucinations") } }
+    var autoVADOff: Bool { didSet { save(autoVADOff, .autoVADOff) } }
+    var filterHallucinations: Bool { didSet { save(filterHallucinations, .filterHallucinations) } }
     /// 「日本語」「英語」「自動判定」のとき、日本語と英語が混ざった録音は自動で「日本語＋英語」で文字にする
-    var autoMixedLanguage: Bool { didSet { save(autoMixedLanguage, "autoMixedLanguage") } }
-    var livePreview: Bool { didSet { save(livePreview, "livePreview") } }
-    var initialPrompt: String { didSet { save(initialPrompt, "initialPrompt") } }
+    var autoMixedLanguage: Bool { didSet { save(autoMixedLanguage, .autoMixedLanguage) } }
+    var livePreview: Bool { didSet { save(livePreview, .livePreview) } }
+    var initialPrompt: String { didSet { save(initialPrompt, .initialPrompt) } }
     // 監査・翻訳 (ローカル LLM)
     /// 一覧のモデルの ID か、`file:` + 取り込んだ GGUF のファイル名
     var llmModelID: String {
         didSet {
-            save(llmModelID, "llmModelID")
+            save(llmModelID, .llmModelID)
             refreshAdapters()
         }
     }
-    var autoAudit: Bool { didSet { save(autoAudit, "autoAudit") } }
-    var autoTranslate: Bool { didSet { save(autoTranslate, "autoTranslate") } }
+    var autoAudit: Bool { didSet { save(autoAudit, .autoAudit) } }
+    var autoTranslate: Bool { didSet { save(autoTranslate, .autoTranslate) } }
     /// 利用者が選んだ訳す先の言語 (nil なら、まだ選んでいない)。確認用の起動 (--selftest-…) では、いつも "ja" で始め、保存しない
     private var chosenTranslationLanguage: String?
-    /// 確認用の起動 (--selftest-…)。設定を保存しない
-    private static let isSelfTestLaunch = CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest-") })
     /// 設定の、訳す先の言語 (13 言語のコード。UserDefaults の translationLanguage)。
     /// 選んでいなければ、今の画面の言語 (保存はしない。利用者が選んだ時に初めて保存する)。
     /// 確認用の起動では日本語 (絵と確認が、日本語へ訳す前提のため)。
@@ -303,23 +303,24 @@ final class AppModel {
             let code = TranslationTarget.normalized(newValue)
             guard code != chosenTranslationLanguage else { return }
             chosenTranslationLanguage = code
-            if !Self.isSelfTestLaunch { save(code, "translationLanguage") }
+            // 確認用の起動では、SettingsWriter が書かない
+            save(code, .translationLanguage)
         }
     }
     /// 原文と訳を左右に並べて表示する
-    var showBilingual: Bool { didSet { save(showBilingual, "showBilingual") } }
+    var showBilingual: Bool { didSet { save(showBilingual, .showBilingual) } }
     /// 結果の右にメモの欄を出す
-    var showNotes: Bool { didSet { save(showNotes, "showNotes") } }
+    var showNotes: Bool { didSet { save(showNotes, .showNotes) } }
     /// メモの欄の幅 (pt)。メモの欄の左の区切りをつかんで変える
     var notesWidth: Double {
         didSet {
             let fitted = min(max(notesWidth, Self.notesWidthRange.lowerBound), Self.notesWidthRange.upperBound)
             if fitted != notesWidth { notesWidth = fitted }
-            save(notesWidth, "notesWidth")
+            save(notesWidth, .notesWidth)
         }
     }
-    /// メモの欄の幅の範囲 (pt)
-    static let notesWidthRange: ClosedRange<Double> = 220...520
+    /// メモの欄の幅の範囲 (pt。設定の定義と同じ)
+    static let notesWidthRange: ClosedRange<Double> = SettingDefinition.notesWidthRange
     /// 履歴の画面を開いているジョブ (nil なら閉じている)
     var historyJobID: Job.ID?
     /// ゴミ箱に入れるかを確かめているジョブ (nil なら確かめの画面は閉じている)
@@ -327,12 +328,12 @@ final class AppModel {
     /// 学習した直し (監査の一覧で利用者が決めた直し・設定で自分で書いた直し)。Mac の中だけに保存する
     var ledger = CorrectionLedger()
     /// 学習した直しを使う (監査の前に当てる・断った直しを出さない・正しい語を語彙のヒントに足す)
-    var useLedger: Bool { didSet { save(useLedger, "useLedger") } }
+    var useLedger: Bool { didSet { save(useLedger, .useLedger) } }
     /// 訳の記憶 (利用者が直した訳。Mac の中だけに保存する)。次の翻訳で同じ文に出た時に、LLM を呼ばずに置く
     /// (`reuseTranslationMemory` が入の時)。設定の「覚えた訳」の一覧が見るので、見張る (結果の一覧は読まない)
     var translationMemory = TranslationMemory()
     /// 覚えた訳を、次の翻訳に使う (切の時も、直した訳は記憶にたまる)
-    var reuseTranslationMemory: Bool { didSet { save(reuseTranslationMemory, "reuseTranslationMemory") } }
+    var reuseTranslationMemory: Bool { didSet { save(reuseTranslationMemory, .reuseTranslationMemory) } }
     /// 訳の記憶の保存先 (学習した直しの台帳と同じフォルダの translation-memory.json)。
     /// 確認用の起動 (--selftest-…) では nil (利用者の本物の記憶を読まず・書かない。確認は useTranslationMemory(at:) で一時のファイルにする)
     @ObservationIgnored private(set) var translationMemoryURL: URL?
@@ -340,7 +341,7 @@ final class AppModel {
     var translationEdit: TranslationEditRequest?
     /// 追加学習の差分 (LoRA) を使う (選んでいる LLM 用の差分が入っているときだけ効く)。
     /// 入・切は 1 つで、監査用・翻訳用の両方に効く
-    var useAdapter: Bool { didSet { save(useAdapter, "useAdapter") } }
+    var useAdapter: Bool { didSet { save(useAdapter, .useAdapter) } }
     /// 選んでいる LLM 用の、監査用の差分が入っている
     var hasAdapter = false
     /// 選んでいる LLM 用の、翻訳用の差分が入っている
@@ -381,40 +382,41 @@ final class AppModel {
         let player = PlayerController()
         self.player = player
         practice = PracticeController(player: player)
-        let d = UserDefaults.standard
+        // 既定の値・確認用の起動で決まった値・読む時の直しは、SettingKey の定義から来る
+        let settings = SettingsReader()
         uiLanguage = UILanguageSetting.startup.language
         L10n.language = UILanguageSetting.startup.language
-        languageCode = d.string(forKey: "languageCode") ?? "ja"
-        let savedModel = d.string(forKey: "modelID") ?? ModelCatalog.defaultModelID
-        modelID = ModelCatalog.spec(id: savedModel) == nil ? ModelCatalog.defaultModelID : savedModel
-        preferAccuracy = d.object(forKey: "preferAccuracy") as? Bool ?? true
-        useVAD = d.object(forKey: "useVAD") as? Bool ?? true
-        autoVADOff = d.object(forKey: "autoVADOff") as? Bool ?? true
-        filterHallucinations = d.object(forKey: "filterHallucinations") as? Bool ?? true
-        autoMixedLanguage = d.object(forKey: "autoMixedLanguage") as? Bool ?? true
-        livePreview = d.object(forKey: "livePreview") as? Bool ?? true
-        initialPrompt = d.string(forKey: "initialPrompt") ?? ""
-        llmModelID = d.string(forKey: "llmModelID") ?? LLMCatalog.defaultModelID
-        autoAudit = d.object(forKey: "autoAudit") as? Bool ?? true
-        autoTranslate = d.object(forKey: "autoTranslate") as? Bool ?? true
-        // 確認用の起動では、設定を読まず、日本語に決める
-        chosenTranslationLanguage = Self.isSelfTestLaunch
-            ? "ja" : d.string(forKey: "translationLanguage").map { TranslationTarget.normalized($0) }
-        showBilingual = d.object(forKey: "showBilingual") as? Bool ?? true
-        showNotes = d.object(forKey: "showNotes") as? Bool ?? false
-        notesWidth = min(max(d.object(forKey: "notesWidth") as? Double ?? 320, Self.notesWidthRange.lowerBound),
-                         Self.notesWidthRange.upperBound)
-        useLedger = d.object(forKey: "useLedger") as? Bool ?? true
+        // 一覧に無い言語は "ja" に、一覧に無いモデルは既定のモデルに直る
+        // (定義に既定の値が在るので、`??` の右には来ない)
+        languageCode = settings.string(.languageCode) ?? "ja"
+        modelID = settings.string(.modelID) ?? ModelCatalog.defaultModelID
+        preferAccuracy = settings.bool(.preferAccuracy)
+        useVAD = settings.bool(.useVAD)
+        autoVADOff = settings.bool(.autoVADOff)
+        filterHallucinations = settings.bool(.filterHallucinations)
+        autoMixedLanguage = settings.bool(.autoMixedLanguage)
+        livePreview = settings.bool(.livePreview)
+        initialPrompt = settings.string(.initialPrompt) ?? ""
+        // LLM は、ここでは直さない (手元の GGUF が在るので、refreshLLMInstalled() が受け持つ)
+        llmModelID = settings.string(.llmModelID) ?? LLMCatalog.defaultModelID
+        autoAudit = settings.bool(.autoAudit)
+        autoTranslate = settings.bool(.autoTranslate)
+        // 保存が無い間は nil (画面の言語と同じ)。確認用の起動では、設定を読まず、日本語に決める
+        chosenTranslationLanguage = settings.string(.translationLanguage)
+        showBilingual = settings.bool(.showBilingual)
+        showNotes = settings.bool(.showNotes)
+        notesWidth = settings.double(.notesWidth)
+        useLedger = settings.bool(.useLedger)
         // 確認用の起動では、設定を読まず、入に決める (記憶は一時のファイルにするので、本物の記憶は使わない)
-        reuseTranslationMemory = Self.isSelfTestLaunch ? true : d.object(forKey: "reuseTranslationMemory") as? Bool ?? true
-        useAdapter = d.object(forKey: "useAdapter") as? Bool ?? true
+        reuseTranslationMemory = settings.bool(.reuseTranslationMemory)
+        useAdapter = settings.bool(.useAdapter)
         llmStore = LLMModelStore(models: store)
         let loaded = CorrectionLedger.loadKeepingUnreadable(from: ledgerURL)
         ledger = loaded.ledger
         if let aside = loaded.setAside {
             errorMessage = L("Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.", aside.lastPathComponent)
         }
-        if !Self.isSelfTestLaunch {
+        if !LaunchMode.current.isSelfTest {
             let memoryURL = ledgerURL.deletingLastPathComponent().appendingPathComponent(TranslationMemory.fileName)
             translationMemoryURL = memoryURL
             let memory = TranslationMemory.loadKeepingUnreadable(from: memoryURL)
@@ -423,22 +425,22 @@ final class AppModel {
                 errorMessage = L("Could not read the translation memory file, so starting empty. The original file is kept in the same folder as “%@”.", aside.lastPathComponent)
             }
         }
-        if !Languages.isKnown(languageCode) { languageCode = "ja" }
+        // 保存してあった話す言語が一覧に無かった時は、直した値を保存し直す (前と同じ動き)。
+        // 初めの代入では didSet が動かないので、ここでもう一度代入する (didSet が保存する)
+        if settings.savedStringIsFixed(.languageCode) { languageCode = settings.string(.languageCode) ?? "ja" }
         refreshInstalled()
         refreshLLMInstalled()
         // 確認用の起動 (--selftest-…) では保存しない (--selftest-ui-load は、確かめるときに一時フォルダを使う)
-        if !CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest-") }) {
+        if !LaunchMode.current.isSelfTest {
             library = LibraryWriter(store: LibraryStore(root: LibraryStore.defaultRoot()))
             loadLibrary()
         }
         chat.model = self
     }
 
-    private func save(_ value: Any, _ key: String) {
-        // 確認用の起動 (--selftest-…) では、利用者の本物の設定に書かない
-        // (確認が設定を変えて戻しても、決めていなかった項目に値が書かれてしまうため)
-        guard !Self.isSelfTestLaunch else { return }
-        UserDefaults.standard.set(value, forKey: key)
+    private func save(_ value: Any, _ key: SettingKey) {
+        // 確認用の起動 (--selftest-…) では、SettingsWriter が利用者の本物の設定に書かない
+        SettingsWriter.set(value, for: key)
     }
 
     var selectedJob: Job? {
@@ -1226,10 +1228,11 @@ final class AppModel {
     // MARK: チャット (LLM)
 
     /// チャットの答えを、選んでいる LLM で出す。差分 (adapter) は渡さない (監査・翻訳を学んだ差分なので)。
-    /// 監査・翻訳と同じ列で順に回るので、それらが LLM を使っている間は、終わるまで待つ
+    /// 監査・翻訳が同じモデルを差分なしで使っている最中なら、その合間 (かたまりの `generate` の手前) に先に通る。
+    /// 監査・翻訳が差分を使っている時・別のモデルの時は、今までどおり、それらが終わるまで待つ
     func runChatLLM(shouldCancel: @escaping @Sendable () -> Bool,
                     _ body: @escaping (LlamaEngine) throws -> String) async throws -> String {
-        try await llm.run(modelPath: currentLLM.url.path, adapterPath: nil, shouldCancel: shouldCancel, body)
+        try await llm.runInteractive(modelPath: currentLLM.url.path, shouldCancel: shouldCancel, body)
     }
 
     /// チャットの窓を閉じた時: 監査・翻訳の仕事が無ければ、LLM を手放す (数 GB のメモリを空ける)
@@ -1243,29 +1246,71 @@ final class AppModel {
 
     /// チャットに見せる、今の設定の値 (`ChatSettingsAccess` の形。toggle は "on" / "off")。一覧に無い鍵は nil
     func currentValue(for key: String) -> String? {
-        func onOff(_ value: Bool) -> String { value ? "on" : "off" }
+        guard let setting = SettingKey(rawValue: key) else { return nil }
+        return chatAccess(setting)?.get()
+    }
+
+    /// チャットから設定 1 つを読み書きする口 (値はチャットの書き方。toggle は "on" / "off")
+    private struct ChatAccess {
+        let get: () -> String
+        /// 当てたら true。値は `normalizedValue` で確かめた後の物
+        let set: (String) -> Bool
+    }
+
+    /// 設定ごとに、どのプロパティを読み書きするか。nil は、チャットから触れない物。
+    /// 設定を足したら、ここに足す (足し忘れは、コンパイルが止める)。
+    /// 書くのは、設定の画面と同じ道 (このモデルの値を変える。didSet が保存する)
+    private func chatAccess(_ key: SettingKey) -> ChatAccess? {
+        // 入り切り: "on" / "off" と Bool の橋渡し
+        func toggle(_ path: ReferenceWritableKeyPath<AppModel, Bool>) -> ChatAccess {
+            ChatAccess(get: { self[keyPath: path] ? "on" : "off" },
+                       set: { value in
+                           self[keyPath: path] = value == "on"
+                           return true
+                       })
+        }
+        // 文: 当てる前の確かめ (`accepts`) が通った時だけ当てる
+        func text(_ path: ReferenceWritableKeyPath<AppModel, String>,
+                  accepts: @escaping (String) -> Bool = { _ in true }) -> ChatAccess {
+            ChatAccess(get: { self[keyPath: path] },
+                       set: { value in
+                           guard accepts(value) else { return false }
+                           self[keyPath: path] = value
+                           return true
+                       })
+        }
         switch key {
-        case "uiLanguage": return uiLanguage.rawValue
-        case "languageCode": return languageCode
-        case "modelID": return modelID
-        case "preferAccuracy": return onOff(preferAccuracy)
-        case "useVAD": return onOff(useVAD)
-        case "autoVADOff": return onOff(autoVADOff)
-        case "filterHallucinations": return onOff(filterHallucinations)
-        case "autoMixedLanguage": return onOff(autoMixedLanguage)
-        case "livePreview": return onOff(livePreview)
-        case "initialPrompt": return initialPrompt
-        case "llmModelID": return llmModelID
-        case "autoAudit": return onOff(autoAudit)
-        case "translationLanguage": return translationLanguage
-        case "autoTranslate": return onOff(autoTranslate)
-        case "useLedger": return onOff(useLedger)
-        case "reuseTranslationMemory": return onOff(reuseTranslationMemory)
-        case "useAdapter": return onOff(useAdapter)
-        case "showBilingual": return onOff(showBilingual)
-        case "showNotes": return onOff(showNotes)
-        case "practiceDictation": return onOff(practice.showsDictation)
-        default: return nil
+        case .uiLanguage:
+            // 設定の画面と同じ: didSet が文を引き直し、保存し、開き直しの案内の印を立てる
+            return ChatAccess(get: { self.uiLanguage.rawValue },
+                              set: { value in
+                                  guard let language = UILanguage(rawValue: value) else { return false }
+                                  self.uiLanguage = language
+                                  return true
+                              })
+        case .languageCode: return text(\.languageCode, accepts: { Languages.isKnown($0) })
+        // 設定の画面と同じ: 入っていないモデルも選べる (使う時に取得する)
+        case .modelID: return text(\.modelID, accepts: { ModelCatalog.spec(id: $0) != nil })
+        case .preferAccuracy: return toggle(\.preferAccuracy)
+        case .useVAD: return toggle(\.useVAD)
+        case .autoVADOff: return toggle(\.autoVADOff)
+        case .filterHallucinations: return toggle(\.filterHallucinations)
+        case .autoMixedLanguage: return toggle(\.autoMixedLanguage)
+        case .livePreview: return toggle(\.livePreview)
+        case .initialPrompt: return text(\.initialPrompt)
+        // 設定の画面と同じ: didSet が差分の有無を読み直す。入っていないモデルも選べる
+        case .llmModelID: return text(\.llmModelID, accepts: { LLMCatalog.spec(id: $0) != nil })
+        case .autoAudit: return toggle(\.autoAudit)
+        case .translationLanguage: return text(\.translationLanguage, accepts: { TranslationTarget.all.contains($0) })
+        case .autoTranslate: return toggle(\.autoTranslate)
+        case .useLedger: return toggle(\.useLedger)
+        case .reuseTranslationMemory: return toggle(\.reuseTranslationMemory)
+        case .useAdapter: return toggle(\.useAdapter)
+        case .showBilingual: return toggle(\.showBilingual)
+        case .showNotes: return toggle(\.showNotes)
+        case .practiceDictation: return toggle(\.practice.showsDictation)
+        // チャットから触れない物 (ChatSettingsCatalog.excludedKeys にも入っている)
+        case .notesWidth, .practice: return nil
         }
     }
 
@@ -1284,45 +1329,9 @@ final class AppModel {
     func applyChatSetting(key: String, value raw: String) -> Bool {
         guard key != ChatSettingsCatalog.researchKey, !ChatSettingsCatalog.excludedKeys.contains(key),
               let item = chatCatalog.first(where: { $0.key == key }),
-              let value = item.normalizedValue(raw) else { return false }
-        let on = value == "on"
-        switch key {
-        case "uiLanguage":
-            // 設定の画面と同じ: didSet が文を引き直し、保存し、開き直しの案内の印を立てる
-            guard let language = UILanguage(rawValue: value) else { return false }
-            uiLanguage = language
-        case "languageCode":
-            guard Languages.isKnown(value) else { return false }
-            languageCode = value
-        case "modelID":
-            // 設定の画面と同じ: 入っていないモデルも選べる (使う時に取得する)
-            guard ModelCatalog.spec(id: value) != nil else { return false }
-            modelID = value
-        case "preferAccuracy": preferAccuracy = on
-        case "useVAD": useVAD = on
-        case "autoVADOff": autoVADOff = on
-        case "filterHallucinations": filterHallucinations = on
-        case "autoMixedLanguage": autoMixedLanguage = on
-        case "livePreview": livePreview = on
-        case "initialPrompt": initialPrompt = value
-        case "llmModelID":
-            // 設定の画面と同じ: didSet が差分の有無を読み直す。入っていないモデルも選べる
-            guard LLMCatalog.spec(id: value) != nil else { return false }
-            llmModelID = value
-        case "autoAudit": autoAudit = on
-        case "translationLanguage":
-            guard TranslationTarget.all.contains(value) else { return false }
-            translationLanguage = value
-        case "autoTranslate": autoTranslate = on
-        case "useLedger": useLedger = on
-        case "reuseTranslationMemory": reuseTranslationMemory = on
-        case "useAdapter": useAdapter = on
-        case "showBilingual": showBilingual = on
-        case "showNotes": showNotes = on
-        case "practiceDictation": practice.showsDictation = on
-        default: return false
-        }
-        return true
+              let value = item.normalizedValue(raw),
+              let setting = SettingKey(rawValue: key), let access = chatAccess(setting) else { return false }
+        return access.set(value)
     }
 
     private func run(_ job: Job) async {

@@ -81,7 +81,8 @@ enum WhisperSelfTest {
             return 2
         }
         let store = ModelStore()
-        let savedID = UserDefaults.standard.string(forKey: "modelID") ?? ModelCatalog.defaultModelID
+        // 読む口は、一覧に無いモデルを既定のモデルに直す
+        let savedID = SettingsReader().string(.modelID) ?? ModelCatalog.defaultModelID
         let spec = ModelCatalog.spec(id: savedID) ?? ModelCatalog.spec(id: ModelCatalog.defaultModelID) ?? ModelCatalog.all[0]
         let modelPath = value("--model") ?? (store.isInstalled(spec) ? store.url(for: spec).path : nil)
         guard let modelPath, FileManager.default.fileExists(atPath: modelPath) else {
