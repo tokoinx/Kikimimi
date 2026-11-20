@@ -42,16 +42,17 @@ let package = Package(
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
         // whisper.cpp 公式のビルド済み XCFramework (Metal 対応, macOS 13.3 以降)
+        // v1.9.3 からは、zip が vN.N.N の release でなく bNNNN の release に付く。b5454 は v1.9.5 と同じコミット
         .binaryTarget(
             name: "WhisperFramework",
-            url: "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-v1.9.2-xcframework.zip",
-            checksum: "af74fed13ea7f2d5ca2a39d9f58ec177713fafd7cab63aef4e27b79f3ceca80b"
+            url: "https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-b5454-xcframework.zip",
+            checksum: "e57f8c48933000acabc13bb913fbe82805d483a2deff692cc6738836bd92393b"
         ),
         // llama.cpp 公式のビルド済み XCFramework (Metal 対応, macOS 13.3 以降)
         .binaryTarget(
             name: "LlamaFramework",
-            url: "https://github.com/ggml-org/llama.cpp/releases/download/b12211/llama-b12211-xcframework.zip",
-            checksum: "1f701c47b0e2f9410e1441960105e7d7ad1757f8a49e4063c6e792df31348a7a"
+            url: "https://github.com/ggml-org/llama.cpp/releases/download/b12556/llama-b12556-xcframework.zip",
+            checksum: "354dfa19491eb6e154559879020f652d31c9c8330c40b14877d9451d70162590"
         ),
         .testTarget(
             name: "KikimimiCoreTests",
