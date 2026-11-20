@@ -62,9 +62,14 @@ enum KikimimiMain {
         // macOS が復元しようとして、ウインドウが 1 つも無いまま動いていることがあった (CI で、3 回目の起動で再現)。
         // ウインドウの状態は復元しなくてよい (文字起こしの結果・メモ・履歴はライブラリに保存してあり、
         // 次の起動で一覧に戻る) ので、いつも新しいウインドウで始める
+        // 確認用の起動 (--selftest-…) は、利用者の本物の設定に書かず、この起動のあいだだけ効く値で同じ事をする
         if !args.contains("--restore-windows") {
-            UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
-            UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+            if LaunchMode.current.isSelfTest {
+                SettingsWriter.setForThisLaunch(["ApplePersistenceIgnoreState": true, "NSQuitAlwaysKeepsWindows": false])
+            } else {
+                SettingsWriter.set(true, forKey: "ApplePersistenceIgnoreState")
+                SettingsWriter.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+            }
             // 前の版が残した状態も消す (残っていると、無視する設定にしても、最初の起動でウインドウが出ないことがあった)
             if let id = Bundle.main.bundleIdentifier,
                let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
@@ -72,9 +77,18 @@ enum KikimimiMain {
                     at: library.appendingPathComponent("Saved Application State/\(id).savedState"))
             }
         } else {
-            // 確認用: これまでの動き (復元する) に戻す
-            UserDefaults.standard.removeObject(forKey: "ApplePersistenceIgnoreState")
-            UserDefaults.standard.removeObject(forKey: "NSQuitAlwaysKeepsWindows")
+            // 確認用: これまでの動き (復元する) に戻す。ふつうの起動では、前の起動が保存した 2 つを消す
+            SettingsWriter.remove(forKey: "ApplePersistenceIgnoreState")
+            SettingsWriter.remove(forKey: "NSQuitAlwaysKeepsWindows")
+            // 確認用の起動は消せない (本物の設定に書かない) ので、この起動のあいだだけ、消した時と同じ値を上に置く:
+            // 復元を無視しない。終了の時に窓を残すかは、macOS 全体の設定に従う (無ければ、保存してある値のまま)
+            if LaunchMode.current.isSelfTest {
+                var values: [String: Any] = ["ApplePersistenceIgnoreState": false]
+                if let keep = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?["NSQuitAlwaysKeepsWindows"] {
+                    values["NSQuitAlwaysKeepsWindows"] = keep
+                }
+                SettingsWriter.setForThisLaunch(values)
+            }
         }
         KikimimiApp.main()
     }

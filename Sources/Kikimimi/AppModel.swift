@@ -199,7 +199,7 @@ enum UILanguageSetting {
     /// - 確認用の起動 (`--selftest-…`) は、日本語 (絵の説明が日本語の画面を前提にしているため。設定を読まず・書かない)。
     /// - ほかは、保存した言語。無ければ、macOS の言語が 13 の中に在ればそれ、無ければ英語
     static func resolve(arguments: [String], defaults: UserDefaults, preferredLanguages: [String]) -> Startup {
-        let selfTest = arguments.contains { $0.hasPrefix("--selftest-") }
+        let selfTest = LaunchMode(arguments: arguments).isSelfTest
         if let i = arguments.firstIndex(of: "--ui-language") {
             let code = i + 1 < arguments.count ? arguments[i + 1] : ""
             if let language = UILanguage(rawValue: code) {
@@ -291,8 +291,6 @@ final class AppModel {
     var autoTranslate: Bool { didSet { save(autoTranslate, "autoTranslate") } }
     /// 利用者が選んだ訳す先の言語 (nil なら、まだ選んでいない)。確認用の起動 (--selftest-…) では、いつも "ja" で始め、保存しない
     private var chosenTranslationLanguage: String?
-    /// 確認用の起動 (--selftest-…)。設定を保存しない
-    private static let isSelfTestLaunch = CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest-") })
     /// 設定の、訳す先の言語 (13 言語のコード。UserDefaults の translationLanguage)。
     /// 選んでいなければ、今の画面の言語 (保存はしない。利用者が選んだ時に初めて保存する)。
     /// 確認用の起動では日本語 (絵と確認が、日本語へ訳す前提のため)。
@@ -303,7 +301,8 @@ final class AppModel {
             let code = TranslationTarget.normalized(newValue)
             guard code != chosenTranslationLanguage else { return }
             chosenTranslationLanguage = code
-            if !Self.isSelfTestLaunch { save(code, "translationLanguage") }
+            // 確認用の起動では、SettingsWriter が書かない
+            save(code, "translationLanguage")
         }
     }
     /// 原文と訳を左右に並べて表示する
@@ -398,7 +397,7 @@ final class AppModel {
         autoAudit = d.object(forKey: "autoAudit") as? Bool ?? true
         autoTranslate = d.object(forKey: "autoTranslate") as? Bool ?? true
         // 確認用の起動では、設定を読まず、日本語に決める
-        chosenTranslationLanguage = Self.isSelfTestLaunch
+        chosenTranslationLanguage = LaunchMode.current.isSelfTest
             ? "ja" : d.string(forKey: "translationLanguage").map { TranslationTarget.normalized($0) }
         showBilingual = d.object(forKey: "showBilingual") as? Bool ?? true
         showNotes = d.object(forKey: "showNotes") as? Bool ?? false
@@ -406,7 +405,7 @@ final class AppModel {
                          Self.notesWidthRange.upperBound)
         useLedger = d.object(forKey: "useLedger") as? Bool ?? true
         // 確認用の起動では、設定を読まず、入に決める (記憶は一時のファイルにするので、本物の記憶は使わない)
-        reuseTranslationMemory = Self.isSelfTestLaunch ? true : d.object(forKey: "reuseTranslationMemory") as? Bool ?? true
+        reuseTranslationMemory = LaunchMode.current.isSelfTest ? true : d.object(forKey: "reuseTranslationMemory") as? Bool ?? true
         useAdapter = d.object(forKey: "useAdapter") as? Bool ?? true
         llmStore = LLMModelStore(models: store)
         let loaded = CorrectionLedger.loadKeepingUnreadable(from: ledgerURL)
@@ -414,7 +413,7 @@ final class AppModel {
         if let aside = loaded.setAside {
             errorMessage = L("Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.", aside.lastPathComponent)
         }
-        if !Self.isSelfTestLaunch {
+        if !LaunchMode.current.isSelfTest {
             let memoryURL = ledgerURL.deletingLastPathComponent().appendingPathComponent(TranslationMemory.fileName)
             translationMemoryURL = memoryURL
             let memory = TranslationMemory.loadKeepingUnreadable(from: memoryURL)
@@ -427,7 +426,7 @@ final class AppModel {
         refreshInstalled()
         refreshLLMInstalled()
         // 確認用の起動 (--selftest-…) では保存しない (--selftest-ui-load は、確かめるときに一時フォルダを使う)
-        if !CommandLine.arguments.contains(where: { $0.hasPrefix("--selftest-") }) {
+        if !LaunchMode.current.isSelfTest {
             library = LibraryWriter(store: LibraryStore(root: LibraryStore.defaultRoot()))
             loadLibrary()
         }
@@ -435,10 +434,8 @@ final class AppModel {
     }
 
     private func save(_ value: Any, _ key: String) {
-        // 確認用の起動 (--selftest-…) では、利用者の本物の設定に書かない
-        // (確認が設定を変えて戻しても、決めていなかった項目に値が書かれてしまうため)
-        guard !Self.isSelfTestLaunch else { return }
-        UserDefaults.standard.set(value, forKey: key)
+        // 確認用の起動 (--selftest-…) では、SettingsWriter が利用者の本物の設定に書かない
+        SettingsWriter.set(value, forKey: key)
     }
 
     var selectedJob: Job? {

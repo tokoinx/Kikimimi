@@ -65,8 +65,9 @@ final class PracticeController {
     /// 結果の下に書き取りの欄を出す (UserDefaults の "practiceDictation")
     var showsDictation: Bool {
         didSet {
-            if showsDictation != oldValue, !Self.isSelfTestLaunch {
-                UserDefaults.standard.set(showsDictation, forKey: Self.dictationKey)
+            // 確認用の起動 (--selftest-…) では、SettingsWriter が利用者の本物の設定に書かない
+            if showsDictation != oldValue {
+                SettingsWriter.set(showsDictation, forKey: Self.dictationKey)
             }
         }
     }
@@ -105,8 +106,6 @@ final class PracticeController {
 
     static let settingsKey = "practice"
     static let dictationKey = "practiceDictation"
-    /// 確認用の起動 (--selftest-…)。利用者の本物の設定に書かない
-    private static let isSelfTestLaunch = CommandLine.arguments.contains { $0.hasPrefix("--selftest-") }
 
     init(player: PlayerController) {
         self.player = player
@@ -413,7 +412,8 @@ final class PracticeController {
         if normalized != settings { settings = normalized }
         guard settings != old else { return }
         // 隠し方は保存するが、起動のたびに「隠さない」から始める
-        if !Self.isSelfTestLaunch { UserDefaults.standard.set(settings.jsonString(), forKey: Self.settingsKey) }
+        // 確認用の起動 (--selftest-…) では、SettingsWriter が利用者の本物の設定に書かない
+        SettingsWriter.set(settings.jsonString(), forKey: Self.settingsKey)
         if player.rate != settings.rate { player.rate = settings.rate }
         sequencer.update(settings: settings)
         if hideMode != settings.hide {

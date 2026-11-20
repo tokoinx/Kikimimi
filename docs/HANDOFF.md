@@ -307,9 +307,14 @@ LLM とのチャット (2026-11-20、1ef6407):
 
 ## リファクタリングの案 (2026-11-20)
 
-考えただけで、**どれも、まだ行っていない**。行う時は、利用者に確かめてから。
+**1 は行った (2026-11-20、利用者の OK「1 から始める」)。2〜8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
 
 1. **確認用の起動の判定を 1 か所に**: 「`--selftest-…` か」を、`AppModel`・`PracticeController`・`UILanguageSetting` が別々に見ていて、本物の設定に書いていた不具合 (上の「確認用の起動と本物の設定」) の元になった。1 つの型 (例: `LaunchMode`) にまとめ、設定に書く所は全部そこを通す。小さい。先に行う値打ちが在る。
+   - **行った (2026-11-20)**: 判定は `Sources/KikimimiCore/LaunchMode.swift` (`app`・`selfTest`・`tool`) だけ、設定 (UserDefaults) に書く所は `Sources/KikimimiCore/SettingsWriter.swift` だけにした (ふつうの起動の時だけ書く)。ばらばらだった判定 6 か所を消し、書き込み 7 か所を通した。
+   - **抜けを見つける仕組み**: `LaunchModeTests` (7 件) がソースを読み、`--selftest-` で始まるかの判定が `LaunchMode.swift` のほかに在る時、`UserDefaults` への書き込み (`UserDefaults.standard.set`・`removeObject`・別の名前に入れてからの `d.set`・`@AppStorage` など) が `SettingsWriter.swift` のほかに在る時に落ちる。`PracticeController.swift` に 1 行足すと落ちる事を見て、元に戻した。
+   - **動きが変わった所 (1 つ)**: 確認用の起動は、窓の復元を止めるための 2 つの鍵 (`ApplePersistenceIgnoreState`・`NSQuitAlwaysKeepsWindows`) を、本物の設定に書かず、この起動のあいだだけ効く所 (引数の領域) に置くようになった。前の版が本物の設定に残した 2 つの鍵は、次のふつうの起動が今までどおり扱う (この Mac の設定には、今も残っている)。`--selftest-launch … --restore-windows` (CI の参考の段) は、本物の設定から鍵を消す代わりに、同じ効き目の値をこの起動のあいだだけ置く。
+   - **確かめ (手元)**: `swift test` は「Executed 516 tests, with 0 failures」(509 → 516)。`make check-ui` は「LIBRARY CHECK OK」「PRACTICE CHECK OK」「CHAT CHECK OK」「UI LOAD OK」、終了コード 0。`make check-ui` の前後で `defaults read local.kikimimi.app` の出力を `diff` で比べ、違いは 0 行。`--selftest-ui-load 3000 --ui-language de`・`--selftest-launch 5`・`--selftest-launch 5 --restore-windows` も終了コード 0。
+   - **確かめていない事**: ふつうの起動で、設定が今までどおり保存される事 (ふつうの起動は、本物の設定に書くので行っていない。同じ鍵と値が `SettingsWriter.set` を通って書かれる事はコードで見て、「ふつうの起動の時だけ書く」事は試験が一時の置き場で見ている)。確認用の起動で、macOS が窓の復元を本当に行わない事 (窓が 1 つだけ開き `LAUNCH SELFTEST OK` になる事で、間接に見ただけ)。
 2. **設定の定義を 1 か所に**: 同じ鍵が、`AppModel` の読み (init)・保存 (didSet)・設定の画面・チャットの一覧 (`ChatSettingsCatalog`)・`applyChatSetting` の switch の 5 か所に在る。鍵・型・既定の値・取れる値の表を 1 つにし、ほかはそこから作る。今は、CHAT CHECK が「一覧の 20 項目が全部読めて当てられる」事だけを見ている。
 3. **LLM の順番待ちに割り込み**: 監査・翻訳は 1 回の `LLMService.run` に全体が入るので、チャットは全部が終わるまで待つ。かたまり (監査の 1 回分・翻訳の 1 回分) ごとに列を空ければ、チャットが間に入れる。
 4. **モデルの一覧をコードからデータへ**: `ModelCatalog`・`LLMCatalog` を JSON のリソースにすれば、リンクの検査の一覧 (`runtime-urls.txt`) を手で合わせる事が要らなくなる。将来、一覧を外から差し替える仕組みを作る時の土台にもなる (その時は checksum か署名が要る)。
