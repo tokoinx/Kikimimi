@@ -37,7 +37,7 @@ python3 tools/check-links/check_links.py --report out.json     # 結果を JSON 
 | `BROKEN` | 4xx・つながらない | なる |
 
 終わりの行は `LINK CHECK OK (N urls)` か `LINK CHECK FAILED: N broken`。終了コードは、`BROKEN` が在れば 1、無ければ 0。
-`DEPENDENCY: llama.cpp b12211 -> latest b12556 (…)` は、今の版と最新の版 (括弧の中は、その zip の名前など)。`unknown (rate limited)` は GitHub の回数の制限で読めなかった事。
+`DEPENDENCY: llama.cpp b12556 is the latest (…)` は、今の版が最新の時の出力 (古い時は `DEPENDENCY: llama.cpp <今の版> -> latest <最新の版> (…)`。括弧の中は、その zip の名前など)。`unknown (rate limited)` は GitHub の回数の制限で読めなかった事。
 GitHub Actions の上では、`BROKEN` は error、`MOVED`・`UNSURE`・古い依存は warning の注釈になる。
 実行時の URL の `UNSURE` は、続いているかを見られないので、毎回 warning に出る。続く時は手で確かめる。
 

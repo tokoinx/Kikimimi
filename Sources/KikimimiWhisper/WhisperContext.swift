@@ -345,7 +345,7 @@ public final class WhisperContext: @unchecked Sendable {
 
         // 語彙のヒントは、前の区間の文章を混ぜずに毎区間へ付ける:
         // carry_initial_prompt でヒントを固定の前置きにし、n_max_text_ctx を「ヒント + 1」に絞って
-        // 前の区間の文章が入る余地をなくす (whisper.cpp v1.9.2 の whisper_full_with_state の組み立て方による)。
+        // 前の区間の文章が入る余地をなくす (whisper.cpp v1.9.2 の時に確かめた whisper_full_with_state の組み立て方による)。
         if let p = hint?.trimmingCharacters(in: .whitespacesAndNewlines), !p.isEmpty {
             let hintTokens = tokenCount(p)
             if hintTokens > 0 {
@@ -529,7 +529,7 @@ public final class WhisperContext: @unchecked Sendable {
         guard rc == 0 else { return nil }
         var probs = [Float](repeating: 0, count: Int(whisper_lang_max_id()) + 1)
         guard whisper_lang_auto_detect(ctx, 0, n, &probs) >= 0 else { return nil }
-        // 言語判定は [SOT] だけを読ませた次のトークンの確率を、状態の logits の 1 行目に残す。whisper.cpp v1.9.2 は、
+        // 言語判定は [SOT] だけを読ませた次のトークンの確率を、状態の logits の 1 行目に残す。whisper.cpp v1.9.2 の時に確かめた事だが、
         // 次の whisper_full の最初の 30 秒の「無音らしさ」(no_speech_prob) をその 1 行目から読むので、別の音声の値が混ざり、
         // 言い直しをせずに 30 秒ぶんの文を捨てることがある。読み込んだばかりの状態と同じく 0 に戻す
         // (判定に成功した直後の logits は、ちょうど語彙の数の 1 行)
