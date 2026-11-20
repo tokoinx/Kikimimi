@@ -327,11 +327,11 @@ final class ChatController {
         let applied = model.applyChatSetting(key: proposal.key, value: proposal.value)
         extra.cards[index].state = applied ? .applied : .failed
         if applied {
-            switch proposal.key {
-            case "uiLanguage" where model.needsReopenForLanguage:
+            switch SettingKey(rawValue: proposal.key) {
+            case .uiLanguage? where model.needsReopenForLanguage:
                 extra.notices.append(ChatNotice(kind: .info, text: L("The text on screen has already changed. Standard menu bar items (Edit, Window, and so on) change when you reopen Kikimimi.")))
-            case "modelID" where model.availability(of: model.currentModel) == .notInstalled,
-                 "llmModelID" where !model.isLLMInstalled:
+            case .modelID? where model.availability(of: model.currentModel) == .notInstalled,
+                 .llmModelID? where !model.isLLMInstalled:
                 extra.notices.append(ChatNotice(kind: .info, text: L("This model is not downloaded yet. Download it in Settings.")))
             default:
                 break

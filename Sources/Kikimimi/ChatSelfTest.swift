@@ -86,7 +86,7 @@ enum ChatCheck {
             let state = chat.extras[proposalID]?.cards.first?.state
             step("Change applies it", !model.useVAD && state == .applied)
         }
-        model.useVAD = original["useVAD"] == "on"
+        model.useVAD = original[SettingKey.useVAD.rawValue] == "on"
 
         // 4. リサーチの鍵と、一覧に無い鍵は断る
         let researchReply = chat.receive(reply: "Sure.\n[[set chatResearch=on]]", pagesRead: false)
@@ -94,12 +94,12 @@ enum ChatCheck {
         step("[[set chatResearch=on]] gives no card", researchCards.isEmpty && !chat.researchOn)
         step("applyChatSetting refuses chatResearch", !model.applyChatSetting(key: ChatSettingsCatalog.researchKey, value: "on"))
         step("applyChatSetting refuses unknown keys", !model.applyChatSetting(key: "noSuchSetting", value: "on")
-             && !model.applyChatSetting(key: "notesWidth", value: "400"))
+             && !model.applyChatSetting(key: SettingKey.notesWidth.rawValue, value: "400"))
 
         // 5. ページを読んだ回の案は、札にならない
         let pageReply = chat.receive(reply: "The page says so.\n[[set useVAD=off]]", pagesRead: true)
         let pageCards = pageReply.flatMap { chat.extras[$0]?.cards } ?? []
-        step("no card after reading pages", pageCards.isEmpty && model.useVAD == (original["useVAD"] == "on"))
+        step("no card after reading pages", pageCards.isEmpty && model.useVAD == (original[SettingKey.useVAD.rawValue] == "on"))
 
         // 6. 一覧の 20 項目の読み書き
         var missing: [String] = []
@@ -273,15 +273,8 @@ enum ChatCheck {
 /// 2. 測り: `ChatEvalCases.all` を 1 つずつ (履歴なし) 答えさせ、`ChatEval.score` で採点する (点は参考。落とさない)。
 /// 終了コード: 0 = 流れの確認が通った、1 = 通らない・読み込めない、2 = 使い方の間違い
 enum ChatSelfTest {
-    /// 決めた既定の値 (利用者の設定は読まない)
-    static let defaults: [String: String] = [
-        "uiLanguage": "ja", "languageCode": "ja", "modelID": ModelCatalog.defaultModelID,
-        "preferAccuracy": "on", "useVAD": "on", "autoVADOff": "on", "filterHallucinations": "on",
-        "autoMixedLanguage": "on", "livePreview": "on", "initialPrompt": "",
-        "llmModelID": LLMCatalog.defaultModelID, "autoAudit": "on", "translationLanguage": "ja",
-        "autoTranslate": "on", "useLedger": "on", "reuseTranslationMemory": "on", "useAdapter": "on",
-        "showBilingual": "on", "showNotes": "off", "practiceDictation": "off",
-    ]
+    /// 決めた既定の値 (利用者の設定は読まない)。設定の定義の、確認用の起動で決まった値か既定の値
+    static let defaults: [String: String] = ChatSettingsCatalog.selfTestValues()
 
     static func run(arguments: [String]) -> Int32 {
         let usage = "usage: Kikimimi --selftest-chat <model.gguf> [--report <file>]"

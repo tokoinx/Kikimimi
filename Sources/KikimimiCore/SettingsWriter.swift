@@ -10,6 +10,11 @@ public enum SettingsWriter {
         set(value, forKey: key, mode: .current, defaults: .standard)
     }
 
+    /// 設定 (SettingKey) の値を保存する。鍵の文字列は SettingKey から作る
+    public static func set(_ value: Any?, for key: SettingKey) {
+        set(value, forKey: key.rawValue)
+    }
+
     /// 値を消す
     public static func remove(forKey key: String) {
         remove(forKey: key, mode: .current, defaults: .standard)

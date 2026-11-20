@@ -52,7 +52,7 @@ final class PracticeController {
         var time: Date
     }
 
-    /// 練習の設定。UserDefaults の "practice" に JSON で保存する。隠し方は、起動のたびに「隠さない」から始める。
+    /// 練習の設定。UserDefaults の SettingKey.practice に JSON で保存する。隠し方は、起動のたびに「隠さない」から始める。
     /// 変えるとすぐ効く: 速さは再生の係へすぐ渡し、ほかは次に決めるときから
     var settings: PracticeSettings {
         didSet { settingsDidChange(from: oldValue) }
@@ -62,12 +62,12 @@ final class PracticeController {
     /// 一覧の結果の訳す先の言語 (この言語の行は隠さない)。一覧の見えない部品が、変わった時だけ入れる。
     /// めったに変わらない (結果を選んだ・訳す先を変えた) ので、行が見てもよい
     private(set) var target = TranslationTarget.fallback
-    /// 結果の下に書き取りの欄を出す (UserDefaults の "practiceDictation")
+    /// 結果の下に書き取りの欄を出す (UserDefaults の SettingKey.practiceDictation)
     var showsDictation: Bool {
         didSet {
             // 確認用の起動 (--selftest-…) では、SettingsWriter が利用者の本物の設定に書かない
             if showsDictation != oldValue {
-                SettingsWriter.set(showsDictation, forKey: Self.dictationKey)
+                SettingsWriter.set(showsDictation, for: .practiceDictation)
             }
         }
     }
@@ -104,16 +104,13 @@ final class PracticeController {
     @ObservationIgnored private var scrollSerial = 0
     @ObservationIgnored private(set) var events: [Event] = []
 
-    static let settingsKey = "practice"
-    static let dictationKey = "practiceDictation"
-
     init(player: PlayerController) {
         self.player = player
-        let d = UserDefaults.standard
-        var loaded = PracticeSettings.load(jsonString: d.string(forKey: Self.settingsKey))
+        let stored = SettingsReader()
+        var loaded = PracticeSettings.load(jsonString: stored.string(.practice))
         loaded.hide = .nothing
         settings = loaded
-        showsDictation = d.object(forKey: Self.dictationKey) as? Bool ?? false
+        showsDictation = stored.bool(.practiceDictation)
         sequencer = LineSequencer(settings: loaded)
         player.rate = loaded.rate
         player.onLineFinished = { [weak self] id in
@@ -413,7 +410,7 @@ final class PracticeController {
         guard settings != old else { return }
         // 隠し方は保存するが、起動のたびに「隠さない」から始める
         // 確認用の起動 (--selftest-…) では、SettingsWriter が利用者の本物の設定に書かない
-        SettingsWriter.set(settings.jsonString(), forKey: Self.settingsKey)
+        SettingsWriter.set(settings.jsonString(), for: .practice)
         if player.rate != settings.rate { player.rate = settings.rate }
         sequencer.update(settings: settings)
         if hideMode != settings.hide {
