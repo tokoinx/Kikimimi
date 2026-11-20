@@ -307,7 +307,7 @@ LLM とのチャット (2026-11-20、1ef6407):
 
 ## リファクタリングの案 (2026-11-20)
 
-**1 と 2 は行った (2026-11-20、利用者の OK「1 から始める」「案 2 へ進む」)。3〜8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
+**1・2・3 は行った (2026-11-20、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」)。4〜8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
 
 1. **確認用の起動の判定を 1 か所に**: 「`--selftest-…` か」を、`AppModel`・`PracticeController`・`UILanguageSetting` が別々に見ていて、本物の設定に書いていた不具合 (上の「確認用の起動と本物の設定」) の元になった。1 つの型 (例: `LaunchMode`) にまとめ、設定に書く所は全部そこを通す。小さい。先に行う値打ちが在る。
    - **行った (2026-11-20)**: 判定は `Sources/KikimimiCore/LaunchMode.swift` (`app`・`selfTest`・`tool`) だけ、設定 (UserDefaults) に書く所は `Sources/KikimimiCore/SettingsWriter.swift` だけにした (ふつうの起動の時だけ書く)。ばらばらだった判定 6 か所を消し、書き込み 7 か所を通した。
@@ -329,7 +329,15 @@ LLM とのチャット (2026-11-20、1ef6407):
      - 設定の画面だけに在る「使えない時は押せない」: 無音を飛ばすのが切の時の「自動でやり直す」(`autoVADOff`)、差分が入っていない時の「差分を使う」(`useAdapter`)。チャットからは、その時でも変えられる。
      - 対訳 (`showBilingual`): 結果の画面のスイッチは「設定 または その結果だけの印」を見せるので、チャットが見る値 (設定だけ) と食い違う事が在る。
      - `uiLanguage` の確認用の起動の値 "ja" が 2 か所に在る (定義と `UILanguageSetting.resolve`)。試験は両方を見ている。
+   - **CI (271f6de、run 44713727412)**: Xcode 16.2・26.3 の 2 列とも success。2 列とも「Executed 528 tests, with 0 failures」「CHAT CHECK OK」「LAUNCH SELFTEST OK」「UI LOAD OK」。
 3. **LLM の順番待ちに割り込み**: 監査・翻訳は 1 回の `LLMService.run` に全体が入るので、チャットは全部が終わるまで待つ。かたまり (監査の 1 回分・翻訳の 1 回分) ごとに列を空ければ、チャットが間に入れる。
+   - **行った (2026-11-20)**: 監査・翻訳の中身 (`Auditor`・`Translator` のループ) は変えず、LLM を 1 回呼ぶ (`generate`) たびに、その手前で、待っているチャットを先に通す継ぎ目を入れた。`LLMService.run` は body に包み (`YieldingGenerator`) を渡し、チャットは `LLMService.runInteractive` (`AppModel.runChatLLM`) から入る。依頼は「割り込みの待ち行列」(`LLMInterruptQueue`。`Sources/KikimimiCore/LLM/LLMInterrupts.swift`) と LLM の列の両方に入り、先に取った側が 1 度だけ走らせる。割り込みの body のエラー・中止は、チャットの側にだけ返る。
+   - **割り込める時・割り込めない時**: 監査・翻訳が、同じモデルを差分 (LoRA) なしで動かしている最中 → 次の `generate` の手前で通る。差分を重ねたエンジンで動かしている最中・別のモデルで動かしている最中 → 通らず、その仕事が終わった後に列の順番で走る (エンジンを 2 つ読み込む事・差分の付け外しはしない、と決めた)。`generate` 1 回の途中では割り込めないので、1 回の呼び出しに収まる短い結果では、終わるまで待つ。
+   - **結果が変わらない理由と確かめ**: `LlamaEngine.generate` は、呼び出しごとに KV キャッシュを消して始め、乱数を使わない (貪欲法)。持ち越しは Core の関数のローカル変数に在り、エンジンには無い。新しい確認 `--selftest-llm-queue <GGUF>` (`make check-llm-queue LLM=…`。本物の `LLMService` を通す初めての確認) が、割り込みあり (B)・なし (A) で訳と監査の結果・`generate` の回数を比べる。Qwen3.5 4B で走らせた結果 (私が 1 回、実装の役が 2 回): `same translation: true, same audit: true, same generate calls: true`、`interrupts: 5 queued, 4 passed during audit/translation, 3 answered during`、`LLM QUEUE OK`。A は 27.01 秒、B は 28.95 秒 (翻訳 3 かたまり・`generate` 3 回、監査 3 かたまり・`generate` 9 回)。差分つきの監査 (`ADAPTER=…`。実装の役が走らせた) では、最中のチャットは通らず、監査の後に答えた (10.89 秒待ち)。
+   - **確かめ (手元)**: `swift test` は「Executed 534 tests, with 0 failures」(528 → 534。`LLMInterruptTests` 6 件)。`make app` に `warning:` の行は 0。`make check-ui` は「LIBRARY CHECK OK」「PRACTICE CHECK OK」「CHAT CHECK OK」「ADAPTER MESSAGE CHECK OK」「UI LOAD OK」、終了コード 0。前後で `defaults read local.kikimimi.app` の違いは 0 行。`make check-chat` は `CHAT STREAM OK`・`CHAT EVAL: 14/16` (実装の役が走らせた。前と同じ)。
+   - **本物の窓で見た事 (試しの置き場のライブラリと、差分の無いモデルの置き場。Qwen3.5 4B、M1)**: (1) 8 行の結果を訳し直している最中にチャットを送る → チャットは「LLM を待っています…」のまま、翻訳が終わってから答えた (8 行が 1 回の `generate` に収まり、継ぎ目が無い)。(2) 40 行の結果を翻訳している最中 (始めて 8 秒後) にチャットを送る → 40 秒ほど待った後、翻訳が「16/40」の所で「答えています…」になり、答えが出終わった。その間、翻訳は 16/40 のまま。その後、翻訳は最後 (40 区間・対訳) まで進んだ。前後で本物の設定の違いは 0 行。
+   - **確かめていない事**: 監査の最中の割り込みを本物の窓で (見たのは翻訳だけ。監査は `--selftest-llm-queue` で見た)。メモリの少ない Mac (12 GB 未満)。チャットが答えている最中に監査・翻訳を中止した時の画面。割り込みを何度も続けた時。CI の新しい段 (`LLM queue self-test (CPU)`。重みが乱数の小さな GGUF) は、次の push で初めて走る。
+   - **気づいて、直していない事**: チャットが答えている間、監査・翻訳の進み具合の表示は止まったままで、「チャットに答えています」のような知らせは出ない (足すなら、画面の文が要る)。待っているチャットを「中止」しても、今のかたまりが終わるまでは「待っています」のまま (前からの動き。前は、仕事の全部が終わるまでだった)。割り込みを `generate` の途中まで細かくするには、チャット用にもう 1 つの文脈 (同じモデルの上の別の KV) を持つ形が考えられる (`LlamaEngine` の中を変える。行っていない)。
 4. **モデルの一覧をコードからデータへ**: `ModelCatalog`・`LLMCatalog` を JSON のリソースにすれば、リンクの検査の一覧 (`runtime-urls.txt`) を手で合わせる事が要らなくなる。将来、一覧を外から差し替える仕組みを作る時の土台にもなる (その時は checksum か署名が要る)。
 5. **`AppModel.swift` を分ける** (2400 行を超える): 仕事の順番待ち / LLM の後処理 (監査・翻訳) / モデルの取得 / 設定 / チャット。
 6. **`UILoadSelfTest.swift` を分ける** (2100 行を超える): 確認ごとのファイルにし、終了コードの決め方を 1 つの表にする。

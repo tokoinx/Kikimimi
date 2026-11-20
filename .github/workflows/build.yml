@@ -240,6 +240,11 @@ jobs:
       - name: LLM self-test (CPU)
         run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm build/tiny.gguf --cpu
 
+      # 本物の LLMService を通して、監査・翻訳の最中にチャットが割り込めるかを見る。重みが乱数なので、
+      # 答えの中身ではなく「割り込みあり・なしで結果が同じ」「最中に通った」だけを見る
+      - name: LLM queue self-test (CPU)
+        run: build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm-queue build/tiny.gguf --cpu
+
       - name: LLM self-test (Metal)
         # GitHub の Mac は仮想 GPU なので、Metal が使えないことがある (結果は参考)
         continue-on-error: true

@@ -102,6 +102,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - 起動の確認 (`--selftest-launch` の 7 通り: シェルから・open で・reopen で・メニューで・何度か強制終了した後・ウインドウの復元 (参考)・ウインドウの無い写しが動いている時の open。ほかに「確認用の実行中の起動」の段)。
 - `--selftest-llm`、`--selftest-whisper`。
 - `--selftest-chat` (本物の LLM でチャットの答えを測る。手元で走らせるなら `make check-chat LLM=<モデル.gguf>`。`CHAT STREAM OK` (出している途中の文が 2 回以上届き、最後の文が答えと同じ) で終了コード 0。`CHAT EVAL: <id> ok|NG | <期待> | <答えの始め>` の 16 行と `CHAT EVAL: N/16` は参考で、点では落とさない。`--report <ファイル>` で同じ行をファイルにも書く)。
+- `--selftest-llm-queue` (本物の `LLMService` を通して、監査・翻訳の最中にチャットが割り込めるかを見る。手元で走らせるなら `make check-llm-queue LLM=<モデル.gguf>`。割り込みあり・なしで訳と監査の結果が同じ、最中に通った割り込みが 1 つ以上、中止した割り込みが監査・翻訳を止めない、で `LLM QUEUE OK`・終了コード 0。通らない時は `LLM QUEUE FAILED: 理由`・終了コード 1)。LLM の順番待ち (`LLMService.swift`・`LLMInterrupts.swift`) を変えた時は、手元でも走らせる。
 - 8000 行のアプリの確認 (参考。失敗にしない)。
 - Xcode 16.2 と 26.3 の両方でのビルド (手元の Xcode は 1 つ)。
 - macOS 14 の実機での動作は、利用者の Mac でだけ見られる (CI にも無い)。

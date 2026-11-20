@@ -1228,10 +1228,11 @@ final class AppModel {
     // MARK: チャット (LLM)
 
     /// チャットの答えを、選んでいる LLM で出す。差分 (adapter) は渡さない (監査・翻訳を学んだ差分なので)。
-    /// 監査・翻訳と同じ列で順に回るので、それらが LLM を使っている間は、終わるまで待つ
+    /// 監査・翻訳が同じモデルを差分なしで使っている最中なら、その合間 (かたまりの `generate` の手前) に先に通る。
+    /// 監査・翻訳が差分を使っている時・別のモデルの時は、今までどおり、それらが終わるまで待つ
     func runChatLLM(shouldCancel: @escaping @Sendable () -> Bool,
                     _ body: @escaping (LlamaEngine) throws -> String) async throws -> String {
-        try await llm.run(modelPath: currentLLM.url.path, adapterPath: nil, shouldCancel: shouldCancel, body)
+        try await llm.runInteractive(modelPath: currentLLM.url.path, shouldCancel: shouldCancel, body)
     }
 
     /// チャットの窓を閉じた時: 監査・翻訳の仕事が無ければ、LLM を手放す (数 GB のメモリを空ける)

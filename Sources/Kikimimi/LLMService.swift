@@ -2,12 +2,21 @@ import Foundation
 import KikimimiCore
 import KikimimiLLM
 
-/// 監査・翻訳のローカル LLM (llama.cpp) を専用のスレッドで回す。読み込んだモデルは使い回す。
+/// 監査・翻訳・チャットのローカル LLM (llama.cpp) を専用のスレッドで回す。読み込んだモデルは使い回す。
+/// チャット (`runInteractive`) は、監査・翻訳の最中でも、その `generate` の合間に先に通る (条件は `run` の説明)。
 final class LLMService: @unchecked Sendable {
     private let queue = DispatchQueue(label: "local.kikimimi.llm", qos: .userInitiated)
     private let lock = NSLock()
     /// `queue` の上でだけ書き換える。`lock` で保護する
     private var engine: LlamaEngine?
+    /// 読み込みの設定 (差分のほか)。アプリはいつも既定の値。確認用の起動 (`--selftest-llm-queue --cpu`) だけが変える
+    private let baseOptions: LlamaOptions
+
+    init(baseOptions: LlamaOptions = LlamaOptions()) {
+        var options = baseOptions
+        options.adapterPath = nil
+        self.baseOptions = options
+    }
 
     /// 読み込み済みで、すぐに使えるか (状態表示用)
     func isLoaded(modelPath: String) -> Bool {
@@ -51,18 +60,55 @@ final class LLMService: @unchecked Sendable {
     /// いまのモデルに重ねてある差分。`lock` で保護する
     private var loadedAdapter: AdapterID?
 
+    /// 割り込み (チャット) の待ち行列。監査・翻訳の `generate` の手前で、合う物を先に通す
+    private let interrupts = LLMInterruptQueue<LlamaEngine>()
+
+    /// 待っている割り込みの数 (確認用の起動 `--selftest-llm-queue` が、積み終えたかを見るのに使う)
+    var waitingInterrupts: Int { interrupts.waitingCount }
+
+    /// 監査・翻訳の `generate` の手前で通した割り込みの数 (これまでの合計。確認用)
+    var yieldedInterrupts: Int { interrupts.yielded }
+
     /// モデルを (必要なら読み込んで) 使う。body は LLM のスレッドで動く。
-    /// adapterPath は追加学習の差分 (LoRA)。読み込めなければ、差分なしで動かす (`failedAdapter()` でわかる)
+    /// adapterPath は追加学習の差分 (LoRA)。読み込めなければ、差分なしで動かす (`failedAdapter()` でわかる)。
+    /// body に渡すエンジンは包み (`YieldingGenerator`) で、`generate` の手前で、待っている割り込み (チャット) のうち
+    /// 今のエンジンに合う物 (モデルが同じで、差分を重ねていない) を先に通す。割り込みの答えやエラーは、body には入らない
     func run<T>(modelPath: String, adapterPath: String? = nil,
                 shouldCancel: @escaping @Sendable () -> Bool,
-                _ body: @escaping (LlamaEngine) throws -> T) async throws -> T {
+                _ body: @escaping (YieldingGenerator) throws -> T) async throws -> T {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<T, Error>) in
             queue.async {
                 do {
                     let engine = try self.loadedEngine(modelPath, adapterPath: adapterPath, shouldCancel: shouldCancel)
-                    cont.resume(returning: try body(engine))
+                    let interrupts = self.interrupts
+                    let generator = YieldingGenerator(engine, adapterPath: engine.adapterPath) {
+                        interrupts.runWaiting(modelPath: engine.modelPath, adapterLoaded: engine.adapterPath != nil, engine: engine)
+                    }
+                    cont.resume(returning: try body(generator))
                 } catch {
                     cont.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// チャットのための口。差分はいつも「なし」。body は LLM のスレッドで動き、包んでいないエンジンを受け取る。
+    /// 依頼を割り込みの待ち行列に入れ、同時に LLM の列にも積む。先に取った側が 1 度だけ走らせる:
+    /// 監査・翻訳が同じモデルを差分なしで使っている最中なら、その `generate` の手前で通る。
+    /// そうでなければ (何も動いていない・差分やモデルが違う)、今までどおり列の順番で走る
+    func runInteractive<T>(modelPath: String,
+                           shouldCancel: @escaping @Sendable () -> Bool,
+                           _ body: @escaping (LlamaEngine) throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<T, Error>) in
+            let id = interrupts.add(modelPath: modelPath, body: body) { result in cont.resume(with: result) }
+            queue.async {
+                // 監査・翻訳の継ぎ目が先に取って走らせていれば、ここでは何もしない
+                guard let request = self.interrupts.take(id: id) else { return }
+                do {
+                    let engine = try self.loadedEngine(modelPath, adapterPath: nil, shouldCancel: shouldCancel)
+                    request.run(engine)
+                } catch {
+                    request.fail(error)
                 }
             }
         }
@@ -88,13 +134,15 @@ final class LLMService: @unchecked Sendable {
         let loaded: LlamaEngine
         var applied = adapter
         do {
-            loaded = try LlamaEngine(modelPath: path, options: LlamaOptions(adapterPath: adapter?.path), shouldCancel: shouldCancel)
+            var options = baseOptions
+            options.adapterPath = adapter?.path
+            loaded = try LlamaEngine(modelPath: path, options: options, shouldCancel: shouldCancel)
         } catch LLMError.adapterLoadFailed {
             lock.lock()
             rejectedAdapter = adapter
             lock.unlock()
             applied = nil
-            loaded = try LlamaEngine(modelPath: path, options: LlamaOptions(), shouldCancel: shouldCancel)
+            loaded = try LlamaEngine(modelPath: path, options: baseOptions, shouldCancel: shouldCancel)
         }
         lock.lock()
         engine = loaded

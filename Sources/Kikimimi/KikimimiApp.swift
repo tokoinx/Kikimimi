@@ -25,6 +25,10 @@ enum KikimimiMain {
         if args.contains("--selftest-chat") {
             exit(ChatSelfTest.run(arguments: args))
         }
+        // 監査・翻訳の最中にチャットが割り込めるかを、本物の LLM と本物の LLMService で確かめる (画面を出さない。設定は読まず・書かない)
+        if args.contains("--selftest-llm-queue") {
+            exit(LLMQueueSelfTest.run(arguments: args))
+        }
         if args.contains("--selftest-whisper") {
             exit(WhisperSelfTest.run(arguments: args))
         }
