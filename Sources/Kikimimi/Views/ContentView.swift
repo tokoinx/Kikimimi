@@ -101,6 +101,9 @@ struct ContentView: View {
             ModelBar()
         }
         ToolbarItem(placement: .primaryAction) {
+            ChatWindowButton(iconOnly: true)
+        }
+        ToolbarItem(placement: .primaryAction) {
             RecordButton()
         }
     }

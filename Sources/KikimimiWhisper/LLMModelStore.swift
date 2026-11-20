@@ -58,6 +58,8 @@ public struct LLMModelStore: Sendable {
 
     public enum ImportError: LocalizedError {
         case notGGUF
+        /// 差分の行で選んだファイルが、GGUF でない (壊れたファイルなど)
+        case adapterNotGGUF
         case multimodalProjector
         case notAdapter
         case adapterForAnotherModel(adapter: String, model: String)
@@ -67,6 +69,8 @@ public struct LLMModelStore: Sendable {
             switch self {
             case .notGGUF:
                 return L("This is not an LLM in GGUF format. Choose a .gguf file that runs on llama.cpp.")
+            case .adapterNotGGUF:
+                return L("This is not a fine-tuning adapter (LoRA) in GGUF format. Choose a .gguf file that runs on llama.cpp.")
             case .multimodalProjector:
                 return L("This is a helper file for reading images (mmproj). Choose the main .gguf file.")
             case .notAdapter:
@@ -104,7 +108,7 @@ public struct LLMModelStore: Sendable {
     /// 差分を、その種類の置き場に取り込む。差分の GGUF であること、モデルの種類 (architecture) が modelURL と同じことを確かめる
     /// (検査は、監査用・翻訳用で同じ)
     public func importAdapter(from source: URL, forModelKey key: String, kind: AdapterKind, modelURL: URL) throws {
-        guard GGUFFile.isGGUF(at: source, minimumBytes: 1_000) else { throw ImportError.notGGUF }
+        guard GGUFFile.isGGUF(at: source, minimumBytes: 1_000) else { throw ImportError.adapterNotGGUF }
         let adapter = GGUFFile.stringMetadata(at: source)
         guard adapter["general.type"] == "adapter" else { throw ImportError.notAdapter }
         let model = GGUFFile.stringMetadata(at: modelURL)

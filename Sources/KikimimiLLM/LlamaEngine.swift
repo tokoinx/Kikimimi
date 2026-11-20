@@ -212,6 +212,12 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     }
 
     public func generate(_ prompt: LLMPrompt, shouldCancel: () -> Bool) throws -> String {
+        try generate(prompt, shouldCancel: shouldCancel, onText: nil)
+    }
+
+    /// トークンを出すたびに、そこまでの全文 (文字として読み切れる所まで) を onText に渡す。
+    /// onText が nil なら、今までの generate と同じ動き (出す文は 1 字も変わらない)
+    public func generate(_ prompt: LLMPrompt, shouldCancel: () -> Bool, onText: ((String) -> Void)?) throws -> String {
         lock.lock()
         defer { lock.unlock() }
         if shouldCancel() { throw LLMError.cancelled }
@@ -247,12 +253,21 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         var output: [UInt8] = []
         var lineStart = 0
         var recent: [llama_token] = []
+        // onText に渡し終えたバイト数 (同じ文を二度渡さない)
+        var sent = 0
         for step in 0..<maxNew {
             if shouldCancel() { throw LLMError.cancelled }
             guard let token = pick(grammar: grammar, recent: recent, banned: banned) else { break }
             if llama_vocab_is_eog(vocab, token) { break }
             if let grammar { llama_sampler_accept(grammar, token) }
             output += piece(token)
+            if let onText {
+                let ready = UTF8Prefix.completeLength(output)
+                if ready > sent {
+                    sent = ready
+                    onText(String(decoding: output[..<ready], as: UTF8.self))
+                }
+            }
             if let newline = output.lastIndex(of: 0x0A), newline >= lineStart { lineStart = newline + 1 }
             // 1 行が長すぎる: 同じ語の繰り返しなどの暴走。ここで打ち切る
             if let limit = prompt.maxLineBytes, output.count - lineStart > limit { break }
@@ -264,7 +279,10 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             guard rc == 0 else { throw LLMError.decodeFailed(rc) }
             position += 1
         }
-        return String(decoding: output, as: UTF8.self)
+        let text = String(decoding: output, as: UTF8.self)
+        // 終わりに読み切れないかけらが残った時も、最後に渡す文を返す文と同じにする
+        if let onText, sent < output.count { onText(text) }
+        return text
     }
 
     // MARK: - 実装

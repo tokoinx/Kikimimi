@@ -3,7 +3,7 @@
 // 鍵の足し方と決まりは docs/L10N.md。鍵の集合と置き換えの印は、試験 L10nTests が日本語の表と比べる。
 extension L10nTables {
     /// フランス語
-    static let fr: [String: String] = merged([frPart1, frPart2, frPart3, frPart4, frPart5])
+    static let fr: [String: String] = merged([frPart1, frPart2, frPart3, frPart4, frPart5, frChat])
 
     private static let frPart1: [String: String] = [
         "Kikimimi": "Kikimimi",

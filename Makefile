@@ -1,4 +1,4 @@
-.PHONY: app run doctor install test check-ui clean reset
+.PHONY: app run doctor install test check-ui check-chat check-links clean reset
 
 app:            ## Kikimimi.app を build/ に作る
 	Scripts/build-app.sh
@@ -19,6 +19,13 @@ test:           ## コアのユニットテスト
 
 check-ui:       ## アプリの確認 (3000 行・1 行の再生・練習。ウインドウが開き、音が鳴る。先に make app で作っておく)
 	build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-ui-load 3000 --audio Tests/Fixtures/mixed-en-ja.wav --screenshots build/ui-shots
+
+check-chat:     ## チャットの答えを本物の LLM で測る (画面は出さない。make check-chat LLM=<モデル.gguf>。先に make app で作っておく)
+	@test -n "$(LLM)" || { echo "usage: make check-chat LLM=<model.gguf>"; exit 2; }
+	build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-chat "$(LLM)"
+
+check-links:    ## 文書とアプリが使うリンクが切れていないかを見る (ネットにつなぐ。一覧は tools/check-links/runtime-urls.txt)
+	python3 tools/check-links/check_links.py
 
 clean:          ## ビルド成果物を消す
 	rm -rf .build build

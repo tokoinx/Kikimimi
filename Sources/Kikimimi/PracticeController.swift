@@ -65,7 +65,9 @@ final class PracticeController {
     /// 結果の下に書き取りの欄を出す (UserDefaults の "practiceDictation")
     var showsDictation: Bool {
         didSet {
-            if showsDictation != oldValue { UserDefaults.standard.set(showsDictation, forKey: Self.dictationKey) }
+            if showsDictation != oldValue, !Self.isSelfTestLaunch {
+                UserDefaults.standard.set(showsDictation, forKey: Self.dictationKey)
+            }
         }
     }
     /// 続けて流している行 (流している・間を待っている)。何もしていなければ nil。行の「再生中」の見た目はこれに従う
@@ -103,6 +105,8 @@ final class PracticeController {
 
     static let settingsKey = "practice"
     static let dictationKey = "practiceDictation"
+    /// 確認用の起動 (--selftest-…)。利用者の本物の設定に書かない
+    private static let isSelfTestLaunch = CommandLine.arguments.contains { $0.hasPrefix("--selftest-") }
 
     init(player: PlayerController) {
         self.player = player
@@ -409,7 +413,7 @@ final class PracticeController {
         if normalized != settings { settings = normalized }
         guard settings != old else { return }
         // 隠し方は保存するが、起動のたびに「隠さない」から始める
-        UserDefaults.standard.set(settings.jsonString(), forKey: Self.settingsKey)
+        if !Self.isSelfTestLaunch { UserDefaults.standard.set(settings.jsonString(), forKey: Self.settingsKey) }
         if player.rate != settings.rate { player.rate = settings.rate }
         sequencer.update(settings: settings)
         if hideMode != settings.hide {
