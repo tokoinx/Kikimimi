@@ -266,7 +266,7 @@ LLM とのチャット (2026-11-20、1ef6407):
 - 残っている事 (依存): (finetune (run 44663879033) の結果は success だった。済み)`LlamaEngine.swift` の非推奨の警告 4 つ (下の「リファクタリングの案」の 8)。翻訳の測りをしていないほかの 8 言語 (測ったのは de・ja・ko・th・zh の 5 言語だけ)。長い録音・ほかのモデル・ほかの言語での文字起こしの確かめ、Intel Mac。
 - 週 1 回の `links.yml` は、main に入ってから動く (まだ動いていない)。
 - README の clone の行の `https://github.com/tokoinx/Kikimimi.git` は `MOVED` (`.git` なしへ転送)。失敗にはしていない。直すかは決めていない。
-- アプリを作り直さずにモデルの一覧を差し替える仕組みは無い (一覧はコードに直書き)。切れた時は、`ModelCatalog`・`LLMCatalog` と `tools/check-links/runtime-urls.txt` を直して作り直す。
+- アプリを作り直さずにモデルの一覧を差し替える仕組みは無い (一覧は、アプリに埋め込んだデータ)。切れた時は、`Sources/KikimimiCore/Catalog/models.json` を直し、`/usr/bin/python3 Scripts/generate-model-catalog.py` を走らせて、作り直す (2026-11-20 のリファクタリングの案 4 から。手書きの `runtime-urls.txt` は無くなった)。
 - 1ef6407・9a98c83 の CI: build・links・finetune とも success (上の「いちばん新しい確かめ」)。Xcode 26.3 の列で、8000 行 (参考) の「300 の区間をいっぺんに届ける」が、3 回のうち 1 回だけ 1.6〜1.8 秒かかる事が 2 回続いた (2e409da・54ee466)。3000 行では起きていない。理由は調べていない。
 
 アプリ:
@@ -308,7 +308,7 @@ LLM とのチャット (2026-11-20、1ef6407):
 
 ## リファクタリングの案 (2026-11-20)
 
-**1・2・3 は行った (2026-11-20、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」)。4〜8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
+**1・2・3・4 は行った (2026-11-20、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」)。5〜8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
 
 1. **確認用の起動の判定を 1 か所に**: 「`--selftest-…` か」を、`AppModel`・`PracticeController`・`UILanguageSetting` が別々に見ていて、本物の設定に書いていた不具合 (上の「確認用の起動と本物の設定」) の元になった。1 つの型 (例: `LaunchMode`) にまとめ、設定に書く所は全部そこを通す。小さい。先に行う値打ちが在る。
    - **行った (2026-11-20)**: 判定は `Sources/KikimimiCore/LaunchMode.swift` (`app`・`selfTest`・`tool`) だけ、設定 (UserDefaults) に書く所は `Sources/KikimimiCore/SettingsWriter.swift` だけにした (ふつうの起動の時だけ書く)。ばらばらだった判定 6 か所を消し、書き込み 7 か所を通した。
@@ -340,6 +340,17 @@ LLM とのチャット (2026-11-20、1ef6407):
    - **確かめていない事**: 監査の最中の割り込みを本物の窓で (見たのは翻訳だけ。監査は `--selftest-llm-queue` で見た)。メモリの少ない Mac (12 GB 未満)。チャットが答えている最中に監査・翻訳を中止した時の画面。割り込みを何度も続けた時。CI の新しい段 (`LLM queue self-test (CPU)`。重みが乱数の小さな GGUF) は、次の push で初めて走る。
    - **気づいて、直していない事**: チャットが答えている間、監査・翻訳の進み具合の表示は止まったままで、「チャットに答えています」のような知らせは出ない (足すなら、画面の文が要る)。待っているチャットを「中止」しても、今のかたまりが終わるまでは「待っています」のまま (前からの動き。前は、仕事の全部が終わるまでだった)。割り込みを `generate` の途中まで細かくするには、チャット用にもう 1 つの文脈 (同じモデルの上の別の KV) を持つ形が考えられる (`LlamaEngine` の中を変える。行っていない)。
 4. **モデルの一覧をコードからデータへ**: `ModelCatalog`・`LLMCatalog` を JSON のリソースにすれば、リンクの検査の一覧 (`runtime-urls.txt`) を手で合わせる事が要らなくなる。将来、一覧を外から差し替える仕組みを作る時の土台にもなる (その時は checksum か署名が要る)。
+   - **行った (2026-11-20)**: 一覧の元は `Sources/KikimimiCore/Catalog/models.json` の 1 つ (Whisper 7・VAD・LLM 3 と、URL・ファイルの名前の作り方のテンプレート)。`ModelCatalog`・`LLMCatalog`・2 つの spec の公開の形は前と同じで、中身だけが JSON から来る (`LLMCatalog.defaultQuantizations` を 1 つ足した)。「おすすめ」は JSON に書かず、「id が既定と同じ」で決める。表示名は、訳す鍵なら `displayNameKey`、訳さない名前なら `displayName` のどちらか一方を書く。
+   - **アプリへの入れ方**: 実行時にファイルを探さず、ビルドの時に埋め込む。台本 `Scripts/generate-model-catalog.py` が、JSON の文を持つだけの `Catalog/ModelCatalogGenerated.swift` を作り、リポジトリに入れる (`Package.swift` は JSON を `exclude`)。ずれは `ModelCatalogDataTests.testGeneratedSwiftMatchesTheJSON` が止め、直し方の命令を出す。SwiftPM の `.embedInCode` も手元の Xcode 16.2 (Swift 6.0.3) で試して通ったが (実装の役の報告)、Xcode 26.3 で確かめられない事と、作られる名前が約束された形でない事から、採らなかった。
+   - **読む入口**: `ModelCatalogData.decode(_:)` が JSON を読み、中身を確かめる (id の重なり・既定が一覧に在る・テンプレートの印・`https`・表示名がどちらか一方、など)。埋め込んだ物も同じ入口を通り、読めない時は理由を出して止まる。外から一覧を差し替える仕組みは作っていない (その時は、spec の URL が埋め込みのテンプレートではなく、差し替えた物のテンプレートから作られるように直す事と、checksum か署名が要る)。
+   - **リンクの検査**: `check_links.py` が JSON から 14 本を作る (`--list-runtime` で一覧だけ出せる)。手書きの `tools/check-links/runtime-urls.txt` は消した。`LinkListTests.testLinkCheckerBuildsTheSameURLsAsTheApp` が、JSON のテンプレートを素直に置き換えた URL (Python と同じやり方) と、アプリの関数が作る URL を、並びまで比べる。`links.yml` の `push.paths` は JSON を指す。
+   - **画面の文の検査**: `L10nTests` の `SourceScan` が、JSON の訳す鍵も集める (鍵が表に無い・表に使っていない鍵が在る、で落ちる)。訳さない名前に日本語が入っていても落ちる。12 の表の文は変えていない。
+   - **モデルを 1 つ足す時**: `models.json` に足す → `/usr/bin/python3 Scripts/generate-model-catalog.py` → 訳す鍵を使う時は 12 の表に訳を足す → `ModelCatalogDataTests.testCatalogShape` の数 (7 と 3) を直す。リンクの検査の一覧と `links.yml` は、触らなくてよい。
+   - **動きを変えていない事の確かめ**: 直す前と後で、全部のモデルの全部の値 (名前と説明は 13 言語)・`ChatSettingsCatalog.items()`・14 本の URL を書き出して比べ、違いは 0 行 (229 行)。JSON から作った 14 本は、前の手書きの一覧と並びまで同じ (私が `--list-runtime` で比べた)。
+   - **確かめ (手元)**: `swift test` は「Executed 540 tests, with 0 failures」(534 → 540)。`make app` に `warning:` の行は 0、`--version` は終了コード 0。`make check-ui` は「LIBRARY CHECK OK」「PRACTICE CHECK OK」「CHAT CHECK OK」「ADAPTER MESSAGE CHECK OK」「UI LOAD OK」、終了コード 0。前後で `defaults read local.kikimimi.app` の違いは 0 行。`check_links.py --runtime-only` は「OK 14 … BROKEN 0」「LINK CHECK OK (14 urls)」(実装の役が走らせた)。
+   - **壊して見た事 (実装の役)**: id を変えて作り直さない → 3 件が落ちる。訳す鍵を 1 字変える → `L10nTests.testJapaneseTableMatchesTheSource` が落ちる。既定の id を消す → 読む所で理由を出して止まる。**id を変えて作り直した時は、どの試験も落ちない** (id の値を試験に写していないため。意図して変える時も同じ道なので、止めていない)。
+   - **確かめていない事**: Xcode 26.3 の列 (CI で見る)。macOS 14 の実機。
+   - **気づいて、直していない事** (一覧と手で合わせている残りの所): `README.md`・`README.en.md` のモデルの表 (名前・大きさ)。`.github/workflows/build.yml` の `ggml-tiny.bin`・silero の URL と sha256、`finetune.yml` の 0.8B の URL と sha256。`tools/finetune/finetune.py` の LLM の id の一覧。`Makefile` の `check-links` は `python3` で走る (この Mac の python.org の 3.14 は証明書が無く、全部が切れて見える。`/usr/bin/python3` なら通る)。
 5. **`AppModel.swift` を分ける** (2400 行を超える): 仕事の順番待ち / LLM の後処理 (監査・翻訳) / モデルの取得 / 設定 / チャット。
 6. **`UILoadSelfTest.swift` を分ける** (2100 行を超える): 確認ごとのファイルにし、終了コードの決め方を 1 つの表にする。
 7. **`TranscriptDetailView.swift` の一覧を別のファイルに切り出す**: 一覧の 4 つの決まりを、書き方で見る検査 (ソースの走査) を足せる形にする (今は検査が無い。上の「残っている事」の「エージェントの仕事の仕組み」に前から在る残りの事)。

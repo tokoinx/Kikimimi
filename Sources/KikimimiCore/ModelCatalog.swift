@@ -10,7 +10,7 @@ public struct WhisperModelSpec: Hashable, Identifiable, Sendable {
     public let approxMB: Int
     public let recommended: Bool
 
-    /// displayName と summary は鍵 (英語)。`LKey` で印を付けて渡す (訳の無い名前は、そのまま出る)
+    /// displayName と summary は鍵 (英語。表に無い名前は、そのまま出る)。アプリの一覧は models.json から作る
     public init(id: String, displayName: String, summary: String, approxMB: Int, recommended: Bool = false) {
         self.id = id
         self.displayNameKey = displayName
@@ -24,41 +24,31 @@ public struct WhisperModelSpec: Hashable, Identifiable, Sendable {
     /// 画面に出す説明 (今の画面の言語)
     public var summary: String { L10n.lookup(summaryKey) }
 
-    public var fileName: String { "ggml-\(id).bin" }
+    /// 保存するファイルの名前 (作り方は models.json の whisper.fileNameTemplate)
+    /// (埋め込んだ一覧のテンプレートは、読む時に、印が合っている事を確かめてあるので、置き換えは必ずできる)
+    public var fileName: String {
+        ModelCatalogData.fill(ModelCatalogData.embedded.whisper.fileNameTemplate, [("id", id)])!
+    }
 
-    /// whisper.cpp 公式の配布元 (Hugging Face)
+    /// whisper.cpp 公式の配布元 (Hugging Face。作り方は models.json の whisper.downloadURLTemplate)
     public var downloadURL: URL {
-        URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)")!
+        URL(string: ModelCatalogData.fill(ModelCatalogData.embedded.whisper.downloadURLTemplate, [("fileName", fileName)])!)!
     }
 }
 
+/// Whisper のモデルの一覧。中身は models.json (`ModelCatalogData.embedded`) から来る
 public enum ModelCatalog {
-    public static let defaultModelID = "large-v3-turbo-q5_0"
+    public static let defaultModelID = ModelCatalogData.embedded.whisper.defaultModelID
 
-    public static let all: [WhisperModelSpec] = [
-        WhisperModelSpec(id: "large-v3-turbo-q5_0", displayName: LKey("Large v3 Turbo (light)"),
-                         summary: LKey("Best balance of Japanese accuracy and speed. Pick this if unsure."), approxMB: 574, recommended: true),
-        WhisperModelSpec(id: "large-v3-turbo", displayName: "Large v3 Turbo",
-                         summary: LKey("Slightly more accurate than the light version. For Macs with plenty of memory."), approxMB: 1620),
-        WhisperModelSpec(id: "large-v3-q5_0", displayName: LKey("Large v3 (light)"),
-                         summary: LKey("Top accuracy. Several times slower than Turbo."), approxMB: 1080),
-        WhisperModelSpec(id: "medium-q5_0", displayName: LKey("Medium (light)"),
-                         summary: LKey("Medium accuracy and speed."), approxMB: 539),
-        WhisperModelSpec(id: "small-q5_1", displayName: LKey("Small (light)"),
-                         summary: LKey("Fast, but less accurate for Japanese."), approxMB: 190),
-        WhisperModelSpec(id: "base-q5_1", displayName: LKey("Base (light)"),
-                         summary: LKey("Very fast. For testing."), approxMB: 60),
-        WhisperModelSpec(id: "tiny", displayName: "Tiny",
-                         summary: LKey("Smallest. Low accuracy."), approxMB: 78),
-    ]
+    public static let all: [WhisperModelSpec] = ModelCatalogData.embedded.whisper.models
 
     public static func spec(id: String) -> WhisperModelSpec? {
         all.first { $0.id == id }
     }
 
     /// 無音を飛ばすための VAD (Silero) モデル。約 0.9 MB。
-    public static let vadFileName = "ggml-silero-v6.2.0.bin"
-    public static let vadURL = URL(string: "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin")!
+    public static let vadFileName = ModelCatalogData.embedded.vad.fileName
+    public static let vadURL = ModelCatalogData.embedded.vad.url
 }
 
 /// ダウンロードしたファイルが ggml 形式のモデルかを先頭バイトで確かめる。

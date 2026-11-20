@@ -19,6 +19,9 @@ let package = Package(
         // プラットフォーム非依存のコア (書き出し・モデル一覧・WAV・誤認識フィルタ)
         .target(
             name: "KikimimiCore",
+            // モデルの一覧のデータ (Whisper・VAD・LLM)。アプリには、台本が作った ModelCatalogGenerated.swift
+            // (中身は同じ JSON の文) として入るので、JSON のファイルそのものはビルドに使わない
+            exclude: ["Catalog/models.json"],
             swiftSettings: [.swiftLanguageMode(.v6), libraryEvolution]
         ),
         // whisper.cpp の C API を Swift から使うための薄いラッパーと、モデルの取得・保存

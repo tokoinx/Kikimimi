@@ -5,7 +5,10 @@ CI では `.github/workflows/links.yml` が、週 1 回 (月曜 03:17 UTC) と�
 
 ## 何を見るか
 
-- **実行時の URL**: アプリがモデルを取りに行く URL。`runtime-urls.txt` に手で書いてある (Whisper 7 本・VAD・LLM の tree API 6 つ)。
+- **実行時の URL**: アプリがモデルを取りに行く URL。モデルの一覧 `Sources/KikimimiCore/Catalog/models.json` (アプリが埋め込むのと同じ JSON) から作る。
+  Whisper の各モデル (`whisper.fileNameTemplate` と `whisper.downloadURLTemplate` の `{id}`・`{fileName}` を置き換える) → VAD (`vad.url`) → LLM の tree API (`llm.treeURLTemplate` の `{repository}` を、モデルの順 × リポジトリの順に置き換える) の順。
+  LLM は、アプリがファイルの一覧を読む tree API の URL を見る (取るファイルは、その一覧から選ぶため)。
+  置き換えはアプリと同じやり方で、両方が同じ URL になる事は Swift の試験 (`LinkListTests`) が見る。
 - **文書・CI の URL**: `README.md`・`README.en.md`・`docs/**/*.md`・`Package.swift`・`.github/workflows/*.yml`・`tools/**/*.py`・`tools/**/*.md`・`.claude/skills/**/*.md` に書いてある `https://…`。
   組み立て途中の URL (`${…}`・`{…}`・`<…>`・`$(`・`\(`・`…` が続く物、`"…/" + 名前` の形) は飛ばす。
 - **依存の新しさ (参考)**: `Package.swift` の binaryTarget (llama.cpp・whisper.cpp) の版と、最新の版。失敗にはしない。
@@ -23,7 +26,10 @@ python3 tools/check-links/check_links.py --runtime-only        # 実行時の UR
 python3 tools/check-links/check_links.py --docs-only           # 文書・CI の URL だけ
 python3 tools/check-links/check_links.py --urls-file 一覧.txt  # 1 行に 1 つの一覧の URL だけ (依存は見ない)
 python3 tools/check-links/check_links.py --report out.json     # 結果を JSON にも書く
+python3 tools/check-links/check_links.py --list-runtime        # 実行時の URL を、調べずに 1 行に 1 つ出すだけ (ネットにつながない)
 ```
+
+macOS では `/usr/bin/python3` で走らせる (python.org の版は、証明書を入れていないと、全部の URL が切れて見える)。
 
 `--no-deps` を付けると、依存の新しさを見ない。`GITHUB_TOKEN` が在れば、`api.github.com` への問い合わせにだけ付ける。
 
@@ -48,7 +54,8 @@ GitHub Actions の上では、`BROKEN` は error、`MOVED`・`UNSURE`・古い�
 
 ## 切れていた時にやる事
 
-- **モデルの URL (実行時の URL)**: 取り先が動いた。新しい URL を確かめ、`Sources/KikimimiCore/ModelCatalog.swift` (Whisper・VAD) か `Sources/KikimimiCore/LLM/LLMCatalog.swift` (LLM) と、`runtime-urls.txt` の両方を直す。両方が合っている事は Swift の試験 (LinkListTests) が見る。
+- **モデルの URL (実行時の URL)**: 取り先が動いた。新しい URL を確かめ、`Sources/KikimimiCore/Catalog/models.json` だけを直す (Whisper・VAD・LLM の全部がここに在る。この検査も同じファイルを読む)。
+  直した後、`/usr/bin/python3 Scripts/generate-model-catalog.py` でアプリに埋め込む Swift のファイルを作り直し、`swift test` を通す (作り直し忘れは `ModelCatalogDataTests` が止める)。
 - **依存の zip (`Package.swift`)**: 新しい版の zip を落とし、`swift package compute-checksum <zip>` で checksum を出し、`Package.swift` の `url:` と `checksum:` を直す。その後、`swift test` とアプリの確認を通す。名前の形が変わっていた時 (例: whisper.cpp は bNNNN の release に付く形になった) は、新しい release の zip の名前を見て、URL を書き直す。
 - **文書の URL**: 新しい URL に書き換えるか、要らなければ消す。
 - `MOVED` は、行き先に書き換えておくと、後で切れにくい。

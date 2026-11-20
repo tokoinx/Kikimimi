@@ -28,7 +28,7 @@ check-llm-queue: ## 監査・翻訳の最中にチャットが割り込めるか
 	@test -n "$(LLM)" || { echo "usage: make check-llm-queue LLM=<model.gguf> [ADAPTER=<lora.gguf>]"; exit 2; }
 	build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-llm-queue "$(LLM)" $(if $(ADAPTER),--adapter "$(ADAPTER)")
 
-check-links:    ## 文書とアプリが使うリンクが切れていないかを見る (ネットにつなぐ。一覧は tools/check-links/runtime-urls.txt)
+check-links:    ## 文書とアプリが使うリンクが切れていないかを見る (ネットにつなぐ。アプリが使う URL は Sources/KikimimiCore/Catalog/models.json から作る)
 	python3 tools/check-links/check_links.py
 
 clean:          ## ビルド成果物を消す

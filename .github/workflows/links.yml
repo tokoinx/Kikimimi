@@ -15,8 +15,8 @@ on:
     paths:
       - "tools/check-links/**"
       - "Package.swift"
-      - "Sources/KikimimiCore/ModelCatalog.swift"
-      - "Sources/KikimimiCore/LLM/LLMCatalog.swift"
+      # モデルの一覧 (実行時の URL は、この JSON から作る)
+      - "Sources/KikimimiCore/Catalog/models.json"
       - "README*.md"
       - ".github/workflows/**"
 

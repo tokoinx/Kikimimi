@@ -268,7 +268,23 @@ struct SourceScan {
         for file in files where !keepFiles.contains(where: { file.path.hasPrefix($0.path) }) {
             scan.collectJapanese(file.path, file.text)
         }
+        // モデルの一覧のデータ (Swift のファイルでなく JSON に在る、名前と説明)
+        let catalog = sources.appendingPathComponent(catalogPath)
+        try scan.collectCatalog(catalogPath, Data(contentsOf: catalog))
         return scan
+    }
+
+    /// モデルの一覧の JSON (Sources からの相対)
+    static let catalogPath = "KikimimiCore/Catalog/models.json"
+
+    /// 一覧の JSON の「訳す鍵」(displayNameKey・summaryKey) を鍵として集め、
+    /// 「訳さない名前」(displayName) に日本語が入っていれば、日本語のリテラルとして数える
+    mutating func collectCatalog(_ path: String, _ data: Data) throws {
+        let catalog = try ModelCatalogData.decode(data)
+        keys.formUnion(catalog.translationKeys)
+        for name in catalog.untranslatedNames where Self.hasJapanese(name) {
+            japaneseLiterals.append("\(path) displayName \"\(name)\" (use displayNameKey for a name to translate)")
+        }
     }
 
     // MARK: 鍵
