@@ -12,6 +12,7 @@ enum L10nTables {
         ("JA+Detail", JA.detail),
         ("JA+Settings", JA.settings),
         ("JA+Views", JA.views),
+        ("JA+Chat", JA.chat),
     ]
 
     /// 言語ごとの表 (鍵 = 英語、値 = その言語の訳)。英語の表は無い (鍵をそのまま出す)

@@ -238,6 +238,8 @@ struct SourceScan {
         ("KikimimiCore/LLM/Translator.swift", "LLM prompt"),
         // 翻訳の手本 (LLM に見せる、訳す先の言語ごとの依頼と答えの例。画面には出ない)
         ("KikimimiCore/LLM/TranslationExamples.swift", "LLM translation examples"),
+        // チャットの測りの問題 (LLM に渡す利用者の発言の例。画面には出ない)
+        ("KikimimiCore/Chat/ChatEvalCases.swift", "chat eval utterances"),
     ]
 
     /// 鍵も日本語も見ないファイル: 訳の表そのものと、確認用の実行・診断の出力

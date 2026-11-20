@@ -356,6 +356,8 @@ final class AppModel {
     var llmSetupCardDismissed = false
     /// 手元の GGUF を取り込んでいる
     var importingLLM = false
+    /// LLM とのチャット (会話は保存しない。アプリを閉じると消える)
+    let chat = ChatController()
 
     let store = ModelStore()
     let llmStore: LLMModelStore
@@ -429,9 +431,13 @@ final class AppModel {
             library = LibraryWriter(store: LibraryStore(root: LibraryStore.defaultRoot()))
             loadLibrary()
         }
+        chat.model = self
     }
 
     private func save(_ value: Any, _ key: String) {
+        // 確認用の起動 (--selftest-…) では、利用者の本物の設定に書かない
+        // (確認が設定を変えて戻しても、決めていなかった項目に値が書かれてしまうため)
+        guard !Self.isSelfTestLaunch else { return }
         UserDefaults.standard.set(value, forKey: key)
     }
 
@@ -616,9 +622,10 @@ final class AppModel {
         useLedger ? (ledger.glossary(adding: initialPrompt) ?? "") : initialPrompt
     }
 
-    /// 作業中か (文字起こし・録音・監査・翻訳・モデルの取得や取り込み)。作業中は、ウインドウを閉じてもアプリを終了しない
+    /// 作業中か (文字起こし・録音・監査・翻訳・モデルの取得や取り込み・チャットの答え)。作業中は、ウインドウを閉じてもアプリを終了しない
     var isBusy: Bool {
         isRecording || importingLLM || importingAdapter || !downloads.isEmpty || !llmDownloads.isEmpty
+            || chat.isAnswering
             || jobs.contains { $0.isActive || $0.isPostActive }
     }
 
@@ -1209,9 +1216,113 @@ final class AppModel {
                     await self.runPost(task, for: job)
                 }
             }
-            // 手が空いたら LLM を手放す (数 GB のメモリを空ける。次に使うときは数秒で読み直せる)
+            // 手が空いたら LLM を手放す (数 GB のメモリを空ける。次に使うときは数秒で読み直せる)。
+            // チャットが答えを出している最中でも壊れない: unload は LLM の列の後ろに並ぶので、
+            // 答えを出し終えてから手放す (答えの途中の engine は、その body が持っている)
             self?.llm.unload()
         }
+    }
+
+    // MARK: チャット (LLM)
+
+    /// チャットの答えを、選んでいる LLM で出す。差分 (adapter) は渡さない (監査・翻訳を学んだ差分なので)。
+    /// 監査・翻訳と同じ列で順に回るので、それらが LLM を使っている間は、終わるまで待つ
+    func runChatLLM(shouldCancel: @escaping @Sendable () -> Bool,
+                    _ body: @escaping (LlamaEngine) throws -> String) async throws -> String {
+        try await llm.run(modelPath: currentLLM.url.path, adapterPath: nil, shouldCancel: shouldCancel, body)
+    }
+
+    /// チャットの窓を閉じた時: 監査・翻訳の仕事が無ければ、LLM を手放す (数 GB のメモリを空ける)
+    func releaseLLMAfterChat() {
+        guard worker == nil, !chat.isAnswering else { return }
+        llm.unload()
+    }
+
+    /// チャットから変える案を出せる設定の一覧
+    var chatCatalog: [ChatSettingItem] { ChatSettingsCatalog.items() }
+
+    /// チャットに見せる、今の設定の値 (`ChatSettingsAccess` の形。toggle は "on" / "off")。一覧に無い鍵は nil
+    func currentValue(for key: String) -> String? {
+        func onOff(_ value: Bool) -> String { value ? "on" : "off" }
+        switch key {
+        case "uiLanguage": return uiLanguage.rawValue
+        case "languageCode": return languageCode
+        case "modelID": return modelID
+        case "preferAccuracy": return onOff(preferAccuracy)
+        case "useVAD": return onOff(useVAD)
+        case "autoVADOff": return onOff(autoVADOff)
+        case "filterHallucinations": return onOff(filterHallucinations)
+        case "autoMixedLanguage": return onOff(autoMixedLanguage)
+        case "livePreview": return onOff(livePreview)
+        case "initialPrompt": return initialPrompt
+        case "llmModelID": return llmModelID
+        case "autoAudit": return onOff(autoAudit)
+        case "translationLanguage": return translationLanguage
+        case "autoTranslate": return onOff(autoTranslate)
+        case "useLedger": return onOff(useLedger)
+        case "reuseTranslationMemory": return onOff(reuseTranslationMemory)
+        case "useAdapter": return onOff(useAdapter)
+        case "showBilingual": return onOff(showBilingual)
+        case "showNotes": return onOff(showNotes)
+        case "practiceDictation": return onOff(practice.showsDictation)
+        default: return nil
+        }
+    }
+
+    /// 今の設定の値の写し (LLM のスレッドで読むので、メインで写しておく)
+    func chatSettingsSnapshot() -> ChatSettingsSnapshot {
+        var values: [String: String] = [:]
+        for item in chatCatalog {
+            if let value = currentValue(for: item.key) { values[item.key] = value }
+        }
+        return ChatSettingsSnapshot(values: values)
+    }
+
+    /// チャットの案を当てる (利用者が札の「変える」を押した時だけ呼ぶ)。当てたら true。
+    /// 一覧に在る鍵だけを、値をもう 1 回確かめてから、設定の画面と同じ道 (このモデルの値を変える。didSet が保存する) で当てる。
+    /// リサーチの鍵と、一覧に無い鍵は、必ず断る
+    func applyChatSetting(key: String, value raw: String) -> Bool {
+        guard key != ChatSettingsCatalog.researchKey, !ChatSettingsCatalog.excludedKeys.contains(key),
+              let item = chatCatalog.first(where: { $0.key == key }),
+              let value = item.normalizedValue(raw) else { return false }
+        let on = value == "on"
+        switch key {
+        case "uiLanguage":
+            // 設定の画面と同じ: didSet が文を引き直し、保存し、開き直しの案内の印を立てる
+            guard let language = UILanguage(rawValue: value) else { return false }
+            uiLanguage = language
+        case "languageCode":
+            guard Languages.isKnown(value) else { return false }
+            languageCode = value
+        case "modelID":
+            // 設定の画面と同じ: 入っていないモデルも選べる (使う時に取得する)
+            guard ModelCatalog.spec(id: value) != nil else { return false }
+            modelID = value
+        case "preferAccuracy": preferAccuracy = on
+        case "useVAD": useVAD = on
+        case "autoVADOff": autoVADOff = on
+        case "filterHallucinations": filterHallucinations = on
+        case "autoMixedLanguage": autoMixedLanguage = on
+        case "livePreview": livePreview = on
+        case "initialPrompt": initialPrompt = value
+        case "llmModelID":
+            // 設定の画面と同じ: didSet が差分の有無を読み直す。入っていないモデルも選べる
+            guard LLMCatalog.spec(id: value) != nil else { return false }
+            llmModelID = value
+        case "autoAudit": autoAudit = on
+        case "translationLanguage":
+            guard TranslationTarget.all.contains(value) else { return false }
+            translationLanguage = value
+        case "autoTranslate": autoTranslate = on
+        case "useLedger": useLedger = on
+        case "reuseTranslationMemory": reuseTranslationMemory = on
+        case "useAdapter": useAdapter = on
+        case "showBilingual": showBilingual = on
+        case "showNotes": showNotes = on
+        case "practiceDictation": practice.showsDictation = on
+        default: return false
+        }
+        return true
     }
 
     private func run(_ job: Job) async {

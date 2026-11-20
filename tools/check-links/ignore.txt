@@ -1,0 +1,11 @@
+# 調べない URL (1 行に 1 つ。前方一致。# で始まる行は注釈)。
+# 足す時は、なぜ調べないかを上の行に注釈で書く。
+
+# 例として書いた URL と、手元の URL
+https://example.com
+https://example.org
+https://localhost
+https://127.0.0.1
+
+# 後ろにファイル名を足して使う元の URL (tools/translation-eval/fetch_wmt24pp.py の BASE_URL)。そのままでは 404 になる
+https://huggingface.co/datasets/google/wmt24pp/resolve/main/

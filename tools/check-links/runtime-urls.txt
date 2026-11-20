@@ -1,0 +1,24 @@
+# アプリが実行時に使う URL の一覧 (1 行に 1 つ。# で始まる行は注釈)。
+# この一覧は Swift の試験 (LinkListTests) が ModelCatalog・LLMCatalog と比べる。モデルを足したら、この一覧も直す。
+# 並び: Whisper (ModelCatalog.all の順) → VAD (ModelCatalog.vadURL) → LLM (LLMCatalog.all の順。リポジトリは書いてある順)。
+# LLM は、アプリがファイルの一覧を読む tree API の URL を載せる (取るファイルは、その一覧から選ぶため)。
+
+# Whisper (Sources/KikimimiCore/ModelCatalog.swift)
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+
+# VAD (Sources/KikimimiCore/ModelCatalog.swift)
+https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin
+
+# LLM (Sources/KikimimiCore/LLM/LLMCatalog.swift)
+https://huggingface.co/api/models/unsloth/Qwen3.5-4B-GGUF/tree/main
+https://huggingface.co/api/models/bartowski/Qwen_Qwen3.5-4B-GGUF/tree/main
+https://huggingface.co/api/models/unsloth/Qwen3.5-2B-GGUF/tree/main
+https://huggingface.co/api/models/bartowski/Qwen_Qwen3.5-2B-GGUF/tree/main
+https://huggingface.co/api/models/unsloth/Qwen3.5-9B-GGUF/tree/main
+https://huggingface.co/api/models/bartowski/Qwen_Qwen3.5-9B-GGUF/tree/main

@@ -7,7 +7,7 @@
 - 確かめの手順 → Skill `kikimimi-verify` (`.claude/skills/kikimimi-verify/SKILL.md`)
 - 実機でまだ確かめていない事と、分かっている制限 → `README.md` の「検証状況」「既知の制限」
 
-最後に書き換えた日: 2026-11-16
+最後に書き換えた日: 2026-11-20
 
 ## 進み具合と決めた事
 
@@ -15,14 +15,33 @@
 - 2026-11-14: `CLAUDE.md` を、このプロジェクトの決まりに置き換えた。確かめの手順の Skill を足した。
 - 2026-11-15: `make check-ui` (アプリの確認)、CI で Xcode 16.2 が無い時に止める事、この文書を足した。
 - 最後に確かめた状態 (2026-11-15): 手元 (macOS 14.8.3・M1・Xcode 16.2) の `swift test` は 266 件で失敗 0、`make app` は終了コード 0 (コミット 25ed5c7 の時点)。`make check-ui` は終了コード 0 (コミット 5c4272d の時点)。CI は、コミット a958cae の実行 43686468415 で、Xcode 16.2 と 26.3 の 2 列とも成功: 試験は 266 件で失敗 0、3000 行の確認は 3 つの OK の行、`Sources` の Swift の警告は 0 件、起動の確認は `LAUNCH SELFTEST OK` が 9 回で `(not ready …)` の行は無い。台本 (`build-app.sh`) の中の確かめは 34 秒 / 49 秒、その次の「Prepare the Metal shaders」の段は 0.36 秒 / 0.28 秒。
-- **いちばん新しい確かめ (2026-11-16、手元。コミット c064dc4 の時点)**: `swift test` は「Executed 474 tests, with 0 failures」。アプリの確認は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`UI LOAD OK`、終了コード 0。翻訳用の追加学習の道 (`finetune.py --task translation`) を、本物の MLX で 4 回だけ学習させて走らせ、GGUF の差分が出来る所まで通った (終了コード 0)。CI: c064dc4 のビルドは、Xcode 16.2・26.3 の 2 列とも success。c064dc4 の追加学習の CI (finetune) は `LoRA end to end (macos-15, Qwen3.5 0.8B): success`。文書だけの push (c606a8b) のビルドも、2 列とも success。記録だけの次のコミット (0072f97) のビルドは、1 回目が GitHub の macOS の機械の不足で始まらずに取り消され (「The job was not acquired by Runner of type hosted」)、やり直しで 2 列 (Xcode 16.2・26.3) とも success (2026-11-17)。その次の記録だけのコミット (f2c2f5a) のビルドも、2 列とも success。記録だけの 2e0d71f のビルドは、1 回目に Xcode 16.2 の列がアプリの確認で「重い」(終了コード 5、`UI LOAD: SLOW ("one-line stop" max 415 ms >= 350 ms)`) になり、やり直しで 2 列とも success (違いを調べた結果は、下の「残っている事」)。その記録のコミット (8e55d56) と、CI を「重い」の時だけ 1 回測り直す形にしたコミット (bd74818、2026-11-19) のビルドは、どちらも 2 列とも success (bd74818 では「重い」が出なかったので、測り直しは動いていない)。数の検査と英語の画面の切れを直したコミット (b3b95d4) のビルドも、2 列とも success (どちらの列も `Executed 479 tests, with 0 failures`・`UI LOAD OK`、「重い」は出ていない)。
-- 1 つ前の確かめ (2026-11-16、手元。コミット 256f8de の時点): `swift test` は「Executed 452 tests, with 0 failures」。`make check-ui` は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`UI LOAD OK`、終了コード 0。メインスレッドが止まった割合は最大 5.6% (裏で LLM の測りが動いている中での値)。絵は 13 枚のまま (訳を直すシートに、訳語の 1 行が足された)。保存の確認 (LIBRARY CHECK) に足した段: `count “this translation is fine” for the check`・`a check stops after five “this translation is fine”`・`undo a stopped check`。CI: 09e4168 (U4〜U6 と基準を入れた版) のビルドは `macos-15 / Xcode 16.2: success`・`macos-15 / Xcode 26.3: success` (9af7b6b のビルドも、2 列とも success)。追加学習の CI (finetune) は、9af7b6b の分が、09e4168 の push で止まった (cancelled。`LLMEval.swift`・`LLMEvalRunner.swift` を変えた push は、走っている finetune を止めて走り直す。`.github/workflows/finetune.yml` の paths と concurrency)。09e4168 の分は `LoRA end to end (macos-15, Qwen3.5 0.8B): success` (2 時間 27 分かかった)。文書だけの push (ac472c1) のビルドも、2 列とも success。
-- 2 つ前の確かめ (2026-11-16、手元。コミット 9af7b6b の時点): `swift test` は「Executed 400 tests, with 0 failures」。`make check-ui` (日本語の画面、3000 行) は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`UI LOAD OK`、終了コード 0。3000 行に、直した印 125 行・要確認の印 125 行を混ぜて、メインスレッドが止まった割合は最大 5.0% (同じ日の、印を混ぜる前の値は 6〜8%)。絵は 13 枚 (足した物: `12-translation-edit.png` = 訳を直すシート、`13-translation-check.png` = 要確認の行のシート)。英語・ドイツ語・タイ語の画面では、この日は測っていない。
-- 3 つ前の確かめ (2026-11-15 の深夜、手元。翻訳を 13 言語に広げた後): `swift test` は 317 件で失敗 0、`swift build`・`make app` に `warning:` の行は無い。アプリの確認の結果は、この行の後の push の CI と合わせて見る。
-- 4 つ前の確かめ (2026-11-15 の夜、手元。VAD の直しと画面の言語を足した後): `swift test` は 301 件で失敗 0、`swift build`・`make app` に `warning:` の行は無い、`make check-ui` (日本語の画面、3000 行) は 3 つの OK の行が出て終了コード 0。同じ確認を、英語・ドイツ語・タイ語の画面 (300 行) でも走らせて、終了コード 0。CI の結果は、ここには書いていない (`gh run list --branch feature/auditor-translation` で見る)。
+- **いちばん新しい確かめ (2026-11-20、手元。依存を上げ、Python の版の固定を足した後の状態)**: 依存の版を上げた (whisper.cpp v1.9.2 → b5454、llama.cpp b12211 → b12556。下の 2026-11-20 の項)。この状態で `swift test` は「Executed 509 tests, with 0 failures」、`make check-ui` は 4 つの OK (ほかに `ADAPTER MESSAGE CHECK OK`) と終了コード 0、リンクの検査 (文書の側) は `LINK CHECK OK (19 urls)`・`DEPENDENCY: whisper.cpp b5454 is the latest`・`DEPENDENCY: llama.cpp b12556 is the latest`。以下は、その前 (コミット 1ef6407・9a98c83 の時点) の確かめ: `swift test` は「Executed 509 tests, with 0 failures」(479 → 509。チャットの印の読み取り・指示の組み立て・ページの文の取り出し・URL の検査で 28 件、リンクの一覧 `LinkListTests` で 2 件)。`make check-ui` は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`CHAT CHECK OK`・`ADAPTER MESSAGE CHECK OK`・`UI LOAD OK`、終了コード 0、`UI LOAD: SLOW` は出ていない。ドイツ語・タイ語の画面でも同じ確認が終了コード 0 (絵 14〜17 に字の切れは無い)。ほかの 9 言語 (zh ko es fr it pt ru vi id) の `--selftest-ui-load 3000 --ui-language <コード>` も、9 言語とも終了コード 0 (下の「残っている事」の操作の列の項)。本物の Qwen3.5 4B の `make check-chat` は `CHAT STREAM OK` (71 回の書き換え)・`CHAT EVAL: 14/16`。`make check-links` は OK 30・MOVED 1・BROKEN 0、`LINK CHECK OK (31 urls)`。`make check-ui` の前後で、本物の `showNotes`・`useVAD` が変わらない事を `defaults read` で見た。CI: 前回の記録のコミット (361097f) のビルドは、2 列 (Xcode 16.2・26.3) とも success、どちらも「Executed 479 tests, with 0 failures」、3000 行と 8000 行の `UI LOAD OK` (run 44649361045)。1ef6407・9a98c83 の CI は、2 つを一緒に push したので、走ったのは 9a98c83 の 1 回: build (run 44663878948) は Xcode 16.2・26.3 の 2 列とも success (どちらも「Executed 509 tests, with 0 failures」、`CHAT CHECK OK` と `UI LOAD OK` が 3000 行と 8000 行の 2 回、`UI LOAD: SLOW` なし。測り直しは動いていない)、links (44663879095) は success (GitHub の上で初めて走った)、finetune (44663879033。Python の版を固定した後の初めての実行) も success (`LoRA end to end (macos-15, Qwen3.5 0.8B): success`)。依存を上げたコミットと記録のコミット (666226a・54ee466。一緒に push したので、走ったのは 54ee466 の 1 回) の CI: build (run 44677858530) は Xcode 16.2・26.3 の 2 列とも success (どちらの列も `Executed 509 tests, with 0 failures`、3000 行は 1 回目で `CHAT CHECK OK`・`UI LOAD OK`。測り直しは動いていない。固定した版 gguf 0.19.0・numpy 2.5.5 が入った)、links (run 44677858474) も success。この時、Xcode 26.3 の列で、参考に測るだけの 8000 行の段がまた「重い」になった (`UI LOAD: SLOW ("burst: 300 segments delivered at once to the selected running job" max 1780 ms >= 1500 ms)`、終了コード 5。3 回の中央値は 294.8 ms。2e409da の時 (max 1631 ms、中央値 298.5 ms) と同じ列・同じ操作で、これで 2 回目。同じ実行の 3000 行では max 127.3 ms)。この段は失敗にしない決まりなので、列は success のまま。Xcode 16.2 の列の 8000 行は `UI LOAD OK`。
+- 1 つ前の確かめ (2026-11-16、手元。コミット c064dc4 の時点): `swift test` は「Executed 474 tests, with 0 failures」。アプリの確認は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`UI LOAD OK`、終了コード 0。翻訳用の追加学習の道 (`finetune.py --task translation`) を、本物の MLX で 4 回だけ学習させて走らせ、GGUF の差分が出来る所まで通った (終了コード 0)。CI: c064dc4 のビルドは、Xcode 16.2・26.3 の 2 列とも success。c064dc4 の追加学習の CI (finetune) は `LoRA end to end (macos-15, Qwen3.5 0.8B): success`。文書だけの push (c606a8b) のビルドも、2 列とも success。記録だけの次のコミット (0072f97) のビルドは、1 回目が GitHub の macOS の機械の不足で始まらずに取り消され (「The job was not acquired by Runner of type hosted」)、やり直しで 2 列 (Xcode 16.2・26.3) とも success (2026-11-17)。その次の記録だけのコミット (f2c2f5a) のビルドも、2 列とも success。記録だけの 2e0d71f のビルドは、1 回目に Xcode 16.2 の列がアプリの確認で「重い」(終了コード 5、`UI LOAD: SLOW ("one-line stop" max 415 ms >= 350 ms)`) になり、やり直しで 2 列とも success (違いを調べた結果は、下の「残っている事」)。その記録のコミット (8e55d56) と、CI を「重い」の時だけ 1 回測り直す形にしたコミット (bd74818、2026-11-19) のビルドは、どちらも 2 列とも success (bd74818 では「重い」が出なかったので、測り直しは動いていない)。数の検査と英語の画面の切れを直したコミット (b3b95d4) のビルドも、2 列とも success (どちらの列も `Executed 479 tests, with 0 failures`・`UI LOAD OK`、「重い」は出ていない)。記録だけの次のコミット (5832822) のビルドも、2 列とも success (run 44486559102。どちらの列も `Executed 479 tests, with 0 failures`・`UI LOAD OK`)。main へのマージ コミット (2e409da、2026-11-19) のビルドも、2 列とも success (run 44540422396。どちらの列も `Executed 479 tests, with 0 failures`、3000 行は 1 回目で `UI LOAD OK`・`LIBRARY CHECK OK`・`PRACTICE CHECK OK`。測り直しは動いていない)。この時、Xcode 26.3 の列で、参考に測るだけの 8000 行の段が「重い」になった (`UI LOAD: SLOW ("burst: 300 segments delivered at once to the selected running job" max 1631 ms >= 1500 ms)`、終了コード 5。3 回の中央値は 298.5 ms)。この段は失敗にしない決まりなので、列は success のまま。Xcode 16.2 の列の 8000 行は `UI LOAD OK`。
+- 2 つ前の確かめ (2026-11-16、手元。コミット 256f8de の時点): `swift test` は「Executed 452 tests, with 0 failures」。`make check-ui` は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`UI LOAD OK`、終了コード 0。メインスレッドが止まった割合は最大 5.6% (裏で LLM の測りが動いている中での値)。絵は 13 枚のまま (訳を直すシートに、訳語の 1 行が足された)。保存の確認 (LIBRARY CHECK) に足した段: `count “this translation is fine” for the check`・`a check stops after five “this translation is fine”`・`undo a stopped check`。CI: 09e4168 (U4〜U6 と基準を入れた版) のビルドは `macos-15 / Xcode 16.2: success`・`macos-15 / Xcode 26.3: success` (9af7b6b のビルドも、2 列とも success)。追加学習の CI (finetune) は、9af7b6b の分が、09e4168 の push で止まった (cancelled。`LLMEval.swift`・`LLMEvalRunner.swift` を変えた push は、走っている finetune を止めて走り直す。`.github/workflows/finetune.yml` の paths と concurrency)。09e4168 の分は `LoRA end to end (macos-15, Qwen3.5 0.8B): success` (2 時間 27 分かかった)。文書だけの push (ac472c1) のビルドも、2 列とも success。
+- 3 つ前の確かめ (2026-11-16、手元。コミット 9af7b6b の時点): `swift test` は「Executed 400 tests, with 0 failures」。`make check-ui` (日本語の画面、3000 行) は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`UI LOAD OK`、終了コード 0。3000 行に、直した印 125 行・要確認の印 125 行を混ぜて、メインスレッドが止まった割合は最大 5.0% (同じ日の、印を混ぜる前の値は 6〜8%)。絵は 13 枚 (足した物: `12-translation-edit.png` = 訳を直すシート、`13-translation-check.png` = 要確認の行のシート)。英語・ドイツ語・タイ語の画面では、この日は測っていない。
+- 4 つ前の確かめ (2026-11-15 の深夜、手元。翻訳を 13 言語に広げた後): `swift test` は 317 件で失敗 0、`swift build`・`make app` に `warning:` の行は無い。アプリの確認の結果は、この行の後の push の CI と合わせて見る。
+- 5 つ前の確かめ (2026-11-15 の夜、手元。VAD の直しと画面の言語を足した後): `swift test` は 301 件で失敗 0、`swift build`・`make app` に `warning:` の行は無い、`make check-ui` (日本語の画面、3000 行) は 3 つの OK の行が出て終了コード 0。同じ確認を、英語・ドイツ語・タイ語の画面 (300 行) でも走らせて、終了コード 0。CI の結果は、ここには書いていない (`gh run list --branch feature/auditor-translation` で見る)。
 - 3 つの機能を足した後に確かめた状態 (2026-11-15、手元。上の行より新しい): `swift test` は 278 件で失敗 0 (足した試験は `DeletionPlanTests` 9 件と `MediaImportTests` 3 件)、`swift build` と `make app` に `warning:` の行は無い、`make check-ui` は 3 つの OK の行が出て終了コード 0、絵は 11 枚 (`11-delete-confirm.png` を足した)。この時の CI の結果は、ここには書いていない (`gh run list --branch feature/auditor-translation` で、機能を足したコミットの実行を見る)。
 - 2026-11-15 に、利用者が、マイクでの録音を実機 (この Mac) で試した。結果は「良好」(利用者の報告)。
 - 2026-11-15 (夜): 利用者の OK で、作業の枝を main にマージした (PR tokoinx/Kikimimi#1、マージ コミット eaaebf2。main の CI の `build` は 2 列とも成功)。作業は、引き続き `feature/auditor-translation` で行う。
+- 2026-11-19 (夜): 利用者の OK (「main へマージ」) で、その後の 34 コミット (VAD のやり直し、画面と翻訳の 13 言語、翻訳の Harness、数の印と英語の画面の切れの直し、CI の測り直し) を main にマージした (PR tokoinx/Kikimimi#2、マージ コミット 2e409da。マージの直後、main と枝の中身に違いは無い。main の CI の `build` は 2 列とも success)。作業は、引き続き `feature/auditor-translation` で行う。
+- 2026-11-20: **LLM とのチャット**を足した (コミット 1ef6407)。使い方と注意は `README.md` の「LLM とのチャット」、確かめた事は「検証状況」、制限は「既知の制限」。決めた形:
+  - 入口は、メニューの「ファイル」›「LLM とチャット」(⇧⌘L) と、メインの窓のツールバーの絵のボタン。別の窓 (`Window(id: "chat")`)。
+  - 答えるのは、設定で選んでいる Qwen3.5 (差分 (LoRA) は使わない)。答えを少しずつ出すため、`TextGenerating.generate(_:shouldCancel:onText:)` を足した。監査・翻訳が通る道は変えていない。会話は保存しない。
+  - 設定を変える案: LLM は答えの終わりに `[[set 鍵=値]]` を書くだけ。アプリがそれを「項目: 今の値 → 新しい値」の札にし、**当てるのは利用者が札の「変える」を押した時だけ**。変えられるのは `ChatSettingsCatalog` (`Sources/KikimimiCore/Chat/ChatSettings.swift`) の 20 項目。一覧に無い鍵・取れない値は当てない。`[[open settings=…]]` はボタンを出すだけ。
+  - リサーチ: 既定で切、アプリを開くたびに切 (保存しない)。窓の上の帯と、入れる時の確認のシート (既定は「キャンセル」) の文は、`README.md` の「リサーチ」の節にそのまま在る。中身は、利用者が発言に書いた `https` の URL (3 つまで) を読むだけ。LLM が自分で外へつなぐ道と、Web の検索は無い。リサーチのスイッチはチャットの一覧に入れず、アプリの側でも断る。ページを読んだ回の答えからは札を作らない。読み方: クッキーなし・GET だけ・URL のほかは送らない・2 MB・15 秒・転送 5 回 (転送の先も検査)。`localhost`・IP の直書き・内の名前・443 以外のポートは読まない。
+  - LLM は同時に 1 つなので、監査・翻訳の最中は、チャットはその全部が終わるまで待つ。
+- 2026-11-20: **確認用の起動が、本物の設定に書いていた事を直した** (コミット 1ef6407)。直す前は、`--selftest-…` の起動でも `AppModel.save` と `PracticeController` が UserDefaults に書いていた。`--selftest-ui-load` は、練習の設定 (`practice`: 速さ・回数・間・自動で次へ) と `practiceDictation` を終わりに既定の値へ戻す作りだったので、**それまでの「アプリの確認」を走らせるたびに、本物の練習の設定が既定の値に書き換わっていた** (`showNotes` は元の値へ戻していた)。この Mac の今の値は既定の値 (速さ 1・1 回・間なし・書き取りの欄は切)。前に別の値だったかは、分からない。直した後は、確認用の起動は読むだけで書かない。
+- 2026-11-20: **リンク切れと古い依存に気づく仕組み**を足した (コミット 9a98c83): `tools/check-links/check_links.py` (`make check-links`)、`.github/workflows/links.yml` (週 1 回、月曜 03:17 UTC と、関わるファイルが変わった push)、`LinkListTests`、`tools/requirements-finetune.txt` (`finetune.yml` の Python の部品の版の固定。成功した実行 44540422570 の値: mlx-lm 0.32.2・mlx 0.32.4・transformers 5.23.0・gguf 0.19.0・numpy 2.5.5)。`build.yml` の gguf・numpy は、この時は固定していなかった (次の項で固定した)。
+- 2026-11-20: **依存の版を上げた** (次のコミットに入る): whisper.cpp v1.9.2 → **b5454** (v1.9.5 と同じコミット d1be6fde。v1.9.3 からは、XCFramework の zip が vN.N.N の release でなく bNNNN の release に付く)、llama.cpp b12211 → **b12556**。`Package.swift` の URL とチェックサム、`build.yml` の語彙のファイル (ggml-vocab-qwen2.gguf) のタグを合わせた。コードの直しは無い (コンパイルは通った)。
+  - 上げてよいかを、先に決めた基準で測った: `swift test` 失敗 0・`make check-ui` 4 つの OK と終了コード 0・文字起こしに悪くなった行が無い・翻訳の chrF がどの言語も 1.0 より大きく下がらない・`--selftest-chat` が `CHAT STREAM OK` で 12/16 以上。
+  - 結果 (手元、Apple Silicon の同じ Mac): `swift test` は「Executed 509 tests, with 0 failures」。`make check-ui` は `LIBRARY CHECK OK`・`PRACTICE CHECK OK`・`CHAT CHECK OK`・`UI LOAD OK`、終了コード 0、`UI LOAD: SLOW` なし。
+  - 翻訳 (Qwen3.5 4B、5 言語 × 100 行。上げる前の `qwen3.5-4b-100-run2-20261119` と同じ問題・設定。結果は `build/translation-eval/results/qwen3.5-4b-100-llama-b12556-20261120`): chrF は de 57.17・ja 29.06・ko 28.73・th 42.76・zh 35.52 で、5 言語とも上げる前と同じ値。訳の文も、475 行のうち変わった行は 0。かかった時間は 37 分 (前は 94 分。ただし前の回は、ほかの作業と同時に走っていたので、どれだけ速くなったかは確かめていない)。
+  - `--selftest-llm` (Qwen3.5 4B): 訳 4 行と監査 2 件は前と同じ、`SELFTEST OK`。`--selftest-chat`: `CHAT STREAM OK`、`CHAT EVAL: 14/16` (前と同じ点)。
+  - 文字起こし (`--selftest-whisper`、large-v3-turbo-q5_0、silero VAD、`Tests/Fixtures/mixed-en-ja.wav`、日本語＋英語、47 秒): 文は 1 字も変わらない。区間の分け方が 1 か所だけ変わった: 前は 2 つの区間 (00:26-00:30 と 00:30-00:33) だった英語の 1 文が、1 つの区間 (00:26-00:34) になった。ほかの 8 区間は、文も時刻も同じ。抜け・くり返し・言語の取り違えは無い。
+  - 新しい版で出る事: `LlamaEngine.swift` に、llama.cpp の非推奨の警告が 4 つ (`llama_batch_init` → `llama_batch_ext_init`、`llama_batch_free` → `llama_batch_ext_free`、`llama_decode` → `llama_process` が 2 か所)。エラーではない。直していない (下の「リファクタリングの案」の 8)。
+  - 確かめていない事: 翻訳の測りは 5 言語だけ (ほかの 8 言語は測っていない)。whisper.cpp を上げた後の、長い録音・ほかのモデル・ほかの言語での文字起こし (見たのは 47 秒の 1 つの音声だけ)。Intel Mac。この版での CI は、次の push で初めて走る。
+- 2026-11-20: **`build.yml` の Python の版も固定した** (次のコミットに入る): 9a98c83 の build の実行 (44663878948) の記録に出た版 (gguf 0.19.0・numpy 2.5.5。2 列とも同じ) で `tools/requirements-ci.txt` を作り、`build.yml` を `pip install -r tools/requirements-ci.txt` にした。この固定での実行は、次の push の CI で初めて走る。
 - 2026-11-15 (夜): 歌の入った動画 (`input.mov`、日本語の歌、153.9 秒) で歌詞が出なかった件。
   - 元は VAD (silero)。診断の記録は `VAD: on in 3.8 s, 4.0 s of speech` で、歌を声と見ていなかった。VAD なしなら、元の音で 23〜24 区間の歌詞が出る。
   - 足した物 (コミット 3b76ca5): 判定 `VADDropCheck` (結果の区間に入らなかった所の半分以上で、大きな音が鳴っているか)、自動のやり直し (`TranscriptionService.transcribeCheckingVAD`。VAD なしでもう一度文字起こしし、文字の多いほうを採る。設定 `autoVADOff`、既定は入)、結果の画面とメニューバーの「やり直す」(VAD のあり・なしと言語を、その結果だけについて選ぶ。`Job.vadOverride`)、診断の引数 `--no-vad`・`--auto-vad-off`。
@@ -204,9 +223,10 @@
     - (1) の確かめ: 画面で、同じ音声をし直すと、訳は「十岁」「三十张账单」のままで、印「要確認」が 1 つも付かなかった (直す前は 2 行に付いた。一時のライブラリ・モデルのフォルダ、本物の Whisper と Qwen3.5 4B)。人の訳 (100 行の問題、13 言語) に関門を掛けると、誤って付く `number` の印は合計 10 件 → 8 件 (pt 2 → 1、zh 1 → 0。ほかは同じ)、数を消した訳を拾う数は同じ (どの言語も全部。例: zh 17/17)。結果の置き場 (手元だけ): `build/translation-eval/results/gate-sets-100-before-20261119` と `gate-sets-100-numwords-20261119`。
     - (1) で救えない形: 韓国語の固有の数え方 (서른・열)、女性形や格で変わる形 (veintiuna・двадцать одна)、「两」「廿」「一百」「三〇」、桁の言い換え (30万)。当てすぎ: ja・zh・ko・th で、別の語がその数の言葉を含む時 (100 と「百貨店」)。ko・th は前後を見ない (韓国語の数の字は、ふつうの語にも多い)。
     - **(2) 英語の画面の切れ**: 原因は、操作の列 (`TranscriptControls`) の幅の測り方。始めの 1 回は「1 行の形」で並べ、その幅 (字を縮めないボタンの合計) が使える幅より広い言語では、結果の画面がウインドウの外へ押し広げられる。操作の列は、押し広げられた後の自分の幅を「使える幅」として測るので、「1 行に収まる」と見て、1 行の形のまま抜けられなかった。直し: 操作の列の外枠を `.frame(minWidth: 0, maxWidth: .infinity)` にして、中身の幅を外へ求めない (1 行の変更)。一覧の 4 つの決まりには触っていない。
-    - (2) の確かめ: 横およそ 1200 の同じ窓で、英語・ドイツ語・タイ語は 2 行の形になり、右の端 (印の列・書き出し) と左の一覧が全部見えた。日本語は前と同じ 1 行の形。ほかの 9 言語の画面と、もっと狭い窓では見ていない。
+    - (2) の確かめ: 横およそ 1200 の同じ窓で、英語・ドイツ語・タイ語は 2 行の形になり、右の端 (印の列・書き出し) と左の一覧が全部見えた。日本語は前と同じ 1 行の形。
+    - (2) のほかの 9 言語 (済み、2026-11-20。コードの変更なし): b3b95d4 の直しの後のアプリで、`--selftest-ui-load 3000 --ui-language <コード>` を zh ko es fr it pt ru vi id で走らせ、9 言語とも終了コード 0。絵 01 と 04 (計 18 枚) で、左の一覧と右端の「書き出し」のメニューが、窓の中に全部見えていた。操作の列は、zh・ko は 1 行、ほかは 2 行 (字つき)。字が「…」で省かれていたのは、ツールバーのモデル名と左の一覧の副題 (幅に合わせて省く作りの所)。**残り: もっと狭い窓 (1200 pt 未満) では見ていない。**
     - (2) の後のアプリの確認 (2026-11-19、手元。`--selftest-ui-load 3000`、音声と絵の指定つき): 日本語・英語・ドイツ語・タイ語の画面のどれも「UI LOAD OK」「LIBRARY CHECK OK」「PRACTICE CHECK OK」、終了コード 0。段階 3 (文字起こし中) でメインスレッドがふさがる割合は、英語 3.8%・ドイツ語 2.8%・タイ語 2.9% (同時に翻訳の測りが走っていた時の値)。ドイツ語の絵 (`01-finished-bilingual.png`) で、操作の列は 2 行に収まっていた。`swift test` は「Executed 479 tests, with 0 failures」。
-    - 差分の行の残りの確かめ (2026-11-19、一時のモデルのフォルダ、日本語の画面): 監査の行の「差分を追加…」で 4B 用の差分を選ぶ →「入っています」と「外す」「入れ替える…」になり、置き場に `qwen3.5-4b.lora.gguf` (元のファイルと shasum が同じ)。翻訳の行で、差分ではないモデルの本体 (Hy-MT2 7B の GGUF) を選ぶ → お知らせ「追加学習の差分 (LoRA アダプタ) の GGUF ではありません。…」が出て、入らない。GGUF でないファイルを選ぶ → お知らせ「GGUF 形式の LLM ではありません。…」が出て、入らない (文は、モデルを足す時と同じ物で、「差分」とは言わない。直していない)。別の LLM 用の差分を断る所は、手元にその差分が無いので見ていない。「差分を使う」のスイッチは、押すと利用者の本物の設定に書かれるので、画面では押していない (切の時に差分を渡さない事は、試験 `FineTuneTranslationTests` が見ている)。
+    - 差分の行の残りの確かめ (2026-11-19、一時のモデルのフォルダ、日本語の画面): 監査の行の「差分を追加…」で 4B 用の差分を選ぶ →「入っています」と「外す」「入れ替える…」になり、置き場に `qwen3.5-4b.lora.gguf` (元のファイルと shasum が同じ)。翻訳の行で、差分ではないモデルの本体 (Hy-MT2 7B の GGUF) を選ぶ → お知らせ「追加学習の差分 (LoRA アダプタ) の GGUF ではありません。…」が出て、入らない。GGUF でないファイルを選ぶ → お知らせ「GGUF 形式の LLM ではありません。…」が出て、入らない (文は、モデルを足す時と同じ物で、「差分」とは言わなかった)。**この文は直した** (済み、2026-11-20、1ef6407): 「GGUF 形式の追加学習の差分 (LoRA アダプタ) ではありません。…」。確かめは、`make check-ui` の `ADAPTER MESSAGE CHECK OK` (文だけを見る)。本物の設定の画面では、まだ見ていない。別の LLM 用の差分を断る所は、手元にその差分が無いので見ていない。「差分を使う」のスイッチは、押すと利用者の本物の設定に書かれるので、画面では押していない (切の時に差分を渡さない事は、試験 `FineTuneTranslationTests` が見ている)。
   - 「5 回・8 割」は初めに置いた値で、実際の使い方で確かめた値ではない。
   - `--eval-llm --memory` と `--export-translation-eval` は、本物の記憶・本物の LLM では走らせていない (試験と、一時の記憶だけ)。
   - 文に分けて訳し直す時の、タイ語・中国語の原文の文の分かれ方は確かめていない (測りの原文は、英語と日本語)。
@@ -217,6 +237,35 @@
   - 関門の人の訳での値は、短い原文の写しに印を付けない決まり (9af7b6b) を入れた後、測り直していない。
 - 分かっている制限 (`README.md` の「既知の制限」にも書いた): 数の検査は、単位や桁を言い換えた正しい訳にも印を付ける (約 1%)。シートを開いている間に翻訳が進み、行が別の文のまとまりに入ると、保存は今のまとまりに置かれる。直した文で「この文を訳し直す」が失敗すると、直した訳は残るが印「直した」は消える。訳せなかった理由は、まとまりの先頭の行にだけ出る。「要確認 N」は、検索で絞って一覧に無い行へは移れない。訳語の当て方 (頭の 75%) は、頭の同じ別の語に当たる事が在りうる (ラテン文字の語の切れ目は「前後が文字でない」で見るので、"car" は "car2" にも当たる)。「この訳でよい」を押した後でその訳を直しても、「検査が当たった」には数えない。文に分けて訳し直すと、そのまとまりは LLM の呼び出しが 1 回以上増える。
 - `heldOut` (取り分け) の決まり (2026-11-16 に決めた): 取り分けた 1 件も、アプリの「同じ文の再利用」には使う (利用者が直した訳が、5 件に 1 件だけ戻らない、という動きを避けるため)。取り分けは「学習と、似た文の手本に使わない」ための印。評価で記憶を使う時 (U6 の `--memory`) は、問題の文そのものを記憶から抜いて測る。初めの設計のメモは「再利用にも使わない」と書いていたが、この決まりに直した。
+
+LLM とのチャット (2026-11-20、1ef6407):
+- 確かめた事は `README.md` の「検証状況」の行 (CHAT CHECK・`make check-chat`・手で通した事)。
+- まだ確かめていない事:
+  - 札の「変える」を、本物の窓で押す事 (本物の設定に書かれるため。当たる事は CHAT CHECK が見ている)。
+  - 日本語入力の変換を確定する Return で、発言が送られない事 (コードは `onSubmit`。実機の IME では見ていない)。
+  - Shift+Return の改行 (作っていない)。
+  - 転送・2 MB の打ち切り・文字コード・待ち切れの、実際の動き (読んだのは `https://example.com/` だけ)。
+  - 悪い指示 (Prompt Injection) を入れたページでの動き。
+  - 日本語・英語・ドイツ語・タイ語のほかの 9 言語の、チャットの画面。
+  - 新しい 47 個の鍵の 11 言語の訳 (AI の訳。その言語を話す人の確認は無い)。
+  - 監査・翻訳の最中のチャット (待つ作りだが、本物の LLM では見ていない)。
+  - メモリの少ない Mac。
+- 測りで分かった事: `CHAT EVAL: 14/16`。落ちた 2 つは、「VAD って何？」「What is beam search?」の類の質問に、頼んでいない `[[set …]]` を付けた物 (アプリでは札が出るだけで、押すまで変わらない)。指示を直して減らすかは、決めていない。
+- 分かっている穴: 公開の名前が DNS で内の住所を指す場合は防げない。JavaScript で作るページは読めない (HTML の文だけ)。
+
+確認用の起動と本物の設定 (2026-11-20、1ef6407 で直した):
+- 直すまでの「アプリの確認」で、この Mac の本物の練習の設定は既定の値に書き換わっていた。今の値は既定の値 (速さ 1・1 回・間なし・書き取りの欄は切)。前に利用者が別の値にしていたかは、分からない (利用者に知らせる事)。
+- 直した後に `defaults read` で前後を比べたのは `showNotes`・`useVAD` だけ。
+- 確認用の起動かどうかの判定が 3 か所に分かれている事が元 (この下の「リファクタリングの案」の 1)。
+
+リンクの検査と依存 (2026-11-20、9a98c83):
+- `build.yml` の gguf・numpy の版は、`tools/requirements-ci.txt` で固定した (この固定での CI は、次の push で初めて走る)。
+- 依存の版は b5454 (whisper.cpp)・b12556 (llama.cpp) に上げた (上の 2026-11-20 の項)。`LinkListTests` は、llama.cpp の版が `Package.swift` と `build.yml` で同じ事を見るので、次に上げる時も両方を変える。
+- 残っている事 (依存): (finetune (run 44663879033) の結果は success だった。済み)`LlamaEngine.swift` の非推奨の警告 4 つ (下の「リファクタリングの案」の 8)。翻訳の測りをしていないほかの 8 言語 (測ったのは de・ja・ko・th・zh の 5 言語だけ)。長い録音・ほかのモデル・ほかの言語での文字起こしの確かめ、Intel Mac。
+- 週 1 回の `links.yml` は、main に入ってから動く (まだ動いていない)。
+- README の clone の行の `https://github.com/tokoinx/Kikimimi.git` は `MOVED` (`.git` なしへ転送)。失敗にはしていない。直すかは決めていない。
+- アプリを作り直さずにモデルの一覧を差し替える仕組みは無い (一覧はコードに直書き)。切れた時は、`ModelCatalog`・`LLMCatalog` と `tools/check-links/runtime-urls.txt` を直して作り直す。
+- 1ef6407・9a98c83 の CI: build・links・finetune とも success (上の「いちばん新しい確かめ」)。Xcode 26.3 の列で、8000 行 (参考) の「300 の区間をいっぺんに届ける」が、3 回のうち 1 回だけ 1.6〜1.8 秒かかる事が 2 回続いた (2e409da・54ee466)。3000 行では起きていない。理由は調べていない。
 
 アプリ:
 - 3 つの機能 (消す・落とす・モデルの案内) を足した時に気づいて、直していない事 (2026-11-15。頼まれていないので、報告だけ):
@@ -250,10 +299,23 @@
   - 台本の写しを別の置き場 (`build/probe/`) に向けて試した (2026-11-15。動いているアプリには触っていない)。読み込めないアプリ (同梱した `whisper.framework` を外した物): 終了コード 1、dyld の `Library not loaded` の文と ✗ の文が出て、前のアプリは同じ物のまま元の場所に在り、読み込めなかった物は `.new` に残った。確かめの途中で止めた時 (Ctrl-C と同じ合図): 新しいアプリが元の場所に、前のアプリが `.previous` に残り、プロセスは残らない。次の実行は終了コード 0 で終わり、`.previous` は消える。
 
 エージェントの仕事の仕組み:
-- 結果の一覧の決まり (`CLAUDE.md`) を、書き方で見る検査は無い。破った時の重さは、`make check-ui` と CI の 3000 行の確認が測る。
+- 結果の一覧の決まり (`CLAUDE.md`) を、書き方で見る検査は無い。破った時の重さは、`make check-ui` と CI の 3000 行の確認が測る (足す時の形は、この下の「リファクタリングの案」の 7)。
 - 報告の型 (動かした事実と、確かめていない事を書く) を、どの指示ファイルに置くかが決まっていない。
 - main へのマージをしない決まり (`CLAUDE.md`) は、門では止まらなくなった (`git merge` は確認なしで通る)。GitHub の側で main の枝を守るかは、利用者が決める。
 - 前の引き継ぎに在った「実機でまだ確かめていない事」「分かっている小さな穴」「残っている案」の一覧は、ここに入っていない。2026-11-15 に利用者の Mac の中を探したが、その文書は見つからなかった。
+
+## リファクタリングの案 (2026-11-20)
+
+考えただけで、**どれも、まだ行っていない**。行う時は、利用者に確かめてから。
+
+1. **確認用の起動の判定を 1 か所に**: 「`--selftest-…` か」を、`AppModel`・`PracticeController`・`UILanguageSetting` が別々に見ていて、本物の設定に書いていた不具合 (上の「確認用の起動と本物の設定」) の元になった。1 つの型 (例: `LaunchMode`) にまとめ、設定に書く所は全部そこを通す。小さい。先に行う値打ちが在る。
+2. **設定の定義を 1 か所に**: 同じ鍵が、`AppModel` の読み (init)・保存 (didSet)・設定の画面・チャットの一覧 (`ChatSettingsCatalog`)・`applyChatSetting` の switch の 5 か所に在る。鍵・型・既定の値・取れる値の表を 1 つにし、ほかはそこから作る。今は、CHAT CHECK が「一覧の 20 項目が全部読めて当てられる」事だけを見ている。
+3. **LLM の順番待ちに割り込み**: 監査・翻訳は 1 回の `LLMService.run` に全体が入るので、チャットは全部が終わるまで待つ。かたまり (監査の 1 回分・翻訳の 1 回分) ごとに列を空ければ、チャットが間に入れる。
+4. **モデルの一覧をコードからデータへ**: `ModelCatalog`・`LLMCatalog` を JSON のリソースにすれば、リンクの検査の一覧 (`runtime-urls.txt`) を手で合わせる事が要らなくなる。将来、一覧を外から差し替える仕組みを作る時の土台にもなる (その時は checksum か署名が要る)。
+5. **`AppModel.swift` を分ける** (2400 行を超える): 仕事の順番待ち / LLM の後処理 (監査・翻訳) / モデルの取得 / 設定 / チャット。
+6. **`UILoadSelfTest.swift` を分ける** (2100 行を超える): 確認ごとのファイルにし、終了コードの決め方を 1 つの表にする。
+7. **`TranscriptDetailView.swift` の一覧を別のファイルに切り出す**: 一覧の 4 つの決まりを、書き方で見る検査 (ソースの走査) を足せる形にする (今は検査が無い。上の「残っている事」の「エージェントの仕事の仕組み」に前から在る残りの事)。
+8. **`LlamaEngine` を llama.cpp の新しい呼び出しに合わせる** (`llama_batch_ext_init`・`llama_process`): b12556 で非推奨の警告が 4 つ出る。次に版を上げる時に、古い呼び出しが消えると通らなくなる。
 
 ## 続けるのに要る参照
 

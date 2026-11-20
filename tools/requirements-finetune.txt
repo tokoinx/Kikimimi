@@ -1,0 +1,15 @@
+# finetune.yml (追加学習の通しの確認) で入れる Python のパッケージの版。
+# 版は、成功した CI の実行 44540422570 (finetune、2026-11-19、コミット 2e409da) の
+# 「Python environment (mlx-lm, gguf)」の段の pip list に出た値。
+# 直に入れている物 (mlx-lm・gguf・numpy) と、finetune.py が中の作りに頼っている物 (mlx・mlx-lm)、
+# それと mlx-lm が使う transformers を固定する。ほかの依存は pip に選ばせる。
+#
+# 上げる時の手順:
+#   1. この行の版を上げ (または == を外し)、tools/finetune/ か .github/workflows/finetune.yml と一緒に push する。
+#   2. finetune の実行が成功するのを見る。その段の pip list に出た版を、ここに書き写す。
+#   3. 上の「実行 …」の番号と日付を書き換える。
+mlx-lm[train]==0.32.2
+mlx==0.32.4
+transformers==5.23.0
+gguf==0.19.0
+numpy==2.5.5

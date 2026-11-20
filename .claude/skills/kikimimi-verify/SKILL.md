@@ -33,7 +33,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - 出力は長いので、終わりの 2 行だけを抜き出すとよい: `swift test 2>&1 | rg -A 1 "Test Suite 'All tests' (passed|failed)"`。終わりの `Test Suite 'All tests' passed at …` (失敗があれば `failed at`) と、その次の `Executed N tests, with M failures (0 unexpected) in …` を見る。件数 N と失敗 M をここから写す。
 - そのさらに後に出る `✔ Test run with 0 tests passed …` は Swift Testing の分で、ここの試験は XCTest なので 0 件と出る。件数として写さない。
 
-アプリの確認: `LIBRARY CHECK OK` (保存)・`PRACTICE CHECK OK` (練習。`--audio` の時だけ)・`UI LOAD OK` (終了コード 0 の時だけ、最後の行) の 3 つが出て、終了コードが 0 である事を見る。
+アプリの確認: `LIBRARY CHECK OK` (保存)・`PRACTICE CHECK OK` (練習。`--audio` の時だけ)・`CHAT CHECK OK` (チャットの窓。LLM もネットワークも使わない)・`UI LOAD OK` (終了コード 0 の時だけ、最後の行) の 4 つが出て、終了コードが 0 である事を見る。`ADAPTER MESSAGE CHECK OK` (設定の「追加学習」の、GGUF でない差分のお知らせ) も出る。
 
 | 終了コード | 意味 | 出力に出る文 |
 |---|---|---|
@@ -44,6 +44,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | 6 | 1 行だけの再生が行の終わりで止まらない・続きから再生しない | `UI LOAD: LINE DID NOT STOP …`・`LINE STOPPED TOO EARLY …`・`LINE STOPPED AWAY FROM …`・`PLAY AFTER THE ROW DID NOT CONTINUE …` |
 | 7 | 保存の確認に失敗 | `LIBRARY CHECK FAILED: …` |
 | 8 | 練習の確認に失敗 | `PRACTICE CHECK FAILED: …` |
+| 9 | チャットの確認に失敗 | `CHAT CHECK FAILED: <段の名前>` (段ごとに `CHAT CHECK: <段> ok` / `NG (…)` の行も出る) |
 
 - 保存の確認 (LIBRARY CHECK) の各段は `LIBRARY: <段の名前>: ok (…)` か `FAILED (…)` の 1 行で出る。訳に関わる段 (2026-11-16 に足した):
   - `rows with edited and flagged translations`: 対訳のジョブに、直した行と要確認の行が両方在る (3000 行なら、それぞれ 125)。
@@ -54,7 +55,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
   - `count “this translation is fine” for the check` (256f8de で足した): 「この訳でよい」で、その印の検査 (数の抜け) の「この訳でよい」の数が 1 以上になり、覚えの判定が `confirmed` になる。
   - `a check stops after five “this translation is fine”` (同): 一時の記憶で「この訳でよい」を 5 回数えると、その検査が、その訳す先で止まる (止めた検査の一覧に 1 つ)。
   - `undo a stopped check` (同): [元に戻す] で、止めた検査が無くなり、保存した記憶の数も消える。
-- 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 の順)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
+- 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 > 9 の順。`ADAPTER MESSAGE CHECK FAILED` は 7 に入る)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
 
@@ -87,6 +88,11 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | `12-translation-edit.png` | 訳を直す画面 (直した訳の行を開いたところ。08 の後、11 の前に撮る)。機械の訳と「機械の訳に戻す」 |
 | `13-translation-check.png` | 要確認の行を開いた、訳を直す画面。上に理由の行と「この訳でよい」 |
 
+| `14-chat-empty.png` | チャットの窓 (480 x 640 pt)。上に灰色の「リサーチ … 切」の帯と「入れる…」、空の案内と例のボタン 3 つ、下に入力の欄と小さな 1 行 |
+| `15-chat-research-confirm.png` | リサーチの確認のシート (シートそのもの)。題「自己責任で、リサーチを入れますか？」、Prompt Injection の説明、「キャンセル」(既定) と「自己責任で入れる」 |
+| `16-chat-research-on.png` | チャットの窓の上の帯が橙色の「リサーチが入っています (自己責任)…」と「切る」 |
+| `17-chat-proposal.png` | 答えの下の札「無音を飛ばす (VAD): オン → オフ」と「変える」「キャンセル」 |
+
 - 12・13 のシートには、23f94f8 (U5) から、下に訳語の 1 行「語を、いつもこう訳す (任意)」が在る (シートのコードでは、いつも出す)。
 
 - 変えた画面に関わる絵を Read で開いて見る。絵の場面ごとの注意 (`… may show no playing tint` など) が出力に在れば、その絵は特に見る。
@@ -95,6 +101,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 
 - 起動の確認 (`--selftest-launch` の 7 通り: シェルから・open で・reopen で・メニューで・何度か強制終了した後・ウインドウの復元 (参考)・ウインドウの無い写しが動いている時の open。ほかに「確認用の実行中の起動」の段)。
 - `--selftest-llm`、`--selftest-whisper`。
+- `--selftest-chat` (本物の LLM でチャットの答えを測る。手元で走らせるなら `make check-chat LLM=<モデル.gguf>`。`CHAT STREAM OK` (出している途中の文が 2 回以上届き、最後の文が答えと同じ) で終了コード 0。`CHAT EVAL: <id> ok|NG | <期待> | <答えの始め>` の 16 行と `CHAT EVAL: N/16` は参考で、点では落とさない。`--report <ファイル>` で同じ行をファイルにも書く)。
 - 8000 行のアプリの確認 (参考。失敗にしない)。
 - Xcode 16.2 と 26.3 の両方でのビルド (手元の Xcode は 1 つ)。
 - macOS 14 の実機での動作は、利用者の Mac でだけ見られる (CI にも無い)。

@@ -47,7 +47,8 @@ import KikimimiCore
 ///
 /// 終了コード: 0 = 成功、1 = メインのウインドウが出ない、3 = 終わらない (メインスレッドが止まっている)、
 /// 5 = 重い (UI LOAD: SLOW)、6 = 1 行だけの再生が行の終わりで止まらない・続きから再生しない、
-/// 7 = 保存の確認に失敗 (LIBRARY CHECK FAILED)、8 = 練習の確認に失敗 (PRACTICE CHECK FAILED)
+/// 7 = 保存の確認に失敗 (LIBRARY CHECK FAILED。差分のお知らせの確認 ADAPTER MESSAGE CHECK FAILED も)、
+/// 8 = 練習の確認に失敗 (PRACTICE CHECK FAILED)、9 = チャットの確認に失敗 (CHAT CHECK FAILED。ChatSelfTest.swift)
 ///
 /// `--audio` のとき、行の確認のあとに練習の確認 (PRACTICE CHECK) も行う: 本当の練習の係 (PracticeController) と
 /// 再生の係で、遅くした 1 行・繰り返し・間・自動で次へ・次と前とまた・スペースキー を確かめる (30 秒ほど。音を出せない Mac では飛ばす)。
@@ -188,7 +189,8 @@ enum UILoadSelfTest {
         // ウインドウの絵も残すときは、場面を出して落ち着くのを待つぶん、長くかかる
         // 保存の確認 (数千行の結果を何回か書く) のぶんも足す
         // 音声があるときは、練習の確認 (30 秒ほど) のぶんも足す。絵のときは、練習の絵 (09・10) のぶんも入れてある
-        let hangLimit = (screenshots == nil ? 200.0 : 300.0) + (audio == nil ? 0 : 45.0)
+        // チャットの確認 (CHAT CHECK。窓を開け、絵 14〜17 を撮る) のぶんも足す
+        let hangLimit = (screenshots == nil ? 200.0 : 300.0) + (audio == nil ? 0 : 45.0) + 40.0
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
             finish(header + ["UI LOAD FAILED: the self-test did not finish in \(Int(hangLimit)) s"
                              + " (the main thread may be stuck)"], code: 3, reportPath: reportPath)
@@ -279,7 +281,11 @@ enum UILoadSelfTest {
         if let screenshots {
             lines += await load.takePracticeScreenshots(into: screenshots)
         }
-        let code: Int32 = slow ? 5 : (lineFailed ? 6 : (library.failed ? 7 : (practiceFailed ? 8 : 0)))
+        // 6. チャットの確認 (LLM もネットワークも使わない)。設定の画面の「追加学習」の、GGUF でない差分のお知らせも見る
+        let chatFailed = await ChatCheck.run(model: model, screenshots: screenshots, lines: &lines)
+        let adapterMessageFailed = ChatCheck.adapterMessageCheck(lines: &lines)
+        let code: Int32 = slow ? 5 : (lineFailed ? 6 : ((library.failed || adapterMessageFailed) ? 7
+                                                       : (practiceFailed ? 8 : (chatFailed ? 9 : 0))))
         if code == 0 { lines.append("UI LOAD OK") }
         // 書きかけを待ってから、確認用のライブラリの一時フォルダを消す
         model.flushLibrary()

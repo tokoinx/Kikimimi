@@ -21,6 +21,10 @@ enum KikimimiMain {
             exit(LLMSelfTest.run(modelPath: path, useGPU: !args.contains("--cpu"), strict: args.contains("--strict"),
                                  translateTo: translateTo))
         }
+        // チャットの答えを、本物の LLM で確かめる (画面を出さない。設定は読まず・書かない)
+        if args.contains("--selftest-chat") {
+            exit(ChatSelfTest.run(arguments: args))
+        }
         if args.contains("--selftest-whisper") {
             exit(WhisperSelfTest.run(arguments: args))
         }
@@ -88,6 +92,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var flushLibrary: @MainActor () -> Void = {}
     /// メインのウインドウを新しく開く (SwiftUI の openWindow)
     var openMainWindow: (@MainActor () -> Void)?
+    /// チャットの窓を開く (SwiftUI の openWindow。確認用の起動が使う)
+    var openChatWindow: (@MainActor () -> Void)?
     /// 起動の確認 (`--selftest-launch --reopen`) のあいだは、ウインドウを閉じても終了しない
     var keepRunningWithoutWindows = false
     /// ウインドウの中のモデル (画面の重さの確認 `--selftest-ui-load` が、結果を入れるのに使う)
@@ -260,6 +266,7 @@ private struct AppLifecycleHook: View {
                 delegate.isBusy = { model.isBusy }
                 delegate.flushLibrary = { model.flushLibrary() }
                 delegate.openMainWindow = { openWindow(id: MainWindow.id) }
+                delegate.openChatWindow = { openWindow(id: ChatWindow.id) }
                 delegate.model = model
                 PlaybackKeys.install(model: model)
                 LaunchLog.note("window appeared")
@@ -438,6 +445,7 @@ struct KikimimiApp: App {
                     .disabled(model.selectedJob == nil || model.isRecording)
                 Divider()
                 ShowMainWindowButton()
+                ChatWindowButton()
             }
             CommandGroup(after: .saveItem) {
                 Menu(L("Export")) {
@@ -502,6 +510,15 @@ struct KikimimiApp: App {
                     .disabled(!canPlayLines)
             }
         }
+        // LLM とのチャットの窓 (1 つだけ)
+        Window(L("Chat"), id: ChatWindow.id) {
+            ChatView()
+                // 画面の言語を変えたら、中身を作り直す (会話は AppModel.chat が持つので消えない)
+                .id(model.uiLanguage)
+                .environment(model)
+                .frame(minWidth: 380)
+        }
+        .defaultSize(width: 480, height: 640)
         Settings {
             SettingsView()
                 // 画面の言語を変えたら、設定の画面も作り直す
