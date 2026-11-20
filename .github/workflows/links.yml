@@ -1,0 +1,51 @@
+name: links
+
+# リンク切れと、古くなった依存に、早く気づくための検査 (tools/check-links/check_links.py)。
+# アプリが実行時に使う URL (モデルの取り先) と、文書・CI の中の URL を調べ、切れが 1 つでも在れば失敗にする。
+# 失敗すると、GitHub がリポジトリの持ち主に知らせる (通知の設定による)。
+# 依存 (Package.swift の llama.cpp・whisper.cpp) の新しさは参考として注釈に出すだけで、失敗にはしない。
+#
+# 週 1 回の実行 (schedule) は、GitHub の決まりで、既定の枝 (main) の上のファイルだけで動く。
+# ほかの枝でこのファイルを変えても、main に入るまでは週 1 回の実行には効かない (push と手動の実行には効く)。
+on:
+  schedule:
+    - cron: "17 3 * * 1"   # 毎週月曜 03:17 UTC
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/check-links/**"
+      - "Package.swift"
+      - "Sources/KikimimiCore/ModelCatalog.swift"
+      - "Sources/KikimimiCore/LLM/LLMCatalog.swift"
+      - "README*.md"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: links-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Link check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # GITHUB_TOKEN は api.github.com への問い合わせ (依存の最新の版を読む所) にだけ付ける。回数の制限を緩めるため
+      - name: Check links
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tools/check-links/check_links.py --report link-report.json
+
+      # 結果の JSON。失敗した時も残す
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: link-report
+          path: link-report.json
+          if-no-files-found: warn
+          retention-days: 30

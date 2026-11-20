@@ -230,6 +230,8 @@ jobs:
         run: |
           python3 -m venv .venv
           .venv/bin/pip install --quiet gguf numpy
+          # 入った版を記録に残す (版を固定する時に、成功した実行のこの行から写す。追加学習の側は tools/requirements-finetune.txt)
+          .venv/bin/pip list 2>/dev/null | grep -i -E "^(gguf|numpy) " || true
           curl -fsSL -o build/ggml-vocab-qwen2.gguf \
             https://raw.githubusercontent.com/ggml-org/llama.cpp/b12211/models/ggml-vocab-qwen2.gguf
           .venv/bin/python Scripts/make-tiny-gguf.py build/ggml-vocab-qwen2.gguf build/tiny.gguf chatml-think

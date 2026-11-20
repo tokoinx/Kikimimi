@@ -8,6 +8,7 @@ on:
     paths:
       - "tools/finetune/**"
       - ".github/workflows/finetune.yml"
+      - "tools/requirements-finetune.txt"
       - "Sources/KikimimiCore/LLM/FineTuneData.swift"
       - "Sources/KikimimiCore/LLM/LLMEval.swift"
       - "Sources/Kikimimi/TrainingExport.swift"
@@ -52,7 +53,8 @@ jobs:
       - name: Python environment (mlx-lm, gguf)
         run: |
           python3 -m venv .venv-finetune
-          .venv-finetune/bin/pip install --quiet "mlx-lm[train]" gguf numpy
+          # 版は tools/requirements-finetune.txt で固定する (上げ方は、そのファイルの始めに在る)
+          .venv-finetune/bin/pip install --quiet -r tools/requirements-finetune.txt
           .venv-finetune/bin/pip list 2>/dev/null | grep -i -E "^(mlx|mlx-lm|gguf|numpy|transformers) "
 
       - name: Is MLX usable here (GPU / CPU)?
