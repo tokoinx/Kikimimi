@@ -309,7 +309,7 @@ LLM とのチャット (2026-11-20、1ef6407):
 
 ## リファクタリングの案 (2026-11-20)
 
-**1・2・3・4 は行った (2026-11-20、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」)。5〜8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
+**1〜5 は行った (2026-11-20〜21、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」「案 5 へ進む」)。6〜8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
 
 1. **確認用の起動の判定を 1 か所に**: 「`--selftest-…` か」を、`AppModel`・`PracticeController`・`UILanguageSetting` が別々に見ていて、本物の設定に書いていた不具合 (上の「確認用の起動と本物の設定」) の元になった。1 つの型 (例: `LaunchMode`) にまとめ、設定に書く所は全部そこを通す。小さい。先に行う値打ちが在る。
    - **行った (2026-11-20)**: 判定は `Sources/KikimimiCore/LaunchMode.swift` (`app`・`selfTest`・`tool`) だけ、設定 (UserDefaults) に書く所は `Sources/KikimimiCore/SettingsWriter.swift` だけにした (ふつうの起動の時だけ書く)。ばらばらだった判定 6 か所を消し、書き込み 7 か所を通した。
@@ -353,6 +353,13 @@ LLM とのチャット (2026-11-20、1ef6407):
    - **確かめていない事**: Xcode 26.3 の列 (CI で見る)。macOS 14 の実機。
    - **気づいて、直していない事** (一覧と手で合わせている残りの所): `README.md`・`README.en.md` のモデルの表 (名前・大きさ)。`.github/workflows/build.yml` の `ggml-tiny.bin`・silero の URL と sha256、`finetune.yml` の 0.8B の URL と sha256。`tools/finetune/finetune.py` の LLM の id の一覧。`Makefile` の `check-links` は `python3` で走る (この Mac の python.org の 3.14 は証明書が無く、全部が切れて見える。`/usr/bin/python3` なら通る)。
 5. **`AppModel.swift` を分ける** (2400 行を超える): 仕事の順番待ち / LLM の後処理 (監査・翻訳) / モデルの取得 / 設定 / チャット。
+   - **行った (2026-11-21)**: `Sources/Kikimimi/AppModel.swift` (2635 行) を 11 個に分けた。`AppModel.swift` (268 行。クラスの宣言・保存するプロパティの全部・`init`・`save`・小さな計算プロパティ・`useLibrary(at:)`・`useTranslationMemory(at:)`)、`AppModel+Jobs.swift` (445。開く・仕事の順番待ち・`run`・消す)、`AppModel+PostTasks.swift` (447。監査・翻訳)、`AppModel+Models.swift` (420。モデル・LLM・差分)、`AppModel+Library.swift` (379。ライブラリ・版)、`AppModel+Learning.swift` (159)、`AppModel+Recording.swift` (144)、`AppModel+Chat.swift` (116)、`AppModel+Export.swift` (90)、`Job.swift` (199。`Job` と小さな型)、`UILanguageSetting.swift` (40)。
+   - **動きは変えていない**: 関数の中の文は、手で打ち直さず、台本で行の範囲ごとに写した。元のファイルと新しいファイル群を行の集まりで比べ (前後の空白・空の行・行の初めの `private` を除く)、片方にしか無い行は、新しい側の「ファイルの初めの注釈 15 行・`import`・`extension AppModel {` 7 つ・閉じの `}` 7 つ」だけ (元の側は 0 行)。
+   - **変わった所 (見える範囲)**: 別のファイルから使うために `private` を外した物が 17 個 (保存するプロパティ 11: `service`・`llm`・`llmDownloadTasks`・`downloadTasks`・`vadTask`・`vadRetryAfter`・`worker`・`recorder`・`previewTask`・`documentSaveTimers`・`notesSaveTimers`。関数 6: `loadLibrary`・`runPost`・`vadModelPath`・`ensureWorker`・`saveLedger`・`refreshAdapters`)。アプリの target の中からは、どこからでも呼べるようになった。`library`・`translationMemoryURL` の `private(set)` は残した (入れる 2 つの関数を `AppModel.swift` に置いた)。
+   - **関数の置き場で決めた所**: 消す (`delete`・`deletionPlan`・`requestDelete`) は Library から Jobs へ。`translationMemoryLookup`・`memoryNote` は PostTasks へ (呼ぶのは `runPost` だけ)。`pausePostTasksForRecording` は Recording へ。`cancelPost` は Jobs (呼ぶ 3 つが Jobs に在る)。
+   - **確かめ (手元)**: `swift test` は「Executed 540 tests, with 0 failures」(件数は前と同じ)。`make app` に `warning:` の行は 0。`make check-ui` は「LIBRARY CHECK OK」「PRACTICE CHECK OK」「CHAT CHECK OK」「ADAPTER MESSAGE CHECK OK」「UI LOAD OK」、終了コード 0 (`time tick` の p95 は 11.0 ms)。前後で `defaults read local.kikimimi.app` の違いは 0 行。
+   - **確かめていない事**: Xcode 26.3 の列 (CI で見る)。比べたのは行の集まりで、行の並びは比べていない (並びは、台本が範囲ごとに写した事と、ビルド・試験・アプリの確認が通った事で見ている)。
+   - **作り直す時**: 分け方の範囲は、一時の置き場の台本に在った物で、リポジトリには入れていない。
 6. **`UILoadSelfTest.swift` を分ける** (2100 行を超える): 確認ごとのファイルにし、終了コードの決め方を 1 つの表にする。
 7. **`TranscriptDetailView.swift` の一覧を別のファイルに切り出す**: 一覧の 4 つの決まりを、書き方で見る検査 (ソースの走査) を足せる形にする (今は検査が無い。上の「残っている事」の「エージェントの仕事の仕組み」に前から在る残りの事)。
 8. **`LlamaEngine` を llama.cpp の新しい呼び出しに合わせる** (`llama_batch_ext_init`・`llama_process`): b12556 で非推奨の警告が 4 つ出る。次に版を上げる時に、古い呼び出しが消えると通らなくなる。
