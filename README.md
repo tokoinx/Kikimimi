@@ -557,7 +557,15 @@ Sources/
   KikimimiLLM/           llama.cpp の C API を包む層
     LlamaEngine.swift    読み込み・追加学習の差分 (LoRA)・チャットテンプレート・文法つきの貪欲法の生成・中止
   Kikimimi/              macOS アプリ (SwiftUI + AVFoundation)
-    AppModel.swift       状態・ジョブの順番待ち・設定
+    AppModel.swift       アプリ全体の状態 (保存する値・初めの読み込み・設定の保存)
+    AppModel+Jobs.swift  ファイルを開く・仕事の順番待ち・文字起こしを走らせる・消す
+    AppModel+PostTasks.swift 監査・翻訳を走らせる
+    AppModel+Models.swift モデルの取得・LLM・追加学習の差分
+    AppModel+Chat.swift  チャット (LLM を走らせる口・設定の読み書きの表)
+    AppModel+Learning.swift 学習した直し・訳の記憶
+    AppModel+Recording.swift / +Export.swift / +Library.swift 録音 / 書き出し / ライブラリと履歴
+    Job.swift            1 件の文字起こしと、その仕事・状態の型
+    UILanguageSetting.swift 画面の言語を、起動の初めに決める
     TranscriptionService.swift  推論専用スレッド、モデルの使い回し
     LLMService.swift     LLM 専用スレッド、モデルの使い回し、チャットの割り込み
     LLMSelfTest.swift    --selftest-llm (診断・CI 用)

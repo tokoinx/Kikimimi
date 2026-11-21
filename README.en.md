@@ -557,7 +557,15 @@ Sources/
   KikimimiLLM/           Thin layer over the llama.cpp C API
     LlamaEngine.swift    Loading, LoRA adapters, chat templates, grammar-constrained greedy generation, cancellation
   Kikimimi/              The macOS app (SwiftUI + AVFoundation)
-    AppModel.swift       State, job queue, settings
+    AppModel.swift       The app-wide state (stored values, initial loading, saving settings)
+    AppModel+Jobs.swift  Opening files, the job queue, running transcription, deleting
+    AppModel+PostTasks.swift Running audits and translations
+    AppModel+Models.swift Getting models, the LLM, fine-tuning adapters
+    AppModel+Chat.swift  Chat (the entry that runs the LLM, the table for reading and changing settings)
+    AppModel+Learning.swift Learned corrections, translation memory
+    AppModel+Recording.swift / +Export.swift / +Library.swift Recording / export / library and history
+    Job.swift            One transcription job and the types for its tasks and state
+    UILanguageSetting.swift Decides the display language at the very start of launch
     TranscriptionService.swift  Dedicated inference thread, model reuse
     LLMService.swift     Dedicated LLM thread, model reuse, letting the chat slip in
     LLMSelfTest.swift    --selftest-llm (diagnostics and CI)
