@@ -303,14 +303,14 @@ LLM とのチャット (2026-11-20、1ef6407):
   - 台本の写しを別の置き場 (`build/probe/`) に向けて試した (2026-11-15。動いているアプリには触っていない)。読み込めないアプリ (同梱した `whisper.framework` を外した物): 終了コード 1、dyld の `Library not loaded` の文と ✗ の文が出て、前のアプリは同じ物のまま元の場所に在り、読み込めなかった物は `.new` に残った。確かめの途中で止めた時 (Ctrl-C と同じ合図): 新しいアプリが元の場所に、前のアプリが `.previous` に残り、プロセスは残らない。次の実行は終了コード 0 で終わり、`.previous` は消える。
 
 エージェントの仕事の仕組み:
-- 結果の一覧の決まり (`CLAUDE.md`) を、書き方で見る検査は無い。破った時の重さは、`make check-ui` と CI の 3000 行の確認が測る (足す時の形は、この下の「リファクタリングの案」の 7)。
+- 結果の一覧の決まり (`CLAUDE.md`) は、2026-11-21 から `swift test` の `TranscriptListRulesTests` が書き方で見る (この下の「リファクタリングの案」の 7。見逃す形も、そこに在る)。破った時の重さは、前と同じく `make check-ui` と CI の 3000 行の確認が測る。
 - 報告の型 (動かした事実と、確かめていない事を書く) を、どの指示ファイルに置くかが決まっていない。
 - main へのマージをしない決まり (`CLAUDE.md`) は、門では止まらなくなった (`git merge` は確認なしで通る)。GitHub の側で main の枝を守るかは、利用者が決める。
 - 前の引き継ぎに在った「実機でまだ確かめていない事」「分かっている小さな穴」「残っている案」の一覧は、ここに入っていない。2026-11-15 に利用者の Mac の中を探したが、その文書は見つからなかった。
 
 ## リファクタリングの案 (2026-11-20)
 
-**1〜6 は行った (2026-11-20〜21、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」「案 5 へ進む」「案 6 へ進む」)。7・8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
+**1〜7 は行った (2026-11-20〜21、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」「案 5 へ進む」「案 6 へ進む」「案 7 へ進む」)。8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
 
 1. **確認用の起動の判定を 1 か所に**: 「`--selftest-…` か」を、`AppModel`・`PracticeController`・`UILanguageSetting` が別々に見ていて、本物の設定に書いていた不具合 (上の「確認用の起動と本物の設定」) の元になった。1 つの型 (例: `LaunchMode`) にまとめ、設定に書く所は全部そこを通す。小さい。先に行う値打ちが在る。
    - **行った (2026-11-20)**: 判定は `Sources/KikimimiCore/LaunchMode.swift` (`app`・`selfTest`・`tool`) だけ、設定 (UserDefaults) に書く所は `Sources/KikimimiCore/SettingsWriter.swift` だけにした (ふつうの起動の時だけ書く)。ばらばらだった判定 6 か所を消し、書き込み 7 か所を通した。
@@ -371,6 +371,15 @@ LLM とのチャット (2026-11-20、1ef6407):
    - **確かめていない事**: 0 でない終了コードを、アプリを本当に失敗させて出す事はしていない (決め方は試験で、数が出る道は 0 の時だけ見た)。絵 (`build/ui-shots`) は開いて見ていない。比べたのは行の集まりで、行の並びは比べていない。
    - **気づいて、直していない事**: `.github/workflows/build.yml` の測り直しの段 (161 行 `if [ "$code" -eq 5 ]`) は、数の 5 を直に書いていて、`UILoadExit` の表と結び付いていない (試験も見ていない)。`UILoadExit.decide` は、`ok`・`noWindow`・`hang` が集まりに入っていても無視する (今の使い方では入らない)。
 7. **`TranscriptDetailView.swift` の一覧を別のファイルに切り出す**: 一覧の 4 つの決まりを、書き方で見る検査 (ソースの走査) を足せる形にする (今は検査が無い。上の「残っている事」の「エージェントの仕事の仕組み」に前から在る残りの事)。
+   - **行った (2026-11-21)**: `Sources/Kikimimi/Views/TranscriptDetailView.swift` (2063 行) の 479〜952 行を、2 つに切り出した (残りは 1589 行)。`Views/TranscriptListView.swift` (165 行。一覧 `TranscriptListView` と、その中身 `TranscriptRows` だけ)、`Views/TranscriptListSupport.swift` (338 行。`FollowButton`・`ListFollow`・`RowHighlight`・`RowTint`・`RowTintCell`・`CurrentLineTracker`・`PracticeRowsFeeder`。よく変わる状態を見てよい部品)。行の部品 (`PlayableRow`・`SegmentRow`・`BilingualRow` など) と、呼ぶ側 (`transcriptColumn` の `.id(job.id)`) は、元のファイルに残した。
+   - **文を変えた所は 2 つだけ** (一覧のファイルに、追いかけるか `follow.isOn` を読む文を残さないため): (a) 一覧の `.onAppear`・`.onDisappear` の中の、確認の口 (`UILoadHooks.register`・`unregister`) の塊を、`ListFollow.registerSelfTestHooks(proxy:)`・`unregisterSelfTestHooks()` へ。(b) 一覧の終わりの印の `.onAppear` の中の `Task { … }` を、`ListFollow.followAgainOnNextTurn()` へ。中の文は、`follow` が `self` になっただけ。ほかは、台本で行の範囲ごとに写した (元と新しい 3 つを行の集まりで比べ、元にしか無い 6 行・新しい側にしか無い 30 行は、全部が a・b・初めの注釈・関数の説明・`import`)。`private` を外したのは 4 つ (`FollowButton`・`CurrentLineTracker`・`PracticeRowsFeeder`・`RowMetrics`)。
+   - **足した試験**: `Tests/KikimimiCoreTests/TranscriptListRulesTests.swift` (5 つ。注釈と文字列の中身を除いてから見る)。決まり 1: 一覧のファイルに `GeometryReader`・`ScrollView {`・`LazyVStack(` が在り、`GeometryReader` が先、`.frame(width: geometry.size.width, height: geometry.size.height)` が在り、`List` が無い。決まり 2: `Sources/Kikimimi` の `TranscriptListView(` のどれにも `.id(job.id)` が続き、一覧のファイルに `.id(` が 0 個、`TranscriptDetailView.swift` に 1 個だけ。決まり 3: `Sources/Kikimimi` のどこにも `HSplitView`・`VSplitView` が無い (決まりより広く禁じている。一覧を包まない所で要る時は、試験の `splitViewAllowed` に、そのファイルを足す)。決まり 4: 一覧のファイルに、再生 (`model.player`・`currentTime`・`isPlaying` など)・練習 (`model.practice`・`RevealCell` など)・メモ (`.notes`・`showNotes` など)・追いかけるか (`.isOn`)・行の色 (`highlight.` の後に語が続く形・`RowTintCell` など) の語が無く、`model.` から読むのは `canPlayLines`・`showTimestamps`・`searchText` だけで、型は `TranscriptListView`・`TranscriptRows` だけ。
+   - **試験が効く事**: 7 通りにわざと破り (`.frame` を消す・`LazyVStack` を `VStack` に・呼ぶ側の `.id(job.id)` を消す・行に `.id(item.id)` を足す・`transcriptColumn` を `HSplitView` で包む・body に `model.player.currentTime` を足す・body に `follow.isOn` を足す)、どれも、その決まりの試験が落ちる事を見て、元に戻した。
+   - **見逃す形** (走査は書き方しか見ない): 一覧の body が、別のファイルの関数や部品を通して状態を読む。禁じた語と違う名前 (別名の変数) で読む。呼ぶ側が一覧を変数に入れてから `.id` を付けずに置く。行の部品 (元のファイルに残した) の中は、決まり 2 の `.id(` の数のほかは見ていない。
+   - **確かめ (手元)**: `swift test` は「Executed 548 tests, with 0 failures」(543 から 5 増えた)。`make app` の警告は 0 (増分のビルド)。`--selftest-ui-load 3000` (音声・絵つき) を新しいコードで 4 回走らせ、どれも終了コード 0 と「LIBRARY CHECK OK」「PRACTICE CHECK OK」「CHAT CHECK OK」「UI LOAD OK」(`SLOW`・`FAILED`・`skipped` の行は 0)。前の出力と、数字を N にして比べると、違いは、版の印・一時フォルダの名前・「長い待ちの上位 5 つ」の顔ぶれだけ。ジョブを選ぶ 3 つの操作で body を動かした行の数は、前と同じ (15,15,15 / 22,22,22 / 40,40,40)。`time tick` は p95 10.7 ms (前 10.5 ms)。絵は、01 (対訳の一覧)・04 (文字起こし中、末尾)・05 (上へ動かした後、「末尾へ」が出ている) を開いて見た。本物の設定の前後の違いは 0 行。
+   - **測った部分の全部で body を動かした行の数** (`rows built during the measured part … bodies N`): 新しいコードの 4 回は 924・796・661・896、同じ時に HEAD のコードで作ったアプリの 2 回は 644・666 だった。**これだけを見ると増えたように見えるが、この数は、コードを変えていなくても 2 つの山に分かれる**: この Mac で 2026-11-19〜21 に走らせた、案 7 の前のコードの 3000 行の確認 35 回では、575〜680 が 18 回、797〜969 が 17 回 (例: 案 5 の時 909・818、案 3 の時 932・915・825、案 6 の時 650・649)。新しいコードの 4 回 (高い山 3・低い山 1) は、この広がりの中に在る。山が 2 つに分かれる理由と、どの段階で増えるのかは、調べていない (確認の出力は、操作ごとの数を、選ぶ操作と遠くへ動かす操作の分しか出さない)。目安 (600) と比べているのは、選ぶ 1 回・遠くへ動かす 1 回の数だけで、この全部の数は比べていない。
+   - **確かめていない事**: Xcode 16.2・26.3 の列 (CI で見る)。「全部の body の数」が、新しいコードで高い山に寄りやすくなったかどうか (4 回では分からない)。追いかけるのをやめる・また追いかける動きを、手で触って見る事 (絵の 04・05 と、確認が口を通して動かした所だけ)。
+   - **合わせて直した文書**: `CLAUDE.md` の「結果の一覧」(見出しのファイル名、理由の在る場所、「検査」の行)、手順書 `kikimimi-verify` の「結果の一覧に触った」の行、`README.md`・`README.en.md` の「構成」。
 8. **`LlamaEngine` を llama.cpp の新しい呼び出しに合わせる** (`llama_batch_ext_init`・`llama_process`): b12556 で非推奨の警告が 4 つ出る。次に版を上げる時に、古い呼び出しが消えると通らなくなる。
 
 ## 続けるのに要る参照

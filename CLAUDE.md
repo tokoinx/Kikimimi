@@ -10,16 +10,16 @@
 - コメントは、平易な日本語で書く (文面のみ。機械の検査なし)。
 - 画面の文は、コードに日本語で直に書かない。`L("英語の文")`・`LPlural(…)` で書き (鍵 = 平易な英語。英語の画面にはそのまま出る)、同じ鍵の訳を、日本語の表 (`Sources/KikimimiCore/L10n/ja/`) と、ほかの 11 言語の表 (`Sources/KikimimiCore/L10n/<コード>/`) の全部に足す。手順・英語の書き方・語の一覧・訳さない物は `docs/L10N.md` (検査: `swift test` の `L10nTests`。鍵が表に無い・表に使っていない鍵が在る・言語ごとに鍵や置き換えの印が合わない・`L` を通らない日本語の文が残っている、のどれでも落ちる)。
 
-## 結果の一覧 (`Sources/Kikimimi/Views/TranscriptDetailView.swift`)
+## 結果の一覧 (`Sources/Kikimimi/Views/TranscriptListView.swift`)
 
-破ると、数千行の結果で画面が 5〜20 秒固まる。理由と測った値は、このファイルの注釈に在る。
+破ると、数千行の結果で画面が 5〜20 秒固まる。理由と測った値は、このファイルと、呼ぶ側 (`TranscriptDetailView.swift` の `transcriptColumn`) の注釈に在る。よく変わる状態を見る部品は、`TranscriptListSupport.swift` に置く。
 
 - 一覧は、`GeometryReader` の中の `ScrollView` + `LazyVStack` に置き、大きさを外から決める。
 - 一覧は、結果ごとに `.id(job.id)` で作り直す。行には `.id()` を付けない。
 - 一覧を `HSplitView`・`VSplitView` で包まない。
 - 一覧の `body` は、よく変わる状態 (再生位置・メモ・練習) を読まない。
 
-(検査: 書き方を見る検査は無い。破った時の重さは、下の「アプリの確認」が測る。)
+(検査: `swift test` の `TranscriptListRulesTests` が、4 つとも書き方で見る。別のファイルの関数を通して状態を読む形などは見逃す。破った時の重さは、下の「アプリの確認」が測る。)
 
 ## git
 

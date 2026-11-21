@@ -595,6 +595,8 @@ Sources/
       HistorySheet.swift 履歴の画面 (版を残す・戻す・消す)
       DeleteConfirmSheet.swift  ゴミ箱に入れるかを確かめる画面 (消える物・残る物のパス)
       TranslationEditSheet.swift  訳を直す画面 (要確認の理由、「この訳でよい」、機械の訳に戻す)
+      TranscriptListView.swift  結果の一覧 (数千行。固まらないための 4 つの決まりは、TranscriptListRulesTests が書き方で見る)
+      TranscriptListSupport.swift  一覧を支える部品 (「末尾へ」・追いかけるか・行の色・再生と練習の様子を見る見えない部品)
 Resources/               Info.plist、アイコン
 Scripts/build-app.sh     .app の組み立て
 Scripts/run-app.sh       起動 (make run)。動いているものを終了させてから開き、動いたかを確かめる
