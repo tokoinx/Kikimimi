@@ -506,6 +506,7 @@ Sources/
     VADDropCheck.swift   無音を飛ばす機能 (VAD) が、大事な音まで飛ばしたらしいかの判定
     L10n/                画面の言語 (13 言語)。L・LPlural、言語ごとの表 (鍵 = 英語の文)。決まりは docs/L10N.md
     WAV.swift            録音の保存 (16-bit PCM)
+    UILoadExit.swift     画面の重さの確認 (--selftest-ui-load) の終了コードの表 (数と、複数が失敗した時の順)
     Practice/            聞き取りの練習 (再生の係に依存しない部分)
       PracticeSettings.swift  速さ・繰り返し・間・自動で次へ・隠す の設定と保存
       LineSequencer.swift  次に何をするか (流す・待つ・止める) を決める
@@ -573,7 +574,10 @@ Sources/
     TrainingExport.swift --export-training (監査の追加学習用のデータの書き出し)、--export-translation-training (翻訳の追加学習用)
     WhisperSelfTest.swift  --selftest-whisper (診断・CI 用)
     LaunchSelfTest.swift --selftest-launch (起動とウインドウの確認。make doctor・CI 用)
-    UILoadSelfTest.swift --selftest-ui-load (数千行の結果で画面が固まらないか・保存の確認。CI 用)
+    UILoadSelfTest.swift --selftest-ui-load (数千行の結果で画面が固まらないか・保存の確認。CI 用) の入口と、確認の順
+    UILoadRun.swift / +Measure.swift / +Screenshots.swift 確認用のジョブと測った値 / 重さを測る所 / ウインドウの絵
+    UILoadLineCheck.swift / UILoadPracticeCheck.swift / UILoadLibraryCheck.swift 1 行だけの再生 / 練習 / 保存の確認
+    UILoadLimits.swift / UILoadTiming.swift / UILoadHooks.swift 合格の目安 / 時間を測る道具 / 一覧を動かす口
     LibraryWriter.swift  ライブラリへの書き込みを、裏の 1 本の列で順に行う
     AudioDecoder.swift   音声/動画 → 16 kHz モノラル
     LiveRecorder.swift   マイク録音

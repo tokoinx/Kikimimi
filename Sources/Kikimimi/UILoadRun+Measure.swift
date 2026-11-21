@@ -1,0 +1,499 @@
+// 画面の重さを測る所: 操作を起こす段階、1 回ずつ測る所、一覧の行を作る手間、結果の行と、目安を超えた物。
+
+import Foundation
+import KikimimiCore
+
+extension LoadRun {
+    // MARK: 操作
+
+    func drive() async {
+        probe.start()
+        let started = Date()
+        let rowsAtStart = UILoadHooks.rowsBuilt
+        let bodiesAtStart = UILoadHooks.rowBodies
+        // 1. 終わったジョブ (対訳)
+        await measure(Action.selectBilingual) { model.select(doneBilingual) }
+        await UILoadSelfTest.sleep(0.5)
+        await phase(Phase.bilingual) {
+            feedAction = Action.appendOther
+            await drivePlayback(seconds: 8, lineJob: doneBilingual, steady: false)
+        }
+        // 同じジョブの中で、再生位置を遠くへ動かす (段階の外。2 回ずつ)
+        await jumpRound()
+        // 2. 終わったジョブ (ふつう)
+        await measure(Action.selectPlain) { model.select(donePlain) }
+        await UILoadSelfTest.sleep(0.5)
+        await phase(Phase.plain) {
+            await drivePlayback(seconds: 8, lineJob: donePlain, steady: false)
+        }
+        // 3. 文字起こし中のジョブ (1 秒に 10 区間)
+        feedAction = nil
+        // ふつうの再生をまねるのをやめる (段階 3 の初めは、再生していないときに一覧の終わりを追いかけるところを見る)
+        player.selfTestSetTime(simulated, playing: false)
+        await measure(Action.selectRunning) { model.select(running) }
+        await UILoadSelfTest.sleep(0.5)
+        await phase(Phase.steady) {
+            feedAction = Action.steadyBatch
+            rowsAdded = true
+            await drivePlayback(seconds: 7, lineJob: running, steady: true)
+            rowsAdded = false
+        }
+        feedAction = nil
+        player.stopLine()
+        player.selfTestSetTime(simulated, playing: false)
+        // ジョブを選び直す (2 回目)。文字起こし中のジョブを選び直すと、一覧はまた終わりを追いかける
+        await selectRound()
+        // 4. 文字起こし中のジョブ (いっぺんに届く)
+        await phase(Phase.burst) {
+            feedAction = Action.appendSelected
+            for _ in 0..<6 {
+                deliver(1)
+                // まとめる間より長くあける (1 つずつ足されるように)
+                await UILoadSelfTest.sleep(batchInterval + 0.4)
+            }
+            feedAction = nil
+            for _ in 0..<3 {
+                await burst(300)
+                await UILoadSelfTest.sleep(1.0)
+            }
+        }
+        // ジョブを選び直す (3 回目)
+        await selectRound()
+        probe.stop()
+        // 届いていない合図を待つ
+        await UILoadSelfTest.sleep(0.3)
+        rowsBuiltTotal = UILoadHooks.rowsBuilt - rowsAtStart
+        rowBodiesTotal = UILoadHooks.rowBodies - bodiesAtStart
+        log.summaryLine = String(format: "driven for %.1f s: %d ticks (%d of them moved the current row), %d one-line starts,"
+                                 + " %d segments delivered to the running job (it now has %d rows; batches are applied every"
+                                 + " %.2f s at that size)",
+                                 Date().timeIntervalSince(started), ticks, rowChanges, lineStarts, delivered,
+                                 running.transcript?.segments.count ?? 0, batchInterval)
+    }
+
+    private func selectRound() async {
+        await measure(Action.selectBilingual) { model.select(doneBilingual) }
+        await UILoadSelfTest.sleep(0.3)
+        await measure(Action.selectPlain) { model.select(donePlain) }
+        await UILoadSelfTest.sleep(0.3)
+        await measure(Action.selectRunning) { model.select(running) }
+        await UILoadSelfTest.sleep(0.5)
+    }
+
+    /// 終わったジョブ (対訳) を一覧の始めで出したまま、再生位置を 8 割ほど下の行の始まりへ動かして再生し
+    /// (再生のつまみを遠くへ動かして再生したとき。いまの行が変わるので、一覧はその行へ動く)、また始めのほうの行へ戻す。2 回ずつ。
+    /// 段階 1 のすぐあとに呼ぶ。終わりに、再生位置と再生中かを段階 1 の終わりのものへ戻し、一覧がそこへ動き終わるのを待つ
+    /// (段階 2 は、その位置から、ふつうの再生のまねを続ける)
+    private func jumpRound() async {
+        guard let segments = doneBilingual.transcript?.segments, segments.count >= 2 else { return }
+        if player.playingLineID != nil { player.stopLine() }
+        let time = player.currentTime
+        let wasPlaying = player.isPlaying
+        // 一覧の始めを出す (段階 1 で動いたのは始めのほうだけだが、念のため)
+        UILoadHooks.scrollList?(segments[0].id, .top)
+        await settle()
+        let far = segments[segments.count * 8 / 10]
+        let near = segments[1]
+        for _ in 0..<2 {
+            await measure(Action.jumpFar) { player.selfTestSetTime(far.start, playing: true) }
+            await UILoadSelfTest.sleep(0.5)
+            await measure(Action.jumpBack) { player.selfTestSetTime(near.start, playing: true) }
+            await UILoadSelfTest.sleep(0.5)
+        }
+        player.selfTestSetTime(time, playing: wasPlaying)
+        await settle()
+    }
+
+    /// 段階を 1 つ行う (見張りの値を、この段階の名前で分ける)。終わりに、まとめて足すのが済むまで待つ
+    private func phase(_ name: String, _ body: () async -> Void) async {
+        probe.setPhase(name)
+        let start = UILoadSelfTest.now()
+        await body()
+        await UILoadSelfTest.sleep(batchInterval + 0.15)
+        phaseTimes[name] = (start, UILoadSelfTest.now())
+        probe.setPhase(Phase.between)
+    }
+
+    /// 1 秒に 10 回の拍で、再生位置・1 行だけの再生・区間・進み具合を起こす。
+    /// steady でないとき: ふつうの再生をまね (位置は本当の見張りと同じく 1 秒に 5 回、0.2 秒ずつ進む。1 行だけの再生の
+    /// あいだは進めない)。後半は、1 行だけの再生を 1 秒に 1 回始め、0.5 秒後に止める。
+    /// 文字起こし中のジョブ (選んでいない) へ 1.5 秒に 1 回、区間を 1 つずつ届ける (まとめる間の 1 秒より長くあける)。
+    /// steady のとき: 区間を毎拍 1 つ (1 秒に 10)。初めの 2.5 秒は再生しない。そのあとは 1 行だけの再生を 1 秒に 1 回始め、
+    /// 0.5 秒後に止め、再生しているあいだは、その行の中で位置を進める。
+    /// どちらも進み具合を 1 秒に 2 回変える
+    private func drivePlayback(seconds: Double, lineJob: Job, steady: Bool) async {
+        let started = Date()
+        var tick = 0
+        while Date().timeIntervalSince(started) < seconds {
+            let elapsed = Date().timeIntervalSince(started)
+            if steady || tick % 15 == 0 { deliver(1) }
+            if tick % 2 == 0 {
+                if !steady {
+                    if player.playingLineID == nil {
+                        simulated += 0.2
+                        if simulated > Double(rows) * UILoadSelfTest.rowSpacing { simulated = 0 }
+                        await advance(to: simulated, in: lineJob)
+                    }
+                } else if player.playingLineID != nil {
+                    await advance(to: player.currentTime + 0.2, in: lineJob)
+                }
+            }
+            if steady {
+                let lineTicks = elapsed >= 2.5
+                if lineTicks, tick % 10 == 5 {
+                    if player.playingLineID != nil {
+                        await measure(Action.lineStop) { player.stopLine() }
+                    } else {
+                        await startLine(in: lineJob)
+                    }
+                } else if lineTicks, tick % 10 == 0, player.playingLineID != nil {
+                    await measure(Action.lineStop) { player.stopLine() }
+                }
+            } else if elapsed >= seconds / 2 {
+                if tick % 10 == 0, player.playingLineID == nil {
+                    await startLine(in: lineJob)
+                } else if tick % 10 == 5, player.playingLineID != nil {
+                    await measure(Action.lineStop) { player.stopLine() }
+                }
+            }
+            if tick % 5 == 2 {
+                await measure(Action.progress) {
+                    running.progress = min(0.99, running.progress + 0.001)
+                    running.message = "認識中 \(Int(running.progress * 100))%"
+                }
+            }
+            tick += 1
+            let next = started.addingTimeInterval(Double(tick) * 0.1)
+            await UILoadSelfTest.sleep(max(0, next.timeIntervalSinceNow))
+        }
+        if player.playingLineID != nil {
+            await measure(Action.lineStop) { player.stopLine() }
+        }
+    }
+
+    /// 再生位置を変える (本当の見張りの知らせと同じ)。いまの行が変わるかで、操作を分けて記録する
+    private func advance(to position: Double, in job: Job) async {
+        let count = job.transcript?.segments.count ?? 0
+        let moves = UILoadSelfTest.rowIndex(at: player.currentTime, rows: count)
+            != UILoadSelfTest.rowIndex(at: position, rows: count)
+        await measure(moves ? Action.rowChange : Action.tick) { player.selfTestSetTime(position, playing: true) }
+        ticks += 1
+        if moves { rowChanges += 1 }
+    }
+
+    /// 文字起こし中のジョブで、いまの行の数のときに、届いた区間をまとめて足す間 (秒)
+    private var batchInterval: Double {
+        LiveSegmentBuffer.interval(forRows: running.transcript?.segments.count ?? 0)
+    }
+
+    /// いまの位置の少し後ろの行を、1 行だけ再生する (音声が短いときは、音声の中の行)
+    private func startLine(in job: Job) async {
+        guard let segments = job.transcript?.segments, !segments.isEmpty else { return }
+        var index = min(segments.count - 1, Int(simulated / UILoadSelfTest.rowSpacing) + 3)
+        if job === running {
+            // 文字起こし中のジョブでは、終わりのほうの行 (使う人が、出てきた行を聞き直すところ)
+            index = max(0, segments.count - 1 - (lineStarts % 20))
+        }
+        if player.duration > 0, segments[index].start > player.duration - 1 {
+            index = lineStarts % max(1, min(segments.count, Int(player.duration / UILoadSelfTest.rowSpacing) - 1))
+        }
+        let segment = segments[index]
+        await measure(Action.lineStart) { player.playLine(id: segment.id, start: segment.start, end: segment.end) }
+        lineStarts += 1
+    }
+
+    /// 文字起こし中のジョブへ、区間を別のスレッドから届ける (認識のスレッドと同じく、1 つずつ入れ物に入れる)
+    private func deliver(_ count: Int) {
+        guard let feed else { return }
+        let segments = UILoadSelfTest.makeSegments(nextSegment..<(nextSegment + count))
+        nextSegment += count
+        delivered += count
+        log.note(count == 1 ? "deliver 1 segment to the running job" : "deliver \(count) segments to the running job")
+        DispatchQueue.global(qos: .userInitiated).async {
+            for segment in segments { feed.append(segment) }
+        }
+    }
+
+    /// 300 の区間をいっぺんに届け、まとめて足し始めてから、すべてが文字起こしに入り、メインスレッドが空くまでを測る。
+    /// 届けてから足し始めるまで (まとめる間を待つだけで、メインスレッドは空いている) は、別に記録する
+    private func burst(_ count: Int) async {
+        let target = (running.transcript?.segments.count ?? 0) + count
+        let started = UILoadSelfTest.now()
+        awaitingBurst = true
+        burstApplied = nil
+        deliver(count)
+        let deadline = Date().addingTimeInterval(5)
+        while (running.transcript?.segments.count ?? 0) < target, Date() < deadline {
+            await UILoadSelfTest.sleep(0.01)
+        }
+        awaitingBurst = false
+        let applied = burstApplied ?? started
+        burstWaits.append(UILoadSelfTest.seconds(from: started, to: applied))
+        let seconds = await UILoadSelfTest.untilIdle(since: applied)
+        measured[Action.burst, default: []].append(seconds)
+    }
+
+    /// 入れ物が、まとめた区間を足した (AppModel.liveFeed から)。足し始めてから、メインスレッドが空くまでを測る
+    func batchApplied(count: Int, started: UInt64) {
+        log.note("batch of \(count) segments applied to the running job", at: started)
+        if awaitingBurst, burstApplied == nil { burstApplied = started }
+        guard let action = feedAction else { return }
+        // 1 つずつの区間のはずが、まとめて足された (届けるのが遅れた) ものは、1 つの区間の操作に入れない
+        if action != Action.steadyBatch, count != 1 { return }
+        Task { @MainActor in
+            let seconds = await UILoadSelfTest.untilIdle(since: started)
+            self.measured[action, default: []].append(seconds)
+        }
+    }
+
+    /// 操作をメインスレッドで行い、メインスレッドがまた空くまでを測る。
+    /// 段階 3 のあいだは、再生位置・1 行だけの再生を Action.whileAdded の名前で記録する
+    private func measure(_ action: String, _ body: () -> Void) async {
+        let name = rowsAdded ? (Action.whileAdded[action] ?? action) : action
+        log.note(name)
+        let rowsBefore = UILoadHooks.rowsBuilt
+        let bodiesBefore = UILoadHooks.rowBodies
+        let started = UILoadSelfTest.now()
+        body()
+        let seconds = await UILoadSelfTest.untilIdle(since: started)
+        measured[name, default: []].append(seconds)
+        // ジョブを選ぶ・再生位置を遠くへ動かす操作は、そのあいだに一覧が作った行と、body を動かした行の数も記録する
+        if Self.rowCountedActions.contains(name) {
+            rowsBuiltBySelect[name, default: []].append(UILoadHooks.rowsBuilt - rowsBefore)
+            rowBodiesBySelect[name, default: []].append(UILoadHooks.rowBodies - bodiesBefore)
+        }
+    }
+
+    /// ジョブを選ぶ操作 (目安は最大だけ。結果には、測った順の値も出す)
+    private static let selectActions = [Action.selectBilingual, Action.selectPlain, Action.selectRunning]
+    /// 終わったジョブの中で、再生位置を遠くへ動かす操作 (ジョブを選ぶ操作と同じく、目安は最大だけで、測った順の値も出す)
+    private static let jumpActions = [Action.jumpFar, Action.jumpBack]
+    /// 一覧が作った行と、body を動かした行の数を記録し、body の数を目安 (selectRowsBuiltMax) と比べる操作
+    private static let rowCountedActions = selectActions + jumpActions
+
+    /// 操作ごとの目安 (p95 が nil なら最大だけ)。required でないものは、測れなくても失敗にしない
+    /// (段階 3 で、いまの行が変わる再生位置は、起きないことがある)
+    private static var actionLimits: [(action: String, p95: Double?, max: Double, required: Bool)] {
+        var limits: [(action: String, p95: Double?, max: Double, required: Bool)] = [
+            (Action.tick, Limits.tickP95, Limits.tickMax, true)
+        ]
+        for action in [Action.rowChange, Action.lineStart, Action.lineStop] {
+            limits.append((action, Limits.rowP95, Limits.rowMax, true))
+        }
+        for action in [Action.tickWhileAdded, Action.lineStartWhileAdded, Action.lineStopWhileAdded] {
+            limits.append((action, Limits.whileAddedP95, Limits.whileAddedMax, true))
+        }
+        limits.append((Action.rowChangeWhileAdded, Limits.whileAddedP95, Limits.whileAddedMax, false))
+        for action in [Action.progress, Action.appendOther] {
+            limits.append((action, Limits.progressP95, Limits.progressMax, true))
+        }
+        limits.append((Action.appendSelected, Limits.appendP95, Limits.appendMax, true))
+        limits.append((Action.steadyBatch, Limits.steadyBatchP95, Limits.steadyBatchMax, true))
+        limits.append((Action.burst, nil, Limits.burst, true))
+        for action in selectActions {
+            limits.append((action, nil, Limits.selectMax, true))
+        }
+        for action in jumpActions {
+            limits.append((action, nil, Limits.jumpMax, true))
+        }
+        return limits
+    }
+
+    // MARK: 一覧の行を作る手間 (画面を使わない)
+
+    /// 結果の画面が、文字起こしが変わるたびに呼ぶもの (TranscriptRowCache: 翻訳の状況・言語の名前と、一覧の行) の手間を、
+    /// 画面を使わずに測る。すべてから作り直す (終わったジョブ 2 つと文字起こし中のジョブ) と、文字起こし中のジョブに
+    /// 10 区間を足す (足した分だけを作る道) を、それぞれ 20 回
+    func costReport() -> [String] {
+        let repetitions = 20
+        func f(_ seconds: Double) -> String { String(format: "%.2f", UILoadSelfTest.ms(seconds)) }
+        func timed(_ body: () -> Void) -> Double {
+            let start = UILoadSelfTest.now()
+            body()
+            return UILoadSelfTest.seconds(from: start, to: UILoadSelfTest.now())
+        }
+        func line(_ what: String, _ values: [Double], _ extra: String = "") -> String {
+            let sorted = values.sorted()
+            return "UI LOAD: cost \(what): median \(f(UILoadSelfTest.percentile(sorted, 0.5))) ms,"
+                + " max \(f(sorted.last ?? 0)) ms (\(values.count) runs\(extra))"
+        }
+        var lines = ["cost: TranscriptRowCache (translation stats, language label and the list rows, what the result view"
+                     + " computes when the transcript changes), timed without a window"]
+        let cases: [(name: String, job: Job, done: Bool, bilingual: Bool)] = [
+            ("finished, bilingual", doneBilingual, true, true),
+            ("finished, plain", donePlain, true, false),
+            ("running", running, false, false)
+        ]
+        for c in cases {
+            guard let transcript = c.job.transcript else { continue }
+            var values: [Double] = []
+            for _ in 0..<repetitions {
+                let cache = TranscriptRowCache()
+                values.append(timed {
+                    _ = cache.summary(of: transcript, job: c.job.id, done: c.done)
+                    _ = cache.items(of: transcript, job: c.job.id, done: c.done, bilingual: c.bilingual, query: "")
+                })
+            }
+            lines.append(line("full rebuild of \(transcript.segments.count) rows (\(c.name))", values))
+        }
+        if let base = running.transcript {
+            var grown = base
+            grown.segments += UILoadSelfTest.makeSegments(nextSegment..<(nextSegment + 10))
+            var values: [Double] = []
+            var used = 0
+            for _ in 0..<repetitions {
+                let cache = TranscriptRowCache()
+                _ = cache.summary(of: base, job: running.id, done: false)
+                _ = cache.items(of: base, job: running.id, done: false, bilingual: false, query: "")
+                values.append(timed {
+                    _ = cache.summary(of: grown, job: running.id, done: false)
+                    _ = cache.items(of: grown, job: running.id, done: false, bilingual: false, query: "")
+                })
+                if cache.lastSummaryWasAppend && cache.lastItemsWasAppend { used += 1 }
+            }
+            appendPathMissed = repetitions - used
+            lines.append(line("append 10 segments to \(base.segments.count) rows (running)", values,
+                              ", the append path was used in \(used)"))
+        }
+        return lines
+    }
+
+    // MARK: 結果
+
+    func report() -> [String] {
+        /// 秒を、小数 1 けたのミリ秒の文字に
+        func f(_ seconds: Double) -> String { String(format: "%.1f", UILoadSelfTest.ms(seconds)) }
+        var lines: [String] = []
+        if let summary = log.summaryLine { lines.append(summary) }
+        lines.append("hover: not driven (the hover tint is state inside each row)")
+        lines.append("actions: time from just before the action until the main thread is idle again"
+                     + " (rounds of a main-queue block and the run loop's beforeWaiting, at least 2, until a round"
+                     + " finds no new work)")
+        for action in Action.all {
+            let inOrder = measured[action] ?? []
+            let values = inOrder.sorted()
+            guard !values.isEmpty else {
+                lines.append("UI LOAD: action \"\(action)\": no samples")
+                continue
+            }
+            // p95 の目安がある操作で、測った数が足りないときは、p95 を比べないことも出す
+            let hasP95Limit = Self.actionLimits.contains { $0.action == action && $0.p95 != nil }
+            let unchecked = hasP95Limit && values.count < Limits.p95MinSamples
+                ? ", n < \(Limits.p95MinSamples): p95 not checked" : ""
+            lines.append("UI LOAD: action \"\(action)\": n \(values.count), median \(f(UILoadSelfTest.percentile(values, 0.5))) ms,"
+                         + " p95 \(f(UILoadSelfTest.percentile(values, 0.95))) ms, max \(f(values[values.count - 1])) ms" + unchecked)
+            // ジョブを選ぶ・再生位置を遠くへ動かす操作は、測った順の値も出す (初めの 1 回だけが遅いのかを見分ける)
+            if Self.rowCountedActions.contains(action) {
+                lines.append("UI LOAD: samples \"\(action)\": " + inOrder.map(f).joined(separator: ", ") + " ms")
+                let built = (rowsBuiltBySelect[action] ?? []).map { String($0) }.joined(separator: ", ")
+                let bodies = (rowBodiesBySelect[action] ?? []).map { String($0) }.joined(separator: ", ")
+                lines.append("UI LOAD: rows built \"\(action)\": inits \(built); bodies \(bodies)")
+            }
+        }
+        if let rowsBuiltTotal, let rowBodiesTotal {
+            lines.append("UI LOAD: rows built during the measured part: inits \(rowsBuiltTotal), bodies \(rowBodiesTotal)"
+                         + " (PlayableRow inits and bodies; limit per select or jump: \(Limits.selectRowsBuiltMax) bodies)")
+        }
+        let samples = probe.samples()
+        lines.append("watchdog: a background thread posts a block to the main queue every 50 ms (without waiting for the"
+                     + " previous one) and records how long it waited")
+        for name in Phase.all {
+            let mine = samples.filter { $0.phase == name }
+            let waits = mine.map(\.wait).sorted()
+            let span = phaseTimes[name].map { UILoadSelfTest.seconds(from: $0.start, to: $0.end) } ?? 0
+            let expected = Int(span / LatencyProbe.interval)
+            let unavailable = LatencyProbe.unavailable(mine)
+            let share = span > 0 ? unavailable / span * 100 : 0
+            lines.append("UI LOAD: phase \"\(name)\" (" + String(format: "%.1f", span) + " s): samples expected \(expected),"
+                         + " sent \(probe.sent(in: name)), received \(mine.count),"
+                         + " median \(f(UILoadSelfTest.percentile(waits, 0.5))) ms, p95 \(f(UILoadSelfTest.percentile(waits, 0.95))) ms,"
+                         + " max \(f(waits.last ?? 0)) ms, main thread unavailable \(f(unavailable)) ms"
+                         + " (" + String(format: "%.1f", share) + "% of the phase)")
+        }
+        if !burstWaits.isEmpty {
+            let waits = burstWaits.sorted()
+            lines.append("burst: the action is timed from the start of applying the batch; before that the segments waited"
+                         + " in the buffer for the batching interval (main thread free): median \(f(UILoadSelfTest.percentile(waits, 0.5))) ms,"
+                         + " max \(f(waits[waits.count - 1])) ms")
+        }
+        // いちばん長い待ち 5 つ (4 つの段階の中。ジョブを選ぶ待ちは、上の select の行に出ている)
+        let longest = samples.filter { Phase.all.contains($0.phase) }.sorted { $0.wait > $1.wait }.prefix(5)
+        for (i, sample) in longest.enumerated() {
+            lines.append("UI LOAD: stall \(i + 1): \(f(sample.wait)) ms in \"\(sample.phase)\","
+                         + " last action before it: \(log.last(before: sample.ran) ?? "(none)")")
+        }
+        return lines
+    }
+
+    /// 目安を超えたもの (無ければ空)
+    func limitFailures() -> [String] {
+        func f(_ seconds: Double) -> String { String(format: "%.0f", UILoadSelfTest.ms(seconds)) }
+        var failures: [String] = []
+        func check(_ action: String, p95 p95Limit: Double?, max maxLimit: Double, required: Bool) {
+            let values = (measured[action] ?? []).sorted()
+            guard !values.isEmpty else {
+                if required { failures.append("\"\(action)\" was not measured") }
+                return
+            }
+            let p95 = UILoadSelfTest.percentile(values, 0.95)
+            let worst = values[values.count - 1]
+            // 測った数が少ないと、p95 は最大と同じになるので比べない (最大だけを比べる)
+            if let p95Limit, values.count >= Limits.p95MinSamples, p95 >= p95Limit {
+                failures.append("\"\(action)\" p95 \(f(p95)) ms >= \(f(p95Limit)) ms")
+            }
+            if worst >= maxLimit {
+                failures.append("\"\(action)\" max \(f(worst)) ms >= \(f(maxLimit)) ms")
+            }
+        }
+        for limit in Self.actionLimits {
+            check(limit.action, p95: limit.p95, max: limit.max, required: limit.required)
+        }
+        // ジョブを選ぶ 1 回・再生位置を遠くへ動かす 1 回で、一覧が body を動かした行の数 (一覧が行を遅れて並べているか)。
+        // init の数は比べない (一覧が終わりへ飛ぶと、数千になってよい)
+        for action in Self.rowCountedActions {
+            if let worst = rowBodiesBySelect[action]?.max(), worst > Limits.selectRowsBuiltMax {
+                failures.append("\"\(action)\" ran the body of \(worst) rows in one action > \(Limits.selectRowsBuiltMax)"
+                                + " (the list laid out far more rows than it shows)")
+            }
+        }
+        // 一覧が行を並べたのに数えていなければ、上の確かめは役に立たない
+        if rowBodiesTotal == 0 {
+            failures.append("no row bodies were counted while measuring (UILoadHooks.rowBodies is not incremented by"
+                            + " PlayableRow.body)")
+        }
+        // 見張り: 4 つの段階のどれも
+        let watchdogLimits: [(phase: String, max: Double)] = [
+            (Phase.bilingual, Limits.watchdogMax),
+            (Phase.plain, Limits.watchdogMax),
+            (Phase.steady, Limits.watchdogMax),
+            (Phase.burst, Limits.burstWatchdogMax)
+        ]
+        let samples = probe.samples()
+        for limit in watchdogLimits {
+            let waits = samples.filter { $0.phase == limit.phase }.map(\.wait)
+            guard let worst = waits.max() else {
+                failures.append("the watchdog received no samples in \"\(limit.phase)\"")
+                continue
+            }
+            if worst >= limit.max {
+                failures.append("watchdog max \(f(worst)) ms >= \(f(limit.max)) ms in \"\(limit.phase)\"")
+            }
+        }
+        // 段階 3 で、メインスレッドが応えられなかった時間の割合
+        if let times = phaseTimes[Phase.steady] {
+            let span = UILoadSelfTest.seconds(from: times.start, to: times.end)
+            let unavailable = LatencyProbe.unavailable(samples.filter { $0.phase == Phase.steady })
+            if span > 0, unavailable / span >= Limits.steadyUnavailableShare {
+                failures.append("main thread unavailable " + String(format: "%.1f", unavailable / span * 100) + "% of \""
+                                + Phase.steady + "\" >= " + String(format: "%.0f", Limits.steadyUnavailableShare * 100) + "%")
+            }
+        } else {
+            failures.append("the phase \"\(Phase.steady)\" was not timed")
+        }
+        if appendPathMissed > 0 {
+            failures.append("TranscriptRowCache rebuilt all rows \(appendPathMissed) times when 10 segments were appended"
+                            + " (the append path was not used)")
+        }
+        return failures
+    }
+}

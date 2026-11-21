@@ -243,10 +243,12 @@ struct SourceScan {
     ]
 
     /// 鍵も日本語も見ないファイル: 訳の表そのものと、確認用の実行・診断の出力
+    /// (画面の重さの確認は、UILoadSelfTest.swift から分けた Kikimimi/UILoad〜.swift の全部)
     static func skipsEntirely(_ path: String) -> Bool {
         let name = (path as NSString).lastPathComponent
         return path.contains("/L10n/") || path.hasPrefix("KikimimiCore/L10n/")
-            || name.hasSuffix("SelfTest.swift") || name == "LLMEvalRunner.swift" || name == "TrainingExport.swift"
+            || name.hasSuffix("SelfTest.swift") || path.hasPrefix("Kikimimi/UILoad")
+            || name == "LLMEvalRunner.swift" || name == "TrainingExport.swift"
     }
 
     static func run() throws -> SourceScan {

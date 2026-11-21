@@ -310,7 +310,7 @@ LLM とのチャット (2026-11-20、1ef6407):
 
 ## リファクタリングの案 (2026-11-20)
 
-**1〜5 は行った (2026-11-20〜21、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」「案 5 へ進む」)。6〜8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
+**1〜6 は行った (2026-11-20〜21、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」「案 5 へ進む」「案 6 へ進む」)。7・8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
 
 1. **確認用の起動の判定を 1 か所に**: 「`--selftest-…` か」を、`AppModel`・`PracticeController`・`UILanguageSetting` が別々に見ていて、本物の設定に書いていた不具合 (上の「確認用の起動と本物の設定」) の元になった。1 つの型 (例: `LaunchMode`) にまとめ、設定に書く所は全部そこを通す。小さい。先に行う値打ちが在る。
    - **行った (2026-11-20)**: 判定は `Sources/KikimimiCore/LaunchMode.swift` (`app`・`selfTest`・`tool`) だけ、設定 (UserDefaults) に書く所は `Sources/KikimimiCore/SettingsWriter.swift` だけにした (ふつうの起動の時だけ書く)。ばらばらだった判定 6 か所を消し、書き込み 7 か所を通した。
@@ -362,6 +362,14 @@ LLM とのチャット (2026-11-20、1ef6407):
    - **確かめていない事**: Xcode 26.3 の列 (CI で見る)。比べたのは行の集まりで、行の並びは比べていない (並びは、台本が範囲ごとに写した事と、ビルド・試験・アプリの確認が通った事で見ている)。
    - **作り直す時**: 分け方の範囲は、一時の置き場の台本に在った物で、リポジトリには入れていない。
 6. **`UILoadSelfTest.swift` を分ける** (2100 行を超える): 確認ごとのファイルにし、終了コードの決め方を 1 つの表にする。
+   - **行った (2026-11-21)**: `Sources/Kikimimi/UILoadSelfTest.swift` (2103 行) を 10 個に分けた。`UILoadSelfTest.swift` (199 行。初めの注釈・`arm`・確認の順 `run`・`finish`)、`UILoadLimits.swift` (102。`Limits`・`Action`・`Phase`)、`UILoadTiming.swift` (241。メインスレッドが空くまで待つ所・`ActionLog`・`ResumeOnce`・`LatencyProbe`)、`UILoadHooks.swift` (52)、`UILoadRun.swift` (184。`LoadRun` の本体と、確認に使う結果の行を作る所)、`UILoadRun+Measure.swift` (499。重さを測る所・`report`・`limitFailures`)、`UILoadRun+Screenshots.swift` (167)、`UILoadLineCheck.swift` (118)、`UILoadLibraryCheck.swift` (345)、`UILoadPracticeCheck.swift` (254)。チャットの確認 (`ChatCheck`) は、前から `ChatSelfTest.swift` に在る。
+   - **終了コードの表**: `Sources/KikimimiCore/UILoadExit.swift` (`UILoadExit`: 0 ok・1 noWindow・3 hang・5 slow・6 line・7 library・8 practice・9 chat。複数が失敗した時の順 `precedence` と、`decide(failed:)`)。`run` は、失敗した確認を集まりに入れ、この表で 1 つに決める (前は、三項の式を重ねていた)。初めの注釈に数を並べていた段は、表を指す 1 行に替えた。出力の文は変えていない。
+   - **表を守る試験**: `UILoadExitTests` (3 つ)。数が重ならない事、32 通りの失敗の組み合わせで前の式と同じ答えになる事、手順書 (`.claude/skills/kikimimi-verify/SKILL.md`) の終了コードの表の数と「5 > 6 > 7 > 8 > 9 の順」の文が、コードの表と合う事。手順書の表の 9 を一時 10 に変えると、3 つ目が落ちる事を見た (元に戻した)。
+   - **動きは変えていない**: 関数の中の文は、台本で行の範囲ごとに写した。元のファイルと新しい 10 個を行の集まりで比べ (空白と、行の初めの `private`・`fileprivate` を除く。元 1980 行・新 2028 行)、元にしか無い行は 12 行で、全部が終了コードの所 (初めの注釈の 4 行、`code: 1`・`code: 3`、三項の式の 2 行、`if code == 0`、`finish` の宣言・記録・`exit`)。新しい側にしか無い行は 60 行 (終了コードの所 14、各ファイルの初めの注釈 13、拡張の包み 14、`import` 18、表を指す注釈 1)。
+   - **変わった所 (見える範囲)**: 別のファイルから使うために `private`・`fileprivate` を外した物が 40 個 (`LoadRun` のクラスと、保存する値 19 個、`Limits`・`Action`・`Phase`、時間を測る関数、絵を残す関数など)。モジュールの外には出ていない。`L10nTests` の「見ないファイル」に、`Kikimimi/UILoad` で始まる道を足した (前は `SelfTest.swift` で終わる名前で外れていた。分けた名前は当たらず、確認用の日本語の文 24 件で落ちたため。**この名前で始まるファイルに画面の文を書くと、検査の外になる**)。
+   - **確かめ (手元)**: `swift test` は「Executed 543 tests, with 0 failures」(540 から 3 増えた)。`make app` の警告は、前から在る `LlamaEngine.swift` の 4 つだけ。変える前と後のアプリで `--selftest-ui-load 3000` (音声・絵・`--report` つき) を走らせ、どちらも終了コード 0、「LIBRARY CHECK OK」「PRACTICE CHECK OK」「CHAT CHECK OK」「ADAPTER MESSAGE CHECK OK」「UI LOAD OK」(後の `time tick` p95 10.5 ms、`SLOW`・`FAILED`・`skipped` の行は 0)。2 つの出力 (どちらも 130 行) を、数字を N にして比べると、違いは、版の印 (`+` が付く)、一時フォルダの名前、「長い待ちの上位 5 つ」(`UI LOAD: stall`) の顔ぶれだけ。本物の設定 (`defaults read local.kikimimi.app`) の前後の違いは 0 行。
+   - **確かめていない事**: 0 でない終了コードを、アプリを本当に失敗させて出す事はしていない (決め方は試験で、数が出る道は 0 の時だけ見た)。絵 (`build/ui-shots`) は開いて見ていない。比べたのは行の集まりで、行の並びは比べていない。
+   - **気づいて、直していない事**: `.github/workflows/build.yml` の測り直しの段 (161 行 `if [ "$code" -eq 5 ]`) は、数の 5 を直に書いていて、`UILoadExit` の表と結び付いていない (試験も見ていない)。`UILoadExit.decide` は、`ok`・`noWindow`・`hang` が集まりに入っていても無視する (今の使い方では入らない)。
 7. **`TranscriptDetailView.swift` の一覧を別のファイルに切り出す**: 一覧の 4 つの決まりを、書き方で見る検査 (ソースの走査) を足せる形にする (今は検査が無い。上の「残っている事」の「エージェントの仕事の仕組み」に前から在る残りの事)。
 8. **`LlamaEngine` を llama.cpp の新しい呼び出しに合わせる** (`llama_batch_ext_init`・`llama_process`): b12556 で非推奨の警告が 4 つ出る。次に版を上げる時に、古い呼び出しが消えると通らなくなる。
 
