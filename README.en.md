@@ -513,6 +513,7 @@ Sources/
       DictationDisplay.swift  How a dictation result is laid out
       HiddenText.swift   Which text of a row is hidden, the speed labels
     WAV.swift            Saves recordings (16-bit PCM)
+    UILoadExit.swift     The exit codes of the UI load self-test (--selftest-ui-load): the numbers and which one wins when several fail
     Library/             The library (saved results)
       SavedDocument.swift  A saved result, version headers and contents
       LibraryStore.swift   Reads and writes the result folders (keeps unreadable files aside)
@@ -574,7 +575,10 @@ Sources/
     WhisperSelfTest.swift  --selftest-whisper (diagnostics and CI)
     LaunchSelfTest.swift --selftest-launch (launch and window check, for make doctor and CI)
     LibraryWriter.swift  Writes to the library in the background, one write after another
-    UILoadSelfTest.swift --selftest-ui-load (checks that a transcript with thousands of lines does not freeze the window, and the saving, for CI)
+    UILoadSelfTest.swift --selftest-ui-load (checks that a transcript with thousands of lines does not freeze the window, and the saving, for CI): the entry and the order of the checks
+    UILoadRun.swift / +Measure.swift / +Screenshots.swift The test jobs and measured values / measuring the load / pictures of the window
+    UILoadLineCheck.swift / UILoadPracticeCheck.swift / UILoadLibraryCheck.swift The single-line playback / practice / saving checks
+    UILoadLimits.swift / UILoadTiming.swift / UILoadHooks.swift The limits / timing tools / hooks that move the list
     AudioDecoder.swift   Audio/video to 16 kHz mono
     LiveRecorder.swift   Microphone recording
     PlayerController.swift  Playback, seeking and speed

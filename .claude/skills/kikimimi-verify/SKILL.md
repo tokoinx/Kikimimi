@@ -46,6 +46,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | 8 | 練習の確認に失敗 | `PRACTICE CHECK FAILED: …` |
 | 9 | チャットの確認に失敗 | `CHAT CHECK FAILED: <段の名前>` (段ごとに `CHAT CHECK: <段> ok` / `NG (…)` の行も出る) |
 
+- 終了コードの数と順の元は `Sources/KikimimiCore/UILoadExit.swift`。この表や下の「5 > 6 > … の順」と合わない時は、`swift test` の `UILoadExitTests` が落ちる。
 - 保存の確認 (LIBRARY CHECK) の各段は `LIBRARY: <段の名前>: ok (…)` か `FAILED (…)` の 1 行で出る。訳に関わる段 (2026-11-16 に足した):
   - `rows with edited and flagged translations`: 対訳のジョブに、直した行と要確認の行が両方在る (3000 行なら、それぞれ 125)。
   - `count rows that need review`: 「要確認 N」の数 (行を作る時に数えた物) と、結果の覚えの数が同じ。
@@ -61,7 +62,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 
 ## 4. 「重い」(SLOW) の読み方
 
-- 目安を超えた物は 1 つにつき 1 行、`UI LOAD: SLOW ("<操作の名前>" p95 … ms >= … ms)` や `max … ms >= … ms` の形で出る。どの値がどの目安を超えたかは、この行の中に在る。目安の値は `Sources/Kikimimi/UILoadSelfTest.swift` の `Limits`、比べ方は `limitFailures()`。
+- 目安を超えた物は 1 つにつき 1 行、`UI LOAD: SLOW ("<操作の名前>" p95 … ms >= … ms)` や `max … ms >= … ms` の形で出る。どの値がどの目安を超えたかは、この行の中に在る。目安の値は `Sources/Kikimimi/UILoadLimits.swift` の `Limits`、比べ方は `Sources/Kikimimi/UILoadRun+Measure.swift` の `limitFailures()`。
 - 操作ごとの値は `UI LOAD: action "<名前>": n …, median …, p95 …, max …` の行。`n < 20: p95 not checked` と付いた操作は最大だけを比べている。
 - 一覧に関わる値: ジョブを選ぶ操作 (`select finished job …`・`select running job`) と再生位置を遠くへ動かす操作 (`jump …`) には `UI LOAD: rows built "<名前>": inits …; bodies …` の行が出る。比べるのは bodies (行の body が動いた数) で、目安は `Limits.selectRowsBuiltMax`。inits は一覧が終わりへ飛ぶと数千になってよく、比べない。bodies が数千なら、一覧が見える分だけを並べていない (CLAUDE.md の一覧の決まりを破った時の形)。
 - `UI LOAD: rows built during the measured part: inits …, bodies …` は測った間すべての合計で、目安 (1 回あたり) と比べない。合計が目安の数を超えていても `SLOW` にはならない。
