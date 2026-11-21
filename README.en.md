@@ -595,6 +595,8 @@ Sources/
       HistorySheet.swift The history sheet (keep, restore and delete versions)
       DeleteConfirmSheet.swift  The sheet that confirms moving a result to the Trash (paths of what goes and what stays)
       TranslationEditSheet.swift  The sheet for editing a translation (the review reason, "This translation is fine", restoring the machine translation)
+      TranscriptListView.swift  The result list (thousands of rows; TranscriptListRulesTests checks in the source the 4 rules that keep it from freezing)
+      TranscriptListSupport.swift  Parts that support the list ("To the end", following, row tints, the hidden views that watch playback and practice)
 Resources/               Info.plist, icon
 Scripts/build-app.sh     Assembles the .app
 Scripts/run-app.sh       Launch (make run): quits a running copy, opens the new one, checks it is alive

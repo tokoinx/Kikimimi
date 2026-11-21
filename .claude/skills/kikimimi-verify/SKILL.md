@@ -11,7 +11,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 
 - `Sources/KikimimiCore` や `Tests` だけを変えた → 2 の 1〜2 (ビルドと試験) まで。
 - 画面 (`Sources/Kikimimi`) を変えた → 2 の 1〜4 (アプリの確認) まで。
-- 結果の一覧 (`Sources/Kikimimi/Views/TranscriptDetailView.swift`) に触った → 必ず 3000 行のアプリの確認まで行い、4 の「重い」の読み方を見る。
+- 結果の一覧 (`Sources/Kikimimi/Views/TranscriptListView.swift`・`TranscriptListSupport.swift` と、呼ぶ側と行の部品の `TranscriptDetailView.swift`) に触った → 必ず 3000 行のアプリの確認まで行い、4 の「重い」の読み方を見る。
 
 ## 2. 命令 (作業フォルダはプロジェクトの根。1 行に 1 命令)
 
