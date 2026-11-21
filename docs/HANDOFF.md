@@ -45,7 +45,7 @@
   - 翻訳 (Qwen3.5 4B、5 言語 × 100 行。上げる前の `qwen3.5-4b-100-run2-20261119` と同じ問題・設定。結果は `build/translation-eval/results/qwen3.5-4b-100-llama-b12556-20261120`): chrF は de 57.17・ja 29.06・ko 28.73・th 42.76・zh 35.52 で、5 言語とも上げる前と同じ値。訳の文も、475 行のうち変わった行は 0。かかった時間は 37 分 (前は 94 分。ただし前の回は、ほかの作業と同時に走っていたので、どれだけ速くなったかは確かめていない)。
   - `--selftest-llm` (Qwen3.5 4B): 訳 4 行と監査 2 件は前と同じ、`SELFTEST OK`。`--selftest-chat`: `CHAT STREAM OK`、`CHAT EVAL: 14/16` (前と同じ点)。
   - 文字起こし (`--selftest-whisper`、large-v3-turbo-q5_0、silero VAD、`Tests/Fixtures/mixed-en-ja.wav`、日本語＋英語、47 秒): 文は 1 字も変わらない。区間の分け方が 1 か所だけ変わった: 前は 2 つの区間 (00:26-00:30 と 00:30-00:33) だった英語の 1 文が、1 つの区間 (00:26-00:34) になった。ほかの 8 区間は、文も時刻も同じ。抜け・くり返し・言語の取り違えは無い。
-  - 新しい版で出る事: `LlamaEngine.swift` に、llama.cpp の非推奨の警告が 4 つ (`llama_batch_init` → `llama_batch_ext_init`、`llama_batch_free` → `llama_batch_ext_free`、`llama_decode` → `llama_process` が 2 か所)。エラーではない。直していない (下の「リファクタリングの案」の 8)。
+  - 新しい版で出る事: `LlamaEngine.swift` に、llama.cpp の非推奨の警告が 4 つ (`llama_batch_init` → `llama_batch_ext_init`、`llama_batch_free` → `llama_batch_ext_free`、`llama_decode` → `llama_process` が 2 か所)。エラーではない。2026-11-22 に新しい呼び出しへ置き換え、警告は 0 になった (下の「リファクタリングの案」の 8)。
   - 確かめていない事: 翻訳の測りは 5 言語だけ (ほかの 8 言語は測っていない)。whisper.cpp を上げた後の、長い録音・ほかのモデル・ほかの言語での文字起こし (見たのは 47 秒の 1 つの音声だけ)。Intel Mac。この版での CI は、次の push で初めて走る。
 - 2026-11-20: **`build.yml` の Python の版も固定した** (次のコミットに入る): 9a98c83 の build の実行 (44663878948) の記録に出た版 (gguf 0.19.0・numpy 2.5.5。2 列とも同じ) で `tools/requirements-ci.txt` を作り、`build.yml` を `pip install -r tools/requirements-ci.txt` にした。この固定での実行は、次の push の CI で初めて走る。
 - 2026-11-15 (夜): 歌の入った動画 (`input.mov`、日本語の歌、153.9 秒) で歌詞が出なかった件。
@@ -267,7 +267,7 @@ LLM とのチャット (2026-11-20、1ef6407):
 リンクの検査と依存 (2026-11-20、9a98c83):
 - `build.yml` の gguf・numpy の版は、`tools/requirements-ci.txt` で固定した (この固定での CI は、次の push で初めて走る)。
 - 依存の版は b5454 (whisper.cpp)・b12556 (llama.cpp) に上げた (上の 2026-11-20 の項)。`LinkListTests` は、llama.cpp の版が `Package.swift` と `build.yml` で同じ事を見るので、次に上げる時も両方を変える。
-- 残っている事 (依存): (finetune (run 44663879033) の結果は success だった。済み)`LlamaEngine.swift` の非推奨の警告 4 つ (下の「リファクタリングの案」の 8)。翻訳の測りをしていないほかの 8 言語 (測ったのは de・ja・ko・th・zh の 5 言語だけ)。長い録音・ほかのモデル・ほかの言語での文字起こしの確かめ、Intel Mac。
+- 残っている事 (依存): (finetune (run 44663879033) の結果は success だった。済み)(`LlamaEngine.swift` の非推奨の警告 4 つは、2026-11-22 に直した。下の「リファクタリングの案」の 8。済み) 翻訳の測りをしていないほかの 8 言語 (測ったのは de・ja・ko・th・zh の 5 言語だけ)。長い録音・ほかのモデル・ほかの言語での文字起こしの確かめ、Intel Mac。
 - 週 1 回の `links.yml` は、main に入ってから動く (まだ動いていない)。
 - README の clone の行の `https://github.com/tokoinx/Kikimimi.git` は `MOVED` (`.git` なしへ転送)。失敗にはしていない。直すかは決めていない。
 - アプリを作り直さずにモデルの一覧を差し替える仕組みは無い (一覧は、アプリに埋め込んだデータ)。切れた時は、`Sources/KikimimiCore/Catalog/models.json` を直し、`/usr/bin/python3 Scripts/generate-model-catalog.py` を走らせて、作り直す (2026-11-20 のリファクタリングの案 4 から。手書きの `runtime-urls.txt` は無くなった)。
@@ -312,7 +312,7 @@ LLM とのチャット (2026-11-20、1ef6407):
 
 ## リファクタリングの案 (2026-11-20)
 
-**1〜7 は行った (2026-11-20〜21、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」「案 5 へ進む」「案 6 へ進む」「案 7 へ進む」)。8 は考えただけで、まだ行っていない。** 行う時は、利用者に確かめてから。
+**1〜8 の全部を行った (2026-11-20〜22、利用者の OK「1 から始める」「案 2 へ進む」「案 3 へ進む」「案 4 へ進む」「案 5 へ進む」「案 6 へ進む」「案 7 へ進む」「案 8 へ進む」)。** 行う時は、利用者に確かめてから。
 
 1. **確認用の起動の判定を 1 か所に**: 「`--selftest-…` か」を、`AppModel`・`PracticeController`・`UILanguageSetting` が別々に見ていて、本物の設定に書いていた不具合 (上の「確認用の起動と本物の設定」) の元になった。1 つの型 (例: `LaunchMode`) にまとめ、設定に書く所は全部そこを通す。小さい。先に行う値打ちが在る。
    - **行った (2026-11-20)**: 判定は `Sources/KikimimiCore/LaunchMode.swift` (`app`・`selfTest`・`tool`) だけ、設定 (UserDefaults) に書く所は `Sources/KikimimiCore/SettingsWriter.swift` だけにした (ふつうの起動の時だけ書く)。ばらばらだった判定 6 か所を消し、書き込み 7 か所を通した。
@@ -384,6 +384,15 @@ LLM とのチャット (2026-11-20、1ef6407):
    - **確かめていない事**: 「全部の body の数」が、新しいコードで高い山に寄りやすくなったかどうか (4 回では分からない)。追いかけるのをやめる・また追いかける動きを、手で触って見る事 (絵の 04・05 と、確認が口を通して動かした所だけ)。
    - **合わせて直した文書**: `CLAUDE.md` の「結果の一覧」(見出しのファイル名、理由の在る場所、「検査」の行)、手順書 `kikimimi-verify` の「結果の一覧に触った」の行、`README.md`・`README.en.md` の「構成」。
 8. **`LlamaEngine` を llama.cpp の新しい呼び出しに合わせる** (`llama_batch_ext_init`・`llama_process`): b12556 で非推奨の警告が 4 つ出る。次に版を上げる時に、古い呼び出しが消えると通らなくなる。
+   - **行った (2026-11-22)**: `Sources/KikimimiLLM/LlamaEngine.swift` だけを変えた。入れ物 `batch` を `llama_batch` (中に直に書く形) から `llama_batch_ext` (中身の見えない型。`OpaquePointer` で持つ) に替え、`llama_batch_init` → `llama_batch_ext_init(context)`、`llama_batch_free` → `llama_batch_ext_free`、`llama_decode` の 2 か所 → `llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch)`。`fillBatch` は、`llama_batch_ext_clear` → トークンごとに `llama_batch_ext_add_token(batch, 0, token)` → `llama_batch_ext_set_pos` → `llama_batch_ext_set_output_logits` (最後の 1 つだけ true、ほかは false を明示)。`n_batch` 個ずつ読ませる流れ・中止を見る場所・戻り値の確かめ・トークンを選ぶ所は変えていない。
+   - **元にした物**: この版のヘッダ (`llama.h` の「Extended batch API」) と、同じタグ b12556 の上流のソース (`src/llama-batch.cpp`・`src/llama-batch.h`・`src/llama-context.cpp`・`examples/simple/simple.cpp`・`examples/batched/batched.cpp`)。ソースで確かめた事: 入れ物の大きさは context の `n_batch` (前と同じ数まで入る)。`add_token` は位置を入れず、自動で続きにもならない (必ず `set_pos`)。出力の印の初めの値は false で、古い呼び出しのような「印が無ければ最後の 1 つを true にする」動きは無い (だから全部に明示する。このエンジンは `n_outputs_max = 1`)。`llama_get_logits_ith(ctx, -1)` は、前と同じく最後の出力の行を読む (古い `llama_decode` も、中で `llama_batch_ext` に変えてから同じ関数を呼んでいる)。`llama_batch_ext_init` は C++ の `new` なので nil を返さない (それでも `guard` は残し、nil なら context とモデルを手放して `contextFailed`)。
+   - **エラーの扱い**: 入れ物に入れられない時は、黙って進めず `LLMError.decodeFailed(番号)` で止める (`fillBatch` を `throws` にした。新しいエラーの型は足していない)。番号: -1 入れ物が一杯・-2 トークンが無効・-3 列の番号が無効 (`add_token` の戻り値のまま)、-100 位置を入れられない・-101 出力の印を入れられない (llama.cpp に無い番号。注釈に書いた)。
+   - **確かめ (手元、本物の Qwen3.5 4B)**: エンジンは同じ入力に同じ答えを返す作りなので、変える前と後の出力を、時間の数字だけ置き換えて比べた。前のアプリで同じ命令を 2 回走らせると、出力は同じだった (比べ方が成り立つ)。`--selftest-llm --strict` (GPU)・同 `--cpu`・同 `--translate-to en`・`make check-chat` は、前と後で違う行が 0。`make check-llm-queue` と、その差分 (LoRA) つきは、違う行が 28 ずつで、全部が、走らせるたびに変わる区間の ID (8 桁) の行 (ID も置き換えると 0 行。前も後も `same translation: true, same audit: true, same generate calls: true`・`LLM QUEUE OK`)。`check-chat` は前も後も `CHAT STREAM OK`・`CHAT EVAL: 14/16`。どの命令も終了コード 0。
+   - **通した道**: GPU、CPU、差分つき、文法つき (翻訳・監査)、日本語だけの出力、途中の文 (`onText`)。**`n_batch` (既定 512) より長い指示文**は、もとの確認では通っているかが分からなかったので、一時の確かめ (3030 トークンの指示文。`n_batch` 512 で 6 回、32 で 95 回に分けて読ませる。コミットしていない) を足し、答えが前と後で同じ事を見た。
+   - **速さ (秒、前 → 後)**: 翻訳 5.47 → 5.93・監査 3.59 → 3.79 (GPU)、翻訳 144.26 → 144.13・監査 182.62 → 181.47 (CPU)、割り込みの確認 25.76 → 25.41・30.76 → 30.32、チャット 12.51 → 12.46。1 回ずつの値で、ばらつきは測っていない。
+   - **確かめ (ビルドと試験)**: `swift build`・`make app` (Swift 6.0.3) で、`LlamaEngine.swift` を作り直した時の `warning:` の行は 0 (前は 4 つ)。`swift test` は「Executed 548 tests, with 0 failures」(件数は前と同じ)。本物の設定の前後の違いは 0 行。
+   - **確かめていない事**: 失敗の道 (-1・-2・-3・-100・-101) は、実際には起こしていない。Qwen3.5 4B のほかのモデル (llama.cpp のテンプレートを使う Gemma など) では比べていない。`make check-ui` は走らせていない (画面 `Sources/Kikimimi` を変えていないため。CI では走る)。速さのばらつき。
+   - **作り直す時**: 一時の確かめ (長い指示文) と、上流のソースの写しは、一時の置き場に在った物で、リポジトリには入れていない。
 
 ## 続けるのに要る参照
 
