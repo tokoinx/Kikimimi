@@ -53,7 +53,8 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     private let vocab: OpaquePointer
     private let vocabSize: Int
     private let batchSize: Int
-    private var batch: llama_batch
+    /// トークンを読ませる入れ物 (llama.cpp の llama_batch_ext。中身は見えない型なので、指し示しで持つ)
+    private let batch: OpaquePointer
     private let format: ChatFormat
     /// 利用者の文に紛れ込んだ制御用の文字列 (<|im_end|>・</think> など) を取り除くための一覧 (UTF-8)
     private let controlTexts: [[UInt8]]
@@ -137,6 +138,14 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         }
         self.adapterPath = options.adapterPath
 
+        // 入れ物の大きさは、llama.cpp が context の n_batch から決める (今までと同じ n_batch 個まで入る)
+        guard let batch = llama_batch_ext_init(context) else {
+            llama_free(context)
+            llama_model_free(model)
+            throw LLMError.contextFailed
+        }
+        self.batch = batch
+
         self.modelPath = modelPath
         self.model = model
         self.vocab = vocab
@@ -144,7 +153,6 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         self.contextLength = Int(llama_n_ctx(context))
         self.batchSize = Int(cparams.n_batch)
         self.vocabSize = Int(llama_vocab_n_tokens(vocab))
-        self.batch = llama_batch_init(Int32(cparams.n_batch), 0, 1)
 
         var desc = [CChar](repeating: 0, count: 256)
         let n = llama_model_desc(model, &desc, desc.count)
@@ -191,7 +199,7 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     }
 
     deinit {
-        llama_batch_free(batch)
+        llama_batch_ext_free(batch)
         llama_free(context)
         llama_model_free(model)
     }
@@ -243,8 +251,8 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             if shouldCancel() { throw LLMError.cancelled }
             let n = min(batchSize, tokens.count - position)
             let isLast = position + n == tokens.count
-            fillBatch(tokens[position..<(position + n)], startingAt: position, wantLastLogits: isLast)
-            let rc = llama_decode(context, batch)
+            try fillBatch(tokens[position..<(position + n)], startingAt: position, wantLastLogits: isLast)
+            let rc = llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch)
             guard rc == 0 else { throw LLMError.decodeFailed(rc) }
             position += n
         }
@@ -274,8 +282,8 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             recent.append(token)
             if recent.count > Self.repeatWindow { recent.removeFirst() }
             guard step + 1 < maxNew else { break }
-            fillBatch([token][...], startingAt: position, wantLastLogits: true)
-            let rc = llama_decode(context, batch)
+            try fillBatch([token][...], startingAt: position, wantLastLogits: true)
+            let rc = llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch)
             guard rc == 0 else { throw LLMError.decodeFailed(rc) }
             position += 1
         }
@@ -287,14 +295,21 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
 
     // MARK: - 実装
 
-    private func fillBatch(_ tokens: ArraySlice<llama_token>, startingAt start: Int, wantLastLogits: Bool) {
-        batch.n_tokens = Int32(tokens.count)
+    /// 入れ物を空にして、トークンを列 0 に入れる。位置は自動では入らないので、1 つずつ入れる。
+    /// 出力の印も全部に明示して入れる (最後の 1 つだけ。読むのは最後のトークンの確率の 1 行だけ)。
+    ///
+    /// 入れられない時は、黙って進めずに `LLMError.decodeFailed` で止める。番号は llama.cpp の戻り値のまま:
+    /// -1 = 入れ物が一杯、-2 = トークンが無効、-3 = 列の番号が無効 (`llama_batch_ext_add_token` の戻り値)。
+    /// 位置か出力の印を入れられなかった時は、llama.cpp に無い番号 -100 (位置)・-101 (出力の印) を使う
+    private func fillBatch(_ tokens: ArraySlice<llama_token>, startingAt start: Int, wantLastLogits: Bool) throws {
+        llama_batch_ext_clear(batch)
         for (k, token) in tokens.enumerated() {
-            batch.token[k] = token
-            batch.pos[k] = llama_pos(start + k)
-            batch.n_seq_id[k] = 1
-            batch.seq_id[k]![0] = 0
-            batch.logits[k] = (wantLastLogits && k == tokens.count - 1) ? 1 : 0
+            let idx = llama_batch_ext_add_token(batch, 0, token)
+            guard idx >= 0 else { throw LLMError.decodeFailed(idx) }
+            var pos = llama_pos(start + k)
+            guard llama_batch_ext_set_pos(batch, idx, &pos) else { throw LLMError.decodeFailed(-100) }
+            let output = wantLastLogits && k == tokens.count - 1
+            guard llama_batch_ext_set_output_logits(batch, idx, output) else { throw LLMError.decodeFailed(-101) }
         }
     }
 
