@@ -606,6 +606,7 @@ Scripts/build-app.sh     .app の組み立て
 Scripts/run-app.sh       起動 (make run)。動いているものを終了させてから開き、動いたかを確かめる
 Scripts/doctor.sh        起動しないときの診断 (make doctor)
 Scripts/make-tiny-gguf.py  動作確認用の小さな GGUF を作る (CI 用)
+Scripts/make-iconset.sh  1024 x 1024 の PNG から、アイコン一式 (Resources/AppIcon.iconset の 10 枚) を作り直す (16 ポイントの 2 枚は、顔と耳に寄った絵 Resources/AppIcon-16pt-master.png から)
 tools/finetune/          追加学習 (LoRA)
   finetune.py            学習 → 変換 → 評価 → 取り付けを続けて行う (Mac、MLX。--task audit / translation)
   mlx_lora_to_gguf.py    MLX の差分を、llama.cpp が読める GGUF に変える
