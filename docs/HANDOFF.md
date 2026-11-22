@@ -391,6 +391,7 @@ LLM とのチャット (2026-11-20、1ef6407):
    - **通した道**: GPU、CPU、差分つき、文法つき (翻訳・監査)、日本語だけの出力、途中の文 (`onText`)。**`n_batch` (既定 512) より長い指示文**は、もとの確認では通っているかが分からなかったので、一時の確かめ (3030 トークンの指示文。`n_batch` 512 で 6 回、32 で 95 回に分けて読ませる。コミットしていない) を足し、答えが前と後で同じ事を見た。
    - **速さ (秒、前 → 後)**: 翻訳 5.47 → 5.93・監査 3.59 → 3.79 (GPU)、翻訳 144.26 → 144.13・監査 182.62 → 181.47 (CPU)、割り込みの確認 25.76 → 25.41・30.76 → 30.32、チャット 12.51 → 12.46。1 回ずつの値で、ばらつきは測っていない。
    - **確かめ (ビルドと試験)**: `swift build`・`make app` (Swift 6.0.3) で、`LlamaEngine.swift` を作り直した時の `warning:` の行は 0 (前は 4 つ)。`swift test` は「Executed 548 tests, with 0 failures」(件数は前と同じ)。本物の設定の前後の違いは 0 行。
+   - **CI (2026-11-22、a2e3b64)**: build (run 44926436230) は Xcode 16.2・26.3 の 2 列とも success (2 列とも「Executed 548 tests, with 0 failures」「CHAT CHECK OK」「LAUNCH SELFTEST OK」「UI LOAD OK」「LLM QUEUE OK」。「重い」は出ていない)。2 列とも、ログに「is deprecated」の行は 0、Swift の警告の行も 0。LLM の 3 つの段 (CPU・割り込み・Metal) は success で、重みが乱数の小さなモデルの出力 (`generate: "[1] mn\\n[2] mn\\n"`・`translate: 0 translated, 4 failed`・`audit: 1 findings`) は、案 8 の前の CI のログと同じ。links (run 44926436291)・finetune (run 44926436218) も success。前の記録のコミット 0f6201e の build (run 44922524515) も success。
    - **確かめていない事**: 失敗の道 (-1・-2・-3・-100・-101) は、実際には起こしていない。Qwen3.5 4B のほかのモデル (llama.cpp のテンプレートを使う Gemma など) では比べていない。`make check-ui` は走らせていない (画面 `Sources/Kikimimi` を変えていないため。CI では走る)。速さのばらつき。
    - **作り直す時**: 一時の確かめ (長い指示文) と、上流のソースの写しは、一時の置き場に在った物で、リポジトリには入れていない。
 
