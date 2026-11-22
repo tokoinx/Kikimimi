@@ -56,6 +56,13 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
   - `count “this translation is fine” for the check` (256f8de で足した): 「この訳でよい」で、その印の検査 (数の抜け) の「この訳でよい」の数が 1 以上になり、覚えの判定が `confirmed` になる。
   - `a check stops after five “this translation is fine”` (同): 一時の記憶で「この訳でよい」を 5 回数えると、その検査が、その訳す先で止まる (止めた検査の一覧に 1 つ)。
   - `undo a stopped check` (同): [元に戻す] で、止めた検査が無くなり、保存した記憶の数も消える。
+- 聞き取った文を直す段 (2026-11-22 に足した。訳の在る 1 行で、終わりに結果を直す前と同じに戻す):
+  - `edit a line through the model`: 文が変わり、聞き取った文 (直す前の文) が記録に残る。
+  - `editing a line removes its translation`: 直した行の訳が消える。
+  - `reload an edited line with a fresh LibraryStore`: 新しい LibraryStore で読み直すと、結果と記録が同じ。
+  - `the list row shows the edited line`: 一覧の行 (単言語・対訳) に聞き取った文が入り、行の「訳」が出る。
+  - `restore the heard text through the model` → `the job is the same as before the line edit`: 戻すと文が元どおりで記録が無い。確認用に訳を置き直すと、結果が直す前と同じ。
+  - `a bilingual row of two segments lists both` → `edit the second segment of a bilingual row through the model` → `restore the second segment and put the job back`: 確認用の結果には、いくつかの区間から成る訳のまとまりが無いので、確かめる間だけ 2 つの区間を 1 つの訳にする。行が 2 つの区間を持ち、2 つ目だけを直すと行の文が変わって印が出て、戻してまとまりを外すと結果が前と同じ。
 - 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 > 9 の順。`ADAPTER MESSAGE CHECK FAILED` は 7 に入る)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
@@ -76,7 +83,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 
 ## 5. 絵の見方 (`build/ui-shots`)
 
-各絵は 1200 x 800 pt のウインドウ (タイトルバーつき。Retina の Mac では 2400x1600 画素)。08・11・12・13 はシートそのものを撮るので小さく、ウインドウは写らない。出力の `UI LOAD: screenshot <名前>.png <幅>x<高さ> (…)` の行で、できたかが分かる。
+各絵は 1200 x 800 pt のウインドウ (タイトルバーつき。Retina の Mac では 2400x1600 画素)。08・11・12・13・19・20 はシートそのものを撮るので小さく、ウインドウは写らない。出力の `UI LOAD: screenshot <名前>.png <幅>x<高さ> (…)` の行で、できたかが分かる。
 
 | 絵 | 写っているべき物 |
 |---|---|
@@ -93,6 +100,8 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | `11-delete-confirm.png` | ゴミ箱に入れるかの確認の画面 (07・08 の後に撮る)。「ゴミ箱に入れるもの」に保存のフォルダのパス、「残るもの」に元の音声ファイルのパス、「キャンセル」と「ゴミ箱に入れる」 |
 | `12-translation-edit.png` | 訳を直す画面 (直した訳の行を開いたところ。08 の後、11 の前に撮る)。機械の訳と「機械の訳に戻す」 |
 | `13-translation-check.png` | 要確認の行を開いた、訳を直す画面。上に理由の行と「この訳でよい」 |
+| `19-line-edit.png` | 行を直す画面 (13 の後、11 の前に撮る。直した後に訳し直した形の行を開いたところ)。題「この行を直す」、「聞き取った文」の下に元の文、入力の欄に末尾が「 (edited)」の文、訳が消える注意の 1 行、「聞き取った文に戻す」「キャンセル」「保存」 (保存は押せない形) |
+| `20-line-edit-two-segments.png` | 2 つの区間から成る対訳の行の、行を直す画面 (19 の後に撮る。2 つ目の区間を直して訳し直した形)。区間ごとに青い時刻と入力欄、2 つ目の区間だけに「聞き取った文」と元の文、入力欄の末尾が「（確認用に直した）」。訳が消える注意の 1 行と「聞き取った文に戻す」 |
 
 | `14-chat-empty.png` | チャットの窓 (480 x 640 pt)。上に灰色の「リサーチ … 切」の帯と「入れる…」、空の案内と例のボタン 3 つ、下に入力の欄と小さな 1 行 |
 | `15-chat-research-confirm.png` | リサーチの確認のシート (シートそのもの)。題「自己責任で、リサーチを入れますか？」、Prompt Injection の説明、「キャンセル」(既定) と「自己責任で入れる」 |
@@ -104,6 +113,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 
 - 変えた画面に関わる絵を Read で開いて見る。絵の場面ごとの注意 (`… may show no playing tint` など) が出力に在れば、その絵は特に見る。
 - 絵に写らない画面 (設定の画面など) を、手で触って確かめる時: ふつうに起動しない (触った設定が、本物の設定に書かれる)。確認用の起動 `build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 60` を使う (本物の設定に書かない。60 秒で自分で終わる。60 が上限)。値を入れた状態から始めたい時は、`-鍵 値` の引数で渡す (例: `-initialPrompt "…"`。その起動のあいだだけ効く)。ライブラリとモデルの置き場は、`KIKIMIMI_LIBRARY_DIR`・`KIKIMIMI_MODELS_DIR` で一時フォルダにする。終わったら、`defaults read local.kikimimi.app` の前と後の違いが 0 行である事を見る (2026-11-22、設定の欄の 400 字の上限を、この形で確かめた)。確認用の起動は、macOS が自分で書いた物 (ウインドウの位置・大きさなど) を、終わりに元に戻す。戻した鍵は、出力の `REAL SETTINGS:` の行に出る (`--report <ファイル>` を付けると、ファイルにも残る)。
+- 行の画面 (右クリックのメニュー・行の印・直す画面など) を、手で触って確かめる時: 上の確認用の起動は、ライブラリを読まない。**一時フォルダに写した結果を見せたい時は、`KIKIMIMI_LIBRARY_DIR=<一時フォルダ>` を付けて `--selftest-launch 60` で起こす** (ほかの確認用の引数を付けない。その場所を開いて、そこへ保存する。本物の置き場を指している時は、開かない)。順を守る: (1) 確認用の起動を裏で始める → (2) `pgrep -lf "Kikimimi.app/Contents/MacOS/Kikimimi"` で、動いている物が 1 つで、引数に `--selftest-launch` が在る事を見る → (3) それから `open_application` を呼ぶ → (4) 最初の絵で、横の一覧が一時フォルダの結果である事を見てから、触る。**(1) と (3) を同時に送らない**: 起動がまだ動き出していないと、`open_application` が、ききみみをふつうの形で起こし、本物のライブラリが開く (2026-11-22 に、実際に起きた)。引数の無い ききみみ が動いていたら、触らずに、利用者に伝える。終わったら、設定の前後の違いが 0 行である事と、`find "$HOME/Library/Application Support/Kikimimi" -newer <始める前に作ったファイル> -not -type d` が 0 個である事を見る。
 
 ## 6. 手元では見ない事 (CI だけが見る)
 

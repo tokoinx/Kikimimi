@@ -47,11 +47,14 @@ public struct Transcript: Codable, Hashable, Sendable {
     /// 訳の覚え (利用者が直した訳など。訳のまとまりの先頭の区間ごと)。今の原文・訳と合わない覚えは、無い物と扱う。
     /// 中身と読み書きは `TranslationReview.swift`。この項目の無い古い document.json も読める
     public var translationReview: [TranslationNote]?
+    /// 利用者が手で直した、聞き取った文の記録 (区間ごと)。今の文と合わない記録は、無い物と扱う。
+    /// 中身と読み書きは `LineEdit.swift`。この項目の無い古い document.json も読める
+    public var lineEdits: [LineEdit]?
 
     public init(sourceName: String, segments: [TranscriptSegment] = [], language: String? = nil,
                 model: String? = nil, duration: TimeInterval = 0, elapsed: TimeInterval = 0,
                 audit: AuditReport? = nil, translationModel: String? = nil, translationLanguage: String? = nil,
-                translationReview: [TranslationNote]? = nil) {
+                translationReview: [TranslationNote]? = nil, lineEdits: [LineEdit]? = nil) {
         self.sourceName = sourceName
         self.segments = segments
         self.language = language
@@ -62,6 +65,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.translationModel = translationModel
         self.translationLanguage = translationLanguage
         self.translationReview = translationReview
+        self.lineEdits = lineEdits
     }
 
     /// 本文 (1 区間 1 行)

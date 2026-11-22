@@ -124,12 +124,18 @@ extension Transcript {
     public mutating func adopt(_ report: AuditReport) {
         let before = Dictionary(segments.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let decisions = audit?.userDecisions ?? [:]
+        // 利用者が手で直した行 (今も有効な直しの記録が在る区間) は、監査が触らない: 当たる直しは、反映する前に取り除く。
+        // 前の監査の直しは、行を直した時に取り除いてあるので、ふつうは当たらない (古い結果のために、ここでも避ける)
+        let edited = Set(validLineEdits.keys)
         if let previous = audit {
-            for change in previous.changes where change.isApplied {
+            for change in previous.changes where change.isApplied && !edited.contains(change.original.id) {
                 revert(change)
             }
         }
         var report = report
+        if !edited.isEmpty {
+            report.changes.removeAll { edited.contains($0.original.id) }
+        }
         report.userDecisions = decisions.isEmpty ? nil : decisions
         for i in report.changes.indices {
             let wanted = decisions[report.changes[i].signature] ?? report.changes[i].isConfident

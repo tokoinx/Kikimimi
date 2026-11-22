@@ -29,6 +29,19 @@ struct ContentView: View {
                                 .id(model.uiLanguage)
                         }
                     }
+                    // 行を直す画面 (行の右クリックの「この行を直す…」・原文の「直した」の印)。訳を直す画面と同じく、一覧の外に置く
+                    .sheet(isPresented: Binding(
+                        get: { model.lineEdit != nil },
+                        set: { if !$0 { model.lineEdit = nil } }
+                    )) {
+                        if let request = model.lineEdit,
+                           let edited = model.jobs.first(where: { $0.id == request.jobID }) {
+                            LineEditSheet(job: edited, segmentIDs: request.segmentIDs)
+                                .environment(model)
+                                // 画面の言語を変えたら作り直す
+                                .id(model.uiLanguage)
+                        }
+                    }
             } else {
                 EmptyStateView()
             }

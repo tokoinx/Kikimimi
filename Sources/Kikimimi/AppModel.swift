@@ -130,6 +130,8 @@ final class AppModel {
     @ObservationIgnored private(set) var translationMemoryURL: URL?
     /// 訳を直す画面 (対訳の行の「訳を直す…」) を開いている行 (nil なら閉じている)
     var translationEdit: TranslationEditRequest?
+    /// 行を直す画面 (行の右クリックの「この行を直す…」・原文の「直した」の印) を開いている行 (nil なら閉じている)
+    var lineEdit: LineEditRequest?
     /// 追加学習の差分 (LoRA) を使う (選んでいる LLM 用の差分が入っているときだけ効く)。
     /// 入・切は 1 つで、監査用・翻訳用の両方に効く
     var useAdapter: Bool { didSet { save(useAdapter, .useAdapter) } }
@@ -224,6 +226,11 @@ final class AppModel {
         // 確認用の起動 (--selftest-…) では保存しない (--selftest-ui-load は、確かめるときに一時フォルダを使う)
         if !LaunchMode.current.isSelfTest {
             library = LibraryWriter(store: LibraryStore(root: LibraryStore.defaultRoot()))
+            loadLibrary()
+        } else if let path = LaunchMode.handCheckLibraryPath() {
+            // 行の画面を、手で触って確かめる時だけ: 起動の確認 (--selftest-launch) に、一時フォルダのライブラリを
+            // 環境変数で渡すと、そこを開いて、そこへ保存する (利用者の本物のライブラリは、この形では開かない)
+            library = LibraryWriter(store: LibraryStore(root: URL(fileURLWithPath: path, isDirectory: true)))
             loadLibrary()
         }
         chat.model = self

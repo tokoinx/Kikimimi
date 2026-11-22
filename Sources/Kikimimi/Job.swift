@@ -145,6 +145,12 @@ struct TranslationEditRequest: Equatable {
     let segmentID: UUID
 }
 
+/// 行を直す画面で直している行 (結果のジョブと、行が持つ区間の全部。開いた時の並びの順)
+struct LineEditRequest: Equatable {
+    let jobID: UUID
+    let segmentIDs: [UUID]
+}
+
 /// 文字起こしのあとに行う仕事
 enum PostTask: Equatable {
     case audit
