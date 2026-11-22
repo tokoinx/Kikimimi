@@ -40,6 +40,8 @@
   - (4) 確認用の起動が、macOS が本物の設定に書いた物を元に戻す仕組み (38fd471。下の「確認用の起動と本物の設定」)。
   - (5) 手で合わせている所の見張りの試験と、`Makefile` の直し (3a0005e。下の「リファクタリングの案」の 4 と 6)。
   - 最後のコードでの確かめ (手元): `swift test` は「Executed 570 tests, with 0 failures」(559 から 11 増えた)。`--selftest-ui-load 3000` (音声と絵つき) は終了コード 0、「LIBRARY CHECK OK」「PRACTICE CHECK OK」「CHAT CHECK OK」「ADAPTER MESSAGE CHECK OK」「UI LOAD OK」、`REAL SETTINGS: put back 1 key the system wrote during the self-test: NSSplitView Subview Frames main-AppWindow-1, SidebarNavigationSplitView`、`time tick` の p95 は 11.3 ms、`SLOW`・`FAILED`・`NG`・`skipped` の行は 0。本物の設定の前後の違いは 0 行。
+  - CI (5cae6b8。上の 3 つのコードのコミットを含む枝の先頭): build (run 44988531592) は Xcode 16.2・26.3 の 2 列とも success (2 列とも「Executed 570 tests, with 0 failures」「CHAT CHECK OK」「LAUNCH SELFTEST OK」「UI LOAD OK」「LLM QUEUE OK」。「重い」・`NG`・Swift の警告の行は 0)。links (run 44988531564) も success。足した行は、CI でも出ている: `REAL SETTINGS:` は、起動の確認とアプリの確認のたびに、macOS が書いた鍵 (`NSWindow Frame main-AppWindow-1`・`NSSplitView Subview Frames …`・`NSWindow Frame chat` の 1〜3 個) を戻したか `unchanged`。3000 行と 8000 行の確認は、2 列とも `row hover changes 0 (the mouse pointer was inside the main window at 0 of 9 checks ---------; the app was active at 0 ---------, …)` で、3000 行の body の合計は 464 (16.2)・414 (26.3)。CI の Mac では、アプリは前面にならず、マウスも一覧の上に無い (上の「2 つの山」の、低い山の形と合う)。
+  - 1 つ前のマージ (0983c93) の finetune (run 44978458856) は、success で終わった。
 - 2026-11-20: **LLM とのチャット**を足した (コミット 1ef6407)。使い方と注意は `README.md` の「LLM とのチャット」、確かめた事は「検証状況」、制限は「既知の制限」。決めた形:
   - 入口は、メニューの「ファイル」›「LLM とチャット」(⇧⌘L) と、メインの窓のツールバーの絵のボタン。別の窓 (`Window(id: "chat")`)。
   - 答えるのは、設定で選んでいる Qwen3.5 (差分 (LoRA) は使わない)。答えを少しずつ出すため、`TextGenerating.generate(_:shouldCancel:onText:)` を足した。監査・翻訳が通る道は変えていない。会話は保存しない。
