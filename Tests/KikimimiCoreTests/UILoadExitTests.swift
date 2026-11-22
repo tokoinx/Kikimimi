@@ -66,4 +66,21 @@ final class UILoadExitTests: XCTestCase {
         let order = UILoadExit.precedence.map { String($0.rawValue) }.joined(separator: " > ") + " の順"
         XCTAssertTrue(text.contains(order), "\(Self.skillPath) does not say \"\(order)\"")
     }
+
+    /// 4. CI (.github/workflows/build.yml) の、画面の重さの確認を測り直す段の数が、UILoadExit.slow と同じ。
+    /// 測り直す段は、1 回目の出力から「UI LOAD: SLOW」の行を拾う所の、すぐ前の if で決めている
+    func testWorkflowRetriesOnTheSlowCode() throws {
+        let path = ".github/workflows/build.yml"
+        let text = try String(contentsOf: Self.root.appendingPathComponent(path), encoding: .utf8)
+        let pattern = #"if \[ "\$code" -eq (\d+) \]; then\s*\n\s*grep -a "UI LOAD: SLOW""#
+        let regex = try NSRegularExpression(pattern: pattern)
+        let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        XCTAssertEqual(matches.count, 1, "\(path): the retry step (if [ \"$code\" -eq N ]; then, then grep \"UI LOAD: SLOW\") was not found once")
+        guard let match = matches.first, let range = Range(match.range(at: 1), in: text) else { return }
+        XCTAssertEqual(Int32(text[range]), UILoadExit.slow.rawValue,
+                       "\(path) retries on exit code \(text[range]), but UILoadExit.slow is \(UILoadExit.slow.rawValue)")
+        // 測り直す時に出す文の数も同じ
+        XCTAssertTrue(text.contains("the first run was SLOW (exit code \(UILoadExit.slow.rawValue))"),
+                      "\(path): the retry message does not say exit code \(UILoadExit.slow.rawValue)")
+    }
 }
