@@ -597,5 +597,11 @@ extension L10nTables {
         "The translation used the wrong kind of letters, so it was not used.": "คำแปลใช้ตัวอักษรผิดชนิด จึงไม่ได้ใช้",
         "The translation was far too long, so it was not used.": "คำแปลยาวเกินไป จึงไม่ได้ใช้",
         "The model returned no translation for this line.": "โมเดลไม่ได้ส่งคำแปลของบรรทัดนี้กลับมา",
+        "Remember this fix": "จดจำการแก้ไขนี้",
+        "From the next audit, the same mishearing gets this fix as a suggestion.": "ตั้งแต่การตรวจสอบครั้งถัดไป จะเสนอการแก้ไขนี้เมื่อพบการฟังผิดแบบเดียวกัน",
+        "Fill in both terms.": "กรอกคำทั้งสองช่อง",
+        "The two terms are the same.": "คำทั้งสองเหมือนกัน",
+        "The heard text does not contain the misheard term.": "ข้อความที่ถอดได้ไม่มีคำที่ฟังผิด",
+        "Your text does not contain the right term.": "ข้อความของคุณไม่มีคำที่ถูกต้อง",
     ]
 }

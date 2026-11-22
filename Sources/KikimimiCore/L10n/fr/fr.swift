@@ -597,5 +597,11 @@ extension L10nTables {
         "The translation used the wrong kind of letters, so it was not used.": "La traduction utilisait le mauvais alphabet ; elle n’a donc pas été utilisée.",
         "The translation was far too long, so it was not used.": "La traduction était beaucoup trop longue ; elle n’a donc pas été utilisée.",
         "The model returned no translation for this line.": "Le modèle n’a renvoyé aucune traduction pour cette ligne.",
+        "Remember this fix": "Mémoriser cette correction",
+        "From the next audit, the same mishearing gets this fix as a suggestion.": "Dès la prochaine vérification, la même erreur d’écoute recevra cette correction comme suggestion.",
+        "Fill in both terms.": "Remplissez les deux termes.",
+        "The two terms are the same.": "Les deux termes sont identiques.",
+        "The heard text does not contain the misheard term.": "Le texte reconnu ne contient pas le terme mal entendu.",
+        "Your text does not contain the right term.": "Votre texte ne contient pas le bon terme.",
     ]
 }

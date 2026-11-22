@@ -20,6 +20,9 @@ extension LoadRun {
         let fm = FileManager.default
         let store = LibraryStore(root: root)
         let job = doneBilingual
+        // 利用者の本物の、学習した直しの台帳 (在るか・中身の大きさ・更新の時刻)。終わりに、変わっていない事を見る
+        let realLedger = model.ledgerURL
+        let realLedgerBefore = Self.fileStamp(realLedger)
 
         // 1. 終わったジョブ 2 つは、ふだんの道 (終わったジョブを一覧に入れたとき) で保存されている。文字起こし中のジョブは保存しない
         model.flushLibrary()
@@ -193,6 +196,8 @@ extension LoadRun {
 
         // 3c. 聞き取った文を直す・戻す (ふだんと同じ AppModel の関数で)
         lineEditSteps(job: job, root: root, step: step)
+        // 3e. 直した組を、学習した直しの台帳に覚えさせる (確認用の一時の台帳で)
+        ledgerLineEditSteps(job: job, root: root, step: step)
 
         // 4. 書き終えてから、新しい LibraryStore で読み直して比べる
         model.flushLibrary()
@@ -231,6 +236,10 @@ extension LoadRun {
         step("delete a small job through the model", existed && !remains && !listed,
              "folder before \(existed), after \(remains), still listed \(listed)")
 
+        let realLedgerAfter = Self.fileStamp(realLedger)
+        step("the self-test does not use the real learned corrections",
+             model.ledgerFileURL == nil && realLedgerAfter == realLedgerBefore,
+             "ledger file \(model.ledgerFileURL?.path ?? "none") (expected none), real file \(realLedgerBefore) → \(realLedgerAfter)")
         lines.append(failure.map { "LIBRARY CHECK FAILED: \($0)" } ?? "LIBRARY CHECK OK")
         return (lines, failure != nil)
     }
@@ -291,6 +300,86 @@ extension LoadRun {
         step("the job is the same as before the line edit", job.transcript == before,
              "same \(job.transcript == before)")
         groupedLineEditSteps(job: job, step: step)
+    }
+
+    /// ファイルの印 (在るか・大きさ・更新の時刻)。読むだけ
+    static func fileStamp(_ url: URL) -> String {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { return "absent" }
+        let size = (attributes[.size] as? NSNumber)?.intValue ?? -1
+        let date = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(size) bytes, modified \(date)"
+    }
+
+    /// 文の中の、初めの 5 字以上の語を「Kikimimi」に置き換えた文 (語の聞き間違いを直した形。確認と絵に使う)。
+    /// そういう語が無ければ nil
+    static func misheardEdit(of text: String) -> String? {
+        var result: String?
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .byWords) { word, range, _, stop in
+            guard let word, word.count >= 5, word != "Kikimimi" else { return }
+            result = text.replacingCharacters(in: range, with: "Kikimimi")
+            stop = true
+        }
+        return result
+    }
+
+    /// 保存の確認の段 3e: 直した組を、model を通して学習した直しの台帳に覚えさせる。
+    /// 台帳は、確かめる間だけ一時のファイルにし、終わりに、始める前と同じ (確認用の起動では、保存先の無い空の台帳) に戻す
+    private func ledgerLineEditSteps(job: Job, root: URL, step: (String, Bool, String) -> Void) {
+        let ledgerBefore = model.ledger
+        let wasUsingFile = model.ledgerFileURL
+        step("learned corrections are on and have no file before the learning steps", wasUsingFile == nil && model.useLedger,
+             "ledger file \(wasUsingFile?.path ?? "none") (expected none), use learned corrections \(model.useLedger)")
+        guard let before = job.transcript,
+              let original = before.segments.first(where: { s in
+                  s.translation != nil && (s.translationCovers ?? []).isEmpty && !before.coveredIDs.contains(s.id)
+                      && before.audit?.change(forSegment: s.id) == nil && before.translationNote(for: s.id) == nil
+                      && Self.misheardEdit(of: s.text) != nil
+              }),
+              let text = Self.misheardEdit(of: original.text),
+              let pair = LineEdit.suggestedPair(heard: original.text, edited: text) else {
+            step("remember an edited pair in the learned corrections", false, "no row with a word to fix")
+            return
+        }
+        let id = original.id
+        let ledgerURL = root.deletingLastPathComponent()
+            .appendingPathComponent("kikimimi-ui-load-ledger-\(UUID().uuidString).json")
+        model.useLedgerFile(at: ledgerURL)
+        func accepted() -> (memory: Int, saved: Int) {
+            let saved = CorrectionLedger.load(from: ledgerURL)
+            let find = { (ledger: CorrectionLedger) in
+                ledger.corrections.first { $0.wrong == pair.wrong && $0.right == pair.right }?.accepted ?? 0
+            }
+            return (find(model.ledger), find(saved))
+        }
+        let saved = model.setLineText(text, segment: id, learning: pair, in: job)
+        let once = accepted()
+        let learned = job.transcript?.lineEdit(forSegment: id)?.learned
+        step("remember an edited pair in the learned corrections",
+             saved && once == (1, 1) && learned == pair && model.ledger.corrections.count == 1,
+             "pair \(pair.wrong) → \(pair.right), applied \(once.memory) (saved \(once.saved)), "
+                + "corrections \(model.ledger.corrections.count) (expected 1, 1, 1)")
+        // 同じ組で、文を少し変えて保存し直しても、回数は増えない
+        let again = model.setLineTexts([id: text + " Again."], learning: [id: pair], in: job)
+        let twice = accepted()
+        step("saving the same pair again does not count it twice", again && twice == (1, 1),
+             "saved \(again), applied \(twice.memory) (saved \(twice.saved)) (expected 1)")
+        // 戻すと、覚えさせた 1 回を取り消す
+        let reverted = model.revertLineEdit(id, in: job)
+        let after = accepted()
+        step("restoring the heard text takes the pair back", reverted && after == (0, 0)
+                && job.transcript?.lineEdits == nil,
+             "reverted \(reverted), applied \(after.memory) (saved \(after.saved)) (expected 0)")
+        // 結果と台帳を、始める前と同じに戻す
+        if var t = job.transcript, let k = t.segments.firstIndex(where: { $0.id == id }) {
+            t.segments[k].translation = original.translation
+            t.segments[k].translationCovers = original.translationCovers
+            job.transcript = t
+        }
+        model.useLedgerFile(at: wasUsingFile)
+        try? FileManager.default.removeItem(at: ledgerURL)
+        step("the job and the ledger are the same as before the learning steps",
+             job.transcript == before && model.ledger == ledgerBefore && model.ledgerFileURL == wasUsingFile,
+             "job same \(job.transcript == before), ledger same \(model.ledger == ledgerBefore)")
     }
 
     /// 2 つの区間を 1 つの訳のまとまりにできる所: 訳の在る区間 (監査の直し・訳の覚え・ほかの区間との訳のまとまりが無い) と、
@@ -441,15 +530,18 @@ extension LoadRun {
             lines.append("UI LOAD: screenshot failed 13-translation-check.png: no flagged translation in the job")
         }
 
-        // 19. 同じジョブの、行を直す画面 (直した行を開いたところ。聞き取った文・「聞き取った文に戻す」・訳が消える注意が出る)。
-        // 直した後に訳し直した行の形にする (確認用に、元の訳を置き直す)。撮ったら閉じ、直しを戻して、結果を前と同じにする
+        // 19. 同じジョブの、行を直す画面 (直した行を開いたところ。聞き取った文・「この直しを覚える」と 2 つの語・
+        // 「聞き取った文に戻す」・訳が消える注意が出る)。1 語を直し、その組を覚えさせ、訳し直した行の形にする
+        // (確認用に、元の訳を置き直す)。撮ったら閉じ、直しを戻して、結果と台帳 (確認用の物) を前と同じにする
         Self.live("scene 19: the line edit sheet")
         if let before = job.transcript,
            let original = before.segments.first(where: { s in
                s.translation != nil && (s.translationCovers ?? []).isEmpty && !before.coveredIDs.contains(s.id)
                    && before.audit?.change(forSegment: s.id) == nil && before.translationNote(for: s.id) == nil
            }),
-           model.setLineText(original.text + " (edited)", segment: original.id, in: job),
+           let text = Self.misheardEdit(of: original.text),
+           model.setLineText(text, segment: original.id,
+                             learning: LineEdit.suggestedPair(heard: original.text, edited: text), in: job),
            var edited = job.transcript, let i = edited.segments.firstIndex(where: { $0.id == original.id }) {
             edited.segments[i].translation = original.translation
             job.transcript = edited
@@ -472,6 +564,8 @@ extension LoadRun {
                 t.segments[k].translationCovers = original.translationCovers
                 job.transcript = t
             }
+            // 台帳は保存先の無い、確認用の物 (覚えさせて取り消した組が残るので、空に戻す)
+            model.useLedgerFile(at: nil)
             if job.transcript != before {
                 lines.append("UI LOAD: screenshot 19-line-edit.png: the job was not put back as it was")
             }

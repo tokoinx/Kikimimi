@@ -597,5 +597,11 @@ extension L10nTables {
         "The translation used the wrong kind of letters, so it was not used.": "번역에 잘못된 종류의 문자가 쓰여서 사용하지 않았습니다.",
         "The translation was far too long, so it was not used.": "번역이 너무 길어서 사용하지 않았습니다.",
         "The model returned no translation for this line.": "이 줄의 번역이 돌아오지 않았습니다.",
+        "Remember this fix": "이 수정 기억하기",
+        "From the next audit, the same mishearing gets this fix as a suggestion.": "다음 점검부터 같은 잘못 들음에 이 수정을 제안으로 보여 줍니다.",
+        "Fill in both terms.": "두 용어를 모두 입력하세요.",
+        "The two terms are the same.": "두 용어가 같습니다.",
+        "The heard text does not contain the misheard term.": "인식된 텍스트에 잘못 들은 용어가 없습니다.",
+        "Your text does not contain the right term.": "입력한 텍스트에 올바른 용어가 없습니다.",
     ]
 }

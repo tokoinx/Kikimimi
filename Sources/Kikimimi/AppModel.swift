@@ -120,6 +120,9 @@ final class AppModel {
     var ledger = CorrectionLedger()
     /// 学習した直しを使う (監査の前に当てる・断った直しを出さない・正しい語を語彙のヒントに足す)
     var useLedger: Bool { didSet { save(useLedger, .useLedger) } }
+    /// 学習した直しの台帳の保存先 (ledgerURL)。確認用の起動 (--selftest-…) では nil
+    /// (利用者の本物の台帳を読まず・書かない。確認は useLedgerFile(at:) で一時のファイルにする。訳の記憶と同じ形)
+    @ObservationIgnored private(set) var ledgerFileURL: URL?
     /// 訳の記憶 (利用者が直した訳。Mac の中だけに保存する)。次の翻訳で同じ文に出た時に、LLM を呼ばずに置く
     /// (`reuseTranslationMemory` が入の時)。設定の「覚えた訳」の一覧が見るので、見張る (結果の一覧は読まない)
     var translationMemory = TranslationMemory()
@@ -204,12 +207,14 @@ final class AppModel {
         reuseTranslationMemory = settings.bool(.reuseTranslationMemory)
         useAdapter = settings.bool(.useAdapter)
         llmStore = LLMModelStore(models: store)
-        let loaded = CorrectionLedger.loadKeepingUnreadable(from: ledgerURL)
-        ledger = loaded.ledger
-        if let aside = loaded.setAside {
-            errorMessage = L("Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.", aside.lastPathComponent)
-        }
+        // 学習した直しの台帳と訳の記憶は、確認用の起動では読まず・書かない (利用者の本物のファイルを守る)
         if !LaunchMode.current.isSelfTest {
+            ledgerFileURL = ledgerURL
+            let loaded = CorrectionLedger.loadKeepingUnreadable(from: ledgerURL)
+            ledger = loaded.ledger
+            if let aside = loaded.setAside {
+                errorMessage = L("Could not read the learned corrections file, so starting empty. The original file is kept in the same folder as “%@”.", aside.lastPathComponent)
+            }
             let memoryURL = ledgerURL.deletingLastPathComponent().appendingPathComponent(TranslationMemory.fileName)
             translationMemoryURL = memoryURL
             let memory = TranslationMemory.loadKeepingUnreadable(from: memoryURL)
@@ -266,6 +271,13 @@ final class AppModel {
     func useTranslationMemory(at url: URL?) {
         translationMemoryURL = url
         translationMemory = url.map { TranslationMemory.load(from: $0) } ?? TranslationMemory()
+    }
+
+    /// 学習した直しの台帳を、このファイルで読み書きする (確認用の起動が、一時のファイルにするのに使う)。
+    /// nil なら保存しない (台帳は空にする)
+    func useLedgerFile(at url: URL?) {
+        ledgerFileURL = url
+        ledger = url.map { CorrectionLedger.load(from: $0) } ?? CorrectionLedger()
     }
 
     /// 確認用 (--selftest-ui-load): この場所に保存する (前の結果は読まない)

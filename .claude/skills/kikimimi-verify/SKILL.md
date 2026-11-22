@@ -63,6 +63,11 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
   - `the list row shows the edited line`: 一覧の行 (単言語・対訳) に聞き取った文が入り、行の「訳」が出る。
   - `restore the heard text through the model` → `the job is the same as before the line edit`: 戻すと文が元どおりで記録が無い。確認用に訳を置き直すと、結果が直す前と同じ。
   - `a bilingual row of two segments lists both` → `edit the second segment of a bilingual row through the model` → `restore the second segment and put the job back`: 確認用の結果には、いくつかの区間から成る訳のまとまりが無いので、確かめる間だけ 2 つの区間を 1 つの訳にする。行が 2 つの区間を持ち、2 つ目だけを直すと行の文が変わって印が出て、戻してまとまりを外すと結果が前と同じ。
+  - 直した組を、学習した直しの台帳に覚えさせる段 (2026-11-22 に足した。台帳は、確かめる間だけ一時のファイル):
+    - `learned corrections are on and have no file before the learning steps`: 学習した直しが入で、台帳の保存先が無い (確認用の起動は、本物の `learned-corrections.json` を読まず・書かない)。
+    - `remember an edited pair in the learned corrections` → `saving the same pair again does not count it twice` → `restoring the heard text takes the pair back`: 1 語を「Kikimimi」に直して覚えさせると、台帳に 1 件・反映 1 回 (一時のファイルにも)。同じ組で保存し直しても 1 回のまま。戻すと 0 回。
+    - `the job and the ledger are the same as before the learning steps`: 結果と台帳が、始める前と同じ。
+  - `the self-test does not use the real learned corrections` (保存の確認の最後): 台帳の保存先が無く、本物の `learned-corrections.json` の有無・大きさ・更新の時刻が、保存の確認の前後で同じ。
 - 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 > 9 の順。`ADAPTER MESSAGE CHECK FAILED` は 7 に入る)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
@@ -100,7 +105,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | `11-delete-confirm.png` | ゴミ箱に入れるかの確認の画面 (07・08 の後に撮る)。「ゴミ箱に入れるもの」に保存のフォルダのパス、「残るもの」に元の音声ファイルのパス、「キャンセル」と「ゴミ箱に入れる」 |
 | `12-translation-edit.png` | 訳を直す画面 (直した訳の行を開いたところ。08 の後、11 の前に撮る)。機械の訳と「機械の訳に戻す」 |
 | `13-translation-check.png` | 要確認の行を開いた、訳を直す画面。上に理由の行と「この訳でよい」 |
-| `19-line-edit.png` | 行を直す画面 (13 の後、11 の前に撮る。直した後に訳し直した形の行を開いたところ)。題「この行を直す」、「聞き取った文」の下に元の文、入力の欄に末尾が「 (edited)」の文、訳が消える注意の 1 行、「聞き取った文に戻す」「キャンセル」「保存」 (保存は押せない形) |
+| `19-line-edit.png` | 行を直す画面 (13 の後、11 の前に撮る。直した後に訳し直した形の行を開いたところ)。題「この行を直す」、「聞き取った文」の下に元の文、入力の欄に、初めの 5 字以上の語を「Kikimimi」に置き換えた文、その下に「この直しを覚える」(入) と 2 つの欄 (聞き間違えた語 → Kikimimi)、説明の 1 行、訳が消える注意の 1 行、「聞き取った文に戻す」「キャンセル」「保存」 (保存は押せない形) |
 | `20-line-edit-two-segments.png` | 2 つの区間から成る対訳の行の、行を直す画面 (19 の後に撮る。2 つ目の区間を直して訳し直した形)。区間ごとに青い時刻と入力欄、2 つ目の区間だけに「聞き取った文」と元の文、入力欄の末尾が「（確認用に直した）」。訳が消える注意の 1 行と「聞き取った文に戻す」 |
 
 | `14-chat-empty.png` | チャットの窓 (480 x 640 pt)。上に灰色の「リサーチ … 切」の帯と「入れる…」、空の案内と例のボタン 3 つ、下に入力の欄と小さな 1 行 |

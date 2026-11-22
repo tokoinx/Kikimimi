@@ -327,4 +327,120 @@ final class LineEditTests: XCTestCase {
         XCTAssertEqual(joined[0].heard, "one two three")
         XCTAssertNil(joined[1].heard)
     }
+
+    // MARK: 学習した直しの台帳に覚えさせる組
+
+    /// 組を切り出し、聞き取った文の中のその場所の wrong を right に置き換えると、直した文になる事を確かめる
+    @discardableResult
+    private func pair(_ heard: String, _ edited: String, file: StaticString = #filePath,
+                      line: UInt = #line) -> AuditChange.Pair? {
+        guard let span = LineEdit.suggestedSpan(heard: heard, edited: edited) else {
+            XCTAssertNil(LineEdit.suggestedPair(heard: heard, edited: edited), file: file, line: line)
+            return nil
+        }
+        let h = Array(LineEdit.normalized(heard))
+        let replaced = String(h[..<span.range.lowerBound]) + span.pair.right + String(h[span.range.upperBound...])
+        XCTAssertEqual(replaced, LineEdit.normalized(edited), "replacing gives the edited text", file: file, line: line)
+        XCTAssertEqual(String(h[span.range]), span.pair.wrong, file: file, line: line)
+        XCTAssertEqual(LineEdit.suggestedPair(heard: heard, edited: edited), span.pair, file: file, line: line)
+        return span.pair
+    }
+
+    func testSuggestedPairInSpacedText() {
+        XCTAssertEqual(pair("I red the book", "I read the book"), AuditChange.Pair(wrong: "red", right: "read"))
+        XCTAssertEqual(pair("we went to new york last year", "we went to New York last year"),
+                       AuditChange.Pair(wrong: "new york", right: "New York"))
+        XCTAssertEqual(pair("Open Roblocks Studio.", "Open Roblox Studio."),
+                       AuditChange.Pair(wrong: "Roblocks", right: "Roblox"))
+        // 端の句読点は入れない
+        XCTAssertEqual(pair("It was created by Lou Tyce.", "It was created by Lou Tice."),
+                       AuditChange.Pair(wrong: "Tyce", right: "Tice"))
+        // 1 字の語は、右隣の語まで広げる (右に無ければ左)
+        XCTAssertEqual(pair("a b c d", "a x c d"), AuditChange.Pair(wrong: "b c", right: "x c"))
+        XCTAssertEqual(pair("go to x", "go to y"), AuditChange.Pair(wrong: "to x", right: "to y"))
+        // 語の切れ目で、消すだけ・足すだけの直しは、組にしない
+        XCTAssertNil(pair("the the cat", "the cat"))
+        XCTAssertNil(pair("the cat", "the black cat"))
+        XCTAssertNil(pair("It works.", "It works. (edited)"))
+        XCTAssertNil(pair("変更が効きました。", "変更が効きました。（確認用に直した）"))
+        // 同じ・空・文をまるごと書き換えた
+        XCTAssertNil(pair("same text", " same   text "))
+        XCTAssertNil(pair("", "x"))
+        XCTAssertNil(pair("This sentence was heard completely wrong by the model, sadly.",
+                          "A totally different sentence that the speaker actually said out loud."))
+    }
+
+    /// 日本語は、OS の版で語の分け方が変わり得るので、値でなく、成り立つべき事を見る
+    func testSuggestedPairInJapanese() throws {
+        let p = try XCTUnwrap(pair("浜って", "走って"))
+        XCTAssertGreaterThanOrEqual(p.wrong.count, 2)
+        XCTAssertTrue(p.wrong.contains("浜"))
+        XCTAssertTrue(p.right.contains("走"))
+        let q = try XCTUnwrap(pair("毎朝、公園で浜っています。", "毎朝、公園で走っています。"))
+        XCTAssertGreaterThanOrEqual(q.wrong.count, 2)
+        XCTAssertTrue(q.wrong.contains("浜") && q.right.contains("走"))
+        pair("聞き耳で文字起こしをする", "ききみみで文字起こしをする")
+        pair("今日は機会学習の話です。", "今日は機械学習の話です。")
+    }
+
+    func testLearnedIsKeptChangedAndRead() throws {
+        var t = transcript(["浜って"])
+        let id = t.segments[0].id
+        let learned = AuditChange.Pair(wrong: "浜って", right: "走って")
+        XCTAssertTrue(t.setLineText("走って", forSegment: id, learned: learned))
+        XCTAssertEqual(t.lineEdit(forSegment: id)?.learned, learned)
+        // 組を渡さずに直し直すと、組は引き継ぐ。渡すと置き換える
+        XCTAssertTrue(t.setLineText("走っていた", forSegment: id))
+        XCTAssertEqual(t.lineEdit(forSegment: id)?.learned, learned)
+        XCTAssertTrue(t.setLineText("走って", forSegment: id, learned: nil))
+        XCTAssertNil(t.lineEdit(forSegment: id)?.learned)
+        // 文は変えずに、組だけを置く
+        XCTAssertTrue(t.setLineLearned(learned, forSegment: id))
+        XCTAssertFalse(t.setLineLearned(learned, forSegment: id))
+        XCTAssertEqual(t.lineEdit(forSegment: id)?.heard, "浜って")
+        XCTAssertFalse(t.setLineLearned(learned, forSegment: UUID()))
+
+        let reloaded = try JSONDecoder().decode(Transcript.self, from: JSONEncoder().encode(t))
+        XCTAssertEqual(reloaded.lineEdit(forSegment: id)?.learned, learned)
+        // learned の無い古い記録も読める
+        let old = """
+        {"segmentID":"6F9619FF-8B86-D011-B42D-00C04FC964FF","heard":"a","edited":"b","date":0}
+        """
+        XCTAssertNil(try JSONDecoder().decode(LineEdit.self, from: Data(old.utf8)).learned)
+    }
+
+    func testLedgerUpdate() {
+        let a = AuditChange.Pair(wrong: "浜って", right: "走って")
+        let b = AuditChange.Pair(wrong: "浜", right: "走")
+        XCTAssertTrue(LineEdit.ledgerUpdate(old: nil, new: nil).isEmpty)
+        XCTAssertTrue(LineEdit.ledgerUpdate(old: a, new: a).isEmpty, "the same pair: nothing (no second count)")
+        XCTAssertEqual(LineEdit.ledgerUpdate(old: nil, new: a), LineEdit.LedgerUpdate(record: a))
+        XCTAssertEqual(LineEdit.ledgerUpdate(old: a, new: b), LineEdit.LedgerUpdate(retract: a, record: b))
+        // 戻した・覚えないにした
+        XCTAssertEqual(LineEdit.ledgerUpdate(old: a, new: nil), LineEdit.LedgerUpdate(retract: a))
+
+        // 台帳に当てると: 1 回覚えて、同じ組は増えず、戻すと 0 回
+        var ledger = CorrectionLedger()
+        func run(_ update: LineEdit.LedgerUpdate) {
+            if let r = update.retract { ledger.retract(wrong: r.wrong, right: r.right) }
+            if let n = update.record { ledger.record(wrong: n.wrong, right: n.right, language: "ja", example: nil, accepted: true) }
+        }
+        run(LineEdit.ledgerUpdate(old: nil, new: a))
+        run(LineEdit.ledgerUpdate(old: a, new: a))
+        XCTAssertEqual(ledger.corrections.map(\.accepted), [1])
+        run(LineEdit.ledgerUpdate(old: a, new: nil))
+        XCTAssertEqual(ledger.corrections.map(\.accepted), [0])
+        XCTAssertTrue(ledger.active.isEmpty)
+    }
+
+    /// 1 回覚えた「浜って → 走って」は、別の区間の「浜って」に、要確認の直し (自動でない) として出る
+    func testOneLearnedLineEditIsASuggestionElsewhere() throws {
+        var ledger = CorrectionLedger()
+        ledger.record(wrong: "浜って", right: "走って", language: "ja", example: "浜って", accepted: true)
+        let other = TranscriptSegment(start: 10, end: 12, text: "毎朝、公園を浜っています。", language: "ja")
+        let changes = ledger.fixes(for: [other], language: "ja")
+        XCTAssertEqual(changes.count, 1)
+        XCTAssertEqual(changes.first?.replacement, "毎朝、公園を走っています。")
+        XCTAssertEqual(changes.first?.isConfident, false)
+    }
 }

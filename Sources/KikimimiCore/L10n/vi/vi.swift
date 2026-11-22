@@ -597,5 +597,11 @@ extension L10nTables {
         "The translation used the wrong kind of letters, so it was not used.": "Bản dịch dùng sai loại chữ nên không được dùng.",
         "The translation was far too long, so it was not used.": "Bản dịch quá dài nên không được dùng.",
         "The model returned no translation for this line.": "Mô hình không trả về bản dịch cho dòng này.",
+        "Remember this fix": "Ghi nhớ chỉnh sửa này",
+        "From the next audit, the same mishearing gets this fix as a suggestion.": "Từ lần rà soát tiếp theo, chỗ nghe nhầm giống vậy sẽ được đề xuất chỉnh sửa này.",
+        "Fill in both terms.": "Hãy điền cả hai từ.",
+        "The two terms are the same.": "Hai từ giống nhau.",
+        "The heard text does not contain the misheard term.": "Văn bản nhận dạng không chứa từ nghe nhầm.",
+        "Your text does not contain the right term.": "Văn bản của bạn không chứa từ đúng.",
     ]
 }
