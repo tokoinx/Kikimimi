@@ -86,11 +86,42 @@ extension AppModel {
         case .useLedger: return toggle(\.useLedger)
         case .reuseTranslationMemory: return toggle(\.reuseTranslationMemory)
         case .useAdapter: return toggle(\.useAdapter)
-        case .showBilingual: return toggle(\.showBilingual)
+        // 結果の画面の「対訳」のチェックと同じ: 選んでいる結果が在れば、その結果の見え方 (設定が入、または行の「訳」の印) を読み、
+        // 同じ道 (setShowsBilingual。切にすると、その結果の印も消す) で書く。選んでいる結果が無ければ、設定の値
+        case .showBilingual:
+            return ChatAccess(get: {
+                                  let on = self.selectedJob.map { self.showsBilingual($0) } ?? self.showBilingual
+                                  return on ? "on" : "off"
+                              },
+                              set: { value in
+                                  if let job = self.selectedJob {
+                                      self.setShowsBilingual(value == "on", for: job)
+                                  } else {
+                                      self.showBilingual = value == "on"
+                                  }
+                                  return true
+                              })
         case .showNotes: return toggle(\.showNotes)
         case .practiceDictation: return toggle(\.practice.showsDictation)
         // チャットから触れない物 (ChatSettingsCatalog.excludedKeys にも入っている)
         case .notesWidth, .practice: return nil
+        }
+    }
+
+    /// 今、この設定を変えられるか。変えられない時は、その理由 (変えられる時は nil)。
+    /// 設定の画面の部品を押せなくするのも、チャットの札に「変える」を出さないのも、`applyChatSetting` が断るのも、これを使う。
+    /// 設定を足したら、ここで決める (決め忘れは、コンパイルが止める)
+    func unavailableReason(for key: SettingKey) -> SettingUnavailableReason? {
+        switch key {
+        // 無音を飛ばすが切の時は、「自動でやり直す」は働かない
+        case .autoVADOff: return useVAD ? nil : .needsOn(.useVAD)
+        // 差分が 1 つも入っていない時は、「差分を使う」は働かない
+        case .useAdapter: return hasAdapter || hasTranslationAdapter ? nil : .noAdapter
+        case .uiLanguage, .languageCode, .modelID, .preferAccuracy, .useVAD, .filterHallucinations,
+             .autoMixedLanguage, .livePreview, .initialPrompt, .llmModelID, .autoAudit, .translationLanguage,
+             .autoTranslate, .useLedger, .reuseTranslationMemory, .showBilingual, .showNotes, .notesWidth,
+             .practice, .practiceDictation:
+            return nil
         }
     }
 
@@ -105,12 +136,13 @@ extension AppModel {
 
     /// チャットの案を当てる (利用者が札の「変える」を押した時だけ呼ぶ)。当てたら true。
     /// 一覧に在る鍵だけを、値をもう 1 回確かめてから、設定の画面と同じ道 (このモデルの値を変える。didSet が保存する) で当てる。
-    /// リサーチの鍵と、一覧に無い鍵は、必ず断る
+    /// リサーチの鍵と、一覧に無い鍵と、今は変えられない設定 (`unavailableReason(for:)`) は、必ず断る
     func applyChatSetting(key: String, value raw: String) -> Bool {
         guard key != ChatSettingsCatalog.researchKey, !ChatSettingsCatalog.excludedKeys.contains(key),
               let item = chatCatalog.first(where: { $0.key == key }),
               let value = item.normalizedValue(raw),
-              let setting = SettingKey(rawValue: key), let access = chatAccess(setting) else { return false }
+              let setting = SettingKey(rawValue: key), unavailableReason(for: setting) == nil,
+              let access = chatAccess(setting) else { return false }
         return access.set(value)
     }
 }

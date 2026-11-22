@@ -2,9 +2,8 @@
 // AI が訳した物で、その言語を話す人の確認は無い。直す時は、値を書き換える (鍵は変えない)。
 extension L10nTables {
     static let koChat: [String: String] = [
-        "Transcription model": "받아쓰기 모델",
-        "LLM model": "LLM 모델",
-        "Translate other languages automatically": "다른 언어를 자동으로 번역",
+        "Turn on “%@” first.": "먼저 “%@”을(를) 켜십시오.",
+        "No adapter is added. Add one in Settings first.": "어댑터가 추가되어 있지 않습니다. 먼저 설정에서 추가하십시오.",
         "Your message is too long. Shorten it and send it again.": "메시지가 너무 깁니다. 줄여서 다시 보내십시오.",
         "On": "켬",
         "Off": "끔",

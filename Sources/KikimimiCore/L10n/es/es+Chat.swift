@@ -2,9 +2,8 @@
 // AI が訳した物で、その言語を話す人の確認は無い。直す時は、値を書き換える (鍵は変えない)。
 extension L10nTables {
     static let esChat: [String: String] = [
-        "Transcription model": "Modelo de transcripción",
-        "LLM model": "Modelo LLM",
-        "Translate other languages automatically": "Traducir otros idiomas automáticamente",
+        "Turn on “%@” first.": "Activa primero “%@”.",
+        "No adapter is added. Add one in Settings first.": "No hay ningún adaptador añadido. Añade uno primero en Ajustes.",
         "Your message is too long. Shorten it and send it again.": "El mensaje es demasiado largo. Acórtalo y vuelve a enviarlo.",
         "On": "Activado",
         "Off": "Desactivado",

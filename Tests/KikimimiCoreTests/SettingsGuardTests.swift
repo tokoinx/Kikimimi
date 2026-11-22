@@ -34,7 +34,7 @@ final class SettingsGuardTests: XCTestCase {
         XCTAssertEqual(SettingKey.modelID.definition, SettingDefinition(kind: .choice(.whisperModels), defaultValue: .string(ModelCatalog.defaultModelID)))
         XCTAssertEqual(SettingKey.llmModelID.definition, SettingDefinition(kind: .choice(.llmModels), defaultValue: .string(LLMCatalog.defaultModelID)))
         XCTAssertEqual(SettingKey.translationLanguage.definition, SettingDefinition(kind: .choice(.translationTargets), defaultValue: nil, selfTestValue: .string("ja")))
-        XCTAssertEqual(SettingKey.initialPrompt.definition, SettingDefinition(kind: .text, defaultValue: .string("")))
+        XCTAssertEqual(SettingKey.initialPrompt.definition, SettingDefinition(kind: .text(SettingTextRule(maxLength: 400)), defaultValue: .string("")))
         XCTAssertEqual(SettingKey.notesWidth.definition, SettingDefinition(kind: .number(220...520), defaultValue: .double(320)))
         XCTAssertEqual(SettingKey.practice.definition, SettingDefinition(kind: .json, defaultValue: nil))
         // 確認用の起動で決まった値を持つのは、この 3 つだけ

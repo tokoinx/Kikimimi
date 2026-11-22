@@ -1,10 +1,9 @@
 // 日本語の表: LLM とのチャット (KikimimiCore/Chat) の文 (鍵 = 英語、値 = 日本語)
 extension JA {
     static let chat: [String: String] = [
-        // ChatSettingsCatalog (設定の画面のラベルが使えない項目の、短い名前)
-        "Transcription model": "文字起こしのモデル",
-        "LLM model": "LLM のモデル",
-        "Translate other languages automatically": "ほかの言語を自動で翻訳する",
+        // 札: 変えられない時の理由 (KikimimiCore/Chat/ChatSettings.swift の SettingUnavailableReason)
+        "Turn on “%@” first.": "先に「%@」をオンにしてください。",
+        "No adapter is added. Add one in Settings first.": "差分が入っていません。先に設定で差分を追加してください。",
         // ChatSettingItem.displayValue (入り切りの値)
         "On": "オン",
         "Off": "オフ",

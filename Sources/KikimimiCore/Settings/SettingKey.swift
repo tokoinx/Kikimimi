@@ -65,12 +65,60 @@ public enum SettingKind: Sendable, Equatable {
     case toggle
     /// 決まった値から 1 つ (文字列で保存)
     case choice(SettingChoices)
-    /// 自由な文 (文字列で保存)
-    case text
+    /// 自由な文 (文字列で保存)。決まり (長さの上限・制御文字) は、設定の画面の欄とチャットの両方が使う
+    case text(SettingTextRule)
     /// 数 (Double で保存。読む時に範囲に収める)
     case number(ClosedRange<Double>)
     /// JSON の文 (文字列で保存。中身は使う側が読む)
     case json
+}
+
+extension SettingKind {
+    /// 文の設定の決まり。文の設定でなければ nil
+    public var textRule: SettingTextRule? {
+        if case .text(let rule) = self { return rule }
+        return nil
+    }
+}
+
+/// 文の設定の決まり (長さの上限と、制御文字を入れない事)。
+/// 設定の画面の欄 (`fieldValue(new:old:)`) とチャットの案 (`accepts(_:)`) の両方が、ここを使う。
+/// 長さは `String.count` (見た目の 1 文字を 1 と数える) で数える
+public struct SettingTextRule: Sendable, Equatable {
+    /// 長さの上限 (文字数)
+    public let maxLength: Int
+
+    public init(maxLength: Int) {
+        self.maxLength = maxLength
+    }
+
+    /// 入れられない文字か (C0・DEL・C1 と、文の向きを変える印。向きの印は、見た目をごまかせるため)
+    public static func isControl(_ scalar: Unicode.Scalar) -> Bool {
+        let v = scalar.value
+        return v < 0x20 || (0x7F...0x9F).contains(v) || (0x202A...0x202E).contains(v) || (0x2066...0x2069).contains(v)
+    }
+
+    /// チャットの案: 決まりに合うか (上限を超える文や、制御文字の在る文は断る)
+    public func accepts(_ value: String) -> Bool {
+        value.count <= maxLength && !value.unicodeScalars.contains(where: { Self.isControl($0) })
+    }
+
+    /// 設定の欄: 打った後の文 `new` と打つ前の文 `old` から、残す文を返す。
+    /// - 制御文字は、空白 1 つに替える (貼り付けた改行やタブで、語がくっつかないように)。
+    /// - 上限を超えていて、`old` より長くなる入力は受け付けない (`old` を返す)。
+    /// - 上限を超えていても、`old` より短くなる編集は受ける (前から保存してある長い値を、勝手に切らない。短くはできる)
+    public func fieldValue(new: String, old: String) -> String {
+        var cleaned = new
+        if new.unicodeScalars.contains(where: { Self.isControl($0) }) {
+            var scalars = String.UnicodeScalarView()
+            for scalar in new.unicodeScalars {
+                scalars.append(Self.isControl(scalar) ? " " : scalar)
+            }
+            cleaned = String(scalars)
+        }
+        if cleaned.count > maxLength && cleaned.count > old.count { return old }
+        return cleaned
+    }
 }
 
 /// 設定の値 1 つ (既定の値・確認用の起動で決まった値に使う)
@@ -123,7 +171,8 @@ extension SettingKey {
         case .livePreview:
             return SettingDefinition(kind: .toggle, defaultValue: .bool(true))
         case .initialPrompt:
-            return SettingDefinition(kind: .text, defaultValue: .string(""))
+            // 語彙のヒント: 400 字まで。制御文字は入れない (設定の画面の欄も、チャットの案も、この決まりを使う)
+            return SettingDefinition(kind: .text(SettingTextRule(maxLength: 400)), defaultValue: .string(""))
         case .llmModelID:
             return SettingDefinition(kind: .choice(.llmModels), defaultValue: .string(LLMCatalog.defaultModelID))
         case .autoAudit:
@@ -153,6 +202,9 @@ extension SettingKey {
         }
     }
 
+    /// 文の設定の決まり。文の設定でなければ nil
+    public var textRule: SettingTextRule? { definition.kind.textRule }
+
     /// 保存してあった文を、読む時に直す。nil を返すと、既定の値になる
     func fixStored(_ raw: String) -> String? {
         switch self {
@@ -168,5 +220,14 @@ extension SettingKey {
              .showBilingual, .showNotes, .notesWidth, .practiceDictation:
             return raw
         }
+    }
+}
+
+extension UILanguage {
+    /// 確認用の起動 (--selftest-…) の画面の言語。設定の定義 (`SettingKey.uiLanguage` の確認用の値) から読む口は、ここの 1 つ。
+    /// 定義の値が 13 の言語のどれでもなければ nil (`ChatSettingsLabelGuardTests.testSelfTestUILanguageComesFromTheDefinition` が落とす)
+    public static var selfTest: UILanguage? {
+        guard case .string(let code)? = SettingKey.uiLanguage.definition.selfTestValue else { return nil }
+        return UILanguage(rawValue: code)
     }
 }

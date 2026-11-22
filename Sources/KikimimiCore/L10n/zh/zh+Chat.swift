@@ -2,9 +2,8 @@
 // AI が訳した物で、その言語を話す人の確認は無い。直す時は、値を書き換える (鍵は変えない)。
 extension L10nTables {
     static let zhChat: [String: String] = [
-        "Transcription model": "转写模型",
-        "LLM model": "LLM 模型",
-        "Translate other languages automatically": "自动翻译其他语言",
+        "Turn on “%@” first.": "请先打开“%@”。",
+        "No adapter is added. Add one in Settings first.": "尚未添加适配器。请先在设置中添加。",
         "Your message is too long. Shorten it and send it again.": "消息太长。请缩短后重新发送。",
         "On": "开",
         "Off": "关",

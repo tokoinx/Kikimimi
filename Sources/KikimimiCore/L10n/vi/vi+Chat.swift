@@ -2,9 +2,8 @@
 // AI が訳した物で、その言語を話す人の確認は無い。直す時は、値を書き換える (鍵は変えない)。
 extension L10nTables {
     static let viChat: [String: String] = [
-        "Transcription model": "Mô hình chép lời",
-        "LLM model": "Mô hình LLM",
-        "Translate other languages automatically": "Tự động dịch các ngôn ngữ khác",
+        "Turn on “%@” first.": "Hãy bật “%@” trước.",
+        "No adapter is added. Add one in Settings first.": "Chưa thêm bộ điều hợp nào. Hãy thêm một bộ trong Cài đặt trước.",
         "Your message is too long. Shorten it and send it again.": "Tin nhắn quá dài. Hãy rút ngắn rồi gửi lại.",
         "On": "Bật",
         "Off": "Tắt",

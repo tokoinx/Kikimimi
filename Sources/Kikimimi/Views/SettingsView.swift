@@ -116,7 +116,7 @@ struct TranscriptionSettingsForm: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .disabled(!model.useVAD)
+                .disabled(model.unavailableReason(for: .autoVADOff) != nil)
                 Toggle(L("Remove common misrecognitions and repeated sentences"), isOn: $model.filterHallucinations)
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle(L("Automatically transcribe recordings that mix Japanese and English as “Japanese + English”"), isOn: $model.autoMixedLanguage)
@@ -128,9 +128,28 @@ struct TranscriptionSettingsForm: View {
                 Toggle(L("Show a preview while recording"), isOn: $model.livePreview)
                 VStack(alignment: .leading, spacing: 4) {
                     TextField(L("Vocabulary hints"), text: $model.initialPrompt, prompt: Text(L("Example: %@", Self.hintExample)))
-                    Text(L("Write proper nouns and technical terms here, and they are more likely to come out with that spelling. You can leave this empty."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        // 決まり (上限・制御文字) は設定の定義の物 (チャットの案と同じ)。返る文が違う時だけ入れ直す。
+                        // 上限に届かない間の入力 (日本語の変換の途中も) は、そのまま返るので入れ直さない (入れ直すと変換が切れる)。
+                        // 読み込みの時や didSet では切らない (保存してある値を、読んだだけで変えない)
+                        .onChange(of: model.initialPrompt) { old, new in
+                            guard let rule = SettingKey.initialPrompt.textRule else { return }
+                            let kept = rule.fieldValue(new: new, old: old)
+                            if kept != new { model.initialPrompt = kept }
+                        }
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(L("Write proper nouns and technical terms here, and they are more likely to come out with that spelling. You can leave this empty."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 8)
+                        if let rule = SettingKey.initialPrompt.textRule {
+                            // 今の字数 / 上限 (数字と / だけ。上限を超えている時は赤)
+                            let count = model.initialPrompt.count
+                            Text(verbatim: "\(count) / \(rule.maxLength)")
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(count > rule.maxLength ? Color.red : Color.secondary)
+                        }
+                    }
                 }
             }
 
@@ -173,9 +192,8 @@ struct LLMSettingsForm: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Toggle(L("Translate segments that are not in %1$@ into %2$@",
-                         TranslationTarget.displayName(for: model.translationLanguage),
-                         TranslationTarget.displayName(for: model.translationLanguage)), isOn: $model.autoTranslate)
+                // ラベルはチャットの札と同じ関数で作る (訳す先の言語の名前が入る)
+                Toggle(SettingLabels.autoTranslate(target: model.translationLanguage), isOn: $model.autoTranslate)
                 Text(L("Even when this is off, you can translate only the sentences you want to read, one at a time, with “Translate” on a result line (lighter than translating everything)."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -328,7 +346,7 @@ struct AdapterSection: View {
                 ProgressView().controlSize(.small)
             }
             Toggle(L("Use the adapters (the audit adapter for audit, the translation adapter for translation)"), isOn: $model.useAdapter)
-                .disabled(!model.hasAdapter && !model.hasTranslationAdapter)
+                .disabled(model.unavailableReason(for: .useAdapter) != nil)
             Text(L("Translation uses only the translation adapter. Without one, translation runs without an adapter (an adapter trained for audit can garble names in translations)."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
