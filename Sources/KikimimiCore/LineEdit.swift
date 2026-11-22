@@ -229,6 +229,13 @@ extension LineEdit {
         if prefix == E.count - suffix && boundaries.contains(a) && boundaries.contains(b) { return nil }
         while !boundaries.contains(a) { a -= 1 }
         while !boundaries.contains(b) { b += 1 }
+        // カタカナの語 (辞書に無い名前など) は、語の分け方が途中で切る事が在る (「ロブロクス」が「ロブ」と「ロクス」になる)。
+        // 違う所の端がカタカナで、その外にもカタカナが続く時は、カタカナの続きの終わりまで広げる
+        // (広げる先は 2 つの文に共通の所なので、置き換えると直した文になる事は変わらない)
+        if a < b {
+            while a > 0, isKatakana(H[a]), isKatakana(H[a - 1]) { a -= 1 }
+            while b < H.count, isKatakana(H[b - 1]), isKatakana(H[b]) { b += 1 }
+        }
         if letterCount(String(H[a..<b])) < 2 {
             if let next = words.first(where: { $0.lowerBound >= b && $0.upperBound > b }) {
                 b = next.upperBound
@@ -259,6 +266,15 @@ extension LineEdit {
               w.trimmingCharacters(in: .whitespacesAndNewlines) == w, r.trimmingCharacters(in: .whitespacesAndNewlines) == r,
               wrong.count <= pairMaxLength, fixed.count <= pairMaxLength else { return nil }
         return PairSpan(pair: AuditChange.Pair(wrong: w, right: r), range: a..<b)
+    }
+
+    /// カタカナの字か (長音の「ー」・小さい字・半角のカタカナも。語を分ける中黒「・」は入れない)
+    static func isKatakana(_ c: Character) -> Bool {
+        c.unicodeScalars.allSatisfy { s in
+            let v = s.value
+            return (v >= 0x30A1 && v <= 0x30FA) || (v >= 0x30FC && v <= 0x30FF)
+                || (v >= 0x31F0 && v <= 0x31FF) || (v >= 0xFF66 && v <= 0xFF9F)
+        }
     }
 
     /// 空白と句読点を除いた字の数 (組の語が短すぎないかを見るのに使う。直す画面の「覚える」の初めの値も、これで決める)

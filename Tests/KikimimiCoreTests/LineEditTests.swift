@@ -383,6 +383,22 @@ final class LineEditTests: XCTestCase {
         pair("今日は機会学習の話です。", "今日は機械学習の話です。")
     }
 
+    /// カタカナの語は、語の分け方が途中で切っても、カタカナの続きの全部を組にする
+    /// (2026-11-23 に画面で見た形: 「ロブロクス」→「ロブロックス」が「ロクス → ロックス」になっていた)
+    func testSuggestedPairCoversTheWholeKatakanaWord() throws {
+        let p = try XCTUnwrap(pair("子供たちはロブロクスで遊びました。", "子供たちはロブロックスで遊びました。"))
+        XCTAssertEqual(p, AuditChange.Pair(wrong: "ロブロクス", right: "ロブロックス"))
+        // 長音の「ー」も、語の中の字として数える
+        let q = try XCTUnwrap(pair("新しいコンピューダーを買った。", "新しいコンピューターを買った。"))
+        XCTAssertEqual(q, AuditChange.Pair(wrong: "コンピューダー", right: "コンピューター"))
+        // 中黒「・」では広げない (別の語)
+        let r = try XCTUnwrap(pair("ジョン・スミズさんが来た。", "ジョン・スミスさんが来た。"))
+        XCTAssertEqual(r, AuditChange.Pair(wrong: "スミズ", right: "スミス"))
+        // カタカナでない所は、今までどおり
+        XCTAssertTrue(LineEdit.isKatakana("ー") && LineEdit.isKatakana("ッ") && LineEdit.isKatakana("ｶ"))
+        XCTAssertFalse(LineEdit.isKatakana("・") || LineEdit.isKatakana("は") || LineEdit.isKatakana("浜") || LineEdit.isKatakana("a"))
+    }
+
     func testLearnedIsKeptChangedAndRead() throws {
         var t = transcript(["浜って"])
         let id = t.segments[0].id
