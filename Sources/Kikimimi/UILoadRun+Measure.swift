@@ -1,5 +1,6 @@
 // 画面の重さを測る所: 操作を起こす段階、1 回ずつ測る所、一覧の行を作る手間、結果の行と、目安を超えた物。
 
+import AppKit
 import Foundation
 import KikimimiCore
 
@@ -11,6 +12,10 @@ extension LoadRun {
         let started = Date()
         let rowsAtStart = UILoadHooks.rowsBuilt
         let bodiesAtStart = UILoadHooks.rowBodies
+        let hoverAtStart = UILoadHooks.rowHoverChanges
+        // ここから、行の数を操作ごとに分け始める
+        rowCountMark = (rowsAtStart, bodiesAtStart)
+        checkMouse()
         // 1. 終わったジョブ (対訳)
         await measure(Action.selectBilingual) { model.select(doneBilingual) }
         await UILoadSelfTest.sleep(0.5)
@@ -62,8 +67,12 @@ extension LoadRun {
         probe.stop()
         // 届いていない合図を待つ
         await UILoadSelfTest.sleep(0.3)
+        // 操作ごとに分けるのは、ここまで (合計と同じ所で止める)
+        flushRowCounts()
+        rowCountMark = nil
         rowsBuiltTotal = UILoadHooks.rowsBuilt - rowsAtStart
         rowBodiesTotal = UILoadHooks.rowBodies - bodiesAtStart
+        rowHoverChangesTotal = UILoadHooks.rowHoverChanges - hoverAtStart
         log.summaryLine = String(format: "driven for %.1f s: %d ticks (%d of them moved the current row), %d one-line starts,"
                                  + " %d segments delivered to the running job (it now has %d rows; batches are applied every"
                                  + " %.2f s at that size)",
@@ -107,11 +116,56 @@ extension LoadRun {
     /// 段階を 1 つ行う (見張りの値を、この段階の名前で分ける)。終わりに、まとめて足すのが済むまで待つ
     private func phase(_ name: String, _ body: () async -> Void) async {
         probe.setPhase(name)
+        checkMouse()
+        let initsBefore = UILoadHooks.rowsBuilt
+        let bodiesBefore = UILoadHooks.rowBodies
         let start = UILoadSelfTest.now()
         await body()
         await UILoadSelfTest.sleep(batchInterval + 0.15)
         phaseTimes[name] = (start, UILoadSelfTest.now())
+        rowInitsByPhase[name, default: 0] += UILoadHooks.rowsBuilt - initsBefore
+        rowBodiesByPhase[name, default: 0] += UILoadHooks.rowBodies - bodiesBefore
+        checkMouse()
         probe.setPhase(Phase.between)
+    }
+
+    /// マウスの位置が、メインのウインドウの枠の中に在るかを見て、覚える (見えるメインのウインドウが無ければ、外とする)
+    private func checkMouse() {
+        let location = NSEvent.mouseLocation
+        let window = MainWindow.all().first { $0.isVisible }
+        mouseInsideChecks.append(window.map { NSMouseInRect(location, $0.frame, false) } ?? false)
+        // 同じ時の、アプリが前面か・ウインドウがキーか
+        appActiveChecks.append(NSApplication.shared.isActive)
+        windowKeyChecks.append(window?.isKeyWindow ?? false)
+    }
+
+    /// 前の時点から増えた行の数 (init と body) を、いま開いている操作のうち、後から始まった方に入れる
+    /// (開いている操作が無ければ、どこにも入れない: 操作の外)。測る部分の外 (rowCountMark が nil) では何もしない
+    private func flushRowCounts() {
+        guard let mark = rowCountMark else { return }
+        let inits = UILoadHooks.rowsBuilt
+        let bodies = UILoadHooks.rowBodies
+        if let current = openActions.last {
+            rowInitsByAction[current, default: 0] += inits - mark.inits
+            rowBodiesByAction[current, default: 0] += bodies - mark.bodies
+        }
+        rowCountMark = (inits, bodies)
+    }
+
+    /// 操作を始める (ここからの行の数を、この操作に入れる)
+    private func beginRowCount(_ action: String) {
+        flushRowCounts()
+        if rowCountMark != nil {
+            rowInitsByAction[action, default: 0] += 0
+            rowBodiesByAction[action, default: 0] += 0
+        }
+        openActions.append(action)
+    }
+
+    /// 操作を終える (ここまでの行の数を入れてから、開いている操作から外す)
+    private func endRowCount(_ action: String) {
+        flushRowCounts()
+        if let index = openActions.lastIndex(of: action) { openActions.remove(at: index) }
     }
 
     /// 1 秒に 10 回の拍で、再生位置・1 行だけの再生・区間・進み具合を起こす。
@@ -219,6 +273,7 @@ extension LoadRun {
     private func burst(_ count: Int) async {
         let target = (running.transcript?.segments.count ?? 0) + count
         let started = UILoadSelfTest.now()
+        beginRowCount(Action.burst)
         awaitingBurst = true
         burstApplied = nil
         deliver(count)
@@ -230,6 +285,7 @@ extension LoadRun {
         let applied = burstApplied ?? started
         burstWaits.append(UILoadSelfTest.seconds(from: started, to: applied))
         let seconds = await UILoadSelfTest.untilIdle(since: applied)
+        endRowCount(Action.burst)
         measured[Action.burst, default: []].append(seconds)
     }
 
@@ -240,8 +296,10 @@ extension LoadRun {
         guard let action = feedAction else { return }
         // 1 つずつの区間のはずが、まとめて足された (届けるのが遅れた) ものは、1 つの区間の操作に入れない
         if action != Action.steadyBatch, count != 1 { return }
+        beginRowCount(action)
         Task { @MainActor in
             let seconds = await UILoadSelfTest.untilIdle(since: started)
+            self.endRowCount(action)
             self.measured[action, default: []].append(seconds)
         }
     }
@@ -253,9 +311,11 @@ extension LoadRun {
         log.note(name)
         let rowsBefore = UILoadHooks.rowsBuilt
         let bodiesBefore = UILoadHooks.rowBodies
+        beginRowCount(name)
         let started = UILoadSelfTest.now()
         body()
         let seconds = await UILoadSelfTest.untilIdle(since: started)
+        endRowCount(name)
         measured[name, default: []].append(seconds)
         // ジョブを選ぶ・再生位置を遠くへ動かす操作は、そのあいだに一覧が作った行と、body を動かした行の数も記録する
         if Self.rowCountedActions.contains(name) {
@@ -393,6 +453,32 @@ extension LoadRun {
         if let rowsBuiltTotal, let rowBodiesTotal {
             lines.append("UI LOAD: rows built during the measured part: inits \(rowsBuiltTotal), bodies \(rowBodiesTotal)"
                          + " (PlayableRow inits and bodies; limit per select or jump: \(Limits.selectRowsBuiltMax) bodies)")
+            // 段階ごと・操作ごとの内わけ (名前の付いた分を引いた残りが「outside …」。どの目安とも比べない)
+            func split(_ what: String, _ counts: [String: Int], _ order: [String], total: Int, outside: String) -> String {
+                let named = order.filter { counts[$0] != nil }
+                let rest = total - named.reduce(0) { $0 + (counts[$1] ?? 0) }
+                let parts = named.map { "\($0) \(counts[$0] ?? 0)" } + ["\(outside) \(rest)"]
+                return "UI LOAD: \(what): " + parts.joined(separator: ", ")
+            }
+            lines.append(split("row bodies by phase", rowBodiesByPhase, Phase.all, total: rowBodiesTotal,
+                               outside: "outside the phases"))
+            lines.append(split("row inits by phase", rowInitsByPhase, Phase.all, total: rowsBuiltTotal,
+                               outside: "outside the phases"))
+            lines.append(split("row bodies by action", rowBodiesByAction, Action.all, total: rowBodiesTotal,
+                               outside: "outside the measured actions"))
+            lines.append(split("row inits by action", rowInitsByAction, Action.all, total: rowsBuiltTotal,
+                               outside: "outside the measured actions"))
+        }
+        if let rowHoverChangesTotal {
+            let inside = mouseInsideChecks.filter { $0 }.count
+            let active = appActiveChecks.filter { $0 }.count
+            let key = windowKeyChecks.filter { $0 }.count
+            // 見た順の印 (+ = そうだった、- = 違った)。始め・段階 1 の始めと終わり・…・段階 4 の始めと終わり
+            func marks(_ checks: [Bool]) -> String { checks.map { $0 ? "+" : "-" }.joined() }
+            lines.append("UI LOAD: row hover changes \(rowHoverChangesTotal) (the mouse pointer was inside the main window"
+                         + " at \(inside) of \(mouseInsideChecks.count) checks \(marks(mouseInsideChecks));"
+                         + " the app was active at \(active) \(marks(appActiveChecks)),"
+                         + " the main window was key at \(key) \(marks(windowKeyChecks)))")
         }
         let samples = probe.samples()
         lines.append("watchdog: a background thread posts a block to the main queue every 50 ms (without waiting for the"

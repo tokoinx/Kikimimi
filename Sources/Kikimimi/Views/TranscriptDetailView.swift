@@ -549,6 +549,8 @@ struct PlayableRow<Content: View>: View {
             if canPlay { toggle() }
         }
         .onHover { inside in
+            // 画面の重さの確認が、マウスが行に載った・行から出た回数を数える (色が変わり、body がまた動く。ふだんは Bool を 1 つ見るだけ)
+            if UILoadHooks.isActive { UILoadHooks.rowHoverChanges += 1 }
             hovering = inside
         }
         .help(canPlay ? hint(isPlaying) : "")

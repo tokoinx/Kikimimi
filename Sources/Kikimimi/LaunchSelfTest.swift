@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import KikimimiCore
 
 /// `Kikimimi --selftest-launch [秒] [--reopen | --reopen-menu | --reopen-external] [--restore-windows] [--report <ファイル>]`
 ///
@@ -112,6 +113,9 @@ enum LaunchSelfTest {
     }
 
     private static func finish(_ lines: [String], code: Int32, reportPath: String?) -> Never {
+        // macOS が確認のあいだに本物の設定へ書いた物を元に戻し、戻した鍵を合格の行の前に出す (合否・終了コードは変えない)
+        let restored = SettingsWriter.putBackAfterSelfTest().map { SettingsSnapshot.reportLines(restored: $0) } ?? []
+        let lines = SettingsSnapshot.insert(restored, into: lines, before: "LAUNCH SELFTEST OK")
         let text = lines.joined(separator: "\n") + "\n"
         FileHandle.standardError.write(Data(text.utf8))
         LaunchLog.note("launch self-test finished with code \(code)")
