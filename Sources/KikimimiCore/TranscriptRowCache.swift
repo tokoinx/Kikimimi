@@ -24,11 +24,17 @@ public struct TranscriptListItem: Identifiable, Hashable, Sendable {
     /// この行の訳の覚え (利用者が直した訳など。今の原文・訳に合う物だけ)。対訳の行だけに入る。
     /// 画面は、この値を出すだけにする (行の中で結果を読み直さない)
     public var review: TranslationNote?
+    /// 利用者が手で直した行の、聞き取った文 (今も有効な直しが在る時だけ。対訳の行で区間がいくつか在れば、
+    /// 直していない区間は今の文のままつないだ物)。画面は、この値で「直した」の印を出す
+    public var heard: String?
+    /// 行が持つ区間の id (対訳の行で、訳のまとまりが 2 つ以上の区間から成る時だけ。区間が 1 つの行は nil にして、
+    /// 数千行の行を重くしない)。行を直す画面は、ここに在る区間の全部を出す
+    public var segmentIDs: [UUID]?
 
     public init(id: UUID, start: TimeInterval, end: TimeInterval, text: String, translation: String?,
                 isOriginalInTarget: Bool, changes: [AuditChange], languageTag: String? = nil,
                 canTranslate: Bool = false, isTranslated: Bool = false, language: String? = nil,
-                review: TranslationNote? = nil) {
+                review: TranslationNote? = nil, heard: String? = nil, segmentIDs: [UUID]? = nil) {
         self.id = id
         self.start = start
         self.end = end
@@ -41,7 +47,15 @@ public struct TranscriptListItem: Identifiable, Hashable, Sendable {
         self.isTranslated = isTranslated
         self.language = language
         self.review = review
+        self.heard = heard
+        self.segmentIDs = segmentIDs
     }
+
+    /// 利用者が手で直した、聞き取った文の行か
+    public var isEditedLine: Bool { heard != nil }
+
+    /// 行を直す画面に出す区間 (行の区間の全部。区間が 1 つの行は、その区間だけ)
+    public var editSegmentIDs: [UUID] { segmentIDs ?? [id] }
 
     /// 利用者が直した訳の行か
     public var isEditedTranslation: Bool { review?.isEdited == true }
@@ -121,6 +135,8 @@ public final class TranscriptRowCache {
     private var itemsChanges: [UUID: AuditChange] = [:]
     /// 今も合う訳の覚え (訳のまとまりの先頭の区間の id ごと)
     private var itemsNotes: [UUID: TranslationNote] = [:]
+    /// 今も有効な、利用者が手で直した行の記録 (区間の id ごと)
+    private var itemsLineEdits: [UUID: LineEdit] = [:]
     /// 行に言語の印を付けている
     private var itemsTags = false
     /// 検索で絞る前の、最後の行の id
@@ -197,16 +213,18 @@ public final class TranscriptRowCache {
         let covered = done ? transcript.coveredIDs : Set<UUID>()
         // 訳の覚えは、対訳の行にだけ出す (覚えが無ければ、区間を見ずに空)
         let notes = condition.bilingual ? transcript.validTranslationNotes : [:]
+        // 手で直した行の記録 (記録が無ければ、区間を見ずに空)
+        let lineEdits = transcript.validLineEdits
         var items: [TranscriptListItem]
         if condition.bilingual {
             items = transcript.bilingualUnits(target: condition.target).map {
-                Self.item($0, changes: changes, notes: notes, tags: tags, done: done, covered: covered,
+                Self.item($0, changes: changes, notes: notes, lineEdits: lineEdits, tags: tags, done: done, covered: covered,
                           transcriptLanguage: transcript.language)
             }
         } else {
             items = transcript.segments.map {
-                Self.item($0, in: transcript, changes: changes, tags: tags, done: done, covered: covered,
-                          target: condition.target)
+                Self.item($0, in: transcript, changes: changes, lineEdits: lineEdits, tags: tags, done: done,
+                          covered: covered, target: condition.target)
             }
         }
         itemsLastID = items.last?.id
@@ -218,6 +236,7 @@ public final class TranscriptRowCache {
         itemsTally = tally
         itemsChanges = changes
         itemsNotes = notes
+        itemsLineEdits = lineEdits
         itemsTags = tags
     }
 
@@ -243,12 +262,13 @@ public final class TranscriptRowCache {
         if condition.bilingual {
             items = added.map {
                 Self.item(transcript.bilingualUnit([$0], target: condition.target), changes: itemsChanges, notes: itemsNotes,
-                          tags: itemsTags, done: false, covered: covered, transcriptLanguage: transcript.language)
+                          lineEdits: itemsLineEdits, tags: itemsTags, done: false, covered: covered,
+                          transcriptLanguage: transcript.language)
             }
         } else {
             items = added.map {
-                Self.item($0, in: transcript, changes: itemsChanges, tags: itemsTags, done: false, covered: covered,
-                          target: condition.target)
+                Self.item($0, in: transcript, changes: itemsChanges, lineEdits: itemsLineEdits, tags: itemsTags, done: false,
+                          covered: covered, target: condition.target)
             }
         }
         if let last = items.last { itemsLastID = last.id }
@@ -272,34 +292,44 @@ public final class TranscriptRowCache {
               new.sourceName == base.sourceName, new.language == base.language, new.model == base.model,
               new.duration == base.duration, new.elapsed == base.elapsed, new.audit == base.audit,
               new.translationModel == base.translationModel, new.translationLanguage == base.translationLanguage,
-              new.translationReview == base.translationReview,
+              new.translationReview == base.translationReview, new.lineEdits == base.lineEdits,
               new.segments[..<count].elementsEqual(base.segments) else { return nil }
         return new.segments[count...]
     }
 
     // MARK: 行を作る (作り直すときも、足すときも、ここで作る)
 
-    private static func item(_ seg: TranscriptSegment, in transcript: Transcript, changes: [UUID: AuditChange], tags: Bool,
-                             done: Bool, covered: Set<UUID>, target: String) -> TranscriptListItem {
+    private static func item(_ seg: TranscriptSegment, in transcript: Transcript, changes: [UUID: AuditChange],
+                             lineEdits: [UUID: LineEdit], tags: Bool, done: Bool, covered: Set<UUID>,
+                             target: String) -> TranscriptListItem {
         let translated = seg.translation != nil || covered.contains(seg.id)
+        let edit = lineEdits.isEmpty ? nil : lineEdits[seg.id]
         return TranscriptListItem(id: seg.id, start: seg.start, end: seg.end, text: seg.text,
                                   translation: nil, isOriginalInTarget: false, changes: changes[seg.id].map { [$0] } ?? [],
                                   languageTag: tags ? LanguageTag.code(seg.language) : nil,
                                   canTranslate: done && !translated && transcript.needsTranslation(seg, target: target),
-                                  isTranslated: done && translated, language: transcript.language(of: seg))
+                                  isTranslated: done && translated, language: transcript.language(of: seg),
+                                  heard: edit?.heard)
     }
 
     private static func item(_ unit: Transcript.BilingualUnit, changes: [UUID: AuditChange],
-                             notes: [UUID: TranslationNote], tags: Bool, done: Bool,
+                             notes: [UUID: TranslationNote], lineEdits: [UUID: LineEdit], tags: Bool, done: Bool,
                              covered: Set<UUID>, transcriptLanguage: String?) -> TranscriptListItem {
         let translated = unit.segments[0].translation != nil
+        // 手で直した区間が在れば、聞き取った文 (直していない区間は今の文) をつなぐ
+        var heard: String?
+        if !lineEdits.isEmpty, let first = unit.segments.first(where: { lineEdits[$0.id] != nil }) {
+            heard = unit.segments.count == 1 ? lineEdits[first.id]?.heard
+                : Transcript.join(unit.segments.map { lineEdits[$0.id]?.heard ?? $0.text })
+        }
         return TranscriptListItem(id: unit.id, start: unit.start, end: unit.end, text: unit.text,
                                   translation: unit.translation, isOriginalInTarget: unit.isOriginalInTarget,
                                   changes: unit.segments.compactMap { changes[$0.id] },
                                   languageTag: tags ? LanguageTag.code(unit.language) : nil,
                                   canTranslate: done && unit.translation == nil && !covered.contains(unit.id),
                                   isTranslated: done && translated, language: unit.language ?? transcriptLanguage,
-                                  review: notes[unit.id])
+                                  review: notes[unit.id], heard: heard,
+                                  segmentIDs: unit.segments.count > 1 ? unit.segments.map(\.id) : nil)
     }
 
     /// 検索語 (前後の空白を除いたもの) を含む行か

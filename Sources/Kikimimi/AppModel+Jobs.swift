@@ -147,6 +147,7 @@ extension AppModel {
         if historyJobID == job.id { historyJobID = nil }
         if pendingDeleteJobID == job.id { pendingDeleteJobID = nil }
         if translationEdit?.jobID == job.id { translationEdit = nil }
+        if lineEdit?.jobID == job.id { lineEdit = nil }
     }
 
     private enum Work {

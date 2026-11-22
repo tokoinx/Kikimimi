@@ -39,6 +39,33 @@ final class LaunchModeTests: XCTestCase {
         XCTAssertFalse(LaunchMode.tool.isSelfTest)
     }
 
+    /// 確認用の起動がライブラリを開くのは、起動の確認に、一時フォルダを環境変数で渡した時だけ。
+    /// 本物の置き場は、どの形でも開かない
+    func testHandCheckLibraryPath() {
+        let bin = "/Applications/Kikimimi.app/Contents/MacOS/Kikimimi"
+        let temp = ["KIKIMIMI_LIBRARY_DIR": "/private/tmp/kikimimi-hand-check/library"]
+        XCTAssertEqual(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "60"], environment: temp),
+                       "/private/tmp/kikimimi-hand-check/library")
+        // 環境変数が無い・空
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "60"], environment: [:]))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "60"],
+                                                     environment: ["KIKIMIMI_LIBRARY_DIR": ""]))
+        // ふつうの起動・ほかの確認用の起動・道具の起動
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin], environment: temp))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-ui-load", "3000"], environment: temp))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "5", "--selftest-chat", "m.gguf"],
+                                                     environment: temp))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--version"], environment: temp))
+        // 本物の置き場 (Application Support の Kikimimi) と、その中は、開かない
+        let real = LibraryStore.defaultRoot(environment: [:])
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "60"],
+                                                     environment: ["KIKIMIMI_LIBRARY_DIR": real.path]))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "60"],
+                                                     environment: ["KIKIMIMI_LIBRARY_DIR": real.deletingLastPathComponent().path]))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "60"],
+                                                     environment: ["KIKIMIMI_LIBRARY_DIR": real.path + "/../Library/x"]))
+    }
+
     // MARK: 書く口
 
     /// ふつうの起動だけが書き・消す。確認用・道具の起動は、何もしない

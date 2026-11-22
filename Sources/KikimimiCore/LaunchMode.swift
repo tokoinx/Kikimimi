@@ -38,4 +38,19 @@ public enum LaunchMode: Equatable, Sendable {
 
     /// 利用者の設定 (UserDefaults) に書いてよい起動か。ふつうの起動の時だけ
     public var writesSettings: Bool { self == .app }
+
+    /// 確認用の起動で開いてよい、ライブラリの場所 (行の画面を、手で触って確かめる時に使う)。
+    /// 起動の確認 (`--selftest-launch`。ほかの確認用の引数が無い時) で、環境変数 `KIKIMIMI_LIBRARY_DIR` が
+    /// 在る時だけ、その場所を返す (一時フォルダに写した結果を開き、そこへ保存する)。
+    /// 環境変数が無い時と、利用者の本物の置き場 (Application Support の Kikimimi) の中を指している時は nil:
+    /// 確認用の起動は、利用者の本物のライブラリを決して開かない
+    public static func handCheckLibraryPath(arguments: [String] = CommandLine.arguments,
+                                            environment: [String: String] = ProcessInfo.processInfo.environment) -> String? {
+        guard arguments.filter({ $0.hasPrefix("--selftest-") }) == ["--selftest-launch"],
+              let path = environment["KIKIMIMI_LIBRARY_DIR"], !path.isEmpty else { return nil }
+        let real = LibraryStore.defaultRoot(environment: [:]).deletingLastPathComponent().standardizedFileURL.path
+        let wanted = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.path
+        guard wanted != real, !wanted.hasPrefix(real + "/") else { return nil }
+        return wanted
+    }
 }

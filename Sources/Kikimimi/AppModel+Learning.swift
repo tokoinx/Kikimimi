@@ -11,9 +11,11 @@ extension AppModel {
         store.directory.deletingLastPathComponent().appendingPathComponent("learned-corrections.json")
     }
 
+    /// 台帳を保存する。保存先が無い (確認用の起動) 時は、保存しない
     func saveLedger() {
+        guard let url = ledgerFileURL else { return }
         do {
-            try ledger.save(to: ledgerURL)
+            try ledger.save(to: url)
         } catch {
             errorMessage = L("Could not save the learned corrections: %@", error.localizedDescription)
         }

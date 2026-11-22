@@ -50,6 +50,20 @@ extension JA {
         "Edit translation": "訳を直す",
         "Edited": "直した",
         "You edited this translation. Click to change it.": "この訳は、自分で直した訳です。押すと、直せます。",
+        // 聞き取った文を直す (行の右クリック・原文の「直した」の印・行を直す画面)
+        "Edit this line…": "この行を直す…",
+        "Edit this line": "この行を直す",
+        "Heard text": "聞き取った文",
+        "Restore the heard text": "聞き取った文に戻す",
+        "Saving removes this line’s translation. You can translate the line again.": "保存すると、この行の訳は消えます。この行は、訳し直せます。",
+        "You edited this line. Heard text: %@": "この行は、自分で直しました。聞き取った文: %@",
+        // 行を直す画面の「この直しを覚える」(学習した直しの台帳に、1 回分覚えさせる)
+        "Remember this fix": "この直しを覚える",
+        "From the next audit, the same mishearing gets this fix as a suggestion.": "次の監査から、同じ聞き間違いに、この直しを案として出します。",
+        "Fill in both terms.": "2 つの語を、どちらも書いてください。",
+        "The two terms are the same.": "2 つの語が同じです。",
+        "The heard text does not contain the misheard term.": "聞き間違えた語が、聞き取った文に在りません。",
+        "Your text does not contain the right term.": "正しい語が、直した文に在りません。",
         // 訳の記憶から置いた訳の印
         "Remembered": "覚えた訳",
         "This is your earlier translation of the same sentence. Click to change it.": "前に自分で直した、同じ文の訳です。押すと、直せます。",

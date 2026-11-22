@@ -568,6 +568,13 @@ struct PlayableRow<Content: View>: View {
             Button(L("Quote in notes")) {
                 model.quoteToNotes(text: item.text, time: item.start, in: job)
             }
+            // 聞き取った文を、利用者が直す (文字起こしが終わった結果だけ)。直す画面は一覧の外のシート。
+            // 対訳の行では、次の「訳を直す…」と並ぶ (原文を直す・訳を直す、の順)
+            if job.status == .done {
+                Button(L("Edit this line…")) {
+                    model.requestLineEdit(item.editSegmentIDs, in: job)
+                }
+            }
             // 行の「訳」と同じ (VoiceOver では行が 1 つの要素になるので、ここからも訳せるように)
             if item.canTranslate || item.isTranslated {
                 Divider()
@@ -646,6 +653,10 @@ struct SegmentRow: View {
                 // 隠すときは、同じ場所に灰色の帯を出す (行の高さは変わらない)
                 .redacted(reason: conceal.hidesSource ? .placeholder : [])
                 .frame(maxWidth: .infinity, alignment: .leading)
+            // 手で直した行の印 (行の値を出すだけ。原文を隠している時は出さない: 説明に聞き取った文が出るため)
+            if let heard = item.heard, !conceal.hidesSource {
+                EditedLineBadge(ids: item.editSegmentIDs, heard: heard, job: job)
+            }
             if conceal.canHide {
                 RevealLineButton(id: item.id, revealed: conceal.revealed)
             }
@@ -789,6 +800,10 @@ struct BilingualRow: View {
                 Text(highlighted(item.text, highlight))
                     .redacted(reason: conceal.hidesSource ? .placeholder : [])
                     .frame(maxWidth: .infinity, alignment: .leading)
+                // 手で直した行の印は、原文の列に出す (訳の列の「直した」の印と、場所で見分けられるように)
+                if let heard = item.heard, !conceal.hidesSource {
+                    EditedLineBadge(ids: item.editSegmentIDs, heard: heard, job: job)
+                }
                 if conceal.canHide {
                     RevealLineButton(id: item.id, revealed: conceal.revealed)
                 }
@@ -863,6 +878,32 @@ struct EditedTranslationBadge: View {
         }
         .buttonStyle(.plain)
         .help(help ?? L("You edited this translation. Click to change it."))
+    }
+}
+
+/// 利用者が手で直した行の、灰色の小さな印「直した」(原文の側に出す)。押すと、行を直す画面 (一覧の外のシート) を開く。
+/// 見た目は、訳の「直した」の印 (`EditedTranslationBadge`) と同じ
+struct EditedLineBadge: View {
+    @Environment(AppModel.self) private var model
+    /// 行が持つ区間の全部 (直す画面は、区間ごとに入力欄を出す)
+    let ids: [UUID]
+    /// 聞き取った文 (説明に出す)
+    let heard: String
+    let job: Job
+
+    var body: some View {
+        Button {
+            model.requestLineEdit(ids, in: job)
+        } label: {
+            Text(L("Edited"))
+                .font(.caption2.weight(.semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.secondary.opacity(0.15), in: Capsule())
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(L("You edited this line. Heard text: %@", heard))
     }
 }
 
