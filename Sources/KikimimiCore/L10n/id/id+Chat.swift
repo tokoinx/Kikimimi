@@ -2,9 +2,8 @@
 // AI が訳した物で、その言語を話す人の確認は無い。直す時は、値を書き換える (鍵は変えない)。
 extension L10nTables {
     static let idChat: [String: String] = [
-        "Transcription model": "Model transkripsi",
-        "LLM model": "Model LLM",
-        "Translate other languages automatically": "Terjemahkan bahasa lain secara otomatis",
+        "Turn on “%@” first.": "Aktifkan “%@” terlebih dahulu.",
+        "No adapter is added. Add one in Settings first.": "Belum ada adaptor yang ditambahkan. Tambahkan dulu di Pengaturan.",
         "Your message is too long. Shorten it and send it again.": "Pesan terlalu panjang. Persingkat lalu kirim lagi.",
         "On": "Nyala",
         "Off": "Mati",

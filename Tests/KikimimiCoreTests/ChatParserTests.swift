@@ -105,10 +105,23 @@ final class ChatParserTests: XCTestCase {
         XCTAssertEqual(keys, expected)
         XCTAssertFalse(keys.contains(ChatSettingsCatalog.researchKey))
         XCTAssertEqual(catalog.count, keys.count, "keys are unique")
-        // ラベルは、どれも 12 の表に在る鍵 (置き換えの印の無い物)
+        // ラベルは、どれも 12 の表に在る鍵。置き換えの印が在るのは、訳す先の名前が入る文 (自動の翻訳) だけ。
+        // 訳さない語 (LLM) は表に入れない
         for item in catalog {
-            XCTAssertFalse(item.labelKey.contains("%"), item.key)
-            XCTAssertNotNil(L10nTables.tables[.ja]?[item.labelKey], item.key)
+            if item.labelKey == SettingLabels.autoTranslateKey {
+                XCTAssertEqual(item.key, "autoTranslate")
+            } else {
+                XCTAssertFalse(item.labelKey.contains("%"), item.key)
+            }
+            if SettingLabels.untranslated.contains(item.labelKey) {
+                XCTAssertNil(L10nTables.tables[.ja]?[item.labelKey], item.key)
+            } else {
+                XCTAssertNotNil(L10nTables.tables[.ja]?[item.labelKey], item.key)
+            }
+            // 札に出すラベルに、置き換えの印が残らない
+            for target in ["ja", "en", "ko"] {
+                XCTAssertFalse(item.label(translationLanguage: target).contains("%"), item.key)
+            }
         }
         // 言語とモデルの値
         guard case .choice(let spoken) = catalog.first(where: { $0.key == "languageCode" })?.kind else { return XCTFail() }
@@ -132,7 +145,7 @@ final class ChatParserTests: XCTestCase {
         defer { L10n.language = .en }
         let vad = catalog.first { $0.key == "useVAD" }!
         XCTAssertEqual(vad.displayValue("off"), "オフ")
-        XCTAssertEqual(vad.label, "無音を飛ばす (VAD)")
+        XCTAssertEqual(vad.label(translationLanguage: "ja"), "無音を飛ばす (VAD)")
         let target = catalog.first { $0.key == "translationLanguage" }!
         XCTAssertEqual(target.displayValue("ko"), "韓国語")
     }

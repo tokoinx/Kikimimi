@@ -2,9 +2,8 @@
 // AI が訳した物で、その言語を話す人の確認は無い。直す時は、値を書き換える (鍵は変えない)。
 extension L10nTables {
     static let thChat: [String: String] = [
-        "Transcription model": "โมเดลถอดความ",
-        "LLM model": "โมเดล LLM",
-        "Translate other languages automatically": "แปลภาษาอื่นโดยอัตโนมัติ",
+        "Turn on “%@” first.": "โปรดเปิด “%@” ก่อน",
+        "No adapter is added. Add one in Settings first.": "ยังไม่ได้เพิ่มตัวปรับแต่ง โปรดเพิ่มในการตั้งค่าก่อน",
         "Your message is too long. Shorten it and send it again.": "ข้อความยาวเกินไป โปรดย่อให้สั้นลงแล้วส่งอีกครั้ง",
         "On": "เปิด",
         "Off": "ปิด",

@@ -130,8 +130,8 @@ public enum ChatPromptBuilder {
             return "on | off"
         case .choice(let choices):
             return choices.map { $0.value == $0.englishName ? $0.value : "\($0.value) (\($0.englishName))" }.joined(separator: " | ")
-        case .text(let maxLength):
-            return "any text on one line, up to \(maxLength) characters"
+        case .text(let rule):
+            return "any text on one line, up to \(rule.maxLength) characters"
         }
     }
 

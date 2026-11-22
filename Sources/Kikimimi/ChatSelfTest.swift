@@ -6,7 +6,9 @@ import KikimimiWhisper
 
 /// `--selftest-ui-load` の中のチャットの確認 (CHAT CHECK)。LLM もネットワークも使わない。
 /// 窓を開け、リサーチの 2 段の入れ方・札を押すまで設定が変わらない事・リサーチの鍵を断る事・
-/// ページを読んだ回の案を出さない事・一覧の 20 項目の読み書き・リサーチが切の時に読みに行かない事を確かめる。
+/// ページを読んだ回の案を出さない事・一覧の 20 項目の読み書き・設定の画面と同じ「変えられない時」・
+/// 対訳の値が結果の画面のチェックと同じ事・札のラベルが設定の画面と同じ文である事・語彙のヒントの上限・
+/// リサーチが切の時に読みに行かない事を確かめる。
 /// 終わりに窓を閉じ、設定を元の値に戻す。`screenshots` があれば、絵 14〜17 を残す
 @MainActor
 enum ChatCheck {
@@ -23,6 +25,13 @@ enum ChatCheck {
         for item in catalog {
             if let value = model.currentValue(for: item.key) { original[item.key] = value }
         }
+        // 設定でない、確認が触る値 (終わりに戻す): 差分の有無と、選んでいる結果の対訳の印
+        let originalHasAdapter = model.hasAdapter
+        let originalHasTranslationAdapter = model.hasTranslationAdapter
+        let bilingualJob = model.selectedJob
+        let originalLineTranslations = bilingualJob?.showsLineTranslations
+        // 対訳の設定そのもの (チャットの値は結果の印も見るので、値だけでは戻ったか分からない)
+        let originalShowBilingual = model.showBilingual
         let originalFetcher = chat.fetcher
         let fetcher = CountingFetcher()
         chat.fetcher = fetcher
@@ -101,12 +110,16 @@ enum ChatCheck {
         let pageCards = pageReply.flatMap { chat.extras[$0]?.cards } ?? []
         step("no card after reading pages", pageCards.isEmpty && model.useVAD == (original[SettingKey.useVAD.rawValue] == "on"))
 
-        // 6. 一覧の 20 項目の読み書き
+        // 6. 一覧の 20 項目の読み書き (どれも変えられる状態にしてから。変えられない時は、6b で見る)
+        model.useVAD = true
+        model.hasTranslationAdapter = true
         var missing: [String] = []
         var refused: [String] = []
         var changed: [String] = []
         var toggleFailures: [String] = []
         for item in catalog {
+            // LLM を当て直すと、差分の有無が読み直される (didSet) ので、項目ごとに入れ直す
+            model.hasTranslationAdapter = true
             guard let current = model.currentValue(for: item.key) else {
                 missing.append(item.key)
                 continue
@@ -130,6 +143,107 @@ enum ChatCheck {
         step("every item accepts its current value", refused.isEmpty && changed.isEmpty,
              "refused [\(refused.joined(separator: ","))], changed [\(changed.joined(separator: ","))]")
         step("every toggle can be flipped and restored", toggleFailures.isEmpty, toggleFailures.joined(separator: ","))
+        model.useVAD = original[SettingKey.useVAD.rawValue] == "on"
+        model.hasTranslationAdapter = originalHasTranslationAdapter
+
+        // 6b. 設定の画面で押せない時は、チャットからも変えられない (札は「変える」を出さず、理由を出す)
+        let savedUseVAD = model.useVAD
+        let savedAutoVADOff = model.autoVADOff
+        let savedUseAdapter = model.useAdapter
+        model.useVAD = false
+        model.autoVADOff = false
+        step("autoVADOff is unavailable while useVAD is off",
+             model.unavailableReason(for: .autoVADOff) == .needsOn(.useVAD))
+        step("applyChatSetting refuses autoVADOff while useVAD is off",
+             !model.applyChatSetting(key: SettingKey.autoVADOff.rawValue, value: "on") && !model.autoVADOff)
+        // 同じ答えの 2 枚: 1 枚目 (無音を飛ばすを入) を当てると、2 枚目が変えられるようになる (札は描く時に見る)
+        let twoReply = chat.receive(reply: "I proposed both changes. Please confirm them in the app.\n[[set useVAD=on]]\n[[set autoVADOff=on]]",
+                                    pagesRead: false)
+        let twoCards = twoReply.flatMap { chat.extras[$0]?.cards } ?? []
+        step("two cards: the second is unavailable until the first is applied",
+             twoCards.count == 2 && twoCards.allSatisfy { $0.state == .pending } && model.unavailableReason(for: .autoVADOff) != nil,
+             "cards \(twoCards.count)")
+        await settle()
+        if let window, let screenshots { lines.append(shot("18-chat-unavailable", window, screenshots)) }
+        if let twoReply, twoCards.count == 2 {
+            chat.apply(card: twoCards[0].id, in: twoReply)
+            step("after the first card, autoVADOff can be changed",
+                 model.useVAD && model.unavailableReason(for: .autoVADOff) == nil)
+            chat.apply(card: twoCards[1].id, in: twoReply)
+            step("the second card applies", chat.extras[twoReply]?.cards[1].state == .applied && model.autoVADOff)
+        }
+        model.useVAD = false
+        step("useVAD off again: autoVADOff is unavailable again", model.unavailableReason(for: .autoVADOff) != nil)
+        model.useVAD = true
+        step("useVAD on: autoVADOff can be changed", model.unavailableReason(for: .autoVADOff) == nil
+             && model.applyChatSetting(key: SettingKey.autoVADOff.rawValue, value: "off") && !model.autoVADOff)
+        // 差分が 1 つも無い時の「差分を使う」
+        model.hasAdapter = false
+        model.hasTranslationAdapter = false
+        let flippedAdapter = model.useAdapter ? "off" : "on"
+        step("useAdapter is unavailable without adapters",
+             model.unavailableReason(for: .useAdapter) == .noAdapter
+             && !model.applyChatSetting(key: SettingKey.useAdapter.rawValue, value: flippedAdapter)
+             && model.useAdapter == savedUseAdapter)
+        model.hasTranslationAdapter = true
+        step("useAdapter can be changed with an adapter",
+             model.unavailableReason(for: .useAdapter) == nil
+             && model.applyChatSetting(key: SettingKey.useAdapter.rawValue, value: flippedAdapter)
+             && model.useAdapter != savedUseAdapter)
+        model.useAdapter = savedUseAdapter
+        model.hasAdapter = originalHasAdapter
+        model.hasTranslationAdapter = originalHasTranslationAdapter
+        model.useVAD = savedUseVAD
+        model.autoVADOff = savedAutoVADOff
+
+        // 6c. 対訳: チャットが読む値と書く道は、結果の画面の「対訳」のチェックと同じ
+        if let job = bilingualJob {
+            let savedSetting = model.showBilingual
+            let savedMark = job.showsLineTranslations
+            model.showBilingual = false
+            job.showsLineTranslations = true
+            step("bilingual: the chat reads the result screen's check (setting off, line mark on)",
+                 model.currentValue(for: SettingKey.showBilingual.rawValue) == "on" && model.showsBilingual(job))
+            step("bilingual: off from the chat clears the result's mark",
+                 model.applyChatSetting(key: SettingKey.showBilingual.rawValue, value: "off")
+                 && !job.showsLineTranslations && !model.showsBilingual(job)
+                 && model.currentValue(for: SettingKey.showBilingual.rawValue) == "off")
+            model.showBilingual = savedSetting
+            job.showsLineTranslations = savedMark
+        } else {
+            lines.append("CHAT CHECK: bilingual follows the selected result skipped (no selected result)")
+        }
+
+        // 6d. 札のラベルは、設定の画面と同じ文 (設定の画面の部品と同じ書き方で比べる)
+        func cardLabel(_ key: SettingKey) -> String? {
+            model.chatCatalog.first { $0.key == key.rawValue }?.label(translationLanguage: model.translationLanguage)
+        }
+        step("card label: transcription model is the Settings label", cardLabel(.modelID) == L("Model"), cardLabel(.modelID) ?? "nil")
+        step("card label: LLM is the Settings label", cardLabel(.llmModelID) == "LLM", cardLabel(.llmModelID) ?? "nil")
+        let savedTarget = model.translationLanguage
+        let firstLabel = cardLabel(.autoTranslate)
+        step("card label: auto-translate is the Settings switch",
+             firstLabel == SettingLabels.autoTranslate(target: savedTarget) && firstLabel?.contains("%") == false, firstLabel ?? "nil")
+        let otherTarget = TranslationTarget.all.first { $0 != savedTarget } ?? savedTarget
+        model.translationLanguage = otherTarget
+        let otherLabel = cardLabel(.autoTranslate)
+        step("card label: auto-translate follows the translation language",
+             otherLabel == SettingLabels.autoTranslate(target: otherTarget) && otherLabel != firstLabel, otherLabel ?? "nil")
+        model.translationLanguage = savedTarget
+
+        // 6e. 語彙のヒント: 上限 (設定の定義の決まり) を超える案は断り、上限ちょうどは当てる
+        let savedPrompt = model.initialPrompt
+        let limit = ChatSettingsCatalog.initialPromptMaxLength
+        let tooLong = String(repeating: "a", count: limit + 1)
+        let longReply = chat.receive(reply: "Sure.\n[[set initialPrompt=\(tooLong)]]", pagesRead: false)
+        let longCards = longReply.flatMap { chat.extras[$0]?.cards } ?? []
+        step("vocabulary hints: \(limit + 1) characters give no card and are refused",
+             longCards.isEmpty && !model.applyChatSetting(key: SettingKey.initialPrompt.rawValue, value: tooLong)
+             && model.initialPrompt == savedPrompt)
+        step("vocabulary hints: \(limit) characters are applied",
+             model.applyChatSetting(key: SettingKey.initialPrompt.rawValue, value: String(repeating: "a", count: limit))
+             && model.initialPrompt.count == limit)
+        model.initialPrompt = savedPrompt
 
         // 7. リサーチが切の時は、URL の入った発言でも読みに行かない (LLM の手前まで: 答えは決めた文)
         chat.selfTestReply = "ok"
@@ -165,6 +279,10 @@ enum ChatCheck {
                 }
             }
         }
+        model.hasAdapter = originalHasAdapter
+        model.hasTranslationAdapter = originalHasTranslationAdapter
+        model.showBilingual = originalShowBilingual
+        if let bilingualJob, let originalLineTranslations { bilingualJob.showsLineTranslations = originalLineTranslations }
         step("settings restored", notRestored.isEmpty, notRestored.joined(separator: ","))
         step("the chat window is closed", !ChatWindow.all().contains { $0.isVisible })
 

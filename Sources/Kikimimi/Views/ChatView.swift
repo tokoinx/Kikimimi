@@ -298,19 +298,33 @@ struct ChatProposalCardView: View {
         let item = card.proposal.item
         let before = card.before.map { item.displayValue($0) } ?? "—"
         let after = item.displayValue(card.proposal.value)
+        // ラベルは設定の画面と同じ文 (訳す先の名前が入る物は、今の訳す先の言語で作る)
+        let label = item.label(translationLanguage: model.translationLanguage)
+        // 今、変えられるか (描く時に、その場で見る: 同じ答えの前の札を当てると、押せるようになる事が在る)
+        let unavailable = SettingKey(rawValue: item.key).flatMap { model.unavailableReason(for: $0) }
         VStack(alignment: .leading, spacing: 6) {
-            Text(card.state == .alreadySet ? L("%1$@: %2$@", item.label, after) : L("%1$@: %2$@ → %3$@", item.label, before, after))
+            Text(card.state == .alreadySet ? L("%1$@: %2$@", label, after) : L("%1$@: %2$@ → %3$@", label, before, after))
                 .font(.callout)
                 .lineLimit(4)
                 .fixedSize(horizontal: false, vertical: true)
             switch card.state {
             case .pending:
-                HStack {
-                    Button(L("Change")) { model.chat.apply(card: card.id, in: messageID) }
-                        .buttonStyle(.borderedProminent)
+                if let unavailable {
+                    // 変えられない時は「変える」を出さず、理由を出す
+                    Label(unavailable.message, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Button(L("Cancel")) { model.chat.decline(card: card.id, in: messageID) }
+                        .controlSize(.small)
+                } else {
+                    HStack {
+                        Button(L("Change")) { model.chat.apply(card: card.id, in: messageID) }
+                            .buttonStyle(.borderedProminent)
+                        Button(L("Cancel")) { model.chat.decline(card: card.id, in: messageID) }
+                    }
+                    .controlSize(.small)
                 }
-                .controlSize(.small)
             case .alreadySet:
                 Text(L("It is already this value."))
                     .font(.caption)

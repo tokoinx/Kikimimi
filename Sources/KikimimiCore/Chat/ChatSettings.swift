@@ -44,15 +44,16 @@ public enum ChatSettingKind: Sendable, Equatable {
     case toggle
     /// 決まった値から 1 つ
     case choice([ChatChoice])
-    /// 自由な文 (長さの上限つき。制御文字は入れられない)
-    case text(maxLength: Int)
+    /// 自由な文。決まり (長さの上限・制御文字は入れられない) は、設定の定義 (`SettingKind.text`) から来る
+    case text(SettingTextRule)
 }
 
 /// チャットから変える案を出せる設定 1 つ
 public struct ChatSettingItem: Sendable, Equatable {
     /// UserDefaults の名前 (AppModel の設定の名前と同じ)
     public let key: String
-    /// 画面のラベルの鍵 (設定の画面と同じ英語の鍵。`label` で今の言語の文になる)
+    /// 画面のラベルの鍵 (設定の画面と同じ英語の鍵。`label(translationLanguage:)` で今の言語の文になる)。
+    /// 設定の画面のコードに同じ鍵が在る事は、`ChatSettingsLabelGuardTests.testChatLabelsAreTheSettingsScreenLabels` が見る
     public let labelKey: String
     /// LLM に見せる短い説明 (英語。訳さない)
     public let summary: String
@@ -68,8 +69,13 @@ public struct ChatSettingItem: Sendable, Equatable {
         self.page = page
     }
 
-    /// 画面に出すラベル (今の画面の言語)
-    public var label: String { L10n.lookup(labelKey) }
+    /// 画面に出すラベル (今の画面の言語)。訳す先の名前が入る文 (自動の翻訳) は、渡した訳す先の言語で作る。
+    /// 訳さない語 (LLM) は、そのまま
+    public func label(translationLanguage: String) -> String {
+        if labelKey == SettingLabels.autoTranslateKey { return SettingLabels.autoTranslate(target: translationLanguage) }
+        if SettingLabels.untranslated.contains(labelKey) { return labelKey }
+        return L10n.lookup(labelKey)
+    }
 
     /// LLM が書いた値を、保存する形にする (toggle は "on" / "off"、choice は値のコード)。取れない値なら nil。
     /// 大文字小文字と前後の空白にはゆるい。toggle は true/false・yes/no・1/0 も受ける。
@@ -93,10 +99,8 @@ public struct ChatSettingItem: Sendable, Equatable {
             if let hit = choices.first(where: { $0.value.lowercased() == lower }) { return hit.value }
             if let hit = choices.first(where: { $0.englishName.lowercased() == lower }) { return hit.value }
             return nil
-        case .text(let maxLength):
-            guard value.count <= maxLength else { return nil }
-            guard !value.unicodeScalars.contains(where: { Self.isControl($0) }) else { return nil }
-            return value
+        case .text(let rule):
+            return rule.accepts(value) ? value : nil
         }
     }
 
@@ -112,16 +116,16 @@ public struct ChatSettingItem: Sendable, Equatable {
         }
     }
 
+    /// 入れられない文字か (決まりは `SettingTextRule.isControl` の 1 か所)
     static func isControl(_ scalar: Unicode.Scalar) -> Bool {
-        let v = scalar.value
-        // C0・DEL・C1 と、文の向きを変える印 (見た目をごまかせる)
-        return v < 0x20 || (0x7F...0x9F).contains(v) || (0x202A...0x202E).contains(v) || (0x2066...0x2069).contains(v)
+        SettingTextRule.isControl(scalar)
     }
 }
 
 /// チャットに出す時の出し方 (チャットだけの物。鍵・種類・選択肢は SettingKey の定義から来る)
 public struct ChatSettingPresentation: Sendable, Equatable {
-    /// 画面のラベルの鍵 (設定の画面と同じ英語の鍵)
+    /// 画面のラベルの鍵 (設定の画面と同じ英語の鍵。
+    /// 同じである事は `ChatSettingsLabelGuardTests.testChatLabelsAreTheSettingsScreenLabels` が見る)
     public let labelKey: String
     /// LLM に見せる短い説明 (英語。訳さない)
     public let summary: String
@@ -152,7 +156,7 @@ extension SettingKey {
                                            summary: "Language spoken in recordings. auto = detect it; ja+en = recordings that switch between Japanese and English (2-4 times slower).",
                                            page: .transcription)
         case .modelID:
-            return ChatSettingPresentation(labelKey: LKey("Transcription model"),
+            return ChatSettingPresentation(labelKey: LKey("Model"),
                                            summary: "Whisper speech recognition model. Larger is more accurate but slower. It must be downloaded in Settings.",
                                            page: .transcription)
         case .preferAccuracy:
@@ -185,7 +189,7 @@ extension SettingKey {
                                            page: .transcription)
         // 監査・翻訳
         case .llmModelID:
-            return ChatSettingPresentation(labelKey: LKey("LLM model"),
+            return ChatSettingPresentation(labelKey: SettingLabels.llm,
                                            summary: "Local LLM used for audit, translation, and this chat. Larger is smarter but slower. It must be downloaded in Settings.",
                                            page: .llm)
         case .autoAudit:
@@ -197,7 +201,7 @@ extension SettingKey {
                                            summary: "Language that translations are made into.",
                                            page: .llm)
         case .autoTranslate:
-            return ChatSettingPresentation(labelKey: LKey("Translate other languages automatically"),
+            return ChatSettingPresentation(labelKey: SettingLabels.autoTranslateKey,
                                            summary: "After transcription, translate segments that are not in the translation language into it.",
                                            page: .llm)
         case .useLedger:
@@ -232,6 +236,42 @@ extension SettingKey {
     }
 }
 
+/// 今、設定を変えられない理由 (設定の画面は部品を押せなくし、チャットの札は「変える」の代わりにこの文を出す)。
+/// どの設定がいつ変えられないかは、アプリの `AppModel.unavailableReason(for:)` の 1 か所で決める
+public enum SettingUnavailableReason: Sendable, Equatable {
+    /// 先に、この設定を入にする必要が在る
+    case needsOn(SettingKey)
+    /// 差分 (LoRA) が 1 つも入っていない
+    case noAdapter
+
+    /// 画面に出す文 (今の画面の言語)。相手の設定の名前は、チャットの札と同じラベル
+    public var message: String {
+        switch self {
+        case .needsOn(let other):
+            let name = other.chatPresentation.map { L10n.lookup($0.labelKey) } ?? other.rawValue
+            return L("Turn on “%@” first.", name)
+        case .noAdapter:
+            return L("No adapter is added. Add one in Settings first.")
+        }
+    }
+}
+
+/// 設定の画面とチャットの札が、同じ文を出すためのラベル (どちらも、ここを使う)
+public enum SettingLabels {
+    /// 訳さない語 「LLM」(設定の画面のピッカーと、チャットの札のラベル)
+    public static let llm = "LLM"
+    /// 訳さない語の一覧 (表を引かず、そのまま出す)
+    public static let untranslated: Set<String> = [llm]
+    /// 自動の翻訳のスイッチのラベルの鍵 (訳す先の名前が 2 つ入る)
+    public static let autoTranslateKey = LKey("Translate segments that are not in %1$@ into %2$@")
+
+    /// 自動の翻訳のスイッチのラベル (訳す先の言語の名前を入れた文)。設定の画面のスイッチも、チャットの札も、これを呼ぶ
+    public static func autoTranslate(target: String) -> String {
+        let name = TranslationTarget.displayName(for: target)
+        return L("Translate segments that are not in %1$@ into %2$@", name, name)
+    }
+}
+
 /// チャットから変える案を出せる設定の一覧
 public enum ChatSettingsCatalog {
     /// チャットの窓の「リサーチ」のスイッチの名前。一覧には決して入れない
@@ -243,8 +283,8 @@ public enum ChatSettingsCatalog {
         [researchKey] + SettingKey.allCases.filter { $0.chatPresentation == nil }.map(\.rawValue)
     )
 
-    /// 語彙のヒントの長さの上限 (文字数)
-    public static let initialPromptMaxLength = 400
+    /// 語彙のヒントの長さの上限 (文字数)。決まりは設定の定義 (`SettingKey.initialPrompt` の `.text`) に在る
+    public static let initialPromptMaxLength = SettingKey.initialPrompt.textRule?.maxLength ?? 0
 
     /// 一覧を作る。Whisper と LLM のモデルの一覧は、引数で変えられる (試験や、アプリが見せる物を絞る時)。
     /// 手元の GGUF (`file:…`) の LLM は、チャットからは選ばせない
@@ -278,8 +318,8 @@ public enum ChatSettingsCatalog {
             switch kind {
             case .toggle: return .toggle
             case .choice(let source): return .choice(choices(source))
-            // 文の設定は、今は語彙のヒントだけ (上限はチャットの側だけに在る)
-            case .text: return .text(maxLength: initialPromptMaxLength)
+            // 文の設定 (今は語彙のヒントだけ)。決まりは、設定の画面の欄と同じ定義の物
+            case .text(let rule): return .text(rule)
             case .number, .json: return nil
             }
         }

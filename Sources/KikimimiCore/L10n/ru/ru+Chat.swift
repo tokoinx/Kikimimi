@@ -2,9 +2,8 @@
 // AI が訳した物で、その言語を話す人の確認は無い。直す時は、値を書き換える (鍵は変えない)。
 extension L10nTables {
     static let ruChat: [String: String] = [
-        "Transcription model": "Модель транскрипции",
-        "LLM model": "Модель LLM",
-        "Translate other languages automatically": "Автоматически переводить другие языки",
+        "Turn on “%@” first.": "Сначала включите «%@».",
+        "No adapter is added. Add one in Settings first.": "Адаптер не добавлен. Сначала добавьте его в Настройках.",
         "Your message is too long. Shorten it and send it again.": "Сообщение слишком длинное. Сократите его и отправьте снова.",
         "On": "Вкл.",
         "Off": "Выкл.",
