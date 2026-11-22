@@ -59,6 +59,8 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 > 9 の順。`ADAPTER MESSAGE CHECK FAILED` は 7 に入る)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
+- `REAL SETTINGS:` の行 (`UI LOAD OK`・`LAUNCH SELFTEST OK` の直前): 確認の始めに取った本物の設定の写しと比べ、macOS が確認のあいだに書いた鍵 (ウインドウの位置・大きさ、左の一覧の幅など) を元に戻した結果。`unchanged` は戻す物が無かった事、`put back N keys the system wrote …: <鍵>` は戻した鍵 (どちらも、ふつうの事)。
+- `REAL SETTINGS: APP SETTINGS CHANGED DURING THE SELF-TEST (put back): <鍵>` は、アプリの設定 (`SettingKey`) が確認のあいだに書かれた印 (確認用の起動はアプリの設定を書かない決まりが破れている)。元には戻してあり、終了コードは変わらないが、必ず報告し、書いた所を探す。
 
 ## 4. 「重い」(SLOW) の読み方
 
@@ -66,6 +68,9 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - 操作ごとの値は `UI LOAD: action "<名前>": n …, median …, p95 …, max …` の行。`n < 20: p95 not checked` と付いた操作は最大だけを比べている。
 - 一覧に関わる値: ジョブを選ぶ操作 (`select finished job …`・`select running job`) と再生位置を遠くへ動かす操作 (`jump …`) には `UI LOAD: rows built "<名前>": inits …; bodies …` の行が出る。比べるのは bodies (行の body が動いた数) で、目安は `Limits.selectRowsBuiltMax`。inits は一覧が終わりへ飛ぶと数千になってよく、比べない。bodies が数千なら、一覧が見える分だけを並べていない (CLAUDE.md の一覧の決まりを破った時の形)。
 - `UI LOAD: rows built during the measured part: inits …, bodies …` は測った間すべての合計で、目安 (1 回あたり) と比べない。合計が目安の数を超えていても `SLOW` にはならない。
+- そのすぐ後の `UI LOAD: row bodies by phase: …`・`row inits by phase: …`・`row bodies by action: …`・`row inits by action: …` は、上の合計の内わけ (段階ごと・操作ごと。終わりの `outside …` は、名前の付いた分を引いた残り)。操作が重なった時は、後から始まった操作に入れている。どの目安とも比べない。
+- `UI LOAD: row hover changes N (the mouse pointer was inside the main window at k of 9 checks +++…; the app was active at k +++…, the main window was key at k +++…)` は、マウスが行に載った・行から出た回数と、測る部分の始め・各段階の始めと終わり (9 回) で、マウスがウインドウの枠の中に在ったか・アプリが前面 (active) だったか・メインのウインドウがキーだったか (`+` = そうだった、`-` = 違った)。
+- **bodies の合計は、「アプリが前面でない」と「マウスが一覧の行の上に在る」の 2 つが重なった時に、高い山になる** (2026-11-22 に手元で確かめた。3000 行・音声つきの 6 回)。前面でなく (`the app was active at 0 ---------`)、`row hover changes` が 113・119 の回は 924・926。前面で、87 の回は 648。前面でなくても、0 の回は 579。差は、どれも `outside the measured actions`・`outside the phases` に出る (測った操作の中の数と、操作ごとの時間は変わらない)。裏の命令から起こした確認用のアプリは、何も触らないと前面にならなかった (この日の 13 回とも)。**合計を前の回と比べる時は、先に、この行の `row hover changes` と `active` を見る** (確認の間、マウスを一覧の上に置かなければ、低い山にそろう)。前面でない時に、マウスが載るたびの描き直しが、なぜ 3 倍ほどになるのかは、調べていない。
 - `UI LOAD: samples "<名前>": …` は測った順の値。初めの 1 回だけが遅いのか、毎回遅いのかを見分ける。
 - `UI LOAD: stall 1..5` は長かった待ちと、その直前の操作。どの操作が重いかの手がかり。
 
@@ -98,7 +103,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - 12・13 のシートには、23f94f8 (U5) から、下に訳語の 1 行「語を、いつもこう訳す (任意)」が在る (シートのコードでは、いつも出す)。
 
 - 変えた画面に関わる絵を Read で開いて見る。絵の場面ごとの注意 (`… may show no playing tint` など) が出力に在れば、その絵は特に見る。
-- 絵に写らない画面 (設定の画面など) を、手で触って確かめる時: ふつうに起動しない (触った設定が、本物の設定に書かれる)。確認用の起動 `build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 60` を使う (本物の設定に書かない。60 秒で自分で終わる。60 が上限)。値を入れた状態から始めたい時は、`-鍵 値` の引数で渡す (例: `-initialPrompt "…"`。その起動のあいだだけ効く)。ライブラリとモデルの置き場は、`KIKIMIMI_LIBRARY_DIR`・`KIKIMIMI_MODELS_DIR` で一時フォルダにする。終わったら、`defaults read local.kikimimi.app` の前と後の違いが 0 行である事を見る (2026-11-22、設定の欄の 400 字の上限を、この形で確かめた)。
+- 絵に写らない画面 (設定の画面など) を、手で触って確かめる時: ふつうに起動しない (触った設定が、本物の設定に書かれる)。確認用の起動 `build/Kikimimi.app/Contents/MacOS/Kikimimi --selftest-launch 60` を使う (本物の設定に書かない。60 秒で自分で終わる。60 が上限)。値を入れた状態から始めたい時は、`-鍵 値` の引数で渡す (例: `-initialPrompt "…"`。その起動のあいだだけ効く)。ライブラリとモデルの置き場は、`KIKIMIMI_LIBRARY_DIR`・`KIKIMIMI_MODELS_DIR` で一時フォルダにする。終わったら、`defaults read local.kikimimi.app` の前と後の違いが 0 行である事を見る (2026-11-22、設定の欄の 400 字の上限を、この形で確かめた)。確認用の起動は、macOS が自分で書いた物 (ウインドウの位置・大きさなど) を、終わりに元に戻す。戻した鍵は、出力の `REAL SETTINGS:` の行に出る (`--report <ファイル>` を付けると、ファイルにも残る)。
 
 ## 6. 手元では見ない事 (CI だけが見る)
 

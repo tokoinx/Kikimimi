@@ -55,6 +55,9 @@ enum KikimimiMain {
         }
         // 画面の言語を、画面や文を作る前に決める (保存した言語・macOS の言語・--ui-language・確認用の起動)
         L10n.language = UILanguageSetting.startup.language
+        // 確認用の起動は、ウインドウを作る前に、本物の設定の写しを取る。終わる時 (UILoadSelfTest・LaunchSelfTest の finish) に、
+        // macOS が書いた物 (ウインドウの位置・大きさ、左の一覧の幅など) を元に戻す。ふつうの起動では何もしない
+        SettingsWriter.takeSnapshotForSelfTest()
         if args.contains("--selftest-launch") {
             LaunchSelfTest.arm(arguments: args)
         }
