@@ -606,7 +606,7 @@ Scripts/build-app.sh     Assembles the .app
 Scripts/run-app.sh       Launch (make run): quits a running copy, opens the new one, checks it is alive
 Scripts/doctor.sh        Diagnostics when the app does not launch (make doctor)
 Scripts/make-tiny-gguf.py  Makes a tiny GGUF for smoke tests (CI)
-Scripts/make-iconset.sh  Remakes the icon set (the 10 files in Resources/AppIcon.iconset) from a 1024 x 1024 PNG
+Scripts/make-iconset.sh  Remakes the icon set (the 10 files in Resources/AppIcon.iconset) from a 1024 x 1024 PNG (the two 16-point files come from the closer picture, Resources/AppIcon-16pt-master.png)
 tools/finetune/          Fine-tuning (LoRA)
   finetune.py            Train, convert, evaluate and install in one go (Mac, MLX; --task audit / translation)
   mlx_lora_to_gguf.py    Converts an MLX adapter to a GGUF that llama.cpp reads
