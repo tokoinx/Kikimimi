@@ -72,6 +72,7 @@ extension JA {
         "%@ + fine-tuning": "%@ + 追加学習",
         "The LLM was not found, so the previous audit result is kept. To audit again with the LLM, download it in the “Audit & translation” tab of Settings.": "LLM が見つからないため、前の監査の結果のままにしました。LLM でもう一度見直すには、設定の「監査・翻訳」から LLM を取得してください。",
         "No LLM has been downloaded, so only repetitions were checked. To also check for mishearings, download an LLM in the “Audit & translation” tab of Settings.": "LLM が未取得のため、繰り返しの見直しだけを行いました。聞き取りミスも見直すには、設定の「監査・翻訳」から LLM を取得してください。",
+        "No LLM has been downloaded, so only repetitions and learned corrections were checked. To also check for other mishearings, download an LLM in the “Audit & translation” tab of Settings.": "LLM が未取得のため、繰り返しの見直しと、学習した直しだけを行いました。ほかの聞き取りミスも見直すには、設定の「監査・翻訳」から LLM を取得してください。",
         "The new audit was canceled. The previous audit result is kept.": "監査のやり直しを中止しました。前の監査の結果のままです。",
         "The LLM could not audit, so the previous audit result is kept: %@": "LLM で見直せなかったため、前の監査の結果のままです: %@",
         "The audit was canceled. Results up to the point it reached are applied.": "監査を中止しました。見終えた所までの結果を反映しています。",

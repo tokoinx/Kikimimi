@@ -63,6 +63,7 @@ extension L10nTables {
         "%@ + fine-tuning": "%@ + 微调",
         "The LLM was not found, so the previous audit result is kept. To audit again with the LLM, download it in the “Audit & translation” tab of Settings.": "未找到 LLM，因此保留之前的审核结果。要用 LLM 重新审核，请在“设置”的“审核与翻译”标签页中下载 LLM。",
         "No LLM has been downloaded, so only repetitions were checked. To also check for mishearings, download an LLM in the “Audit & translation” tab of Settings.": "尚未下载 LLM，因此只检查了重复。要同时检查听错，请在“设置”的“审核与翻译”标签页中下载 LLM。",
+        "No LLM has been downloaded, so only repetitions and learned corrections were checked. To also check for other mishearings, download an LLM in the “Audit & translation” tab of Settings.": "尚未下载 LLM，因此只检查了重复和已学习的修正。要同时检查其他听错，请在“设置”的“审核与翻译”标签页中下载 LLM。",
         "The new audit was canceled. The previous audit result is kept.": "新的审核已取消。保留之前的审核结果。",
         "The LLM could not audit, so the previous audit result is kept: %@": "LLM 无法审核，因此保留之前的审核结果：%@",
         "The audit was canceled. Results up to the point it reached are applied.": "审核已取消。已应用到中断处为止的结果。",

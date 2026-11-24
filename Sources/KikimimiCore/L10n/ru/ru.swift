@@ -63,6 +63,7 @@ extension L10nTables {
         "%@ + fine-tuning": "%@ + дообучение",
         "The LLM was not found, so the previous audit result is kept. To audit again with the LLM, download it in the “Audit & translation” tab of Settings.": "LLM не найдена, поэтому прежний результат проверки сохранён. Чтобы снова выполнить проверку с LLM, загрузите её на вкладке «Проверка и перевод» в настройках.",
         "No LLM has been downloaded, so only repetitions were checked. To also check for mishearings, download an LLM in the “Audit & translation” tab of Settings.": "LLM не загружена, поэтому проверены только повторы. Чтобы проверять и ослышки, загрузите LLM на вкладке «Проверка и перевод» в настройках.",
+        "No LLM has been downloaded, so only repetitions and learned corrections were checked. To also check for other mishearings, download an LLM in the “Audit & translation” tab of Settings.": "LLM не загружена, поэтому проверены только повторы и усвоенные исправления. Чтобы проверять и другие ослышки, загрузите LLM на вкладке «Проверка и перевод» в настройках.",
         "The new audit was canceled. The previous audit result is kept.": "Новая проверка отменена. Прежний результат проверки сохранён.",
         "The LLM could not audit, so the previous audit result is kept: %@": "LLM не смогла выполнить проверку, поэтому прежний результат проверки сохранён: %@",
         "The audit was canceled. Results up to the point it reached are applied.": "Проверка отменена. Результаты до момента остановки применены.",

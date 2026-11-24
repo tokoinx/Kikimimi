@@ -63,6 +63,7 @@ extension L10nTables {
         "%@ + fine-tuning": "%@ + penyetelan lanjutan",
         "The LLM was not found, so the previous audit result is kept. To audit again with the LLM, download it in the “Audit & translation” tab of Settings.": "LLM tidak ditemukan, jadi hasil audit sebelumnya dipertahankan. Untuk mengaudit lagi dengan LLM, unduh di tab “Audit & terjemahan” di Pengaturan.",
         "No LLM has been downloaded, so only repetitions were checked. To also check for mishearings, download an LLM in the “Audit & translation” tab of Settings.": "Belum ada LLM yang diunduh, jadi hanya pengulangan yang diperiksa. Untuk memeriksa salah dengar juga, unduh LLM di tab “Audit & terjemahan” di Pengaturan.",
+        "No LLM has been downloaded, so only repetitions and learned corrections were checked. To also check for other mishearings, download an LLM in the “Audit & translation” tab of Settings.": "Belum ada LLM yang diunduh, jadi hanya pengulangan dan koreksi yang dipelajari yang diperiksa. Untuk memeriksa salah dengar lainnya juga, unduh LLM di tab “Audit & terjemahan” di Pengaturan.",
         "The new audit was canceled. The previous audit result is kept.": "Audit baru dibatalkan. Hasil audit sebelumnya dipertahankan.",
         "The LLM could not audit, so the previous audit result is kept: %@": "LLM tidak dapat mengaudit, jadi hasil audit sebelumnya dipertahankan: %@",
         "The audit was canceled. Results up to the point it reached are applied.": "Audit dibatalkan. Hasil sampai titik yang dicapai sudah diterapkan.",

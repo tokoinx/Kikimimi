@@ -63,6 +63,7 @@ extension L10nTables {
         "%@ + fine-tuning": "%@ + 추가 학습",
         "The LLM was not found, so the previous audit result is kept. To audit again with the LLM, download it in the “Audit & translation” tab of Settings.": "LLM을 찾을 수 없어 이전 점검 결과를 유지합니다. LLM으로 다시 점검하려면 설정의 “점검 및 번역” 탭에서 LLM을 다운로드해 주세요.",
         "No LLM has been downloaded, so only repetitions were checked. To also check for mishearings, download an LLM in the “Audit & translation” tab of Settings.": "다운로드된 LLM이 없어 반복만 확인했습니다. 오인식도 확인하려면 설정의 “점검 및 번역” 탭에서 LLM을 다운로드해 주세요.",
+        "No LLM has been downloaded, so only repetitions and learned corrections were checked. To also check for other mishearings, download an LLM in the “Audit & translation” tab of Settings.": "다운로드된 LLM이 없어 반복과 학습한 수정만 확인했습니다. 다른 오인식도 확인하려면 설정의 “점검 및 번역” 탭에서 LLM을 다운로드해 주세요.",
         "The new audit was canceled. The previous audit result is kept.": "새 점검이 취소되었습니다. 이전 점검 결과를 유지합니다.",
         "The LLM could not audit, so the previous audit result is kept: %@": "LLM이 점검하지 못해 이전 점검 결과를 유지합니다: %@",
         "The audit was canceled. Results up to the point it reached are applied.": "점검이 취소되었습니다. 진행된 부분까지의 결과를 적용했습니다.",
