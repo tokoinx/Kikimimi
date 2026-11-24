@@ -1045,11 +1045,19 @@ struct AuditButton: View {
                     .actionLabelStyle(iconOnly: iconOnly)
                     .accessibilityLabel(Text(L("Audit")))
             }
-            .help(model.isLLMInstalled
-                  ? L("Check for repetitions and mishearings with the LLM on your Mac")
-                  : L("Check for repetitions (to also check for mishearings, download an LLM in Settings)"))
+            .help(auditHelp)
             .disabled(job.isPostActive)
         }
+    }
+
+    /// 「監査」ボタンの説明。LLM が無くても、学習した直しを使っている時は、それも当てるので、そう言う
+    private var auditHelp: String {
+        if model.isLLMInstalled {
+            return L("Check for repetitions and mishearings with the LLM on your Mac")
+        }
+        return model.useLedger
+            ? L("Check for repetitions and apply learned corrections (to also check for other mishearings, download an LLM in Settings)")
+            : L("Check for repetitions (to also check for mishearings, download an LLM in Settings)")
     }
 
     /// ボタンの字 (操作の列の並べ方の見積もりでも使う)
@@ -1419,6 +1427,13 @@ struct LLMNeededBanner: View {
     /// 訳す先の言語のコード
     let target: String
 
+    /// 翻訳を案内しない時の見出し。学習した直しを使っている時は、それも当てるので、そう言う
+    private var auditOnlyHeadline: String {
+        model.useLedger
+            ? L("The mishearing audit uses an LLM that runs on your Mac (for now, only repetitions and learned corrections are checked)")
+            : L("The mishearing audit uses an LLM that runs on your Mac (for now, only repetitions are checked)")
+    }
+
     var body: some View {
         let selection = model.currentLLM
         HStack(spacing: 12) {
@@ -1429,7 +1444,7 @@ struct LLMNeededBanner: View {
                 Text(wantsTranslation
                      ? L("The %@ translation and the mishearing audit use an LLM that runs on your Mac",
                          TranslationTarget.displayName(for: target))
-                     : L("The mishearing audit uses an LLM that runs on your Mac (for now, only repetitions are checked)"))
+                     : auditOnlyHeadline)
                     .font(.callout.weight(.semibold))
                 Text(L("%1$@ (about %2$@) is downloaded only once. Your transcriptions never leave your Mac.",
                        selection.name,
