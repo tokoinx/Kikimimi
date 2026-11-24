@@ -63,6 +63,7 @@ extension L10nTables {
         "%@ + fine-tuning": "%@ + tinh chỉnh",
         "The LLM was not found, so the previous audit result is kept. To audit again with the LLM, download it in the “Audit & translation” tab of Settings.": "Không tìm thấy LLM nên giữ lại kết quả rà soát trước. Để rà soát lại bằng LLM, hãy tải nó trong thẻ “Rà soát & dịch” của Cài đặt.",
         "No LLM has been downloaded, so only repetitions were checked. To also check for mishearings, download an LLM in the “Audit & translation” tab of Settings.": "Chưa tải LLM nào nên chỉ kiểm tra việc lặp câu. Để kiểm tra cả lỗi nghe nhầm, hãy tải một LLM trong thẻ “Rà soát & dịch” của Cài đặt.",
+        "No LLM has been downloaded, so only repetitions and learned corrections were checked. To also check for other mishearings, download an LLM in the “Audit & translation” tab of Settings.": "Chưa tải LLM nào nên chỉ kiểm tra việc lặp câu và các chỉnh sửa đã học. Để kiểm tra cả các lỗi nghe nhầm khác, hãy tải một LLM trong thẻ “Rà soát & dịch” của Cài đặt.",
         "The new audit was canceled. The previous audit result is kept.": "Lần rà soát mới đã bị hủy. Kết quả rà soát trước được giữ lại.",
         "The LLM could not audit, so the previous audit result is kept: %@": "LLM không rà soát được nên giữ lại kết quả rà soát trước: %@",
         "The audit was canceled. Results up to the point it reached are applied.": "Lần rà soát đã bị hủy. Kết quả đến điểm đã đạt được đã được áp dụng.",
