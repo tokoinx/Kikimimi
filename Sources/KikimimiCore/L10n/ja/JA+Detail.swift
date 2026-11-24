@@ -125,6 +125,7 @@ extension JA {
         "Audit": "監査",
         "Check for repetitions and mishearings with the LLM on your Mac": "繰り返しと聞き取りミスを、Mac の中の LLM で見直す",
         "Check for repetitions (to also check for mishearings, download an LLM in Settings)": "繰り返しを見直す (聞き取りミスも見直すには、設定から LLM を取得)",
+        "Check for repetitions and apply learned corrections (to also check for other mishearings, download an LLM in Settings)": "繰り返しを見直し、学習した直しを当てる (ほかの聞き取りミスも見直すには、設定から LLM を取得)",
         "%d fix": "修正 %d",
         "%d fixes": "修正 %d",
         "%d deletion": "削除 %d",
@@ -183,6 +184,7 @@ extension JA {
         // LLM の案内
         "The %@ translation and the mishearing audit use an LLM that runs on your Mac": "%@訳と聞き取りミスの監査には、Mac の中で動く LLM を使います",
         "The mishearing audit uses an LLM that runs on your Mac (for now, only repetitions are checked)": "聞き取りミスの監査には、Mac の中で動く LLM を使います (いまは繰り返しだけを見直しています)",
+        "The mishearing audit uses an LLM that runs on your Mac (for now, only repetitions and learned corrections are checked)": "聞き取りミスの監査には、Mac の中で動く LLM を使います (いまは繰り返しの見直しと、学習した直しだけを行っています)",
         "%1$@ (about %2$@) is downloaded only once. Your transcriptions never leave your Mac.": "%1$@ (約 %2$@) を一度だけダウンロードします。文字起こしの内容は Mac の外に出ません。",
         "Close (you can download it at any time in the “Audit & translation” tab of Settings)": "閉じる (設定の「監査・翻訳」タブから、いつでも取得できます)",
         "Download": "ダウンロード",
