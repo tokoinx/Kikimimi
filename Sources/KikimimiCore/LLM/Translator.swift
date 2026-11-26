@@ -653,6 +653,9 @@ public enum Translator {
     }
 
     /// 文に分ける (NaturalLanguage の `NLTokenizer`。原文の言語が分かる時は、その言語として分ける)。
+    /// `NLTokenizer` が 1 つしか返さない時、字の過半がタイ・ラオ・ビルマ・クメールの字なら、空白の所で分ける
+    /// (これらの言葉は、文の終わりの印を書かず、空白で文や句を区切るので、`NLTokenizer` では全体が 1 つになる)。
+    /// 言語の印には頼らず、字で決める (言語が分からない時も同じ)。ほかの字の文は、空白が在っても分けない。
     /// NaturalLanguage の無い環境では、分けない
     static func splitSentences(_ text: String, language: String?) -> [String] {
         #if canImport(NaturalLanguage)
@@ -666,10 +669,45 @@ public enum Translator {
             out.append(String(text[range]))
             return true
         }
+        // 分けない時の返し方は、前と同じにする (`NLTokenizer` が返した 1 つを、そのまま返す)
+        if out.count <= 1, let pieces = splitAtSpacesIfUnspacedScript(text) { return pieces }
         return out.isEmpty ? [text] : out
         #else
         return [text]
         #endif
+    }
+
+    /// 字 (letter) の過半がタイ・ラオ・ビルマ・クメールの字で、空白が在る時に、空白の連なりの所で分ける。
+    /// 空白は前のかけらの尻に付ける (`NLTokenizer` と同じ。つなぐと元の字に戻る)。
+    /// 先頭の空白は、初めのかけらに含める。条件に合わない時と、分かれない時は nil
+    static func splitAtSpacesIfUnspacedScript(_ text: String) -> [String]? {
+        var letters = 0
+        var southeastAsian = 0
+        for scalar in text.unicodeScalars where CharacterSet.letters.contains(scalar) {
+            letters += 1
+            if Script.isUnspacedSoutheastAsian(scalar) { southeastAsian += 1 }
+        }
+        guard letters > 0, southeastAsian * 2 > letters else { return nil }
+        // 字のかたまり (Character) ごとに見るので、結合する印の前では切らない
+        var out: [String] = []
+        var current = ""
+        var afterSpace = false
+        var seenNonSpace = false
+        for ch in text {
+            if ch.isWhitespace {
+                if seenNonSpace { afterSpace = true }
+            } else {
+                if afterSpace {
+                    out.append(current)
+                    current = ""
+                    afterSpace = false
+                }
+                seenNonSpace = true
+            }
+            current.append(ch)
+        }
+        if !current.isEmpty { out.append(current) }
+        return out.count >= 2 ? out : nil
     }
 
     /// 区間に付いた言語のうち、いちばん多いもの (区間に言語が無ければ nil。同じ数なら先に出てきたもの)

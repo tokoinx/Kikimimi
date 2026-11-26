@@ -81,10 +81,17 @@ struct LineEditSheet: View {
         Binding(get: { draft(of: line) }, set: { drafts[line.id] = $0 })
     }
 
+    /// 区間の「聞き取った文」: 保存が記録に残す文 (`Transcript.heardText(forSegment:)`)。
+    /// 手で直した行では直す前の文、監査の直しを反映していた行では監査の前の文、どちらでもなければ今の文。
+    /// 札に出す文と、「覚える組」を切り出す元の文を、同じにする (別々に決めると、札は監査の後・組は監査の前、と食い違う)
+    private func heardText(of line: Line) -> String {
+        job.transcript?.heardText(forSegment: line.id) ?? line.heard ?? line.text
+    }
+
     /// 区間の「この直しを覚える」の所。組は、保存が記録に残す聞き取った文 (`Transcript.heardText(forSegment:)`。
     /// 監査の直しを反映していた行では監査の前の文) と下書きから、保存と同じ関数 (`Transcript.suggestedLearnedPair`) で、そのつど切り出す
     private func learning(of line: Line) -> Learning {
-        let heard = job.transcript?.heardText(forSegment: line.id) ?? line.heard ?? line.text
+        let heard = heardText(of: line)
         let text = draft(of: line)
         let suggested = job.transcript?.suggestedLearnedPair(forSegment: line.id, edited: text)
         let fixed = fixedWrong[line.id] != nil || fixedRight[line.id] != nil
@@ -159,7 +166,7 @@ struct LineEditSheet: View {
                 .font(.headline)
             if lines.count == 1, let line = lines.first {
                 section(L("Heard text")) {
-                    Text(line.heard ?? line.text)
+                    Text(heardText(of: line))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -229,7 +236,9 @@ struct LineEditSheet: View {
                     Text(TimeFormat.short(line.start))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(Color.accentColor)
-                    if let heard = line.heard {
+                    // 聞き取った文が今の文と違う区間 (手で直した・監査の直しを反映していた) にだけ、札を出す
+                    let heard = heardText(of: line)
+                    if line.heard != nil || LineEdit.normalized(heard) != LineEdit.normalized(line.text) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(L("Heard text"))
                                 .font(.caption.weight(.semibold))
