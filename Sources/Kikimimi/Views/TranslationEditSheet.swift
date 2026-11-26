@@ -121,18 +121,9 @@ struct TranslationEditSheet: View {
                 }
                 Button(L("Cancel")) { close() }
                     .keyboardShortcut(.cancelAction)
-                Button(L("Save")) {
-                    // 訳語の対は、訳す先を訳を置く前に決める (訳の無い結果に初めて訳を置くと、訳す先の決め方が変わりうるため)
-                    if termReady, let transcript = job.transcript {
-                        model.addTerm(source: termSource, translation: termTranslation,
-                                      target: model.translationTarget(for: transcript))
-                    }
-                    // 訳の欄が空なら、対だけを足して閉じる (setTranslation は、今の訳と同じなら何もしない)
-                    if !cleaned.isEmpty { model.setTranslation(draft, head: segmentID, in: job) }
-                    close()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(current == nil || (cleaned.isEmpty && !termReady))
+                Button(L("Save")) { save() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(current == nil || (cleaned.isEmpty && !termReady))
             }
         }
         .padding(20)
@@ -152,6 +143,24 @@ struct TranslationEditSheet: View {
                 .foregroundStyle(.secondary)
             content()
         }
+    }
+
+    /// 保存する。何を保存するかは、押した時の入力欄の字から決め直す。
+    /// 画面を描いた時に計算した値をボタンが掴む形は、避ける。行を直す画面では、その形の時に、
+    /// Return キーで押すと「覚える組」が保存されない食い違いが出た (この画面で起きたかは、見ていない)。
+    private func save() {
+        let cleaned = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let termReady = !termSource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !termTranslation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard current != nil, !cleaned.isEmpty || termReady else { return }
+        // 訳語の対は、訳す先を訳を置く前に決める (訳の無い結果に初めて訳を置くと、訳す先の決め方が変わりうるため)
+        if termReady, let transcript = job.transcript {
+            model.addTerm(source: termSource, translation: termTranslation,
+                          target: model.translationTarget(for: transcript))
+        }
+        // 訳の欄が空なら、対だけを足して閉じる (setTranslation は、今の訳と同じなら何もしない)
+        if !cleaned.isEmpty { model.setTranslation(draft, head: segmentID, in: job) }
+        close()
     }
 
     private func close() {

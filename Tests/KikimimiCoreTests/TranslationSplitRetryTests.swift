@@ -100,16 +100,48 @@ final class TranslationSplitRetryTests: XCTestCase {
         XCTAssertEqual(assertSplitKeepsText("真的吗？！太好了……我们走吧。", language: "zh"), ["真的吗？！", "太好了……我们走吧。"])
     }
 
-    /// タイ語: 句点を書かず、空白で文を区切る事が多いが、今の分け方は空白では分けない (全体で 1 つの文。今はこう返す)。
-    /// なので、タイ語の行は、訳の後ろが抜けても、文に分けた訳し直しにならない (かけらが 1 つ)。
+    /// タイ語: 句点を書かず、空白で文や句を区切る。`NLTokenizer` は全体を 1 つにするので、字の過半がタイの字なら
+    /// 空白の所で分ける (空白は前のかけらの尻に付く)。言語が分からない時も、字で決めるので同じ。
+    /// 空白の無い文は 1 つのまま。値は今の Mac (macOS 14) で返る物。
     /// タイ語の分かる人は、例の文を見ていない
     func testSplitSentencesInThai() {
         let spaced = "วันนี้อากาศดีมาก เราไปสวนสาธารณะกันเถอะ คุณอยากไปไหม"
-        XCTAssertEqual(assertSplitKeepsText(spaced, language: "th"), [spaced])
-        XCTAssertEqual(assertSplitKeepsText(spaced, language: nil), [spaced])
-        XCTAssertEqual(Translator.sentencePieces(spaced, language: "th"), [spaced])
+        let parts = ["วันนี้อากาศดีมาก ", "เราไปสวนสาธารณะกันเถอะ ", "คุณอยากไปไหม"]
+        XCTAssertEqual(assertSplitKeepsText(spaced, language: "th"), parts)
+        XCTAssertEqual(assertSplitKeepsText(spaced, language: nil), parts)
+        let pieces = ["วันนี้อากาศดีมาก", "เราไปสวนสาธารณะกันเถอะ", "คุณอยากไปไหม"]
+        XCTAssertEqual(Translator.sentencePieces(spaced, language: "th"), pieces)
+        XCTAssertEqual(Translator.sentencePieces(spaced, language: nil), pieces)
         let unspaced = "วันนี้อากาศดีมากเราไปสวนกัน"
         XCTAssertEqual(assertSplitKeepsText(unspaced, language: "th"), [unspaced])
+        XCTAssertEqual(Translator.sentencePieces(unspaced, language: "th"), [unspaced])
+    }
+
+    /// タイ語の中に英語の語が混じる短い文: 空白の所で分かれるが、かけらが軽いので、訳し直しに送るかけらは 1 つに戻る。
+    /// タイ語の分かる人は、例の文を見ていない
+    func testThaiWithAnEnglishWordMergesBackIntoOnePiece() {
+        let text = "ผมใช้ iPhone ทุกวัน"
+        XCTAssertEqual(assertSplitKeepsText(text, language: "th"), ["ผมใช้ ", "iPhone ", "ทุกวัน"])
+        XCTAssertEqual(Translator.sentencePieces(text, language: "th"), [text])
+    }
+
+    /// ラオ語・クメール語・ビルマ語も、タイ語と同じく空白の所で分ける。値は今の Mac (macOS 14) で返る物。
+    /// どの言葉の分かる人も、例の文を見ていない
+    func testSplitSentencesInLaoKhmerAndBurmese() {
+        XCTAssertEqual(assertSplitKeepsText("ມື້ນີ້ອາກາດດີຫຼາຍ ພວກເຮົາໄປສວນສາທາລະນະກັນເທາະ ເຈົ້າຢາກໄປບໍ່", language: "lo"),
+                       ["ມື້ນີ້ອາກາດດີຫຼາຍ ", "ພວກເຮົາໄປສວນສາທາລະນະກັນເທາະ ", "ເຈົ້າຢາກໄປບໍ່"])
+        XCTAssertEqual(assertSplitKeepsText("ថ្ងៃនេះអាកាសធាតុល្អណាស់ យើងទៅសួនច្បារសាធារណៈ តើអ្នកចង់ទៅទេ", language: "km"),
+                       ["ថ្ងៃនេះអាកាសធាតុល្អណាស់ ", "យើងទៅសួនច្បារសាធារណៈ ", "តើអ្នកចង់ទៅទេ"])
+        XCTAssertEqual(assertSplitKeepsText("ဒီနေ့ရာသီဥတုသာယာတယ် ပန်းခြံကိုသွားကြရအောင်", language: "my"),
+                       ["ဒီနေ့ရာသီဥတုသာယာတယ် ", "ပန်းခြံကိုသွားကြရအောင်"])
+    }
+
+    /// ほかの字の文は、空白が在っても分けない (前と同じ)
+    func testOtherScriptsAreNotSplitAtSpaces() {
+        XCTAssertEqual(assertSplitKeepsText("今日は 天気が いい", language: "ja"), ["今日は 天気が いい"])
+        XCTAssertEqual(assertSplitKeepsText("今日は 天気が いい", language: nil), ["今日は 天気が いい"])
+        XCTAssertEqual(assertSplitKeepsText("hello world again", language: "en"), ["hello world again"])
+        XCTAssertEqual(assertSplitKeepsText("hello world again", language: nil), ["hello world again"])
     }
 
     func testSentencePiecesWithAFixedSplitter() {
@@ -155,6 +187,26 @@ final class TranslationSplitRetryTests: XCTestCase {
         XCTAssertEqual(summary.sentToLLM, 1, "初めに送った行の数は変えない")
         XCTAssertEqual(summary.flagged, 0)
         XCTAssertEqual(summary.failed, 0)
+    }
+
+    /// タイ語の原文も、空白の所で分けて訳し直す (前は、かけらが 1 つで送り直さなかった)。
+    /// タイ語の分かる人は、例の文を見ていない
+    func testThaiShortTranslationIsSplitAndResent() throws {
+        let thai = "วันนี้อากาศดีมาก เราไปสวนสาธารณะกันเถอะ คุณอยากไปไหม"
+        let th1 = "วันนี้อากาศดีมาก", th2 = "เราไปสวนสาธารณะกันเถอะ", th3 = "คุณอยากไปไหม"
+        let g = fake([thai: "Il fait beau.", th1: "Il fait très beau aujourd'hui.",
+                      th2: "Allons au parc public ensemble.", th3: "Est-ce que tu veux y aller ?"])
+        var results: [TranslationResult] = []
+        let summary = try Translator.translateSummarizing([seg(0, thai)], language: "th", target: "fr",
+                                                          options: TranslationOptions(), generator: g,
+                                                          shouldCancel: { false }) { batch, _, _ in results += batch }
+        XCTAssertEqual(g.prompts.count, 2, "初めの 1 回と、訳し直しの 1 回")
+        XCTAssertEqual(sentLines(g.prompts[1]), ["[1] \(th1)", "[2] \(th2)", "[3] \(th3)"])
+        XCTAssertEqual(results.first?.text,
+                       "Il fait très beau aujourd'hui. Allons au parc public ensemble. Est-ce que tu veux y aller ?")
+        XCTAssertEqual(summary.retried, 1)
+        XCTAssertEqual(summary.retryFixed, 1)
+        XCTAssertEqual(summary.retryLines, 3)
     }
 
     func testJapaneseRetryIsJoinedWithoutSpaces() throws {
