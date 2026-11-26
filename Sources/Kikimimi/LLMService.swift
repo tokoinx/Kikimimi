@@ -60,6 +60,25 @@ final class LLMService: @unchecked Sendable {
     /// いまのモデルに重ねてある差分。`lock` で保護する
     private var loadedAdapter: AdapterID?
 
+    /// 確認用の起動 (--selftest-ui-load の監査の流れの確認) だけが入れる、決まった答えを返す生成器。`lock` で保護する。
+    /// 入っている間、`run` はモデルを読み込まず、これを包んで body に渡す (アプリのふだんの起動では、いつも nil)
+    private var selfTestStandIn: (any TextGenerating)?
+
+    /// 確認用: LLM の代わりの生成器を入れる・外す (nil で外す)。入っている間は、LLM が手元に無くても監査が LLM の段まで進む
+    /// (`AppModel.runPost` が見る)
+    var selfTestGenerator: (any TextGenerating)? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return selfTestStandIn
+        }
+        set {
+            lock.lock()
+            selfTestStandIn = newValue
+            lock.unlock()
+        }
+    }
+
     /// 割り込み (チャット) の待ち行列。監査・翻訳の `generate` の手前で、合う物を先に通す
     private let interrupts = LLMInterruptQueue<LlamaEngine>()
 
@@ -79,6 +98,11 @@ final class LLMService: @unchecked Sendable {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<T, Error>) in
             queue.async {
                 do {
+                    // 確認用の代わりの生成器: モデルを読まずに使う (割り込みは通さない。差分も重ねない)
+                    if let standIn = self.selfTestGenerator {
+                        cont.resume(returning: try body(YieldingGenerator(standIn, adapterPath: nil) {}))
+                        return
+                    }
                     let engine = try self.loadedEngine(modelPath, adapterPath: adapterPath, shouldCancel: shouldCancel)
                     let interrupts = self.interrupts
                     let generator = YieldingGenerator(engine, adapterPath: engine.adapterPath) {

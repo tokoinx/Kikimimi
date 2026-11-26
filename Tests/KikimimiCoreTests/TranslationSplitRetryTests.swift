@@ -65,6 +65,53 @@ final class TranslationSplitRetryTests: XCTestCase {
                        ["今日はとてもいい天気ですね。", "公園に行きましょう。", "そうしましょう。"])
     }
 
+    /// 文に分けた結果の、成り立つべき事: つなぐと元の文になる (字が落ちない・増えない)、空の文が無い、
+    /// 字のかたまりの途中で切らない (分けた文が、結合する印で始まらない)
+    private func assertSplitKeepsText(_ text: String, language: String?, file: StaticString = #filePath, line: UInt = #line)
+        -> [String] {
+        let parts = Translator.splitSentences(text, language: language)
+        XCTAssertEqual(parts.joined(), text, "joined parts give the text", file: file, line: line)
+        XCTAssertFalse(parts.contains { $0.isEmpty }, "no empty part", file: file, line: line)
+        for part in parts {
+            let category = part.unicodeScalars.first?.properties.generalCategory
+            XCTAssertFalse(category == .nonspacingMark || category == .spacingMark || category == .enclosingMark,
+                           "part starts inside a grapheme: \(part)", file: file, line: line)
+        }
+        XCTAssertEqual(parts.reduce(0) { $0 + $1.count }, text.count, file: file, line: line)
+        // 訳し直しに送るかけらも、空白を除けば元の文と同じ字
+        let pieces = Translator.sentencePieces(text, language: language)
+        XCTAssertEqual(pieces.joined().filter { !$0.isWhitespace }, text.filter { !$0.isWhitespace }, file: file, line: line)
+        XCTAssertFalse(pieces.contains { $0.isEmpty }, file: file, line: line)
+        return parts
+    }
+
+    /// 中国語 (簡体・繁体): 「。」「！」「？」で分かれる。尻に句読点が無い文も、最後の 1 つとして残る。
+    /// 言語の印 "zh" は、簡体の "zh-Hans" として分ける (繁体の文も、同じ所で分かれる)。値は今の Mac (macOS 14) で返る物
+    func testSplitSentencesInChinese() {
+        XCTAssertEqual(assertSplitKeepsText("今天天气很好。我们去公园吧！你想去吗？好的", language: "zh"),
+                       ["今天天气很好。", "我们去公园吧！", "你想去吗？", "好的"])
+        XCTAssertEqual(assertSplitKeepsText("今天天氣很好。我們去公園吧！你想去嗎？好的", language: "zh"),
+                       ["今天天氣很好。", "我們去公園吧！", "你想去嗎？", "好的"])
+        // 言語が分からない時も、同じ所で分かれる
+        XCTAssertEqual(assertSplitKeepsText("今天天气很好。我们去公园吧！你想去吗？", language: nil),
+                       ["今天天气很好。", "我们去公园吧！", "你想去吗？"])
+        // 閉じかぎの後ろで分かれ、「？！」は 1 つの文の尻。「……」では分かれない
+        XCTAssertEqual(assertSplitKeepsText("他说：“好。”然后走了。", language: "zh"), ["他说：“好。”", "然后走了。"])
+        XCTAssertEqual(assertSplitKeepsText("真的吗？！太好了……我们走吧。", language: "zh"), ["真的吗？！", "太好了……我们走吧。"])
+    }
+
+    /// タイ語: 句点を書かず、空白で文を区切る事が多いが、今の分け方は空白では分けない (全体で 1 つの文。今はこう返す)。
+    /// なので、タイ語の行は、訳の後ろが抜けても、文に分けた訳し直しにならない (かけらが 1 つ)。
+    /// タイ語の分かる人は、例の文を見ていない
+    func testSplitSentencesInThai() {
+        let spaced = "วันนี้อากาศดีมาก เราไปสวนสาธารณะกันเถอะ คุณอยากไปไหม"
+        XCTAssertEqual(assertSplitKeepsText(spaced, language: "th"), [spaced])
+        XCTAssertEqual(assertSplitKeepsText(spaced, language: nil), [spaced])
+        XCTAssertEqual(Translator.sentencePieces(spaced, language: "th"), [spaced])
+        let unspaced = "วันนี้อากาศดีมากเราไปสวนกัน"
+        XCTAssertEqual(assertSplitKeepsText(unspaced, language: "th"), [unspaced])
+    }
+
     func testSentencePiecesWithAFixedSplitter() {
         // 分け方は差し替えられる。全部が軽ければ 1 つにまとめる
         let split: (String, String?) -> [String] = { text, _ in text.components(separatedBy: "|") }

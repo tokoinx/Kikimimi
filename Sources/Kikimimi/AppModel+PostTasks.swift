@@ -157,7 +157,8 @@ extension AppModel {
         let flag = CancelFlag()
         job.postCancel = flag
         let selection = currentLLM
-        let useLLM = isLLMInstalled
+        // 確認用の起動が LLM の代わりを入れている間は、LLM が手元に無くても LLM の段まで進む (ふだんは入っていない)
+        let useLLM = isLLMInstalled || llm.selfTestGenerator != nil
         let glossary = effectiveHint
         let learned = useLedger ? ledger : nil
         // 監査には監査用の差分、翻訳 (全体・行・訳し直し) には翻訳用の差分だけ (`activeAdapterPath(for:)`)

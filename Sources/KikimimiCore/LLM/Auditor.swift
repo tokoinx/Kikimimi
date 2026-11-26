@@ -254,9 +254,11 @@ public enum Auditor {
     static let wordCharacter = "[[\\p{L}\\p{N}'’]--[\\p{Han}\\p{Hiragana}\\p{Katakana}]]"
 
     /// 直す語の前後に付ける「切れ目」の条件
+    /// (タイ・ラオ・クメール・ビルマの字で始まる・終わる語は、ここでは条件を付けず、`termRange` が OS の語の切れ目で見る)
     static func boundaries(for wrong: String) -> (leading: String, trailing: String) {
         func isSpacedLetter(_ c: Character) -> Bool {
             (c.isLetter || c == "'" || c == "’") && !c.unicodeScalars.contains { Script.isUnspacedCJK($0) }
+                && !isUnspacedSoutheastAsian(c)
         }
         var leading = "", trailing = ""
         if let first = wrong.first {
@@ -284,7 +286,32 @@ public enum Auditor {
                                                    options: [.caseInsensitive]) else {
             return text.range(of: term, options: .caseInsensitive) != nil
         }
-        return regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: NSString(string: text).length)) != nil
+        return termRange(of: term, in: text, regex: regex) != nil
+    }
+
+    /// タイ・ラオ・クメール・ビルマの字か (字のかたまりの、どれかの字が当たれば)
+    static func isUnspacedSoutheastAsian(_ c: Character) -> Bool {
+        c.unicodeScalars.contains { Script.isUnspacedSoutheastAsian($0) }
+    }
+
+    /// 行 text の中で、regex (語 term と、`boundaries(for:)` の切れ目の条件) に合う最初の場所。無ければ nil。
+    /// 語の間に空白を書かない文字 (タイ・ラオ・クメール・ビルマ) で始まる・終わる語は、前後に字が続いてよい代わりに、
+    /// 場所の頭・尻が、OS の語の切れ目 (手で直した行から組を切り出す時と同じ `LineEdit.wordBreaks`) に合う事を求める。
+    /// 切り出しが同じ切れ目まで語を広げているので、覚えた文そのものには当たり、長い語の中の一部には当たらない。
+    /// 字のかたまりの途中 (声調・母音の印の前) も、切れ目でないので当たらない
+    static func termRange(of term: String, in text: String, regex: NSRegularExpression) -> NSRange? {
+        let checkHead = term.first.map(isUnspacedSoutheastAsian) ?? false
+        let checkTail = term.last.map(isUnspacedSoutheastAsian) ?? false
+        let all = NSRange(location: 0, length: NSString(string: text).length)
+        guard checkHead || checkTail else { return regex.firstMatch(in: text, options: [], range: all)?.range }
+        let breaks = LineEdit.wordBreaks(text)
+        for match in regex.matches(in: text, options: [], range: all) {
+            guard let r = Range(match.range, in: text) else { continue }
+            if checkHead && !breaks.contains(r.lowerBound) { continue }
+            if checkTail && !breaks.contains(r.upperBound) { continue }
+            return match.range
+        }
+        return nil
     }
 
     /// 直し change (直す前の行 → 直した行) が、直す前の行の中の words の字 (どれか。大文字小文字は区別しない) に重なるか。
@@ -332,15 +359,15 @@ public enum Auditor {
         for options: NSRegularExpression.Options in [[], [.caseInsensitive]] {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { continue }
             let ns = NSString(string: text)
-            guard let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)) else { continue }
+            guard let found = termRange(of: wrong, in: text, regex: regex) else { continue }
             var replacement = right
             // 大文字小文字を無視して見つけた語が大文字で始まっていれば (文の頭など)、直した語もそろえる。
             // 正しい語に大文字が入っているとき (iPhone・eBay・macOS) は、書かれたとおりの表記を使う
-            if !options.isEmpty, let first = ns.substring(with: match.range).first, first.isUppercase,
+            if !options.isEmpty, let first = ns.substring(with: found).first, first.isUppercase,
                let r = replacement.first, r.isLowercase, !replacement.contains(where: \.isUppercase) {
                 replacement = r.uppercased() + replacement.dropFirst()
             }
-            return ns.replacingCharacters(in: match.range, with: replacement)
+            return ns.replacingCharacters(in: found, with: replacement)
         }
         return nil
     }
