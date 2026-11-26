@@ -294,6 +294,48 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(try store.loadVersion(documentID: doc.id, versionID: auto.id).notes, "n")
     }
 
+    /// 「訳し直す前」の版: 保存して読み直せ、自動の版として扱う (「いちばん新しい版に上書き」で飛ばす)
+    func testBeforeRetranslationVersionRoundTripsAndStaysAutomatic() throws {
+        var doc = document(notes: "n")
+        try store.save(doc)
+        doc = try store.addVersion(to: doc, label: "訳す先の言語を変える前", origin: .beforeRetranslation,
+                                   date: Date(timeIntervalSince1970: 1_800_000_000))
+        let auto = doc.versions[0]
+        XCTAssertEqual(auto.origin, .beforeRetranslation)
+        // 書いた形は、名前の文字列
+        let text = String(decoding: try Data(contentsOf: store.documentURL(for: doc.id)), as: UTF8.self)
+        XCTAssertTrue(text.contains("\"origin\" : \"beforeRetranslation\""), text)
+        // 一覧と版の中身から読み直せる
+        XCTAssertEqual(store.loadAll().documents.first?.versions, [auto])
+        XCTAssertEqual(try store.loadVersion(documentID: doc.id, versionID: auto.id).info.origin, .beforeRetranslation)
+        // 自分で残した版ではない
+        XCTAssertNil(doc.latestManualVersion)
+        doc.notes = "m"
+        doc = try store.overwriteLatestVersion(of: doc, label: "X", date: Date(timeIntervalSince1970: 1_800_000_010))
+        XCTAssertEqual(doc.versions.map(\.origin), [.manual, .beforeRetranslation])
+        XCTAssertEqual(doc.versions[1], auto)
+        XCTAssertEqual(try store.loadVersion(documentID: doc.id, versionID: auto.id).notes, "n")
+    }
+
+    /// 新しい値を足す前の形 (manual と beforeRestore だけ) の版の見出しは、今までどおり読める
+    func testVersionOriginsWrittenBeforeRetranslationExistedStillLoad() throws {
+        let decoder = LibraryStore.decoder()
+        let manual = try decoder.decode(VersionInfo.self, from: Data("""
+        { "id" : "\(UUID().uuidString)", "label" : "A", "noteLength" : 3, "origin" : "manual", "savedAt" : "2026-11-12T10:20:31.5Z", "segmentCount" : 2 }
+        """.utf8))
+        XCTAssertEqual(manual.origin, .manual)
+        XCTAssertEqual(manual.label, "A")
+        let restore = try decoder.decode(VersionInfo.self, from: Data("""
+        { "id" : "\(UUID().uuidString)", "label" : "戻す前の状態", "noteLength" : 0, "origin" : "beforeRestore", "savedAt" : "2026-11-12T10:20:31.5Z", "segmentCount" : 2 }
+        """.utf8))
+        XCTAssertEqual(restore.origin, .beforeRestore)
+        // origin の無い古い見出しは、自分で残した版
+        let bare = try decoder.decode(VersionInfo.self, from: Data("""
+        { "id" : "\(UUID().uuidString)", "savedAt" : "2026-11-12T10:20:31.5Z" }
+        """.utf8))
+        XCTAssertEqual(bare.origin, .manual)
+    }
+
     func testOverwriteReplacesManualVersionUnderNewerAutomaticOne() throws {
         var doc = document(notes: "a")
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
