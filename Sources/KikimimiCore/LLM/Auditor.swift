@@ -287,6 +287,40 @@ public enum Auditor {
         return regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: NSString(string: text).length)) != nil
     }
 
+    /// 直し change (直す前の行 → 直した行) が、直す前の行の中の words の字 (どれか。大文字小文字は区別しない) に重なるか。
+    /// 場所 (字の数で数えた位置) で見る: 頭と尻の同じ所を除いた、変わった所が、語の場所と重なれば重なり。
+    /// 何も消さずに字を足すだけの直しは、語の中に足す時と、語に字 (文字・数字) をくっつける時 (Roblox → Robloxx) を、重なりと見る
+    static func touches(_ change: AuditChange, words: [String]) -> Bool {
+        guard let fixed = change.replacement else { return false }
+        let text = change.original.text
+        let before = Array(text), after = Array(fixed)
+        var prefix = 0
+        while prefix < before.count, prefix < after.count, before[prefix] == after[prefix] { prefix += 1 }
+        var suffix = 0
+        while suffix < min(before.count, after.count) - prefix,
+              before[before.count - 1 - suffix] == after[after.count - 1 - suffix] { suffix += 1 }
+        // 直す前の行の中の、変わった所 [start, end)。足しただけなら start == end で、足した字は inserted
+        let start = prefix, end = before.count - suffix
+        let inserted = after[prefix..<(after.count - suffix)]
+        func joins(_ c: Character?) -> Bool { c.map { $0.isLetter || $0.isNumber } ?? false }
+        for word in words where !word.isEmpty {
+            var from = text.startIndex
+            while from < text.endIndex, let r = text.range(of: word, options: .caseInsensitive, range: from..<text.endIndex) {
+                let low = text.distance(from: text.startIndex, to: r.lowerBound)
+                let high = text.distance(from: text.startIndex, to: r.upperBound)
+                if start < end {
+                    if start < high && end > low { return true }
+                } else if (low < start && start < high)
+                            || (start == high && joins(inserted.first))
+                            || (start == low && joins(inserted.last)) {
+                    return true
+                }
+                from = r.upperBound
+            }
+        }
+        return false
+    }
+
     /// 行の中の「聞き間違えた語」を「正しい語」に置き換える (最初の 1 か所だけ)。行に見つからなければ nil。
     /// 語や数は切れ目で合わせる (「can」を直すつもりで「scan」の中を、「15」を直すつもりで「115」の中を変えない)。
     /// 大文字小文字・記号だけが違う組は、LLM の直しとしては使わない (句読点や表記の好みを直したがるため)。
@@ -560,6 +594,12 @@ public enum Auditor {
             var suggested = pending
             for change in llmChanges where !ruled.contains(change.original.id) {
                 guard let own = learned[change.original.id] else {
+                    // 反映されない学習した直し (提案) がある行で、LLM が、その組の聞き間違えた字を、学習した直しと違う字に直した:
+                    // 利用者が前に決めた組を、LLM の案で黙って置き換えない (学習した直しの提案を残す。自動の組の行と同じ考え方)
+                    if let own = suggested[change.original.id], change.kind == .fix, change.replacement != own.replacement,
+                       touches(change, words: (own.learned ?? []).map(\.wrong)) {
+                        continue
+                    }
                     // 反映されない学習した直し (提案) がある行に、LLM も指摘した (1 区間 1 件):
                     // LLM の自信のある直しなら、それを使う。提案どうしなら、利用者が前に決めた、学習した直しの提案を残す
                     if suggested[change.original.id] != nil, !(change.kind == .fix && change.isConfident && !revertedBefore(change)) {
@@ -576,8 +616,9 @@ public enum Auditor {
                     continue
                 }
                 // 学習した直しを当てた行を、LLM がさらに直した: 自信のある直しなら 1 件にまとめる (元の区間は、学習した直しの前のもの)。
-                // 自信の無い提案は捨てて、学習した直しだけを残す (1 区間 1 件)
-                if change.kind == .fix, change.isConfident {
+                // 自信の無い提案は捨てて、学習した直しだけを残す (1 区間 1 件)。
+                // 学習した直しが書いた字 (正しい語) に重なる LLM の直しも、同じく捨てる (利用者が覚えさせた字を、黙って書き換えない)
+                if change.kind == .fix, change.isConfident, !touches(change, words: (own.learned ?? []).map(\.right)) {
                     var merged = change
                     merged.original = own.original
                     merged.reason = own.reason + " / " + change.reason
