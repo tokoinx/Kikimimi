@@ -308,7 +308,7 @@ struct ModelRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(spec.recommended ? L("%@ (recommended)", spec.displayName) : spec.displayName)
-                Text(L("%1$@ About %2$d MB", spec.summary, spec.approxMB))
+                Text(L("%1$@ About %2$@", spec.summary, TimeFormat.bytes(Int64(spec.approxMB) * 1_000_000)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

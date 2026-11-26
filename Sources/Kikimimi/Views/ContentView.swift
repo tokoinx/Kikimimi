@@ -371,7 +371,7 @@ struct EmptyStateView: View {
                         VStack(spacing: 8) {
                             Text(L("Please download the model"))
                                 .font(.headline)
-                            Text(L("First, download the speech recognition model “%1$@” (about %2$d MB) once.", model.currentModel.displayName, model.currentModel.approxMB))
+                            Text(L("First, download the speech recognition model “%1$@” (about %2$@) once.", model.currentModel.displayName, TimeFormat.bytes(Int64(model.currentModel.approxMB) * 1_000_000)))
                                 .font(.callout)
                             Button {
                                 model.download(model.currentModel)

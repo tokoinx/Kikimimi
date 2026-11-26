@@ -724,6 +724,11 @@ struct BilingualHeader: View {
     var showPlayMark = false
     /// 「要確認」の行の id (一覧の順。空なら「要確認 N」を出さない)
     var flaggedIDs: [UUID] = []
+    /// 訳の列が狭いので、名前と「要確認 N」を縦に並べている
+    @State private var stacked = false
+
+    /// 訳の列の幅がこれより狭い時は、縦に並べる (日本語の「日本語訳 要確認 125」が横に入る幅より少し広く取った)
+    private static let stackBelowWidth: CGFloat = 200
 
     var body: some View {
         HStack(spacing: 12) {
@@ -735,18 +740,46 @@ struct BilingualHeader: View {
             }
             Label(label.map { L("Original (%@)", $0) } ?? L("Original"), systemImage: "text.quote")
                 .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 8) {
-                Label(L("%@ translation", TranslationTarget.displayName(for: target)), systemImage: "character.bubble")
-                if !flaggedIDs.isEmpty {
-                    ReviewJumpButton(ids: flaggedIDs)
+            // 訳の列が狭い時 (狭い窓でメモの欄を開いた時など) は、名前と「要確認 N」を縦に並べる。
+            // 横に並べたままだと、名前が 1 字ずつ縦に折れる (2026-11-27 に、横 880 の絵で見た)。
+            // どちらにするかは、列の幅が変わった時にだけ決める。ViewThatFits で毎回測る形は使わない:
+            // 再生位置の刻みのたびに測り直し、「time tick」が 9 ms → 27 ms になった (同じ日に、アプリの確認で測った)
+            Group {
+                if stacked {
+                    VStack(alignment: .leading, spacing: 2) {
+                        translationLabel
+                        reviewJump
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        translationLabel
+                        reviewJump
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: Bool.self) { proxy in
+                proxy.size.width < BilingualHeader.stackBelowWidth
+            } action: { narrow in
+                stacked = narrow
+            }
         }
         .font(.callout.weight(.semibold))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 28)
         .padding(.vertical, 6)
+    }
+
+    /// 訳の列の名前 (「日本語訳」など)
+    private var translationLabel: some View {
+        Label(L("%@ translation", TranslationTarget.displayName(for: target)), systemImage: "character.bubble")
+    }
+
+    /// 「要確認 N」(要確認の行が無い時は出さない)
+    @ViewBuilder private var reviewJump: some View {
+        if !flaggedIDs.isEmpty {
+            ReviewJumpButton(ids: flaggedIDs)
+        }
     }
 }
 

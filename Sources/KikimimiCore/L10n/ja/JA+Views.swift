@@ -40,7 +40,7 @@ extension JA {
         // ContentView (始めの画面)
         "Kikimimi": "ききみみ",
         "Drop audio or video here to transcribe it, entirely on your Mac.\nYou can also record with the microphone and transcribe it.": "音声や動画をここに落とすと、Mac の中だけで文字に起こします。\nマイクで録音して起こすこともできます。",
-        "First, download the speech recognition model “%1$@” (about %2$d MB) once.": "最初に音声認識モデル「%1$@」(約 %2$d MB) を一度だけダウンロードします。",
+        "First, download the speech recognition model “%1$@” (about %2$@) once.": "最初に音声認識モデル「%1$@」(約 %2$@) を一度だけダウンロードします。",
         "Downloading the model %d%%": "モデルをダウンロード中 %d%%",
         "Open a file…": "ファイルを開く",
         "Record with microphone": "マイクで録音",

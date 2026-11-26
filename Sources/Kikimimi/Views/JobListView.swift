@@ -10,11 +10,6 @@ struct JobListView: View {
             get: { model.selectedJobID },
             set: { id in model.select(model.jobs.first { $0.id == id }) }
         )) {
-            if model.jobs.isEmpty {
-                Text(L("Nothing here yet"))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
-            }
             ForEach(model.jobs) { job in
                 JobRow(job: job)
                     .tag(job.id)
@@ -35,6 +30,17 @@ struct JobListView: View {
         }
         // 一覧での delete キーは、PlaybackKeys (KikimimiApp.swift) が受ける
         .listStyle(.sidebar)
+        // 空の時の文は、一覧の行にしない。行にすると、最後の 1 つを消した後、
+        // 一覧がその行を「選んだ行」として青く塗る (2026-11-26 に画面で見た)
+        .overlay(alignment: .topLeading) {
+            if model.jobs.isEmpty {
+                Text(L("Nothing here yet"))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .allowsHitTesting(false)
+            }
+        }
         // 結果が在る時も、落として読み込める事が分かるように、一覧の下に案内を出す
         .safeAreaInset(edge: .bottom) {
             Label(L("You can also drop audio or video files here"), systemImage: "arrow.down.doc")

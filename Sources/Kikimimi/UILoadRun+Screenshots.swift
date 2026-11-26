@@ -99,6 +99,77 @@ extension LoadRun {
         await settle()
         lines += await scroll(to: mixed.transcript?.segments.first?.id, .top, for: "06")
         lines.append(shot("06-auto-mixed-notice", in: window, to: directory))
+
+        // 21・22. ウインドウをいちばん狭く (横 880 pt) した時の、対訳の結果と、メモの欄。撮ったら元の大きさと選んでいた結果に戻す
+        lines += await takeNarrowScreenshots(in: window, to: directory)
+        return lines
+    }
+
+    /// ウインドウのいちばん狭い横幅 (KikimimiApp の `.frame(minWidth: 880, …)` と同じ)
+    static let narrowWidth = 880.0
+
+    /// ウインドウを横 880 pt にして、訳の在る終わった結果 (21) と、同じ結果でメモの欄を出した所 (22) を撮る。
+    /// 頼んだ横幅と、実際の横幅を 1 行で出す。中身がウインドウを押し広げた (実際が頼んだより 1 pt を超えて広い) 時は、
+    /// ほかの場面の失敗と同じく「screenshot failed」の行を出す (絵を残せない時と同じく、終了コードは変えない)。
+    /// 撮った後、ウインドウの大きさ・メモの欄・メモ・選んでいた結果を、始める前と同じに戻す (後ろの場面と段を変えないため)
+    private func takeNarrowScreenshots(in window: NSWindow, to directory: URL) async -> [String] {
+        var lines: [String] = []
+        let wideFrame = window.frame
+        let selectedBefore = model.selectedJob
+        let job = doneBilingual
+        let notesBefore = job.notes
+        let wasShowingNotes = model.showNotes
+        Self.live("scene 21: the finished bilingual job in the narrowest window")
+        player.stopLine()
+        player.selfTestSetTime(0, playing: false)
+        if model.showNotes { model.showNotes = false }
+        model.select(job)
+        // 左上の位置はそのまま、横だけを狭くする
+        var frame = wideFrame
+        frame.size.width = Self.narrowWidth
+        window.setFrame(frame, display: true)
+        await settle()
+        lines += await scroll(to: job.transcript?.segments.first?.id, .top, for: "21")
+        lines += narrowWidthLines(of: window, for: "21-narrow-bilingual")
+        lines.append(shot("21-narrow-bilingual", in: window, to: directory))
+
+        // 22. 同じ横幅で、メモの欄を出したところ (引用した行を 1 つ含むメモ。撮ったら元のメモに戻す)
+        Self.live("scene 22: the notes pane in the narrowest window")
+        var notes = "Notes for the narrow window check.\n"
+        if let segment = job.transcript?.segments.first {
+            notes = NoteQuote.appending(NoteQuote.line(time: segment.start, text: segment.text), to: notes)
+        }
+        job.notes = notes
+        model.showNotes = true
+        await settle()
+        lines += await scroll(to: job.transcript?.segments.first?.id, .top, for: "22")
+        lines += narrowWidthLines(of: window, for: "22-narrow-notes")
+        lines.append(shot("22-narrow-notes", in: window, to: directory))
+
+        // 元に戻し、落ち着くのを待ってから先へ進む
+        Self.live("  put the window back after 21 and 22")
+        if job.notes != notesBefore { job.notes = notesBefore }
+        if model.showNotes != wasShowingNotes { model.showNotes = wasShowingNotes }
+        model.select(selectedBefore)
+        window.setFrame(wideFrame, display: true)
+        await settle()
+        if abs(window.frame.width - wideFrame.width) > 1 || abs(window.frame.height - wideFrame.height) > 1 {
+            lines.append("UI LOAD: screenshot 22-narrow-notes.png: the window did not go back to"
+                         + " \(Int(wideFrame.width))x\(Int(wideFrame.height)) pt"
+                         + " (it is \(Int(window.frame.width))x\(Int(window.frame.height)) pt)")
+        }
+        return lines
+    }
+
+    /// 頼んだ横幅と実際の横幅の行。実際が 1 pt を超えて広ければ、失敗の行も足す
+    private func narrowWidthLines(of window: NSWindow, for name: String) -> [String] {
+        let asked = Self.narrowWidth
+        let got = window.frame.width
+        var lines = ["UI LOAD: narrow window: asked \(Int(asked)), got \(Int(got.rounded())) (\(name).png)"]
+        if got > asked + 1 {
+            lines.append("UI LOAD: screenshot failed \(name).png: the window is \(Int(got.rounded())) pt wide,"
+                         + " wider than the asked \(Int(asked)) pt (the content pushed the window wider)")
+        }
         return lines
     }
 

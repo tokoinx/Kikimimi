@@ -37,7 +37,7 @@ extension JA {
         "Open the models folder": "モデルのフォルダを開く",
         "Speech recognition uses whisper.cpp (a C/C++ implementation of OpenAI Whisper), which is free and open source, and runs on the Mac’s GPU (Metal). Neither the audio nor the transcription leaves your Mac. The internet is used only to download a model the first time.": "音声認識には、無料・オープンソースの whisper.cpp (OpenAI Whisper の C/C++ 実装) を使い、Mac の GPU (Metal) で動きます。音声も文字起こしの内容も Mac の外に送られません。インターネットを使うのは、モデルを初めて取得するときだけです。",
         // モデルの行 (ModelRow・LLMModelRow)
-        "%1$@ About %2$d MB": "%1$@ 約 %2$d MB",
+        "%1$@ About %2$@": "%1$@ 約 %2$@",
         "%1$@ About %2$@ · %3$@": "%1$@ 約 %2$@・%3$@",
         "May be too heavy for this Mac (%d GB of memory)": "この Mac (メモリ %d GB) では重いかもしれません",
         "Downloaded": "取得済み",

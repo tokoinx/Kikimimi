@@ -49,6 +49,8 @@ import KikimimiCore
 ///
 /// 保存の確認のあとに、監査の流れの確認 (AUDIT FLOW CHECK。UILoadAuditFlowCheck.swift) も行う: LLM の代わりを入れて、
 /// AppModel の監査 (規則だけの段 → LLM の段) を 2 つの確認用の結果で通し、学習した直しの提案・反映・自動の直しを見る。
+/// そのあと、訳し直しの確認 (RETRANSLATE CHECK。UILoadRetranslateCheck.swift) も行う: 訳の付いた確認用の結果を、
+/// LLM の代わりで別の言語へ訳し直し、訳し直す前の版 (自動) が 1 つだけ残る事と、訳が新しい言語になる事を見る。
 ///
 /// 終了コードの数と、複数が失敗した時にどれを返すかは、KikimimiCore の `UILoadExit` (UILoadExit.swift) の表に在る。
 ///
@@ -82,7 +84,9 @@ enum UILoadSelfTest {
         // 音声があるときは、練習の確認 (30 秒ほど) のぶんも足す。絵のときは、練習の絵 (09・10) のぶんも入れてある
         // チャットの確認 (CHAT CHECK。窓を開け、絵 14〜17 を撮る) のぶんも足す
         // 監査の流れの確認 (AUDIT FLOW CHECK。監査を 2 回、LLM の代わりで) のぶんも足す
-        let hangLimit = (screenshots == nil ? 200.0 : 300.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0
+        // 訳し直しの確認 (RETRANSLATE CHECK。翻訳を 1 回、LLM の代わりで) のぶんも足す。
+        // 絵のときは、狭いウインドウの絵 (21・22) のぶんも足す
+        let hangLimit = (screenshots == nil ? 200.0 : 310.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0 + 15.0
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
             finish(header + ["UI LOAD FAILED: the self-test did not finish in \(Int(hangLimit)) s"
                              + " (the main thread may be stuck)"], code: .hang, reportPath: reportPath)
@@ -157,6 +161,10 @@ enum UILoadSelfTest {
         // 失敗した時の終了コードは、保存の確認と同じ (UILoadExit.library。終了コードの表は変えていない)
         let auditFlow = await load.auditFlowCheck(root: libraryRoot)
         lines += auditFlow.lines
+        // 訳し直しの確認 (RETRANSLATE CHECK): 「〇〇語で訳し直す」の道を、LLM の代わりで最後まで通す。
+        // 失敗した時の終了コードは、監査の流れの確認と同じ (UILoadExit.library)
+        let retranslate = await load.retranslateCheck(root: libraryRoot)
+        lines += retranslate.lines
 
         // 4. 音声があれば、1 行を本当に再生して、行の終わりで止まるかを見る
         var lineFailed = false
@@ -184,7 +192,7 @@ enum UILoadSelfTest {
         var failed: Set<UILoadExit> = []
         if slow { failed.insert(.slow) }
         if lineFailed { failed.insert(.line) }
-        if library.failed || adapterMessageFailed || auditFlow.failed { failed.insert(.library) }
+        if library.failed || adapterMessageFailed || auditFlow.failed || retranslate.failed { failed.insert(.library) }
         if practiceFailed { failed.insert(.practice) }
         if chatFailed { failed.insert(.chat) }
         let code = UILoadExit.decide(failed: failed)
