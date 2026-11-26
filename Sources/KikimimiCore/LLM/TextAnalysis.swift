@@ -111,6 +111,16 @@ public enum Script {
         return isHan(v) || isKana(v) || (0x3000...0x303F).contains(v) || (0xFF00...0xFFEF).contains(v)
     }
 
+    /// 語の間に空白を書かない、東南アジアの文字か (タイ・ラオ・ビルマ・クメール。字につく印も含む)。
+    /// これらの文字の語の切れ目は、字の続きでは分からないので、OS の語の分け方で見る (`Auditor.applyFix`)
+    public static func isUnspacedSoutheastAsian(_ scalar: Unicode.Scalar) -> Bool {
+        let v = scalar.value
+        return (0x0E00...0x0EFF).contains(v)       // タイ・ラオ
+            || (0x1000...0x109F).contains(v)       // ビルマ
+            || (0xA9E0...0xA9FF).contains(v) || (0xAA60...0xAA7F).contains(v) // ビルマの足りない字
+            || (0x1780...0x17FF).contains(v) || (0x19E0...0x19FF).contains(v) // クメール
+    }
+
     /// 日本語に訳す必要があるか (日本語ではなく、文字を含む)
     public static func needsTranslation(_ text: String, transcriptLanguage: String? = nil) -> Bool {
         hasLetters(text) && !isJapanese(text, transcriptLanguage: transcriptLanguage)

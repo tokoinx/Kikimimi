@@ -82,6 +82,26 @@ extension Transcript {
         return out
     }
 
+    /// 区間 id の「聞き取った文」。直した時に記録 (`LineEdit.heard`) に残す文と、直す画面が組を切り出す元の文は、これ 1 つ:
+    /// 今も有効な直しの記録が在れば、その聞き取った文。無ければ、反映していた監査の直しの前の文。どちらも無ければ今の文。
+    /// 区間が無ければ nil
+    public func heardText(forSegment id: UUID) -> String? {
+        guard let segment = segments.first(where: { $0.id == id }) else { return nil }
+        if let existing = lineEdit(forSegment: id) { return existing.heard }
+        if let fix = audit?.changes.first(where: { $0.original.id == id && $0.kind == .fix && $0.isApplied }) {
+            return fix.original.text
+        }
+        return segment.text
+    }
+
+    /// 区間 id を edited に直す時に、学習した直しの台帳に覚えさせる組の案 (直す画面が出す組。切り出せなければ nil)。
+    /// 聞き取った文 (`heardText(forSegment:)`。監査の直しを反映していた行では、監査の前の文) と edited から切り出す。
+    /// 監査の前の文から切り出すのは、記録に残す聞き取った文の中の wrong を right に置き換えると直した文になるように
+    /// (`LineEdit.suggestedSpan` の決まり)、また、次の監査が学習した直しを当てるのも、監査の前の文だから
+    public func suggestedLearnedPair(forSegment id: UUID, edited: String) -> AuditChange.Pair? {
+        heardText(forSegment: id).flatMap { LineEdit.suggestedPair(heard: $0, edited: edited) }
+    }
+
     /// 区間 id の文を、利用者の文 text に直す (整えてから)。何か変えたら true。
     /// 空の文・区間が無い・今の文と同じ時は、何もせず false。
     /// 聞き取った文は、最初に直した時の物を残す (反映していた監査の直しが在れば、監査の前の文)。
@@ -113,19 +133,11 @@ extension Transcript {
         guard !cleaned.isEmpty, let index = segments.firstIndex(where: { $0.id == id }) else { return false }
         let current = segments[index].text
         guard cleaned != LineEdit.normalized(current) else { return false }
-        let heard: String
-        let existing = lineEdit(forSegment: id)
+        let heard = heardText(forSegment: id) ?? current
         let learned: AuditChange.Pair?
         switch choice {
-        case .keep: learned = existing?.learned
+        case .keep: learned = lineEdit(forSegment: id)?.learned
         case .set(let pair): learned = pair
-        }
-        if let existing {
-            heard = existing.heard
-        } else if let fix = audit?.changes.first(where: { $0.original.id == id && $0.kind == .fix && $0.isApplied }) {
-            heard = fix.original.text
-        } else {
-            heard = current
         }
         // 監査の直し・提案を取り除く (反映済みでも、要確認でも、fix でも delete でも)
         if var report = audit, report.changes.contains(where: { $0.original.id == id }) {
@@ -299,13 +311,45 @@ extension LineEdit {
         text.filter { !$0.isWhitespace && !$0.isPunctuation }.count
     }
 
+    /// 直す画面の「この直しを覚える」を、入で始めるか (利用者は、どちらからでも切り替えられる)。
+    /// 聞き間違えた語が 2 字以上 (空白・句読点を除く) なら入。ただし、2 つの語がどちらも ひらがなだけ (長音「ー」を含めてよい)
+    /// の組 (「ました → ます」のような活用の尻・助詞) は切: 覚えて 2 回反映すると、ほかの行の同じ字を、関係なく書き換えるため。
+    /// カタカナ・漢字を含む組 (「浜って → 走って」「はし → 箸」)・英語の組は、今まで通り
+    public static func remembersByDefault(_ pair: AuditChange.Pair?) -> Bool {
+        guard let pair, letterCount(pair.wrong) >= 2 else { return false }
+        return !(isHiraganaOnly(pair.wrong) && isHiraganaOnly(pair.right))
+    }
+
+    /// ひらがなだけの文か (長音の「ー」も、ひらがなの続きとして入れる。空の文は false)
+    static func isHiraganaOnly(_ text: String) -> Bool {
+        !text.isEmpty && text.unicodeScalars.allSatisfy { s in
+            (0x3041...0x3096).contains(s.value) || (0x309D...0x309F).contains(s.value) || s.value == 0x30FC
+        }
+    }
+
     /// 文の語の場所 (字の数で数えた範囲。Foundation の語の分け方。日本語も辞書で分ける)
     static func wordRanges(_ text: String) -> [Range<Int>] {
-        var out: [Range<Int>] = []
+        wordIndexRanges(text).map {
+            text.distance(from: text.startIndex, to: $0.lowerBound)..<text.distance(from: text.startIndex, to: $0.upperBound)
+        }
+    }
+
+    /// 文の語の切れ目 (文の頭と尻、語の始まりと終わり)。組を切り出す所 (`suggestedSpan`) と同じ語の分け方で、
+    /// 学習した直しを当てる所 (`Auditor.termRange`) が、タイ語などの語の切れ目を見るのに使う
+    static func wordBreaks(_ text: String) -> Set<String.Index> {
+        var out: Set<String.Index> = [text.startIndex, text.endIndex]
+        for r in wordIndexRanges(text) {
+            out.insert(r.lowerBound)
+            out.insert(r.upperBound)
+        }
+        return out
+    }
+
+    /// 語の場所 (Foundation の語の分け方 `.byWords`。語の分け方を決めるのは、ここだけ)
+    private static func wordIndexRanges(_ text: String) -> [Range<String.Index>] {
+        var out: [Range<String.Index>] = []
         text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: [.byWords, .substringNotRequired]) { _, range, _, _ in
-            let start = text.distance(from: text.startIndex, to: range.lowerBound)
-            let end = text.distance(from: text.startIndex, to: range.upperBound)
-            out.append(start..<end)
+            out.append(range)
         }
         return out
     }

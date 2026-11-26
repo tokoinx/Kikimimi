@@ -7,7 +7,8 @@ import SwiftUI
 /// 行が持つ区間の全部を出す: 単言語の行は 1 つ、対訳の行は訳のまとまりの区間の全部 (区間ごとに入力欄を 1 つ)。
 /// 聞き取った文・今の文・訳が在るかは、body の中で今の結果から読む。
 /// 学習した直しを使う設定の時は、入力欄の下に「この直しを覚える」の所を出す (聞き間違えた語 → 正しい語を、
-/// 学習した直しの台帳に 1 回分覚えさせる。組は、聞き取った文と下書きから切り出す: `LineEdit.suggestedPair`)
+/// 学習した直しの台帳に 1 回分覚えさせる。組は、保存が記録に残す聞き取った文と下書きから切り出す:
+/// `Transcript.suggestedLearnedPair`。保存は、ここで見せた組をそのまま覚えさせる)
 struct LineEditSheet: View {
     @Environment(AppModel.self) private var model
     let job: Job
@@ -80,22 +81,24 @@ struct LineEditSheet: View {
         Binding(get: { draft(of: line) }, set: { drafts[line.id] = $0 })
     }
 
-    /// 区間の「この直しを覚える」の所。組は、聞き取った文 (まだ直していない行では今の文) と下書きから、そのつど切り出す
+    /// 区間の「この直しを覚える」の所。組は、保存が記録に残す聞き取った文 (`Transcript.heardText(forSegment:)`。
+    /// 監査の直しを反映していた行では監査の前の文) と下書きから、保存と同じ関数 (`Transcript.suggestedLearnedPair`) で、そのつど切り出す
     private func learning(of line: Line) -> Learning {
-        let heard = line.heard ?? line.text
+        let heard = job.transcript?.heardText(forSegment: line.id) ?? line.heard ?? line.text
         let text = draft(of: line)
-        let suggested = LineEdit.suggestedPair(heard: heard, edited: text)
+        let suggested = job.transcript?.suggestedLearnedPair(forSegment: line.id, edited: text)
         let fixed = fixedWrong[line.id] != nil || fixedRight[line.id] != nil
-        // 聞き取った文と同じに戻した下書き (保存すると直しを戻す) では、出さない
+        // 聞き取った文と同じに戻した下書き (保存すると直しを戻す) では、出さない。
+        // まだ直していない行を、文を変えずに開いた時も、出さない (監査の直しを反映していた行で、監査の直しを組として見せない)
         let backToHeard = LineEdit.normalized(text) == LineEdit.normalized(heard)
-        let shown = model.useLedger && !backToHeard && (suggested != nil || fixed)
+        let untouched = LineEdit.normalized(text) == LineEdit.normalized(line.text)
+        let shown = model.useLedger && !backToHeard && (suggested != nil || fixed) && !(untouched && line.heard == nil)
         let wrong = fixedWrong[line.id] ?? suggested?.wrong ?? ""
         let right = fixedRight[line.id] ?? suggested?.right ?? ""
-        // 初めの値: 切り出した聞き間違えた語が 2 字以上 (空白・句読点を除く) なら入。
+        // 初めの値: `LineEdit.remembersByDefault` (聞き間違えた語が 2 字以上なら入。ひらがなだけの組は切)。
         // ただし、前に覚えさせずに直した行を、文を変えずに開いた時は切 (開いただけで「保存」が押せる形にしない)
-        let untouchedEdit = line.heard != nil && line.learned == nil
-            && LineEdit.normalized(text) == LineEdit.normalized(line.text)
-        let on = learnOn[line.id] ?? (!untouchedEdit && LineEdit.letterCount(suggested?.wrong ?? "") >= 2)
+        let untouchedEdit = line.heard != nil && line.learned == nil && untouched
+        let on = learnOn[line.id] ?? (!untouchedEdit && LineEdit.remembersByDefault(suggested))
         var problem: String?
         if shown && on {
             let w = wrong.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -113,15 +116,39 @@ struct LineEditSheet: View {
         return Learning(shown: shown, on: on, wrong: wrong, right: right, problem: problem)
     }
 
+    /// 区間が変わったか: 文が変わった (整えた後で、今の文と違う)、または、覚えさせる組が変わった (学習した直しを使う設定の時)
+    private func isChanged(_ line: Line, learning: Learning?) -> Bool {
+        LineEdit.normalized(draft(of: line)) != LineEdit.normalized(line.text)
+            || (model.useLedger && line.heard != nil && learning?.pair != line.learned)
+    }
+
+    /// 「保存」。変わった区間だけを直す (結果への代入は 1 回)。区間がもう無い (間に監査が消した、など) 時は、
+    /// その区間は lines に無いので、何も変えない。
+    /// 変わった区間と覚える組は、押した時の下書きから決め直す (画面を作った時の値を使わない)。
+    /// Return キーで保存すると、画面が見せた組が記録に残らない事が在った (2026-11-26 に画面で見た。ボタンを押した時は残った)
+    private func save() {
+        let lines = current.lines
+        let learnings = Dictionary(uniqueKeysWithValues: lines.map { ($0.id, learning(of: $0)) })
+        // 空の入力欄・覚える組の理由が在る時は、保存しない (ボタンが押せない時と同じ決まり)
+        guard !lines.contains(where: { LineEdit.normalized(draft(of: $0)).isEmpty }),
+              !learnings.values.contains(where: { $0.shown && $0.on && $0.problem != nil }) else { return }
+        var texts: [UUID: String] = [:]
+        var pairs: [UUID: AuditChange.Pair] = [:]
+        for line in lines where isChanged(line, learning: learnings[line.id]) {
+            texts[line.id] = draft(of: line)
+            if let pair = learnings[line.id]?.pair { pairs[line.id] = pair }
+        }
+        guard !texts.isEmpty else { return }
+        model.setLineTexts(texts, learning: pairs, in: job)
+        close()
+    }
+
     var body: some View {
         let current = self.current
         let lines = current.lines
         let learnings = Dictionary(uniqueKeysWithValues: lines.map { ($0.id, learning(of: $0)) })
         // 文が変わった区間 (整えた後で、今の文と違う) と、覚えさせる組が変わった区間 (学習した直しを使う設定の時)
-        let changed = lines.filter { line in
-            LineEdit.normalized(draft(of: line)) != LineEdit.normalized(line.text)
-                || (model.useLedger && line.heard != nil && learnings[line.id]?.pair != line.learned)
-        }
+        let changed = lines.filter { isChanged($0, learning: learnings[$0.id]) }
         // 空の入力欄・覚える組の理由が 1 つでも在れば、保存できない
         let hasEmpty = lines.contains { LineEdit.normalized(draft(of: $0)).isEmpty }
         let hasProblem = learnings.values.contains { $0.shown && $0.on && $0.problem != nil }
@@ -171,18 +198,7 @@ struct LineEditSheet: View {
                 Spacer()
                 Button(L("Cancel")) { close() }
                     .keyboardShortcut(.cancelAction)
-                Button(L("Save")) {
-                    // 変わった区間だけを直す (結果への代入は 1 回)。区間がもう無い (間に監査が消した、など) 時は、
-                    // その区間は lines に無いので、何も変えない
-                    var texts: [UUID: String] = [:]
-                    var pairs: [UUID: AuditChange.Pair] = [:]
-                    for line in changed {
-                        texts[line.id] = draft(of: line)
-                        if let pair = learnings[line.id]?.pair { pairs[line.id] = pair }
-                    }
-                    model.setLineTexts(texts, learning: pairs, in: job)
-                    close()
-                }
+                Button(L("Save")) { save() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!canSave)
             }

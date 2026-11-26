@@ -80,23 +80,80 @@ final class LineEditSpacelessLanguageTests: XCTestCase {
         XCTAssertEqual(fixes.map(\.replacement), ["他买了三个苹果。", "苹果手机很贵。"])
         XCTAssertTrue(fixes.allSatisfy(\.isConfident))
         // 行に言語の印 (zh) が在る時: 漢字だけの行は「日本語の字」と見なされ (`Script.spokenLanguage` が ja を返す)、
-        // 「行の言語が変わる直し」として、どの組も当たらない (今はこう返す。報告に挙げた)
+        // 「行の言語が変わる直し」として、どの組も当たらない (今はこう返す)。
+        // ただし、今のアプリでは、行に zh の印は付かない。行の言語の印を付けるのは「日本語＋英語」の文字起こし
+        // (`MixedPipeline.transcriptSegment`) だけで、候補はいつも ja と en (`Languages.candidates(for:)` は「ja+en」の時だけ
+        // ["ja", "en"]、自動で混ざりを確かめる時も `MixedProbe.languages` の ["ja", "en"])。言語を中国語にした時・自動の時の
+        // 1 つの言語の文字起こし (`WhisperContext` の segmentFromContext・filtered) は、行に言語の印を付けない。
+        // なので、このコードは直していない (印が付く道ができた時は、ここを直す)
         XCTAssertEqual(lines.map { Script.spokenLanguage(of: $0.text, among: ["ja", "en"], fallback: "zh") }, ["ja", "ja", "ja"])
         XCTAssertTrue(ledger.fixes(for: lines, language: "zh").isEmpty)
+        // 印を付ける道の候補が、今も ja と en だけである事の見張り
+        XCTAssertNil(Languages.candidates(for: "zh"))
+        XCTAssertNil(Languages.candidates(for: "auto"))
+        XCTAssertEqual(Languages.candidates(for: "ja+en"), ["ja", "en"])
+        XCTAssertEqual(MixedProbe.languages, ["ja", "en"])
     }
 
-    /// 切り出したタイ語の組を台帳に 2 回覚えさせた時、ほかの行にどう当たるか (今はこう返す。報告用)。
-    /// タイ語の字は「空白で分ける言語の字」として扱われ、組の前後に字が続くと当たらない (語の切れ目を、字の続きで見るため)。
-    /// タイ語は語の間に空白を入れないので、文の中の語には、ほぼ当たらない
-    func testThaiPairsOnOtherLines() {
+    /// 切り出したタイ語の組を台帳に 2 回覚えさせた時、ほかの行にどう当たるか。
+    /// タイ語は語の間に空白を書かないので、組の前後に字が続いてよい代わりに、当てる場所の頭と尻が
+    /// OS の語の切れ目 (切り出しと同じ `.byWords`) に合う事を求める (`Auditor.termRange`)。
+    /// 語の分け方は OS の辞書なので、値は今の Mac (macOS 14) で返る物。タイ語の分かる人は、例の文を見ていない
+    func testThaiPairsOnOtherLines() throws {
+        // 手で直した行から切り出した組を、2 回覚えさせる (自動で当たる)
+        let pair = try XCTUnwrap(pair("ฉันไม้ชอบกาแฟ", "ฉันไม่ชอบกาแฟ"))
+        XCTAssertEqual(pair, p("ไม้", "ไม่"))
         var ledger = CorrectionLedger()
-        for _ in 0..<2 { ledger.record(wrong: "ไม้", right: "ไม่", language: "th", example: nil, accepted: true) }
-        XCTAssertTrue(ledger.fixes(for: [TranscriptSegment(start: 0, end: 2, text: "เขาไม้มา")], language: "th").isEmpty)
-        XCTAssertNil(Auditor.applyFix(to: "ฉันไม้ชอบกาแฟ", wrong: "ไม้", right: "ไม่", surfaceOnly: true))
-        XCTAssertNil(Auditor.applyFix(to: "เขาไปทีบ้านเพื่อน", wrong: "ทีบ้าน", right: "ที่บ้าน", surfaceOnly: true))
-        // 前後が空白なら当たる
-        XCTAssertEqual(ledger.fixes(for: [TranscriptSegment(start: 0, end: 2, text: "เขา ไม้ มา")], language: "th").map(\.replacement),
-                       ["เขา ไม่ มา"])
+        for _ in 0..<2 { ledger.record(wrong: pair.wrong, right: pair.right, language: "th", example: nil, accepted: true) }
+        // 覚えた文そのもの (語の切れ目: ฉัน|ไม้|ชอบ|กาแฟ) に当たる
+        XCTAssertEqual(Auditor.applyFix(to: "ฉันไม้ชอบกาแฟ", wrong: "ไม้", right: "ไม่", surfaceOnly: true), "ฉันไม่ชอบกาแฟ")
+        // 別の文の中の同じ語 (เขา|ไม้|มา) に当たる。行の言語の印 (th) が在っても無くても当たる
+        let lines = [
+            TranscriptSegment(start: 0, end: 2, text: "เขาไม้มา"),
+            TranscriptSegment(start: 2, end: 4, text: "เขาไม้มา", language: "th"),
+            TranscriptSegment(start: 4, end: 6, text: "เขา ไม้ มา"),
+            // 長い語の一部 (ไม้บรรทัด は 1 語・ต้นไม้ の尻) は、切れ目に合わないので当たらない
+            TranscriptSegment(start: 6, end: 8, text: "ไม้บรรทัดอยู่ไหน"),
+            TranscriptSegment(start: 8, end: 10, text: "ต้นไม้ใหญ่"),
+        ]
+        // (場所は字のかたまりの数で数える。ไม้บรรทัด は 7 かたまり、ต้นไม้ は 4 かたまり)
+        XCTAssertEqual(LineEdit.wordRanges("ไม้บรรทัดอยู่ไหน").first, 0..<7)
+        XCTAssertEqual(LineEdit.wordRanges("ต้นไม้ใหญ่"), [0..<4, 4..<7])
+        let fixes = ledger.fixes(for: lines, language: "th")
+        XCTAssertEqual(fixes.map(\.original.text), ["เขาไม้มา", "เขาไม้มา", "เขา ไม้ มา"])
+        XCTAssertEqual(fixes.map(\.replacement), ["เขาไม่มา", "เขาไม่มา", "เขา ไม่ มา"])
+        XCTAssertTrue(fixes.allSatisfy(\.isConfident))
+        // 2 語にまたがる組 (ที|บ้าน → ที่บ้าน) も、頭と尻が切れ目なら当たる
+        XCTAssertEqual(Auditor.applyFix(to: "เขาไปทีบ้านเพื่อน", wrong: "ทีบ้าน", right: "ที่บ้าน", surfaceOnly: true),
+                       "เขาไปที่บ้านเพื่อน")
+        // 字のかたまりの途中では切らない: 「ไม」(声調の印なし) は、「ไม่ชอบ」の中の、印の前までには当たらない
+        XCTAssertNil(Auditor.applyFix(to: "ฉันไม่ชอบกาแฟ", wrong: "ไม", right: "ไม่", surfaceOnly: true))
+        // 当てた後の字が壊れない (かたまりの数が、置き換えた分だけ合う。結合する印で始まるかたまりが無い)
+        for fix in fixes {
+            let fixed = try XCTUnwrap(fix.replacement)
+            XCTAssertEqual(fixed.count, fix.original.text.count)
+            XCTAssertFalse(fixed.contains { $0.unicodeScalars.first?.properties.generalCategory == .nonspacingMark })
+        }
+        // 正しい語が、もう文の中の語として入っている行は、そのまま (「正しい語がもう入っている」の見方も、語の切れ目で見る)
+        XCTAssertTrue(Auditor.containsTerm("เขาไม่มา", "ไม่"))
+        XCTAssertFalse(Auditor.containsTerm("ฉันไม่ชอบกาแฟ", "ไม่"), "ไม่ชอบ is one word for the OS")
+    }
+
+    /// ラオ語・クメール語: タイ語と同じく、OS の語の切れ目で当てる (今の Mac は、どちらも語に分けられる)
+    func testLaoAndKhmerPairsOnOtherLines() throws {
+        // ラオ語: ບໍ (1 かたまり) を ບໍ່ に直す。2 字に満たないので右隣の語 (ມັກ) まで広げた組になる
+        XCTAssertEqual(LineEdit.wordRanges("ຂ້ອຍບໍມັກກາເຟ").count, 4)
+        let lao = try XCTUnwrap(pair("ຂ້ອຍບໍມັກກາເຟ", "ຂ້ອຍບໍ່ມັກກາເຟ"))
+        XCTAssertEqual(lao, p("ບໍມັກ", "ບໍ່ມັກ"))
+        XCTAssertEqual(Auditor.applyFix(to: "ລາວບໍມັກປາ", wrong: lao.wrong, right: lao.right, surfaceOnly: true), "ລາວບໍ່ມັກປາ")
+        // クメール語: ចិត្ដ (字の形が違う ដ) を ចិត្ត に直す
+        let khmer = try XCTUnwrap(pair("ខ្ញុំមិនចូលចិត្ដកាហ្វេ", "ខ្ញុំមិនចូលចិត្តកាហ្វេ"))
+        XCTAssertEqual(khmer, p("ចិត្ដ", "ចិត្ត"))
+        XCTAssertEqual(Auditor.applyFix(to: "ខ្ញុំមិនចូលចិត្ដកាហ្វេ", wrong: khmer.wrong, right: khmer.right, surfaceOnly: true),
+                       "ខ្ញុំមិនចូលចិត្តកាហ្វេ")
+        // 文字の見分け方 (タイ・ラオ・ビルマ・クメール)
+        XCTAssertTrue(["ก", "ກ", "က", "ក"].allSatisfy { Auditor.isUnspacedSoutheastAsian(Character($0)) })
+        XCTAssertFalse(["a", "あ", "漢", "한"].contains { Auditor.isUnspacedSoutheastAsian(Character($0)) })
     }
 
     /// 中国語 (繁体)。簡体と同じ形で返る
