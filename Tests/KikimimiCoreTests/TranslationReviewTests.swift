@@ -185,6 +185,36 @@ final class TranslationReviewTests: XCTestCase {
         XCTAssertNil(t.translationNote(for: c))
     }
 
+    /// 訳を手で直した行の原文を、手で直した (setLineText) 時: 訳は消え、古い覚えは効かなくなり、
+    /// もう一度機械で訳すと、古い「直した」の覚えは残らない
+    func testLineTextEditReleasesTheUserTranslation() {
+        var (t, a, b, _) = sample()
+        let machine = "まず、仕組みがどう振る舞うかです。"
+        let own = "最初に話したいのは、仕組みの振る舞いです。"
+        XCTAssertEqual(t.setUserTranslation(own, for: a)?.origin, TranslationNote.edited)
+        XCTAssertEqual(t.userTranslatedIDs, [a, b])
+        XCTAssertTrue(t.setLineText("So the first point is how", forSegment: a))
+        // (a) 訳が消える (b) 古い覚えは無い物 (c) 利用者が訳した行ではない
+        XCTAssertNil(t.segments[0].translation)
+        XCTAssertNil(t.translationNote(for: a))
+        XCTAssertFalse(t.userTranslatedIDs.contains(a))
+        XCTAssertFalse(t.userTranslatedIDs.contains(b))
+        // もう一度、機械で訳す
+        let sources = Dictionary(t.segments.map { ($0.id, $0.text) }, uniquingKeysWith: { x, _ in x })
+        XCTAssertTrue(t.apply(TranslationResult(head: a, covers: [b], text: "まず、仕組みの振る舞いの話です。"), sources: sources))
+        // (d) 新しい訳が入る
+        XCTAssertEqual(t.segments[0].translation, "まず、仕組みの振る舞いの話です。")
+        // (e) その行に「直した」の覚えが残っていない
+        let notes = t.translationReview ?? []
+        XCTAssertFalse(notes.contains { $0.head == a && $0.origin == TranslationNote.edited },
+                       "notes \(notes.map { "\($0.origin) \($0.machine ?? "nil")" })")
+        XCTAssertNotEqual(t.translationNote(for: a)?.origin, TranslationNote.edited)
+        XCTAssertFalse(t.userTranslatedIDs.contains(a))
+        // (f) 古い機械の訳・自分の訳が、覚えに出てこない
+        XCTAssertFalse(notes.contains { $0.machine == machine || $0.machine == own },
+                       "notes \(notes.map { "\($0.origin) \($0.machine ?? "nil")" })")
+    }
+
     // MARK: 行の覚え
 
     func testRowsCarryTheNote() {

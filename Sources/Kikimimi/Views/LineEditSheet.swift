@@ -22,6 +22,10 @@ struct LineEditSheet: View {
     /// 利用者が自分で書き換えた (または、前に覚えた組から始めた) 2 つの欄 (区間ごと。在れば、切り出し直さない)
     @State private var fixedWrong: [UUID: String] = [:]
     @State private var fixedRight: [UUID: String] = [:]
+    /// 区間が 4 つ以上の行で、欄の並びの高さ (測った値。測る前は上限と同じ)
+    @State private var multiLinesHeight: CGFloat = LineEditSheet.multiLinesMaxHeight
+    /// 区間が 4 つ以上の行で、欄の並びに付ける高さの上限
+    private static let multiLinesMaxHeight: CGFloat = 380
 
     /// 今の結果から読んだ、1 つの区間
     private struct Line: Identifiable {
@@ -176,13 +180,19 @@ struct LineEditSheet: View {
                     learningArea(line, learning)
                 }
             } else if lines.count > 1 {
-                // 区間が多い行で画面が高くなりすぎないよう、4 つ以上は高さに上限を付けて中を巻ける形にする
+                // 区間が多い行で画面が高くなりすぎないよう、4 つ以上は高さに上限を付けて中を巻ける形にする。
+                // 高さは、欄の並びを測った値と上限の小さい方にする (いつも上限の高さにすると、欄が少ない時に下に空きが残る)
                 if lines.count > 3 {
                     ScrollView {
                         multiLines(lines, learnings)
                             .padding(.trailing, 12)
+                            .onGeometryChange(for: CGFloat.self) { proxy in
+                                proxy.size.height
+                            } action: { height in
+                                multiLinesHeight = height
+                            }
                     }
-                    .frame(height: 380)
+                    .frame(height: min(multiLinesHeight, LineEditSheet.multiLinesMaxHeight))
                 } else {
                     multiLines(lines, learnings)
                 }

@@ -122,6 +122,7 @@ extension JA {
         "No versions yet.": "まだ版はありません。",
         "No name": "名前なし",
         "Automatic (before going back)": "自動 (戻す前)",
+        "Automatic (before translating again)": "自動 (訳し直す前)",
         "%1$@  %2$@, notes %3$@": "%1$@　%2$@・メモ %3$@",
         "%d character": "%d 文字",
         "%d characters": "%d 文字",

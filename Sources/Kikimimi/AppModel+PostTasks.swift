@@ -79,7 +79,7 @@ extension AppModel {
         }
         guard job.status == .done, job.transcript != nil, canEditVersions(job) else { return }
         Task {
-            guard await saveVersion(job, label: AppModel.beforeRetranslateLabel, mode: .new, origin: .beforeRestore) else { return }
+            guard await saveVersion(job, label: AppModel.beforeRetranslateLabel, mode: .new, origin: .beforeRetranslation) else { return }
             // 版を残しているあいだに、ほかの仕事が始まった・結果が変わった時は、訳を外さない (版は残る)
             guard job.status == .done, !job.isPostActive, var transcript = job.transcript else { return }
             transcript.removeAllTranslations()

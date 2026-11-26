@@ -535,6 +535,7 @@ extension L10nTables {
         "No versions yet.": "Ancora nessuna versione.",
         "No name": "Senza nome",
         "Automatic (before going back)": "Automatica (prima del ripristino)",
+        "Automatic (before translating again)": "Automatica (prima di tradurre di nuovo)",
         "%1$@  %2$@, notes %3$@": "%1$@  %2$@, note %3$@",
         "%d character": "%d carattere",
         "%d characters": "%d caratteri",

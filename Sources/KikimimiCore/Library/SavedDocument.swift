@@ -113,6 +113,9 @@ public struct VersionInfo: Codable, Hashable, Identifiable, Sendable {
         case manual
         /// 前の版に戻す前に、自動で残した
         case beforeRestore
+        /// 「〇〇で訳し直す」の前に、自動で残した。
+        /// 自動の版としての扱いは beforeRestore と同じ (違うのは、履歴の画面の印の文だけ)
+        case beforeRetranslation
 
         public init(from decoder: Decoder) throws {
             let raw = try decoder.singleValueContainer().decode(String.self)

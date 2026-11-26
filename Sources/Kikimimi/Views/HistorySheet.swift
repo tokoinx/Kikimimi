@@ -137,8 +137,8 @@ struct HistorySheet: View {
                                 .fontWeight(.semibold)
                                 .foregroundStyle(version.label.isEmpty ? Color.secondary : Color.primary)
                                 .lineLimit(1)
-                            if version.origin == .beforeRestore {
-                                Text(L("Automatic (before going back)"))
+                            if let badge = HistorySheet.automaticBadge(for: version.origin) {
+                                Text(badge)
                                     .font(.caption2.weight(.semibold))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 1)
@@ -179,6 +179,17 @@ struct HistorySheet: View {
         let name = label
         Task {
             if await model.saveVersion(job, label: name, mode: effective) { label = "" }
+        }
+    }
+
+    /// 自動で残した版の印の文 (自分で残した版は nil)
+    static func automaticBadge(for origin: VersionInfo.Origin) -> String? {
+        switch origin {
+        case .manual: return nil
+        case .beforeRestore: return L("Automatic (before going back)")
+        case .beforeRetranslation: return L("Automatic (before translating again)")
+        // KikimimiCore は library evolution で作るので、知らない値の道が要る。印は付けない (読む時の決まりと同じく、自分で残した版とみなす)
+        @unknown default: return nil
         }
     }
 
@@ -230,20 +241,24 @@ private struct RestoreVersionConfirm: View {
                 Spacer()
                 Button(L("Cancel")) { close() }
                     .keyboardShortcut(.cancelAction)
-                Button(L("Go back")) {
-                    let restoreTranscript = transcript
-                    let restoreNotes = notes
-                    close()
-                    Task {
-                        await model.restoreVersion(job, versionID: version.id,
-                                                   transcript: restoreTranscript, notes: restoreNotes)
-                    }
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!(transcript || notes) || model.versionBlockedReason(job) != nil)
+                Button(L("Go back")) { restore() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!(transcript || notes) || model.versionBlockedReason(job) != nil)
             }
         }
         .padding(20)
         .frame(width: 380)
+    }
+
+    /// 「戻る」: 押した時の選び方を読んでから閉じ、版に戻す
+    /// (Return で押すボタンなので、body で作った値を掴まない。DefaultActionButtonRulesTests)
+    private func restore() {
+        let restoreTranscript = transcript
+        let restoreNotes = notes
+        close()
+        Task {
+            await model.restoreVersion(job, versionID: version.id,
+                                       transcript: restoreTranscript, notes: restoreNotes)
+        }
     }
 }
