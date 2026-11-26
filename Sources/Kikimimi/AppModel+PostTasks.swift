@@ -212,12 +212,8 @@ extension AppModel {
                     adopt(rules, in: job)
                 }
                 guard useLLM else {
-                    // 学習した直しを使っている時は、それも当てたので、そう知らせる
-                    if learned != nil {
-                        job.postNote = L("No LLM has been downloaded, so only repetitions and learned corrections were checked. To also check for other mishearings, download an LLM in the “Audit & translation” tab of Settings.")
-                    } else {
-                        job.postNote = L("No LLM has been downloaded, so only repetitions were checked. To also check for mishearings, download an LLM in the “Audit & translation” tab of Settings.")
-                    }
+                    // 学習した直しを使っている時は、それも当てたので、そう知らせる (文は AuditGuidance が選ぶ)
+                    job.postNote = AuditGuidance.noLLMNote(usesLedger: learned != nil)
                     return
                 }
                 // 規則の見直しのあいだに、メモリの少ない Mac で録音が始まった: LLM は録音のあとで

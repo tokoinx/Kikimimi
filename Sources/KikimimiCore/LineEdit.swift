@@ -194,6 +194,7 @@ extension LineEdit {
     /// 4. 広げた後の wrong が 2 字に満たなければ、右隣の語 1 つ分まで広げる (右に無ければ左)。
     /// 5. 端の空白と句読点は、両方の端が同じ字の時だけ、両方から落とす。
     /// 6. どちらかが空・40 字を超える・同じ、の時は nil
+    /// 7. どちらかに、文や句を区切る句読点が残っている時も nil (`hasSeparatingPunctuation`)
     public static func suggestedPair(heard: String, edited: String) -> AuditChange.Pair? {
         guard let span = suggestedSpan(heard: heard, edited: edited) else { return nil }
         return span.pair
@@ -261,11 +262,27 @@ extension LineEdit {
             right -= 1
             b -= 1
         }
+        // 句読点をまたぐ組 (2 か所の直しを間の読点ごとまとめた物・句読点だけの直しに次の語を付けた物) は覚えない。
+        // 関係の無い行に当たりやすいため (直す事そのものは、今まで通りできる)
+        if hasSeparatingPunctuation(wrong) || hasSeparatingPunctuation(fixed) { return nil }
         let w = String(wrong), r = String(fixed)
         guard !w.isEmpty, !r.isEmpty, w != r,
               w.trimmingCharacters(in: .whitespacesAndNewlines) == w, r.trimmingCharacters(in: .whitespacesAndNewlines) == r,
               wrong.count <= pairMaxLength, fixed.count <= pairMaxLength else { return nil }
         return PairSpan(pair: AuditChange.Pair(wrong: w, right: r), range: a..<b)
+    }
+
+    /// 文や句を区切る句読点が入っているか (Unicode の句読点の種類で見る)。
+    /// 語の中に入る印は、句読点と見ない: アポストロフィ (' ’)・ハイフン (- ‐ ‑)・下線 (_ などのつなぎの印)・
+    /// 中黒 (・ ･)・数の中の「.」「,」(前と後ろが数字。3.5・1,000)。長音の「ー」は、もともと句読点の種類でない
+    static func hasSeparatingPunctuation(_ chars: [Character]) -> Bool {
+        let inWord: Set<Character> = ["'", "’", "-", "‐", "‑", "・", "･"]
+        for (i, c) in chars.enumerated() where c.isPunctuation && !inWord.contains(c) {
+            if c.unicodeScalars.allSatisfy({ $0.properties.generalCategory == .connectorPunctuation }) { continue }
+            if c == "." || c == ",", i > 0, i + 1 < chars.count, chars[i - 1].isNumber, chars[i + 1].isNumber { continue }
+            return true
+        }
+        return false
     }
 
     /// カタカナの字か (長音の「ー」・小さい字・半角のカタカナも。語を分ける中黒「・」は入れない)
