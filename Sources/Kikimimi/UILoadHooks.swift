@@ -27,6 +27,14 @@ enum UILoadHooks {
     static var rowsBuilt = 0
     /// 一覧が body を動かした行の数 (PlayableRow.body の回数。確認の最中だけ数える)。本当に並べた行で、手間はこちら
     static var rowBodies = 0
+    /// 一覧そのもの (TranscriptListView) の body が動いた回数 (確認の最中だけ数える)。一覧の body が再生位置・メモ・
+    /// 練習を見ていると、それが変わるたびに増える (行は作り直されないので、上の 2 つでは分からない)
+    static var listBodies = 0
+
+    /// 一覧の body が呼ぶ: 確認の最中なら listBodies を 1 つ増やす (ふだんは Bool を 1 つ見るだけ)
+    static func listBodyRan() {
+        if isActive { listBodies += 1 }
+    }
     /// マウスが一覧の行に載った・行から出た回数 (PlayableRow.onHover の回数。確認の最中だけ数える)。
     /// 行は、マウスが載ると色を変え、body がまた動く。本物のマウスが一覧の上に在ると、一覧が動くたびに増える
     static var rowHoverChanges = 0

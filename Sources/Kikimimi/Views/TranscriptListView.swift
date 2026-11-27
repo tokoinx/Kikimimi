@@ -46,6 +46,8 @@ struct TranscriptListView: View {
     @State private var follow = ListFollow()
 
     var body: some View {
+        // アプリの確認だけが使う: この body が動いた回数を数える (ふだんは Bool を 1 つ見るだけ)
+        let _ = UILoadHooks.listBodyRan()
         let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
         let canPlay = model.canPlayLines(of: job)
         let showTimestamps = model.showTimestamps
