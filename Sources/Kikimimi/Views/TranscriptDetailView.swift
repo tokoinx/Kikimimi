@@ -688,7 +688,10 @@ struct TranslateLineButton: View {
             Button {
                 model.translateLine(item.id, in: job)
             } label: {
+                // 狭い列でも、語の途中で折らない (1 行のまま、字の幅だけを取る)
                 Text(L("Translate line"))
+                    .lineLimit(1)
+                    .fixedSize()
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -727,8 +730,11 @@ struct BilingualHeader: View {
     /// 訳の列が狭いので、名前と「要確認 N」を縦に並べている
     @State private var stacked = false
 
-    /// 訳の列の幅がこれより狭い時は、縦に並べる (日本語の「日本語訳 要確認 125」が横に入る幅より少し広く取った)
-    private static let stackBelowWidth: CGFloat = 200
+    /// 訳の列の幅がこれより狭い時は、縦に並べる (日本語の「日本語訳 要確認 125」が横に入る幅より少し広く取った)。
+    /// 一覧の行も、見出しが縦に並ぶのと同じ幅で、訳の列の印とボタンを文の下に並べる (BilingualRow.isCompactTranslation)
+    static let stackBelowWidth: CGFloat = 200
+    /// 見出しの左右の余白
+    static let horizontalPadding: CGFloat = 28
 
     var body: some View {
         HStack(spacing: 12) {
@@ -766,7 +772,7 @@ struct BilingualHeader: View {
         }
         .font(.callout.weight(.semibold))
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 28)
+        .padding(.horizontal, BilingualHeader.horizontalPadding)
         .padding(.vertical, 6)
     }
 
@@ -820,6 +826,21 @@ struct BilingualRow: View {
     let job: Job
     /// 訳す先の言語の名前 (行の「訳」の説明の文)
     let targetName: String
+    /// 訳の列が狭い: 訳の文を列の幅いっぱいに出し、印とボタンをその下に並べる。
+    /// 一覧が、外から与えられた幅で 1 度だけ決めて渡す (行は自分を測らない。ViewThatFits などで測ると、
+    /// 再生位置の刻みのたびに測り直して重くなる)
+    var compactTranslation = false
+
+    /// 訳の列を狭い並べ方にするか。対訳の見出しが「訳」の名前と「要確認 N」を縦に並べるのと同じ一覧の幅で切り替える。
+    /// 見出しと行は、同じ幅の中で、同じ物 (再生の印 16 と間 12・時刻 52 と間 12・2 つの列の間 12) を並べ、残りを
+    /// 2 つの列で分ける。違うのは左右の余白だけ (見出し 28、行 10) なので、見出しの訳の列の幅を一覧の幅から計算し、
+    /// 見出しと同じ 200 pt と比べる (行の訳の列は、そのとき 218 pt。再生の印と時刻を出していれば、一覧の幅 560 pt)
+    static func isCompactTranslation(listWidth: CGFloat, canPlay: Bool, showTimestamp: Bool) -> Bool {
+        var fixed = BilingualHeader.horizontalPadding * 2 + 12
+        if canPlay { fixed += 16 + 12 }
+        if showTimestamp { fixed += 52 + 12 }
+        return (listWidth - fixed) / 2 < BilingualHeader.stackBelowWidth
+    }
 
     var body: some View {
         // 練習で隠すか (隠し方と、隠す行ならその行の「見せた」だけを見る)
@@ -845,44 +866,68 @@ struct BilingualRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            // 訳の列。まだ訳がない行は、訳が入る所に「訳」を出す
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Group {
-                    if let japanese = item.translation {
-                        Text(highlighted(japanese, highlight))
-                            .foregroundStyle(item.isOriginalInTarget ? Color.secondary : Color.primary)
-                            .redacted(reason: conceal.hidesTranslation ? .placeholder : [])
-                    } else if !isTranslating, !job.lineQueue.contains(item.id), item.hasUntranslatedReason {
-                        // 訳せなかった理由の覚えが在る行: 理由を、マウスを載せると出る文で添える (行の値を出すだけ)
-                        Text(L("Not translated"))
-                            .foregroundStyle(.tertiary)
-                            .italic()
-                            .help(item.review?.reasonTexts.joined(separator: "\n") ?? "")
-                    } else {
-                        Text(isTranslating || job.lineQueue.contains(item.id) ? L("Translating…") : L("Not translated"))
-                            .foregroundStyle(.tertiary)
-                            .italic()
+            // 訳の列。まだ訳がない行は、訳が入る所に「訳」を出す。
+            // 狭い時は、訳の文を列の幅いっぱいに出し、印とボタンをその下に並べる (横に並べたままだと、文が 1 行に
+            // 3〜4 字ずつ折れ、「訳されていない」なども語の途中で折れた。2026-11-27 に、横 880 でメモの欄を開いた絵で見た)
+            Group {
+                if compactTranslation {
+                    VStack(alignment: .leading, spacing: 2) {
+                        translationText(conceal)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            translationMarks
+                        }
+                    }
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        translationText(conceal)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        translationMarks
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // 利用者が直した訳の印 (行の値を出すだけ。押すと、訳を直す画面を開く)
-                if item.isEditedTranslation {
-                    EditedTranslationBadge(id: item.id, job: job)
-                } else if item.needsTranslationReview {
-                    // 訳の関門の印が付いた機械の訳 (同じ部品。橙色。押すと、理由を見て直す・「この訳でよい」を選べる)
-                    EditedTranslationBadge(id: item.id, job: job, title: L("Needs review"),
-                                           help: L("This translation may have a problem. Click to see why and check it."),
-                                           tint: .orange)
-                } else if item.isRememberedTranslation {
-                    // 訳の記憶から置いた訳の印 (同じ部品。文と説明だけ違う)
-                    EditedTranslationBadge(id: item.id, job: job, title: L("Remembered"),
-                                           help: L("This is your earlier translation of the same sentence. Click to change it."))
-                }
-                TranslateLineButton(item: item, job: job, targetName: targetName)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 3)
+    }
+
+    /// 訳の文 (まだ訳が無い行は「訳されていない」「訳しています…」)
+    @ViewBuilder
+    private func translationText(_ conceal: PracticeController.RowConcealment) -> some View {
+        if let japanese = item.translation {
+            Text(highlighted(japanese, highlight))
+                .foregroundStyle(item.isOriginalInTarget ? Color.secondary : Color.primary)
+                .redacted(reason: conceal.hidesTranslation ? .placeholder : [])
+        } else if !isTranslating, !job.lineQueue.contains(item.id), item.hasUntranslatedReason {
+            // 訳せなかった理由の覚えが在る行: 理由を、マウスを載せると出る文で添える (行の値を出すだけ)
+            Text(L("Not translated"))
+                .foregroundStyle(.tertiary)
+                .italic()
+                .help(item.review?.reasonTexts.joined(separator: "\n") ?? "")
+        } else {
+            Text(isTranslating || job.lineQueue.contains(item.id) ? L("Translating…") : L("Not translated"))
+                .foregroundStyle(.tertiary)
+                .italic()
+        }
+    }
+
+    /// 訳の列の印とボタン (直した・要確認・覚えた訳、と「訳」)
+    @ViewBuilder
+    private var translationMarks: some View {
+        // 利用者が直した訳の印 (行の値を出すだけ。押すと、訳を直す画面を開く)
+        if item.isEditedTranslation {
+            EditedTranslationBadge(id: item.id, job: job)
+        } else if item.needsTranslationReview {
+            // 訳の関門の印が付いた機械の訳 (同じ部品。橙色。押すと、理由を見て直す・「この訳でよい」を選べる)
+            EditedTranslationBadge(id: item.id, job: job, title: L("Needs review"),
+                                   help: L("This translation may have a problem. Click to see why and check it."),
+                                   tint: .orange)
+        } else if item.isRememberedTranslation {
+            // 訳の記憶から置いた訳の印 (同じ部品。文と説明だけ違う)
+            EditedTranslationBadge(id: item.id, job: job, title: L("Remembered"),
+                                   help: L("This is your earlier translation of the same sentence. Click to change it."))
+        }
+        TranslateLineButton(item: item, job: job, targetName: targetName)
     }
 }
 
@@ -902,7 +947,10 @@ struct EditedTranslationBadge: View {
         Button {
             model.requestTranslationEdit(id, in: job)
         } label: {
+            // 狭い列でも、語の途中で折らない (1 行のまま、字の幅だけを取る)
             Text(title ?? L("Edited"))
+                .lineLimit(1)
+                .fixedSize()
                 .font(.caption2.weight(.semibold))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)

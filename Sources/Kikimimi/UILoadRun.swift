@@ -63,10 +63,14 @@ final class LoadRun {
     /// (同じ行を 2 回数えないため。合計から名前の付いた分を引いた残りが、操作の外)
     var rowInitsByAction: [String: Int] = [:]
     var rowBodiesByAction: [String: Int] = [:]
+    /// 操作ごとの、一覧そのもの (TranscriptListView) の body が動いた回数の合計 (分け方は行の数と同じ)
+    var listBodiesByAction: [String: Int] = [:]
+    /// 測る部分のすべてで、一覧の body が動いた回数
+    var listBodiesTotal: Int?
     /// いま開いている操作の名前 (始めた順)。数を分けるのに使う
     var openActions: [String] = []
-    /// 操作ごとに数を分けた、前の時点の数 (init と body)。nil なら分けていない (測る部分の外)
-    var rowCountMark: (inits: Int, bodies: Int)?
+    /// 操作ごとに数を分けた、前の時点の数 (行の init と body、一覧の body)。nil なら分けていない (測る部分の外)
+    var rowCountMark: (inits: Int, bodies: Int, lists: Int)?
     /// 測る段階のすべて (drive) で、マウスが行に載った・行から出た回数
     var rowHoverChangesTotal: Int?
     /// 測る部分の始め・各段階の始めと終わりで、マウスの位置がメインのウインドウの枠の中に在ったか (見た順)

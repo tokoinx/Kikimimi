@@ -13,8 +13,9 @@ extension LoadRun {
         let rowsAtStart = UILoadHooks.rowsBuilt
         let bodiesAtStart = UILoadHooks.rowBodies
         let hoverAtStart = UILoadHooks.rowHoverChanges
+        let listsAtStart = UILoadHooks.listBodies
         // ここから、行の数を操作ごとに分け始める
-        rowCountMark = (rowsAtStart, bodiesAtStart)
+        rowCountMark = (rowsAtStart, bodiesAtStart, listsAtStart)
         checkMouse()
         // 1. 終わったジョブ (対訳)
         await measure(Action.selectBilingual) { model.select(doneBilingual) }
@@ -25,6 +26,8 @@ extension LoadRun {
         }
         // 同じジョブの中で、再生位置を遠くへ動かす (段階の外。2 回ずつ)
         await jumpRound()
+        // 同じジョブを出したまま、メモと練習の書き取りの欄を書き換える (段階の外。一覧の行が作り直されないかを数える)
+        await typingRound()
         // 2. 終わったジョブ (ふつう)
         await measure(Action.selectPlain) { model.select(donePlain) }
         await UILoadSelfTest.sleep(0.5)
@@ -72,6 +75,7 @@ extension LoadRun {
         rowCountMark = nil
         rowsBuiltTotal = UILoadHooks.rowsBuilt - rowsAtStart
         rowBodiesTotal = UILoadHooks.rowBodies - bodiesAtStart
+        listBodiesTotal = UILoadHooks.listBodies - listsAtStart
         rowHoverChangesTotal = UILoadHooks.rowHoverChanges - hoverAtStart
         log.summaryLine = String(format: "driven for %.1f s: %d ticks (%d of them moved the current row), %d one-line starts,"
                                  + " %d segments delivered to the running job (it now has %d rows; batches are applied every"
@@ -113,6 +117,33 @@ extension LoadRun {
         await settle()
     }
 
+    /// 終わったジョブ (対訳) を出したまま、メモを 20 回、練習の書き取りの欄の文を 20 回、1 文字ずつ書き足す
+    /// (欄で打つのと同じく、job.notes と practice.dictation.typed を変える)。一覧の決まり 4 (一覧の body と行は
+    /// メモ・練習を見ない) を、作り直した行の数で確かめるため。段階 1 のあと (jumpRound のあと) に呼ぶ。
+    /// メモは確認用の一時フォルダにだけ保存される。終わりに、メモと書き取りの欄を元に戻し、再生していたかも戻す
+    private func typingRound() async {
+        let time = player.currentTime
+        let wasPlaying = player.isPlaying
+        // 再生位置が動くと、いまの行が変わって行が描き直されることがあるので、止めておく
+        player.selfTestSetTime(time, playing: false)
+        await settle()
+        let notesBefore = doneBilingual.notes
+        for i in 0..<20 {
+            await measure(Action.notesEdit) { doneBilingual.notes = notesBefore + String(repeating: "a", count: i + 1) }
+            await UILoadSelfTest.sleep(0.05)
+        }
+        let dictation = model.practice.dictation
+        let typedBefore = dictation.typed
+        for i in 0..<20 {
+            await measure(Action.dictationEdit) { dictation.typed = typedBefore + String(repeating: "a", count: i + 1) }
+            await UILoadSelfTest.sleep(0.05)
+        }
+        doneBilingual.notes = notesBefore
+        dictation.typed = typedBefore
+        player.selfTestSetTime(time, playing: wasPlaying)
+        await settle()
+    }
+
     /// 段階を 1 つ行う (見張りの値を、この段階の名前で分ける)。終わりに、まとめて足すのが済むまで待つ
     private func phase(_ name: String, _ body: () async -> Void) async {
         probe.setPhase(name)
@@ -145,11 +176,13 @@ extension LoadRun {
         guard let mark = rowCountMark else { return }
         let inits = UILoadHooks.rowsBuilt
         let bodies = UILoadHooks.rowBodies
+        let lists = UILoadHooks.listBodies
         if let current = openActions.last {
             rowInitsByAction[current, default: 0] += inits - mark.inits
             rowBodiesByAction[current, default: 0] += bodies - mark.bodies
+            listBodiesByAction[current, default: 0] += lists - mark.lists
         }
-        rowCountMark = (inits, bodies)
+        rowCountMark = (inits, bodies, lists)
     }
 
     /// 操作を始める (ここからの行の数を、この操作に入れる)
@@ -158,6 +191,7 @@ extension LoadRun {
         if rowCountMark != nil {
             rowInitsByAction[action, default: 0] += 0
             rowBodiesByAction[action, default: 0] += 0
+            listBodiesByAction[action, default: 0] += 0
         }
         openActions.append(action)
     }
@@ -493,6 +527,11 @@ extension LoadRun {
                                outside: "outside the measured actions"))
             lines.append(split("row inits by action", rowInitsByAction, Action.all, total: rowsBuiltTotal,
                                outside: "outside the measured actions"))
+            // 一覧そのもの (TranscriptListView) の body が動いた回数の内わけ
+            if let listBodiesTotal {
+                lines.append(split("list bodies by action", listBodiesByAction, Action.all, total: listBodiesTotal,
+                                   outside: "outside the measured actions"))
+            }
         }
         if let rowHoverChangesTotal {
             let inside = mouseInsideChecks.filter { $0 }.count
@@ -572,6 +611,31 @@ extension LoadRun {
             if let worst = rowBodiesBySelect[action]?.max(), worst > Limits.selectRowsBuiltMax {
                 failures.append("\"\(action)\" ran the body of \(worst) rows in one action > \(Limits.selectRowsBuiltMax)"
                                 + " (the list laid out far more rows than it shows)")
+            }
+        }
+        // 一覧の決まり 4 (CLAUDE.md「結果の一覧」): 一覧の body と行は、再生位置・メモ・練習を見ない。
+        // 一覧の body が見ていれば、これらの操作のたびに一覧の body が動く (行は作り直されないので、一覧の body の回数で見る)。
+        // 行が見ていれば、行が作り直される (init) か、行の body が動く。時間でなく数なので、実行機の重さに左右されない。
+        // いまの行が変わるときは、前といまの行が描き直されてよいので、行は init だけを見る (一覧の body は 0 のまま)。
+        // 文字起こし中に測った分 (while rows are added) は、行が足されているので見ない。測っていない操作 (n が 0) も見ない
+        let unchangedRows: [(action: String, bodies: Bool, reads: String)] = [
+            (Action.tick, true, "the playback position"),
+            (Action.rowChange, false, "the playback position"),
+            (Action.notesEdit, true, "the notes (job.notes)"),
+            (Action.dictationEdit, true, "the practice state (practice.dictation)")
+        ]
+        for rule in unchangedRows where !(measured[rule.action] ?? []).isEmpty {
+            let lists = listBodiesByAction[rule.action] ?? 0
+            let inits = rowInitsByAction[rule.action] ?? 0
+            let bodies = rowBodiesByAction[rule.action] ?? 0
+            let counts = "list bodies \(lists), row inits \(inits), row bodies \(bodies)"
+            if lists > 0 {
+                failures.append("\"\(rule.action)\" re-ran the list (\(counts); list bodies must be 0): the list body reads"
+                                + " \(rule.reads) (CLAUDE.md, results list rule 4)")
+            } else if inits > 0 || (rule.bodies && bodies > 0) {
+                let must = rule.bodies ? "row inits and row bodies must be 0" : "row inits must be 0"
+                failures.append("\"\(rule.action)\" rebuilt rows (\(counts); \(must)): a row reads \(rule.reads)"
+                                + " (CLAUDE.md, results list rule 4)")
             }
         }
         // 一覧が行を並べたのに数えていなければ、上の確かめは役に立たない

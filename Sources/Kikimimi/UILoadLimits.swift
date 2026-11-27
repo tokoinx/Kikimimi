@@ -84,9 +84,14 @@ extension UILoadSelfTest {
             lineStop: lineStopWhileAdded
         ]
 
+        /// 出している結果 (対訳) のメモを 1 回書き換える (メモの欄で 1 文字打ったときと同じく、job.notes を変える)
+        static let notesEdit = "notes edit"
+        /// 練習の書き取りの欄の文を 1 回書き換える (欄で 1 文字打ったときと同じく、practice.dictation.typed を変える)
+        static let dictationEdit = "practice dictation typing"
+
         static let all = [selectBilingual, selectPlain, selectRunning, jumpFar, jumpBack, tick, rowChange, lineStart, lineStop,
                           tickWhileAdded, rowChangeWhileAdded, lineStartWhileAdded, lineStopWhileAdded,
-                          appendSelected, appendOther, burst, progress, steadyBatch]
+                          appendSelected, appendOther, burst, progress, steadyBatch, notesEdit, dictationEdit]
     }
 
     /// 段階の名前 (見張りの出力)

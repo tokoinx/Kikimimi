@@ -46,6 +46,8 @@ struct TranscriptListView: View {
     @State private var follow = ListFollow()
 
     var body: some View {
+        // アプリの確認だけが使う: この body が動いた回数を数える (ふだんは Bool を 1 つ見るだけ)
+        let _ = UILoadHooks.listBodyRan()
         let translating = job.postState.task == .translate || job.postQueue.contains(.translate)
         let canPlay = model.canPlayLines(of: job)
         let showTimestamps = model.showTimestamps
@@ -63,11 +65,18 @@ struct TranscriptListView: View {
         // 大きさが変わると (ウインドウやメモの欄の幅を変えると) この中が動くが、行の中身は TranscriptRows に分けてあり、
         // 渡すものが変わらないので、行を作り直さない
         GeometryReader { geometry in
+            // 対訳の訳の列が狭いか (狭いと、行の訳の列で、印とボタンを文の下に並べる)。外から与えられた一覧の幅から、
+            // ここで 1 度だけ決め、ふつうの値として行へ渡す (行は自分の幅を測らない)。値が変わるのは、狭い・広いが
+            // 入れ替わった時だけなので、幅を少し変えても TranscriptRows は動かない
+            let compactTranslation = bilingual
+                && BilingualRow.isCompactTranslation(listWidth: geometry.size.width, canPlay: canPlay,
+                                                     showTimestamp: showTimestamps)
             ScrollViewReader { proxy in
                 ScrollView {
                     TranscriptRows(job: job, items: items, bilingual: bilingual,
                                    targetName: TranslationTarget.displayName(for: target), emptyMessage: emptyMessage,
                                    canPlay: canPlay, translating: translating, showTimestamps: showTimestamps,
+                                   compactTranslation: compactTranslation,
                                    highlightText: highlightText, running: running, highlight: highlight, follow: follow)
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
@@ -112,6 +121,8 @@ private struct TranscriptRows: View {
     let canPlay: Bool
     let translating: Bool
     let showTimestamps: Bool
+    /// 対訳の訳の列が狭い (行の訳の列で、印とボタンを文の下に並べる)
+    let compactTranslation: Bool
     let highlightText: String
     let running: Bool
     let highlight: RowHighlight
@@ -134,7 +145,8 @@ private struct TranscriptRows: View {
                             bilingual: bilingual) {
                     if bilingual {
                         BilingualRow(item: item, isTranslating: translating, showTimestamp: showTimestamps,
-                                     highlight: highlightText, job: job, targetName: targetName)
+                                     highlight: highlightText, job: job, targetName: targetName,
+                                     compactTranslation: compactTranslation)
                     } else {
                         SegmentRow(item: item, showTimestamp: showTimestamps,
                                    highlight: highlightText, job: job, targetName: targetName)

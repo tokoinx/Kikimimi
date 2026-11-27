@@ -87,7 +87,9 @@ enum UILoadSelfTest {
         // 訳し直しの確認 (RETRANSLATE CHECK。翻訳を 1 回、LLM の代わりで) のぶんも足す。
         // 絵のときは、狭いウインドウの絵 (21・22) のぶんも足す
         // 終わりの参考の段 (UILoadAppendDetail.swift。追いかけたまま・追いかけずに、300 行を 3 回ずつ足す) のぶんも足す
-        let hangLimit = (screenshots == nil ? 200.0 : 310.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0 + 15.0 + 45.0
+        // メモと書き取りの欄を 20 回ずつ書き換える段 (typingRound。数秒) のぶんも足す (typing。式が長いと型を決められないので分ける)
+        let typing = 10.0
+        let hangLimit = (screenshots == nil ? 200.0 : 310.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0 + 15.0 + 45.0 + typing
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
             finish(header + ["UI LOAD FAILED: the self-test did not finish in \(Int(hangLimit)) s"
                              + " (the main thread may be stuck)"], code: .hang, reportPath: reportPath)
