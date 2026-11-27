@@ -33,7 +33,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - 出力は長いので、終わりの 2 行だけを抜き出すとよい: `swift test 2>&1 | rg -A 1 "Test Suite 'All tests' (passed|failed)"`。終わりの `Test Suite 'All tests' passed at …` (失敗があれば `failed at`) と、その次の `Executed N tests, with M failures (0 unexpected) in …` を見る。件数 N と失敗 M をここから写す。
 - そのさらに後に出る `✔ Test run with 0 tests passed …` は Swift Testing の分で、ここの試験は XCTest なので 0 件と出る。件数として写さない。
 
-アプリの確認: `LIBRARY CHECK OK` (保存)・`PRACTICE CHECK OK` (練習。`--audio` の時だけ)・`CHAT CHECK OK` (チャットの窓。LLM もネットワークも使わない)・`UI LOAD OK` (終了コード 0 の時だけ、最後の行) の 4 つが出て、終了コードが 0 である事を見る。`ADAPTER MESSAGE CHECK OK` (設定の「追加学習」の、GGUF でない差分のお知らせ) と、`AUDIT FLOW CHECK OK` (監査の流れ。LLM の代わりを入れて、アプリの監査を、行を直して覚える → 提案 → 反映 → 自動の直し → LLM の段の後も直ったまま、まで通す。2026-11-26 に足した) も出る。
+アプリの確認: `LIBRARY CHECK OK` (保存)・`PRACTICE CHECK OK` (練習。`--audio` の時だけ)・`CHAT CHECK OK` (チャットの窓。LLM もネットワークも使わない)・`UI LOAD OK` (終了コード 0 の時だけ、最後の行) の 4 つが出て、終了コードが 0 である事を見る。`ADAPTER MESSAGE CHECK OK` (設定の「追加学習」の、GGUF でない差分のお知らせ) と、`AUDIT FLOW CHECK OK` (監査の流れ。LLM の代わりを入れて、アプリの監査を、行を直して覚える → 提案 → 反映 → 自動の直し → LLM の段の後も直ったまま、まで通す。2026-11-26 に足した) も出る。`RETRANSLATE CHECK OK` (「〇〇で訳し直す」の道。LLM の代わりを入れて、訳の付いた確認用の結果を別の言語へ訳し直し、LLM が無い時は何も変わらない事・訳し直す前の版 (自動) が 1 つだけ残る事・訳が新しい言語になる事・「いちばん新しい版に上書き」の相手が自分で残した版のままである事を見る。段ごとに `RETRANSLATE: <段の名前>: ok (…)` か `FAILED (…)` の行が出る。2026-11-27 に足した) も出る。
 
 | 終了コード | 意味 | 出力に出る文 |
 |---|---|---|
@@ -68,9 +68,10 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
     - `remember an edited pair in the learned corrections` → `saving the same pair again does not count it twice` → `restoring the heard text takes the pair back`: 1 語を「Kikimimi」に直して覚えさせると、台帳に 1 件・反映 1 回 (一時のファイルにも)。同じ組で保存し直しても 1 回のまま。戻すと 0 回。
     - `the job and the ledger are the same as before the learning steps`: 結果と台帳が、始める前と同じ。
   - `the self-test does not use the real learned corrections` (保存の確認の最後): 台帳の保存先が無く、本物の `learned-corrections.json` の有無・大きさ・更新の時刻が、保存の確認の前後で同じ。
-- 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 > 9 の順。`ADAPTER MESSAGE CHECK FAILED` と `AUDIT FLOW CHECK FAILED` は 7 に入る)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
+- 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 > 9 の順。`ADAPTER MESSAGE CHECK FAILED`・`AUDIT FLOW CHECK FAILED`・`RETRANSLATE CHECK FAILED` は 7 に入る)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
+- 狭い窓の絵 (21・22) を撮る時は、`UI LOAD: narrow window: asked 880, got <実際の横幅> (<絵の名前>)` の行が出る。実際の横幅が 880 より 1 pt を超えて広い時 (中身が窓を押し広げた時) は、`screenshot failed` の行も出る。この時も終了コードは変わらないので、行を見て報告する。
 - `REAL SETTINGS:` の行 (`UI LOAD OK`・`LAUNCH SELFTEST OK` の直前): 確認の始めに取った本物の設定の写しと比べ、macOS が確認のあいだに書いた鍵 (ウインドウの位置・大きさ、左の一覧の幅など) を元に戻した結果。`unchanged` は戻す物が無かった事、`put back N keys the system wrote …: <鍵>` は戻した鍵 (どちらも、ふつうの事)。
 - `REAL SETTINGS: APP SETTINGS CHANGED DURING THE SELF-TEST (put back): <鍵>` は、アプリの設定 (`SettingKey`) が確認のあいだに書かれた印 (確認用の起動はアプリの設定を書かない決まりが破れている)。元には戻してあり、終了コードは変わらないが、必ず報告し、書いた所を探す。
 
@@ -88,7 +89,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 
 ## 5. 絵の見方 (`build/ui-shots`)
 
-各絵は 1200 x 800 pt のウインドウ (タイトルバーつき。Retina の Mac では 2400x1600 画素)。08・11・12・13・19・20 はシートそのものを撮るので小さく、ウインドウは写らない。出力の `UI LOAD: screenshot <名前>.png <幅>x<高さ> (…)` の行で、できたかが分かる。
+各絵は 1200 x 800 pt のウインドウ (タイトルバーつき。Retina の Mac では 2400x1600 画素)。08・11・12・13・19・20 はシートそのものを撮るので小さく、ウインドウは写らない。21・22 は、窓の横幅をいちばん狭い 880 pt にして撮る (880 x 800 pt。撮った後、窓は元の大きさに戻る)。出力の `UI LOAD: screenshot <名前>.png <幅>x<高さ> (…)` の行で、できたかが分かる。
 
 | 絵 | 写っているべき物 |
 |---|---|
@@ -107,6 +108,8 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 | `13-translation-check.png` | 要確認の行を開いた、訳を直す画面。上に理由の行と「この訳でよい」 |
 | `19-line-edit.png` | 行を直す画面 (13 の後、11 の前に撮る。直した後に訳し直した形の行を開いたところ)。題「この行を直す」、「聞き取った文」の下に元の文、入力の欄に、初めの 5 字以上の語を「Kikimimi」に置き換えた文、その下に「この直しを覚える」(入) と 2 つの欄 (聞き間違えた語 → Kikimimi)、説明の 1 行、訳が消える注意の 1 行、「聞き取った文に戻す」「キャンセル」「保存」 (保存は押せない形) |
 | `20-line-edit-two-segments.png` | 2 つの区間から成る対訳の行の、行を直す画面 (19 の後に撮る。2 つ目の区間を直して訳し直した形)。区間ごとに青い時刻と入力欄、2 つ目の区間だけに「聞き取った文」と元の文、入力欄の末尾が「（確認用に直した）」。訳が消える注意の 1 行と「聞き取った文に戻す」 |
+| `21-narrow-bilingual.png` | 横 880 pt の窓 (06 の後に撮る)。終わった対訳のジョブ。2 段目のボタン (やり直す・履歴・監査・残りを翻訳・コピー・書き出す) とチェック (時刻・対訳・メモ) が全部見え、窓の外へ出た物・重なった物が無い。ツールバーの右端は `>>` (入りきらない項目のメニュー) でよい |
+| `22-narrow-notes.png` | 横 880 pt の窓で、メモの欄を開いたところ。一覧は 360 pt ほどで、行は縦に長い。訳の列の見出しは、名前 (「日本語訳」) と「要確認 N」が縦に 2 段で、名前が 1 字ずつ折れていない |
 
 | `14-chat-empty.png` | チャットの窓 (480 x 640 pt)。上に灰色の「リサーチ … 切」の帯と「入れる…」、空の案内と例のボタン 3 つ、下に入力の欄と小さな 1 行 |
 | `15-chat-research-confirm.png` | リサーチの確認のシート (シートそのもの)。題「自己責任で、リサーチを入れますか？」、Prompt Injection の説明、「キャンセル」(既定) と「自己責任で入れる」 |
