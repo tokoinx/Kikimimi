@@ -57,8 +57,8 @@ extension LoadRun {
                 await UILoadSelfTest.sleep(batchInterval + 0.4)
             }
             feedAction = nil
-            for _ in 0..<3 {
-                await burst(300)
+            for index in 1...3 {
+                await burst(300, index: index, of: 3)
                 await UILoadSelfTest.sleep(1.0)
             }
         }
@@ -270,10 +270,22 @@ extension LoadRun {
 
     /// 300 の区間をいっぺんに届け、まとめて足し始めてから、すべてが文字起こしに入り、メインスレッドが空くまでを測る。
     /// 届けてから足し始めるまで (まとめる間を待つだけで、メインスレッドは空いている) は、別に記録する
-    private func burst(_ count: Int) async {
-        let target = (running.transcript?.segments.count ?? 0) + count
-        let started = UILoadSelfTest.now()
+    private func burst(_ count: Int, index: Int, of total: Int) async {
         beginRowCount(Action.burst)
+        let timed = await timedBurst(count, detail: "burst", index: index, of: total)
+        burstWaits.append(timed.wait)
+        endRowCount(Action.burst)
+        measured[Action.burst, default: []].append(timed.seconds)
+    }
+
+    /// burst の中身: 届けて、まとめて足し始めるのを待ち、メインスレッドが空くまでを測る。内わけの行も appendDetails に足す。
+    /// 返すのは、足し始めてから空くまでの秒 (seconds) と、届けてから足し始めるまでの秒 (wait)。
+    /// 追いかけていない時の参考の段 (UILoadAppendDetail.swift) も使う (そちらは measured に入れない)
+    func timedBurst(_ count: Int, detail name: String, index: Int, of total: Int) async -> (seconds: Double, wait: Double) {
+        let before = running.transcript?.segments.count ?? 0
+        let target = before + count
+        let mark = detailMark()
+        let started = UILoadSelfTest.now()
         awaitingBurst = true
         burstApplied = nil
         deliver(count)
@@ -283,10 +295,9 @@ extension LoadRun {
         }
         awaitingBurst = false
         let applied = burstApplied ?? started
-        burstWaits.append(UILoadSelfTest.seconds(from: started, to: applied))
-        let seconds = await UILoadSelfTest.untilIdle(since: applied)
-        endRowCount(Action.burst)
-        measured[Action.burst, default: []].append(seconds)
+        let idle = await UILoadSelfTest.untilIdleDetail(since: applied)
+        appendDetails.append(detailLine(name, index: index, of: total, rowsBefore: before, since: mark, idle: idle))
+        return (idle.seconds, UILoadSelfTest.seconds(from: started, to: applied))
     }
 
     /// 入れ物が、まとめた区間を足した (AppModel.liveFeed から)。足し始めてから、メインスレッドが空くまでを測る
@@ -297,10 +308,22 @@ extension LoadRun {
         // 1 つずつの区間のはずが、まとめて足された (届けるのが遅れた) ものは、1 つの区間の操作に入れない
         if action != Action.steadyBatch, count != 1 { return }
         beginRowCount(action)
+        // 選んでいる文字起こし中のジョブに 1 行足した操作は、内わけの行も出す (足すのは済んでいるので、足した時間は最後の 1 回)
+        let detailed = action == Action.appendSelected
+        let mark = detailed ? detailMark(applyDone: true) : nil
         Task { @MainActor in
-            let seconds = await UILoadSelfTest.untilIdle(since: started)
+            guard let mark else {
+                let seconds = await UILoadSelfTest.untilIdle(since: started)
+                self.endRowCount(action)
+                self.measured[action, default: []].append(seconds)
+                return
+            }
+            let idle = await UILoadSelfTest.untilIdleDetail(since: started)
             self.endRowCount(action)
-            self.measured[action, default: []].append(seconds)
+            self.measured[action, default: []].append(idle.seconds)
+            self.singleAppendDetails += 1
+            self.appendDetails.append(self.detailLine("append 1 segment", index: self.singleAppendDetails, of: 6,
+                                                      rowsBefore: mark.rows - count, since: mark, idle: idle))
         }
     }
 
@@ -501,6 +524,11 @@ extension LoadRun {
             lines.append("burst: the action is timed from the start of applying the batch; before that the segments waited"
                          + " in the buffer for the batching interval (main thread free): median \(f(UILoadSelfTest.percentile(waits, 0.5))) ms,"
                          + " max \(f(waits[waits.count - 1])) ms")
+        }
+        // 段階 4 の、足す操作 1 回ごとの内わけ (目安とは比べない)
+        if !appendDetails.isEmpty {
+            lines.append(Self.appendDetailLegend)
+            lines += appendDetails
         }
         // いちばん長い待ち 5 つ (4 つの段階の中。ジョブを選ぶ待ちは、上の select の行に出ている)
         let longest = samples.filter { Phase.all.contains($0.phase) }.sorted { $0.wait > $1.wait }.prefix(5)

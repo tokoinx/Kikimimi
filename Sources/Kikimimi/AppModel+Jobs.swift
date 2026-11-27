@@ -381,9 +381,13 @@ extension AppModel {
     }
 
     static func applyLive(_ batch: LiveSegmentBuffer.Batch?, to job: Job) {
-        guard let batch, job.status == .running, var transcript = job.transcript else { return }
+        guard let batch, job.status == .running else { return }
+        // 確認の最中だけ、足して書き戻すまでの時間を測る (ふだんの起動では時刻を取らない)
+        let started = UILoadHooks.timingStart()
+        guard var transcript = job.transcript else { return }
         batch.apply(to: &transcript.segments)
         job.transcript = transcript
+        UILoadHooks.applyEnded(started)
     }
 
     /// 中止・失敗したジョブの途中結果にも、完了時と同じ繰り返しの後始末をかける (画面に残り、コピーもできるため)。

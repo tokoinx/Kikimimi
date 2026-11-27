@@ -75,6 +75,10 @@ final class LoadRun {
     /// 前面でない間に、行を描き直す回数が変わるかを見るための値
     var appActiveChecks: [Bool] = []
     var windowKeyChecks: [Bool] = []
+    /// 段階 4 の、足す操作 1 回ごとの内わけの行 (UILoadAppendDetail.swift。目安とは比べない)
+    var appendDetails: [String] = []
+    /// 内わけの行に付けた、1 行足す操作の番号
+    var singleAppendDetails = 0
 
     init(model: AppModel, rows: Int, url: URL) {
         self.model = model

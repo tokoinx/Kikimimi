@@ -287,7 +287,10 @@ struct CurrentLineTracker: View {
                 let id = last.id
                 Task { @MainActor in
                     guard follow.isOn, !player.isPlaying else { return }
+                    // 確認の最中だけ、呼び出しが戻るまでの時間を測る (ふだんの起動では時刻を取らない)
+                    let started = UILoadHooks.timingStart()
                     proxy.scrollTo(id, anchor: .bottom)
+                    UILoadHooks.scrollToEnded(started)
                 }
             }
     }

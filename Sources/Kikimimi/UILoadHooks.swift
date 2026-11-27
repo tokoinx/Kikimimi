@@ -30,6 +30,16 @@ enum UILoadHooks {
     /// マウスが一覧の行に載った・行から出た回数 (PlayableRow.onHover の回数。確認の最中だけ数える)。
     /// 行は、マウスが載ると色を変え、body がまた動く。本物のマウスが一覧の上に在ると、一覧が動くたびに増える
     static var rowHoverChanges = 0
+    /// CurrentLineTracker が、行が増えた時に一覧の終わりへ動かした (proxy.scrollTo) 回数と、呼び出しが戻るまでの
+    /// 時間の合計・いちばん長い 1 回 (uptime のナノ秒。確認の最中だけ数える)
+    static var scrollToCalls = 0
+    static var scrollToNanos: UInt64 = 0
+    static var scrollToLongestNanos: UInt64 = 0
+    /// AppModel.applyLive (まとめた区間を足して job.transcript に書き戻す) の回数と、時間の合計・最後の 1 回
+    /// (uptime のナノ秒。確認の最中だけ数える)
+    static var applyCalls = 0
+    static var applyNanos: UInt64 = 0
+    static var lastApplyNanos: UInt64 = 0
     /// いまの口を入れた一覧 (その一覧の ListFollow)
     private static var owner: ObjectIdentifier?
 
@@ -42,6 +52,29 @@ enum UILoadHooks {
         self.scrollList = scrollList
         self.setFollowing = setFollowing
         self.isFollowing = isFollowing
+    }
+
+    /// 測る口の始め: 確認の最中なら、いまの時刻 (uptime のナノ秒)。ふだんの起動では 0 (時刻を取らない)
+    static func timingStart() -> UInt64 {
+        isActive ? DispatchTime.now().uptimeNanoseconds : 0
+    }
+
+    /// CurrentLineTracker の scrollTo が戻った。started は timingStart() の値 (0 なら何もしない)
+    static func scrollToEnded(_ started: UInt64) {
+        guard started > 0 else { return }
+        let took = DispatchTime.now().uptimeNanoseconds &- started
+        scrollToCalls += 1
+        scrollToNanos &+= took
+        scrollToLongestNanos = max(scrollToLongestNanos, took)
+    }
+
+    /// AppModel.applyLive が、足して書き戻し終えた。started は timingStart() の値 (0 なら何もしない)
+    static func applyEnded(_ started: UInt64) {
+        guard started > 0 else { return }
+        let took = DispatchTime.now().uptimeNanoseconds &- started
+        applyCalls += 1
+        applyNanos &+= took
+        lastApplyNanos = took
     }
 
     /// 消えた一覧が、口を外す。ほかの一覧 (あとから現れた、新しいジョブの一覧) が入れたものは外さない
