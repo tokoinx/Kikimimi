@@ -141,7 +141,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - Xcode 16.2 と 26.3 の両方でのビルド (手元の Xcode は 1 つ)。
 - macOS 14 の実機での動作は、利用者の Mac でだけ見られる (CI にも無い)。
 
-push の後の build は、`tools/ci-watch/watch-build.sh <run の ID>` で待てる (裏で走らせる。使い方は `tools/ci-watch/README.md`)。列が「取り消し (cancelled) で、ランナーの名前が空」の時は、GitHub の Mac が付かなかっただけで、コードの失敗ではない。この道具が、その列だけを走らせ直す (3 回まで)。失敗 (failure) の列は走らせ直さないので、ログを読む。
+push の後の build は、`tools/ci-watch/watch-build.sh <run の ID>` で待てる (裏で走らせる。使い方は `tools/ci-watch/README.md`)。列が「取り消し (cancelled) で、ランナーの名前が空」の時は、GitHub の Mac が付かなかっただけで、コードの失敗ではない。この道具は、走らせ直す命令 (`gh run rerun <run の ID> --repo tokoinx/Kikimimi --failed`) を出すだけで、自分では走らせ直さない (2026-11-28 に変えた。確認の出る命令を、台本で包まないため)。出た命令を、そのまま打つ (門の確認が出る)。失敗 (failure) の列の時は、命令を出さないので、ログを読む。
 
 ## 7. 報告に入れる物
 

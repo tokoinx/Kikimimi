@@ -12,8 +12,8 @@ run の ID は、push の後に `gh run list --repo tokoinx/Kikimimi --commit <�
 
 列にランナーが付かないまま 15 分たつと、GitHub がその列を取り消し、run は failure になります。コードの失敗ではありません。
 
-- 見分け方: 列の conclusion が `cancelled`、`runner_name` が空、段が 1 つも走っていない。注記は「The job was not acquired by Runner of type hosted even after multiple attempts」。
-- 対応: 取り消された列だけを走らせ直す (`gh run rerun <run の ID> --failed`)。この道具は、それを 3 回まで自動で行います。成功した列は、走らせ直しません。
+- 見分け方: 列の conclusion が `cancelled` で、段が 1 つも走っていない (道具は、段の数で見ます)。注記は「The job was not acquired by Runner of type hosted even after multiple attempts」。
+- 対応: 取り消された列だけを走らせ直す (`gh run rerun <run の ID> --failed`)。この道具は、その命令を出すだけで、自分では走らせ直しません (2026-11-28 に変えた。前は、3 回まで自動で走らせ直していた)。走らせ直しは、この Mac の門が確認を出す命令で、台本の中からだと、確認なしで通ってしまうためです。成功した列は、走らせ直されません。
 - 起きた例: 2026-11-26 の 12:35〜15:45 (UTC) に 3 回 (main の a4df723 で 2 回、枝の 314724e で 1 回)。同じ時間帯に、始まるまで 5〜10 分待った列も在りました (ふだんは 3 秒ほど)。Xcode の版には関係なく、GitHub の障害の履歴にも知らせは在りませんでした。
 
 列が `failure` の時は、走らせ直しません。ログを読んで、原因を見ます。

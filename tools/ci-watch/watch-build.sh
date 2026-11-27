@@ -3,14 +3,18 @@
 #
 # 使い方: tools/ci-watch/watch-build.sh <run の ID> [<リポジトリ。既定は tokoinx/Kikimimi>]
 #
-# 列 (ジョブ) が「ランナーが付かないまま取り消し」になった時だけ、その列を走らせ直す (3 回まで)。
-#   - 見分け方: conclusion が cancelled で、runner_name が空 (段が 1 つも走っていない)。
+# この台本は、読むだけ (gh run watch・gh run view)。run を走らせ直す・止めるなど、GitHub の側を変える命令は、
+# 台本の中からは走らせない。この Mac の門は、台本の中の命令までは見ないので、確認の出る命令 (gh run rerun・gh api
+# など) を台本で包むと、確認なしで通ってしまう (2026-11-28 に、自動の走らせ直しと gh api を外した)。
+#
+# 列 (ジョブ) が「ランナーが付かないまま取り消し」になった時は、走らせ直す命令を出すだけにする。
+#   - 見分け方: conclusion が cancelled で、段が 1 つも走っていない。
 #     GitHub の注記は「The job was not acquired by Runner of type hosted even after multiple attempts」。
 #   - 理由: GitHub の macOS のランナーの空きが足りない時、列は 15 分待って取り消される (コードの失敗ではない)。
 #     2026-11-26 の 12:35〜15:45 (UTC) に 3 回起きた。その間、始まるまで 5〜10 分待った列も在った (ふだんは 3 秒ほど)。
-# 失敗 (failure) の列が在る時は、走らせ直さない (コードの失敗かもしれないので、ログを読む)。
+# 失敗 (failure) の列が在る時は、走らせ直しを勧めない (コードの失敗かもしれないので、ログを読む)。
 #
-# 出す物: 回ごとの列の結果と時刻、終わりの結果、試験の件数の行、アプリの確認の OK・FAILED・SLOW の行。
+# 出す物: 列の結果と時刻、終わりの結果、試験の件数の行、アプリの確認の OK・FAILED・SLOW の行。
 # gh (GitHub CLI) が要る。
 
 RUN="$1"
@@ -20,28 +24,27 @@ if [ -z "$RUN" ]; then
   exit 2
 fi
 
-for round in 1 2 3 4; do
-  gh run watch "$RUN" --repo "$REPO" --interval 30 --exit-status > /dev/null 2>&1
-  echo "watch exit $? (round $round)"
-  gh api "repos/$REPO/actions/runs/$RUN/jobs" \
-    --jq '.jobs[] | [.name, .conclusion, .runner_name, .created_at, .started_at, .completed_at] | @tsv'
-  CONCLUSION=$(gh run view "$RUN" --repo "$REPO" --json conclusion --jq .conclusion)
-  [ "$CONCLUSION" = "success" ] && break
-  FAILED=$(gh api "repos/$REPO/actions/runs/$RUN/jobs" \
-    --jq '[.jobs[] | select(.conclusion == "failure")] | length')
-  NORUNNER=$(gh api "repos/$REPO/actions/runs/$RUN/jobs" \
-    --jq '[.jobs[] | select(.conclusion == "cancelled" and (.runner_name == "" or .runner_name == null))] | length')
-  if [ "$FAILED" != "0" ] || [ "$NORUNNER" = "0" ] || [ "$round" = "4" ]; then
-    echo "not rerunning: failed jobs $FAILED, cancelled without a runner $NORUNNER, round $round"
-    break
-  fi
-  echo "rerunning the cancelled jobs (no runner was assigned)"
-  gh run rerun "$RUN" --repo "$REPO" --failed
-  sleep 30
-done
-
+gh run watch "$RUN" --repo "$REPO" --interval 30 --exit-status > /dev/null 2>&1
+echo "watch exit $?"
+gh run view "$RUN" --repo "$REPO" --json jobs \
+  --jq '.jobs[] | [.name, (.conclusion // "-"), ("steps " + ((.steps | length) | tostring)), (.startedAt // "-"), (.completedAt // "-")] | @tsv'
 gh run view "$RUN" --repo "$REPO" --json conclusion,attempt \
   --jq '"conclusion " + .conclusion + ", attempt " + (.attempt | tostring)'
+
+CONCLUSION=$(gh run view "$RUN" --repo "$REPO" --json conclusion --jq .conclusion)
+if [ "$CONCLUSION" != "success" ]; then
+  FAILED=$(gh run view "$RUN" --repo "$REPO" --json jobs \
+    --jq '[.jobs[] | select(.conclusion == "failure")] | length')
+  NORUNNER=$(gh run view "$RUN" --repo "$REPO" --json jobs \
+    --jq '[.jobs[] | select(.conclusion == "cancelled" and ((.steps | length) == 0))] | length')
+  if [ "$FAILED" = "0" ] && [ "$NORUNNER" != "0" ]; then
+    echo "cancelled without a runner: $NORUNNER job(s). This is not a code failure. To run them again (the gate asks first):"
+    echo "  gh run rerun $RUN --repo $REPO --failed"
+  else
+    echo "failed jobs $FAILED, cancelled without a runner $NORUNNER: read the log before running anything again"
+  fi
+fi
+
 # 試験の件数 (全体の行だけ。100 件より少ない組の行は出さない) と、アプリの確認の行
 gh run view "$RUN" --repo "$REPO" --log \
   | grep -a -E "Executed [0-9]{3,} tests, with|UI LOAD OK|CHECK OK|CHECK FAILED|UI LOAD: SLOW|UI LOAD FAILED|UI LOAD RETRY: the|narrow window|screenshot failed" \
