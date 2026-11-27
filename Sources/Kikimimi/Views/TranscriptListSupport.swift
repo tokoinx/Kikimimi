@@ -286,6 +286,9 @@ struct CurrentLineTracker: View {
                 guard job.status == .running, follow.isOn, !player.isPlaying, let last = items.last else { return }
                 let id = last.id
                 Task { @MainActor in
+                    // 確認の参考の段だけ、動かす前に少し待つ (ふだんの起動では 0 で、待たない)
+                    let delay = UILoadHooks.followScrollDelayMs
+                    if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000) }
                     guard follow.isOn, !player.isPlaying else { return }
                     // 確認の最中だけ、呼び出しが戻るまでの時間を測る (ふだんの起動では時刻を取らない)
                     let started = UILoadHooks.timingStart()

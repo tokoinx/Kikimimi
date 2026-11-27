@@ -31,20 +31,27 @@ extension LoadRun {
     struct AppendDetail {
         var text: String
         var start: UInt64
+        /// その操作のあいだに body を動かした行の数
+        var bodies: Int = 0
     }
 
-    /// 内わけの行を仕上げる: 各行に、その操作を始めた時から次の操作を始める時 (最後は end) までに積まれた
-    /// watchdog の合図の、いちばん長い待ちを足す
-    func renderDetails(_ details: ArraySlice<AppendDetail>, until end: UInt64) -> [String] {
+    /// 各操作を始めた時から次の操作を始める時 (最後は end) までに積まれた watchdog の合図の、いちばん長い待ち (秒。合図が無ければ nil)
+    func longestWaits(_ details: ArraySlice<AppendDetail>, until end: UInt64) -> [Double?] {
         let samples = probe.samples()
         let items = Array(details)
         return items.indices.map { i in
             let from = items[i].start
             let to = i + 1 < items.count ? items[i + 1].start : end
-            let waits = samples.filter { $0.posted >= from && $0.posted < to }.map(\.wait)
-            let wait = waits.max().map { String(format: "%.1f ms", UILoadSelfTest.ms($0)) }
-                ?? "unknown (no watchdog samples)"
-            return items[i].text + ", longest wait before the next append \(wait)"
+            return samples.filter { $0.posted >= from && $0.posted < to }.map(\.wait).max()
+        }
+    }
+
+    /// 内わけの行を仕上げる: 各行に、longestWaits の待ちを足す
+    func renderDetails(_ details: ArraySlice<AppendDetail>, until end: UInt64) -> [String] {
+        let waits = longestWaits(details, until: end)
+        return zip(details, waits).map { detail, longest in
+            let wait = longest.map { String(format: "%.1f ms", UILoadSelfTest.ms($0)) } ?? "unknown (no watchdog samples)"
+            return detail.text + ", longest wait before the next append \(wait)"
         }
     }
 
@@ -92,16 +99,18 @@ extension LoadRun {
             + " scrollTo calls \(scrollCalls) (total \(f(scrollSeconds)) ms, longest \(f(longestScroll)) ms),"
             + " idle after \(f(idle.seconds)) ms, turns \(idle.rounds) (longest \(f(idle.longestRound)) ms),"
             + " row inits \(UILoadHooks.rowsBuilt - mark.inits), row bodies \(UILoadHooks.rowBodies - mark.bodies)"
-        return AppendDetail(text: text, start: start)
+        return AppendDetail(text: text, start: start, bodies: UILoadHooks.rowBodies - mark.bodies)
     }
 
-    /// 参考の段: 同じ文字起こし中の結果で、追いかけたまま 300 行を 3 回足し、追いかけるのをやめてから (絵 05 と同じ口)、
+    /// 参考の段: 同じ文字起こし中の結果で、追いかけたまま 300 行を足し (終わりへ動かす前の待ちを 0・50・300 ms で交互に)、追いかけるのをやめてから (絵 05 と同じ口)、
     /// 300 行を 3 回足し、「末尾へ」と同じ道 (追いかけるのを戻し、終わりの行へ動かす) で、また追いかける。
     /// 測る段階・絵・ほかの確認がすべて終わったあとに呼ぶ (このあとに確認は無い)。目安とは比べず、SLOW にも終了コードにも入れない
     func notFollowingRound() async -> [String] {
         func f(_ seconds: Double) -> String { String(format: "%.1f", UILoadSelfTest.ms(seconds)) }
-        var lines = ["append detail (reference, not compared with any limit): the running job again, three bursts of 300"
-                     + " while following the end, three after scrolling up and stopping following (as for screenshot 05),"
+        var lines = ["append detail (reference, not compared with any limit): the running job again, bursts of 300"
+                     + " while following the end with a wait of 0, 50 and 300 ms before the tracker scrolls to the end"
+                     + " (taken in turn, \(Self.waitRounds) rounds; with a wait, the idle time is measured after the scrollTo"
+                     + " and includes the wait), three after scrolling up and stopping following (as for screenshot 05),"
                      + " then following again as the To the end button does (the watchdog runs again for this stage)"]
         Self.live("reference: bursts while not following")
         player.stopLine()
@@ -122,18 +131,23 @@ extension LoadRun {
         probe.setPhase(Self.referencePhase)
         probe.start()
         let first = appendDetails.count
-        // 1. 追いかけたまま、300 行を 3 回 (段階 4 と同じ。行の数が 2 の累乗をまたぐかを、段階 4 の回と比べる)
+        // 1. 追いかけたまま、300 行を足す。一覧の終わりへ動かす前の待ちを 0・50・300 ms の順に 1 回ずつ、Self.waitRounds 回り
+        // (行の数や時間の流れの影響をならすため、まとめずに交互に)。終わりに待ちを 0 に戻す
         setFollowing(true)
         scrollList(firstLast, .bottom)
         await settle()
-        var followingExtra: [Double] = []
-        for index in 1...3 {
-            let timed = await timedBurst(300, detail: "burst (following, extra)", index: index, of: 3)
-            followingExtra.append(timed.seconds)
-            await UILoadSelfTest.sleep(1.0)
+        var waitGroups: [Int: [Int]] = [:]
+        for round in 1...Self.waitRounds {
+            for wait in Self.followScrollWaits {
+                waitGroups[wait, default: []].append(appendDetails.count - first)
+                _ = await timedBurst(300, detail: "burst (following, wait \(wait))", index: round, of: Self.waitRounds,
+                                     scrollWait: wait)
+                await UILoadSelfTest.sleep(1.0)
+            }
         }
+        UILoadHooks.followScrollDelayMs = 0
         if !isFollowing() {
-            lines.append("UI LOAD: append detail: the list stopped following the end during the extra bursts")
+            lines.append("UI LOAD: append detail: the list stopped following the end during the bursts with a scroll wait")
         }
         // 2. 一覧の終わりから、15 行ほど上へ動かし、追いかけるのをやめて (絵 05 と同じ)、300 行を 3 回
         let segments = running.transcript?.segments ?? []
@@ -182,21 +196,42 @@ extension LoadRun {
         await UILoadSelfTest.sleep(1.0)
         let end = UILoadSelfTest.now()
         probe.stop()
-        lines += renderDetails(appendDetails[first...], until: end)
-        // 追いかけている時 (段階 4 の burst と、この段の追加の burst) と比べる 1 行
+        let details = appendDetails[first...]
+        lines += renderDetails(details, until: end)
+        // 待ちの組ごとに、body が多かった (重い) 回の数、body の最大、いちばん長い待ちの中央値と最大
+        let waits = longestWaits(details, until: end)
+        let items = Array(details)
+        let groups = Self.followScrollWaits.map { wait -> String in
+            let indices = waitGroups[wait] ?? []
+            let bodies = indices.map { items[$0].bodies }
+            let heavy = bodies.filter { $0 >= Self.heavyBodies }.count
+            let longest = indices.compactMap { waits[$0] }.sorted()
+            let waitText = longest.last.map {
+                "longest wait median \(f(UILoadSelfTest.percentile(longest, 0.5))) ms, max \(f($0)) ms"
+            } ?? "no watchdog samples"
+            return "\(wait) ms heavy \(heavy) of \(indices.count) (bodies max \(bodies.max() ?? 0), \(waitText))"
+        }
+        lines.append("UI LOAD: follow scroll wait: " + groups.joined(separator: "; ")
+                     + " (heavy = row bodies >= \(Self.heavyBodies))")
+        // 追いかけている時 (段階 4 の burst) と比べる 1 行
         func summary(_ values: [Double]) -> String {
             let sorted = values.sorted()
             guard let worst = sorted.last else { return "no samples" }
             return "median \(f(UILoadSelfTest.percentile(sorted, 0.5))) ms (max \(f(worst)))"
         }
         lines.append("UI LOAD: burst idle after: following \(summary(measured[Action.burst] ?? [])),"
-                     + " following extra \(summary(followingExtra)), not following \(summary(notFollowing))")
+                     + " not following \(summary(notFollowing))")
         Self.live("reference: done")
         return lines
     }
 
     /// 参考の段のあいだの、見張りの合図の段階の名前 (測る段階の集計には入らない)
     static let referencePhase = "reference stage (not measured)"
+    /// 参考の段で比べる、一覧の終わりへ動かす前の待ち (ミリ秒。この順に交互に) と、回りの数
+    static let followScrollWaits = [0, 50, 300]
+    static let waitRounds = 6
+    /// まとめの行で「重い」とする、1 回の body の数
+    static let heavyBodies = 100
 }
 
 extension UILoadSelfTest {
