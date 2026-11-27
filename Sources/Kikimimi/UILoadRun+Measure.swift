@@ -296,7 +296,8 @@ extension LoadRun {
         awaitingBurst = false
         let applied = burstApplied ?? started
         let idle = await UILoadSelfTest.untilIdleDetail(since: applied)
-        appendDetails.append(detailLine(name, index: index, of: total, rowsBefore: before, since: mark, idle: idle))
+        appendDetails.append(detailLine(name, index: index, of: total, rowsBefore: before, since: mark, idle: idle,
+                                        start: started))
         return (idle.seconds, UILoadSelfTest.seconds(from: started, to: applied))
     }
 
@@ -323,7 +324,8 @@ extension LoadRun {
             self.measured[action, default: []].append(idle.seconds)
             self.singleAppendDetails += 1
             self.appendDetails.append(self.detailLine("append 1 segment", index: self.singleAppendDetails, of: 6,
-                                                      rowsBefore: mark.rows - count, since: mark, idle: idle))
+                                                      rowsBefore: mark.rows - count, since: mark, idle: idle,
+                                                      start: started))
         }
     }
 
@@ -528,7 +530,9 @@ extension LoadRun {
         // 段階 4 の、足す操作 1 回ごとの内わけ (目安とは比べない)
         if !appendDetails.isEmpty {
             lines.append(Self.appendDetailLegend)
-            lines += appendDetails
+            // 最後の操作の「次まで」は、段階 4 の終わりまで
+            let end = phaseTimes[Phase.burst]?.end ?? UILoadSelfTest.now()
+            lines += renderDetails(appendDetails[...], until: end)
         }
         // いちばん長い待ち 5 つ (4 つの段階の中。ジョブを選ぶ待ちは、上の select の行に出ている)
         let longest = samples.filter { Phase.all.contains($0.phase) }.sorted { $0.wait > $1.wait }.prefix(5)
