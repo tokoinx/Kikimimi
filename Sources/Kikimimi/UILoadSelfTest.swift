@@ -86,7 +86,8 @@ enum UILoadSelfTest {
         // 監査の流れの確認 (AUDIT FLOW CHECK。監査を 2 回、LLM の代わりで) のぶんも足す
         // 訳し直しの確認 (RETRANSLATE CHECK。翻訳を 1 回、LLM の代わりで) のぶんも足す。
         // 絵のときは、狭いウインドウの絵 (21・22) のぶんも足す
-        let hangLimit = (screenshots == nil ? 200.0 : 310.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0 + 15.0
+        // 終わりの参考の段 (UILoadAppendDetail.swift。追いかけたまま・追いかけずに、300 行を 3 回ずつ足す) のぶんも足す
+        let hangLimit = (screenshots == nil ? 200.0 : 310.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0 + 15.0 + 45.0
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
             finish(header + ["UI LOAD FAILED: the self-test did not finish in \(Int(hangLimit)) s"
                              + " (the main thread may be stuck)"], code: .hang, reportPath: reportPath)
@@ -105,7 +106,8 @@ enum UILoadSelfTest {
     @MainActor
     private static func run(rows: Int, audio: URL?, screenshots: URL?, header: [String],
                             reportPath: String?) async {
-        var lines = header
+        // 実行機の 1 行 (CI と手元を比べるため)
+        var lines = header + [environmentDetailLine]
         // 一覧が、絵を残すときに動かす口を入れる (一覧が出る前に)
         UILoadHooks.isActive = true
         // 1. メインのウインドウと、その中のモデルを待つ
@@ -188,6 +190,9 @@ enum UILoadSelfTest {
         // 6. チャットの確認 (LLM もネットワークも使わない)。設定の画面の「追加学習」の、GGUF でない差分のお知らせも見る
         let chatFailed = await ChatCheck.run(model: model, screenshots: screenshots, lines: &lines)
         let adapterMessageFailed = ChatCheck.adapterMessageCheck(lines: &lines)
+        // 参考の段: 一覧の終わりを追いかけていない時に 300 行を足す (目安と比べず、終了コードにも入れない)。
+        // 文字起こし中の結果の行が増えるので、ほかの測り・絵・確認がすべて終わったあとに置く
+        lines += await load.notFollowingRound()
         // 失敗した確認を集め、返す 1 つを UILoadExit の表 (順) で決める
         var failed: Set<UILoadExit> = []
         if slow { failed.insert(.slow) }

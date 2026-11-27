@@ -20,10 +20,28 @@ extension UILoadSelfTest {
     /// 測り始めから 2 秒たっても終わらなければ、そこで打ち切る (その時間を記録するので、遅いものとして出る)
     @MainActor
     static func untilIdle(since started: UInt64) async -> Double {
+        await untilIdleDetail(since: started).seconds
+    }
+
+    /// untilIdle の内わけ: かかった秒と、回った回数と、いちばん長かった 1 回り (前の回りの眠る直前から、
+    /// この回りの眠る直前まで。1 回り目は started から) の秒
+    struct IdleDetail {
+        var seconds: Double
+        var rounds: Int
+        var longestRound: Double
+    }
+
+    /// untilIdle と同じ待ち方で、回った回数と、いちばん長い 1 回りも返す
+    @MainActor
+    static func untilIdleDetail(since started: UInt64) async -> IdleDetail {
         let giveUp = now() + 2_000_000_000
         var previous: UInt64?
         var ended = now()
+        var rounds = 0
+        var longest = 0.0
+        var roundStart = started
         for round in 1...maxRounds {
+            rounds = round
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 DispatchQueue.main.async { continuation.resume() }
             }
@@ -31,13 +49,16 @@ extension UILoadSelfTest {
             guard left > 0, let at = await nextBeforeWaiting(timeout: left) else {
                 // 打ち切り
                 ended = now()
+                longest = max(longest, seconds(from: roundStart, to: ended))
                 break
             }
             ended = at
+            longest = max(longest, seconds(from: roundStart, to: at))
+            roundStart = at
             if round >= 2, let previous, seconds(from: previous, to: at) < idleGap { break }
             previous = at
         }
-        return seconds(from: started, to: ended)
+        return IdleDetail(seconds: seconds(from: started, to: ended), rounds: rounds, longestRound: longest)
     }
 
     /// untilIdle の回りの数の上限

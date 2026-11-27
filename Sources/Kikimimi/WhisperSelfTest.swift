@@ -54,6 +54,23 @@ enum WhisperSelfTest {
         var probe: MixedProbe.Result?
         /// --auto-vad-off の、自動のやり直しの様子 (やり直さなかったら retried が false)
         var vadRetry: VADRetry?
+        /// 途中の区間が届いた様子 (アプリが LiveSegmentBuffer へ渡すのと同じ onSegment で数える)
+        var liveArrivals: LiveArrivals?
+    }
+
+    /// 途中の区間が、どれだけまとまって届いたか (知らせるだけ。OK・FAILED には使わない)
+    struct LiveArrivals: Encodable {
+        var count: Int
+        /// 初めに届いてから最後に届くまでの秒
+        var spanSeconds: Double
+        /// 幅 0.25・0.5・1.0・3.0 秒の窓に入った数の最大
+        var mostWithin025: Int
+        var mostWithin05: Int
+        var mostWithin1: Int
+        var mostWithin3: Int
+        var longestGapSeconds: Double
+        /// VAD なしでのやり直しの回数 (数は、やり直しの前の分も含めて、実行の全体で数える)
+        var restarts: Int
     }
 
     /// --auto-vad-off で、VAD なしでやり直したか・どちらを採ったか
@@ -144,6 +161,9 @@ enum WhisperSelfTest {
             // whisper.cpp は VAD を使った実行の時刻の対応表を持ち続けるので、VAD のあとに VAD なしで動かす時は読み込み直す
             // (アプリの TranscriptionService と同じ)
             var contextUsedVAD = false
+            // 途中の区間が届いた時刻 (単調に進む時計の秒)。やり直しの前の分も含める
+            var arrivals: [Double] = []
+            var restarts = 0
             // アプリと同じ関数を通す (--auto-vad-off の時だけ、VAD が音を落としたらしければ VAD なしでやり直す)
             let result = try TranscriptionService.transcribeCheckingVAD(
                 samples: samples, options: options, autoVADOff: autoVADOff,
@@ -165,6 +185,7 @@ enum WhisperSelfTest {
                             nextReport = (p / 0.05).rounded(.down) * 0.05 + 0.05
                         }
                     }, onSegment: { s in
+                        arrivals.append(ProcessInfo.processInfo.systemUptime)
                         log(String(format: "  [%@] %@ %@", TimeFormat.short(s.start + offset), tag(s.language), s.text))
                     }, onStage: { stage in
                         switch stage {
@@ -180,6 +201,7 @@ enum WhisperSelfTest {
                     log(String(format: "VAD: sound was dropped (%.1f s kept of %.1f s, %.1f s of loud sound dropped),"
                                + " running again without VAD", a.keptSeconds, a.totalSeconds, a.loudDroppedSeconds))
                     nextReport = 0.05
+                    restarts += 1
                 },
                 shouldCancel: { false }
             )
@@ -208,6 +230,18 @@ enum WhisperSelfTest {
             log(String(format: "summary: %@, %d segments, %.1f s for %.1f s of audio (%.2f x real time), peak memory %.0f MB",
                        transcript.languageLabel ?? "-", output.segments.count, wall, audioSeconds,
                        audioSeconds > 0 ? wall / audioSeconds : 0, peak))
+            let liveArrivals = LiveArrivals(count: arrivals.count,
+                                            spanSeconds: (arrivals.max() ?? 0) - (arrivals.min() ?? 0),
+                                            mostWithin025: ArrivalBursts.mostWithin(0.25, times: arrivals),
+                                            mostWithin05: ArrivalBursts.mostWithin(0.5, times: arrivals),
+                                            mostWithin1: ArrivalBursts.mostWithin(1.0, times: arrivals),
+                                            mostWithin3: ArrivalBursts.mostWithin(3.0, times: arrivals),
+                                            longestGapSeconds: ArrivalBursts.longestGap(times: arrivals),
+                                            restarts: restarts)
+            log(String(format: "WHISPER: live segments: n %d over %.1f s; most within 0.25 s %d, 0.5 s %d, 1.0 s %d, 3.0 s %d;"
+                       + " longest gap %.1f s", liveArrivals.count, liveArrivals.spanSeconds, liveArrivals.mostWithin025,
+                       liveArrivals.mostWithin05, liveArrivals.mostWithin1, liveArrivals.mostWithin3,
+                       liveArrivals.longestGapSeconds) + (restarts > 0 ? "; restarts \(restarts)" : ""))
 
             if let path = value("--report") {
                 let out = Output(audio: audioPath, model: modelPath, languages: codes, from: offset, audioSeconds: audioSeconds,
@@ -218,7 +252,8 @@ enum WhisperSelfTest {
                                  },
                                  report: output.report.map { shifted($0, by: offset) },
                                  probe: output.probe.map { shifted($0, by: offset) },
-                                 vadRetry: autoVADOff ? vadRetryOutput(result.vadRetry) : nil)
+                                 vadRetry: autoVADOff ? vadRetryOutput(result.vadRetry) : nil,
+                                 liveArrivals: liveArrivals)
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
                 try encoder.encode(out).write(to: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))

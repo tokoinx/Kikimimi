@@ -660,6 +660,7 @@ Tests/Fixtures/          A short English/Japanese recording (for --selftest-whis
 - If "Translate this sentence again" fails on a sentence you edited, your translation stays but the "Edited" mark disappears.
 - The reason a line could not be translated is shown only on the first row of its sentence group.
 - "N needs review" cannot move to rows that are not in the list because a search has narrowed it.
+- While you watch a running transcription with thousands of lines and the list follows the end, the window can stop for about 0.5-1.7 s when several hundred lines arrive at once. This was seen on GitHub's Mac (macOS 15) with test data (300 lines added at once to 8000 lines). It has not happened on a Mac with macOS 14. Measured with real speech recognition (an M1 Mac, large-v3-turbo, three runs with 20-32 minutes of audio), at most 8 lines arrived within one second, and several hundred lines never arrived at once. So this should be rare in a normal transcription. It is not verified on real hardware with macOS 15 or later. The investigation is in `docs/HANDOFF.md` (2026-11-27).
 - Matching a term by its first 75% can match a different word that starts the same way. For Latin letters, a word boundary means "no letter before or after", so "car" also matches "car2".
 - If you edit a translation after choosing "This translation is fine", it is not counted as a right mark.
 - Translating again sentence by sentence adds one or more LLM calls for that group.
