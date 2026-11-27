@@ -252,8 +252,7 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             let n = min(batchSize, tokens.count - position)
             let isLast = position + n == tokens.count
             try fillBatch(tokens[position..<(position + n)], startingAt: position, wantLastLogits: isLast)
-            let rc = llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch)
-            guard rc == 0 else { throw LLMError.decodeFailed(rc) }
+            try LLMBatchCheck.processed(llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch))
             position += n
         }
 
@@ -283,8 +282,7 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             if recent.count > Self.repeatWindow { recent.removeFirst() }
             guard step + 1 < maxNew else { break }
             try fillBatch([token][...], startingAt: position, wantLastLogits: true)
-            let rc = llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch)
-            guard rc == 0 else { throw LLMError.decodeFailed(rc) }
+            try LLMBatchCheck.processed(llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch))
             position += 1
         }
         let text = String(decoding: output, as: UTF8.self)
@@ -300,16 +298,16 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     ///
     /// 入れられない時は、黙って進めずに `LLMError.decodeFailed` で止める。番号は llama.cpp の戻り値のまま:
     /// -1 = 入れ物が一杯、-2 = トークンが無効、-3 = 列の番号が無効 (`llama_batch_ext_add_token` の戻り値)。
-    /// 位置か出力の印を入れられなかった時は、llama.cpp に無い番号 -100 (位置)・-101 (出力の印) を使う
+    /// 位置か出力の印を入れられなかった時は、llama.cpp に無い番号 -100 (位置)・-101 (出力の印) を使う。
+    /// 番号の決まりは `LLMBatchCheck` (KikimimiCore) に在り、試験はそちらで確かめる
     private func fillBatch(_ tokens: ArraySlice<llama_token>, startingAt start: Int, wantLastLogits: Bool) throws {
         llama_batch_ext_clear(batch)
         for (k, token) in tokens.enumerated() {
-            let idx = llama_batch_ext_add_token(batch, 0, token)
-            guard idx >= 0 else { throw LLMError.decodeFailed(idx) }
+            let idx = try LLMBatchCheck.added(llama_batch_ext_add_token(batch, 0, token))
             var pos = llama_pos(start + k)
-            guard llama_batch_ext_set_pos(batch, idx, &pos) else { throw LLMError.decodeFailed(-100) }
+            try LLMBatchCheck.positionSet(llama_batch_ext_set_pos(batch, idx, &pos))
             let output = wantLastLogits && k == tokens.count - 1
-            guard llama_batch_ext_set_output_logits(batch, idx, output) else { throw LLMError.decodeFailed(-101) }
+            try LLMBatchCheck.outputMarked(llama_batch_ext_set_output_logits(batch, idx, output))
         }
     }
 
