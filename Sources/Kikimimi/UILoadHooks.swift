@@ -40,9 +40,6 @@ enum UILoadHooks {
     static var applyCalls = 0
     static var applyNanos: UInt64 = 0
     static var lastApplyNanos: UInt64 = 0
-    /// CurrentLineTracker が、行が増えた時に一覧の終わりへ動かす前に待つミリ秒 (確認の参考の段だけで変える。
-    /// ふだんの起動と、測る段階では 0: 待たない)
-    static var followScrollDelayMs = 0
     /// いまの口を入れた一覧 (その一覧の ListFollow)
     private static var owner: ObjectIdentifier?
 

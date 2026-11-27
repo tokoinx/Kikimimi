@@ -72,6 +72,11 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
 - 狭い窓の絵 (21・22) を撮る時は、`UI LOAD: narrow window: asked 880, got <実際の横幅> (<絵の名前>)` の行が出る。実際の横幅が 880 より 1 pt を超えて広い時 (中身が窓を押し広げた時) は、`screenshot failed` の行も出る。この時も終了コードは変わらないので、行を見て報告する。
+- 測りの行 (2026-11-27 に足した。どれも参考で、目安・「重い」・終了コードには入らない):
+  - `UI LOAD: environment: …`: 走らせた Mac の macOS・コアの数・メモリ・画面の倍率。
+  - `UI LOAD: append detail "<操作>" k of n: rows A -> B, crosses …, apply … ms, scrollTo calls …, idle after … ms, turns …, row inits …, row bodies …, longest wait before the next append … ms`: 文字起こし中の結果に区間を足す操作ごとの内わけ。`row bodies` が、その操作で作り直した行の数。
+  - 3000 行・8000 行の確認の後に、参考の段が走る: `"burst (following, extra)"` 3 回 → 追いかけるのをやめて `"burst (not following)"` 3 回 → `"follow again after 900 rows"`。まとめは `UI LOAD: burst idle after: following median …, following extra median …, not following median …`。
+  - `UI LOAD: note: "burst" k of n at N rows built M row bodies (…)`: 300 行をいっぺんに足した 1 回で、行の body を 100 以上作った時だけ出る。GitHub の Mac (macOS 15) の 8000 行で時々出る (この回が長いと、8000 行の `UI LOAD: SLOW` になる)。手元 (macOS 14) では出ていない。出たら、行の数・body の数・待ちを報告する。調べた事は `docs/HANDOFF.md` の 2026-11-27。
 - `REAL SETTINGS:` の行 (`UI LOAD OK`・`LAUNCH SELFTEST OK` の直前): 確認の始めに取った本物の設定の写しと比べ、macOS が確認のあいだに書いた鍵 (ウインドウの位置・大きさ、左の一覧の幅など) を元に戻した結果。`unchanged` は戻す物が無かった事、`put back N keys the system wrote …: <鍵>` は戻した鍵 (どちらも、ふつうの事)。
 - `REAL SETTINGS: APP SETTINGS CHANGED DURING THE SELF-TEST (put back): <鍵>` は、アプリの設定 (`SettingKey`) が確認のあいだに書かれた印 (確認用の起動はアプリの設定を書かない決まりが破れている)。元には戻してあり、終了コードは変わらないが、必ず報告し、書いた所を探す。
 
@@ -132,6 +137,8 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 - 8000 行のアプリの確認 (参考。失敗にしない)。
 - Xcode 16.2 と 26.3 の両方でのビルド (手元の Xcode は 1 つ)。
 - macOS 14 の実機での動作は、利用者の Mac でだけ見られる (CI にも無い)。
+
+push の後の build は、`tools/ci-watch/watch-build.sh <run の ID>` で待てる (裏で走らせる。使い方は `tools/ci-watch/README.md`)。列が「取り消し (cancelled) で、ランナーの名前が空」の時は、GitHub の Mac が付かなかっただけで、コードの失敗ではない。この道具が、その列だけを走らせ直す (3 回まで)。失敗 (failure) の列は走らせ直さないので、ログを読む。
 
 ## 7. 報告に入れる物
 

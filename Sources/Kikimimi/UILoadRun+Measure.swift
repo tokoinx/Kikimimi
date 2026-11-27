@@ -281,14 +281,10 @@ extension LoadRun {
     /// burst の中身: 届けて、まとめて足し始めるのを待ち、メインスレッドが空くまでを測る。内わけの行も appendDetails に足す。
     /// 返すのは、足し始めてから空くまでの秒 (seconds) と、届けてから足し始めるまでの秒 (wait)。
     /// 追いかけていない時の参考の段 (UILoadAppendDetail.swift) も使う (そちらは measured に入れない)
-    /// scrollWait (ミリ秒) が 0 より大きい時 (参考の段だけ): CurrentLineTracker が一覧の終わりへ動かす前に、その分だけ待たせ、
-    /// 足した後、その scrollTo が呼ばれるまで (待ち + 1 秒まで) 待ってから、メインスレッドが空くのを待つ
-    func timedBurst(_ count: Int, detail name: String, index: Int, of total: Int,
-                    scrollWait: Int = 0) async -> (seconds: Double, wait: Double) {
+    func timedBurst(_ count: Int, detail name: String, index: Int, of total: Int) async -> (seconds: Double, wait: Double) {
         let before = running.transcript?.segments.count ?? 0
         let target = before + count
         let mark = detailMark()
-        UILoadHooks.followScrollDelayMs = scrollWait
         let started = UILoadSelfTest.now()
         awaitingBurst = true
         burstApplied = nil
@@ -299,22 +295,9 @@ extension LoadRun {
         }
         awaitingBurst = false
         let applied = burstApplied ?? started
-        var scrollNote = ""
-        if scrollWait > 0 {
-            let scrollDeadline = Date().addingTimeInterval(Double(scrollWait) / 1000 + 1)
-            while UILoadHooks.scrollToCalls == mark.scrollToCalls, Date() < scrollDeadline {
-                await UILoadSelfTest.sleep(0.005)
-            }
-            scrollNote = ", scroll wait \(scrollWait) ms"
-            if UILoadHooks.scrollToCalls == mark.scrollToCalls {
-                scrollNote += " (scrollTo was not called within \(scrollWait + 1000) ms)"
-            }
-        }
         let idle = await UILoadSelfTest.untilIdleDetail(since: applied)
-        UILoadHooks.followScrollDelayMs = 0
-        var detail = detailLine(name, index: index, of: total, rowsBefore: before, since: mark, idle: idle, start: started)
-        detail.text += scrollNote
-        appendDetails.append(detail)
+        appendDetails.append(detailLine(name, index: index, of: total, rowsBefore: before, since: mark, idle: idle,
+                                        start: started))
         return (idle.seconds, UILoadSelfTest.seconds(from: started, to: applied))
     }
 
