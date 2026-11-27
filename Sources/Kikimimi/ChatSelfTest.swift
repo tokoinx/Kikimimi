@@ -278,6 +278,32 @@ enum ChatCheck {
                 && emptyNotices.first?.text == L("The LLM returned an empty answer."),
              "last role \(lastMessage.map { "\($0.role)" } ?? "none"), notices \(emptyNotices.map(\.text))")
 
+        // 7c. LLM が失敗した (llama.cpp の失敗 -1 を、LLM を呼ぶ所で投げる): 発言に、失敗の知らせを 1 つ付ける。
+        // その後、ふつうの答えは今までどおり出る
+        let failure = LLMError.decodeFailed(-1)
+        chat.selfTestError = failure
+        chat.draft = "Hello again"
+        chat.send()
+        let failedFinished = await waitUntil(5) { !chat.isAnswering }
+        let failedLast = chat.messages.last
+        let failedNotices = failedLast.flatMap { chat.extras[$0.id]?.notices } ?? []
+        step("an LLM failure shows the error",
+             failedFinished && !chat.isAnswering && failedLast?.role == .user && failedLast?.text == "Hello again"
+                && failedNotices.count == 1 && failedNotices.first?.kind == .error
+                && failedNotices.first?.text == failure.localizedDescription
+                && failedNotices.first?.text.contains("-1") == true,
+             "last role \(failedLast.map { "\($0.role)" } ?? "none"), notices \(failedNotices.map(\.text))")
+        chat.selfTestError = nil
+        chat.selfTestReply = "Fine, thanks."
+        chat.draft = "How are you?"
+        chat.send()
+        let afterFinished = await waitUntil(5) { !chat.isAnswering }
+        let afterLast = chat.messages.last
+        step("a normal reply works after the failure",
+             afterFinished && afterLast?.role == .assistant && afterLast?.text == "Fine, thanks.",
+             "last role \(afterLast.map { "\($0.role)" } ?? "none"), text \(afterLast?.text ?? "none")")
+        chat.selfTestReply = ""
+
         // 8. 片付け: 窓を閉じ、設定を元の値に戻す
         chat.selfTestReset()
         chat.fetcher = originalFetcher
@@ -401,8 +427,9 @@ enum ChatCheck {
 ///
 /// 画面を出さずに、本物の LLM でチャットの答えを確かめる。設定は読まず・書かない (今の値は、決めた既定の値)。
 /// 1. 流れの確認: 1 つの発言で onText が 2 回以上呼ばれ、最後に渡った文が戻り値と同じ (CHAT STREAM OK / FAILED)。
+///    やめた訳の確認: 小さな上限の答えは「上限」、ふつうの答えは「書き終えた」(CHAT FINISH: … ok / NG)。
 /// 2. 測り: `ChatEvalCases.all` を 1 つずつ (履歴なし) 答えさせ、`ChatEval.score` で採点する (点は参考。落とさない)。
-/// 終了コード: 0 = 流れの確認が通った、1 = 通らない・読み込めない、2 = 使い方の間違い
+/// 終了コード: 0 = 流れとやめた訳の確認が通った、1 = 通らない・読み込めない、2 = 使い方の間違い
 enum ChatSelfTest {
     /// 決めた既定の値 (利用者の設定は読まない)。設定の定義の、確認用の起動で決まった値か既定の値
     static let defaults: [String: String] = ChatSettingsCatalog.selfTestValues()
@@ -444,9 +471,22 @@ enum ChatSelfTest {
                 calls += 1
                 last = text
             })
+            // ふつうの答えの、やめた訳 (答えの generate の直後に読む)
+            let normalFinish = engine.lastFinish
             let streamOK = calls >= 2 && last == reply
             out("stream: \(calls) updates, \(reply.utf8.count) bytes, \(seconds(since: clock))")
             out(streamOK ? "CHAT STREAM OK" : "CHAT STREAM FAILED: \(calls) updates, last equals the reply: \(last == reply)")
+
+            // 1b. やめた訳: 長い答えの要る依頼を、わざと小さな上限で答えさせると「上限」、ふつうの答えは「書き終えた」
+            var tiny = try ChatPromptBuilder.build(history: [], newUserText: "Explain step by step, in detail, how to transcribe a recording and then audit and translate it in this app.",
+                                                   catalog: catalog, access: access, pages: [], researchOn: false, engine: engine)
+            tiny.maxTokens = 4
+            let tinyReply = try engine.generate(tiny, shouldCancel: { false })
+            let tinyFinish = engine.lastFinish
+            let tinyOK = tinyFinish == .limit
+            let normalOK = normalFinish == .complete
+            out("CHAT FINISH: a tiny limit is reported as cut off: \(tinyOK ? "ok" : "NG") (finish \(tinyFinish), \(engine.tokenCount(tinyReply)) tokens)")
+            out("CHAT FINISH: a normal answer is reported as complete: \(normalOK ? "ok" : "NG") (finish \(normalFinish), \(engine.tokenCount(reply)) tokens)")
 
             // 2. 測り
             var good = 0
@@ -461,7 +501,7 @@ enum ChatSelfTest {
                 out("CHAT EVAL: \(item.id) \(ok ? "ok" : "NG") | \(expected) | \(head)")
             }
             out("CHAT EVAL: \(good)/\(ChatEvalCases.all.count)")
-            return streamOK ? 0 : 1
+            return streamOK && tinyOK && normalOK ? 0 : 1
         } catch {
             out("SELFTEST FAILED: \(error.localizedDescription)")
             return 1

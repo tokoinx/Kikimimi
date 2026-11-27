@@ -744,7 +744,7 @@ struct BilingualHeader: View {
             if showTimestamp {
                 Color.clear.frame(width: 52, height: 1)
             }
-            Label(label.map { L("Original (%@)", $0) } ?? L("Original"), systemImage: "text.quote")
+            heading(label.map { L("Original (%@)", $0) } ?? L("Original"), systemImage: "text.quote")
                 .frame(maxWidth: .infinity, alignment: .leading)
             // 訳の列が狭い時 (狭い窓でメモの欄を開いた時など) は、名前と「要確認 N」を縦に並べる。
             // 横に並べたままだと、名前が 1 字ずつ縦に折れる (2026-11-27 に、横 880 の絵で見た)。
@@ -778,7 +778,17 @@ struct BilingualHeader: View {
 
     /// 訳の列の名前 (「日本語訳」など)
     private var translationLabel: some View {
-        Label(L("%@ translation", TranslationTarget.displayName(for: target)), systemImage: "character.bubble")
+        heading(L("%@ translation", TranslationTarget.displayName(for: target)), systemImage: "character.bubble")
+    }
+
+    /// 見出しの名前 1 つ。縦に並べる時 (訳の列が狭い時) は、頭の印を出さない (両方の列で出さず、左右の頭をそろえる)。
+    /// 印と間の約 24 pt があると、ドイツ語の「Übersetzung」などが入らず、語の途中で折れる (横 880 の絵で見た)
+    @ViewBuilder private func heading(_ title: String, systemImage: String) -> some View {
+        if stacked {
+            Text(title)
+        } else {
+            Label(title, systemImage: systemImage)
+        }
     }
 
     /// 「要確認 N」(要確認の行が無い時は出さない)

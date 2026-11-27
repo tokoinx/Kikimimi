@@ -129,6 +129,27 @@ final class LLMFailureTests: XCTestCase {
         }
     }
 
+    /// 文をトークンに分けた数: 空でない文で 1 以上なら、その数をそのまま返す。空の文は 0 でよい
+    func testBatchCheckTokenizedPassesCounts() throws {
+        XCTAssertEqual(LLMBatchCheck.tokenizeFailedCode, -102)
+        XCTAssertEqual(try LLMBatchCheck.tokenized(count: 1, textIsEmpty: false), 1)
+        XCTAssertEqual(try LLMBatchCheck.tokenized(count: 4096, textIsEmpty: false), 4096)
+        // 空でない文が 0 個: 失敗にしない (今までどおり、空として進む)
+        XCTAssertEqual(try LLMBatchCheck.tokenized(count: 0, textIsEmpty: false), 0)
+        XCTAssertEqual(try LLMBatchCheck.tokenized(count: 0, textIsEmpty: true), 0)
+        XCTAssertEqual(try LLMBatchCheck.tokenized(count: Int32.min, textIsEmpty: true), 0)
+    }
+
+    /// 空でない文を分けられない (負の数・Int32.min): -102 を投げる (黙って空の依頼にしない)
+    func testBatchCheckTokenizedThrowsForFailures() {
+        for count: Int32 in [-1, -12, Int32.min] {
+            XCTAssertThrowsError(try LLMBatchCheck.tokenized(count: count, textIsEmpty: false)) { error in
+                XCTAssertEqual(error as? LLMError, .decodeFailed(-102))
+            }
+        }
+        XCTAssertTrue(LLMError.decodeFailed(LLMBatchCheck.tokenizeFailedCode).localizedDescription.contains("-102"))
+    }
+
     // MARK: 監査
 
     /// はじめの依頼で失敗: 失敗はそのまま投げ直され、LLM の結果として渡る物は無い (規則だけの途中の結果は渡る)

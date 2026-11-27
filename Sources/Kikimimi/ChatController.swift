@@ -97,6 +97,8 @@ final class ChatController {
     @ObservationIgnored private(set) var fetchCount = 0
     /// 確認用: 入れると、LLM を呼ばずに、この文を答えにする (LLM の手前までの道を確かめる)
     @ObservationIgnored var selfTestReply: String?
+    /// 確認用: 入れると、LLM を呼ぶ所でこの失敗を投げる (本物の失敗と同じ catch で受け止める。selfTestReply より先に見る)
+    @ObservationIgnored var selfTestError: Error?
     @ObservationIgnored private var cancelFlag: CancelFlag?
     /// 何回目のやり取りか (「新しいチャット」の後に、前の答えが入らないように)
     @ObservationIgnored private var serial = 0
@@ -180,31 +182,42 @@ final class ChatController {
             return
         }
         phase = .waitingForLLM
-        if let canned = selfTestReply {
-            finish(reply: canned, pagesRead: !read.pages.isEmpty, notices: notices, stopped: false, userID: userID)
-            return
-        }
         let snapshot = model.chatSettingsSnapshot()
         let catalog = model.chatCatalog
         let research = researchOn
         let pages = read.pages
         let latest = LockedBox<String>()
+        // 答えを出すのをやめた訳 (上限で切れたか)。答えの generate の直後に読む
+        let ended = LockedBox<LlamaEngine.Finish>()
         let throttle = StreamThrottle(interval: Self.streamInterval)
         do {
+            // 確認用: 本物の LLM を呼ぶ所の代わり (失敗は下の catch で、本物の失敗と同じに受け止める)
+            if let error = selfTestError { throw error }
+            if let canned = selfTestReply {
+                finish(reply: canned, pagesRead: !pages.isEmpty, notices: notices, stopped: false, userID: userID)
+                return
+            }
             let reply = try await model.runChatLLM(shouldCancel: { flag.isSet }) { [weak self] engine in
                 // ここから LLM の番 (読み込みと、先の監査・翻訳が終わった)
                 Task { @MainActor in self?.began(turn: turn) }
                 let prompt = try ChatPromptBuilder.build(history: history, newUserText: text, catalog: catalog,
                                                          access: snapshot, pages: pages, researchOn: research,
                                                          engine: engine)
-                return try engine.generate(prompt, shouldCancel: { flag.isSet }, onText: { full in
+                let answer = try engine.generate(prompt, shouldCancel: { flag.isSet }, onText: { full in
                     latest.value = full
                     if throttle.shouldSend() {
                         Task { @MainActor in self?.stream(full, turn: turn) }
                     }
                 })
+                // この中は LLM の番を持ったまま (ほかの generate は、この間に同じ engine で走らない)
+                ended.value = engine.lastFinish
+                return answer
             }
             guard turn == serial else { return }
+            // 答えが、書き終える前に上限で切れた・次の字を選べずに止まった: 終わったように見せず、そう知らせる
+            if let reason = ended.value, reason != .complete {
+                notices.append(ChatNotice(kind: .warning, text: L("The answer was cut off before it finished.")))
+            }
             finish(reply: reply, pagesRead: !pages.isEmpty, notices: notices, stopped: false, userID: userID)
         } catch LLMError.cancelled {
             guard turn == serial else { return }
@@ -360,6 +373,7 @@ final class ChatController {
         researchOn = false
         showsResearchConfirm = false
         selfTestReply = nil
+        selfTestError = nil
     }
 }
 

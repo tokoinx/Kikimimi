@@ -10,6 +10,8 @@ public enum LLMBatchCheck {
     public static let positionFailedCode: Int32 = -100
     /// 出力の印を入れられなかった時の番号 (llama.cpp には無い、このアプリが決めた番号)
     public static let outputFailedCode: Int32 = -101
+    /// 文をトークンに分けられなかった時の番号 (llama.cpp には無い、このアプリが決めた番号)
+    public static let tokenizeFailedCode: Int32 = -102
 
     /// `llama_batch_ext_add_token` の戻り値を見る。0 以上は入れた場所の番号なので、そのまま返す。
     /// 負の数は失敗で、その番号のまま投げる (-1 = 入れ物が一杯、-2 = トークンが無効、-3 = 列の番号が無効)
@@ -29,6 +31,16 @@ public enum LLMBatchCheck {
     @inlinable
     public static func outputMarked(_ ok: Bool) throws {
         guard ok else { throw LLMError.decodeFailed(outputFailedCode) }
+    }
+
+    /// `llama_tokenize` の戻り値 (トークンの数) を見る。負の数 (失敗・Int32.min) なら -102 を投げる。
+    /// 0 個は、失敗にしない (今までどおり、空として進む。変わった 1 行のせいで、翻訳の全体を止めないため)。
+    /// 空の文は 0 個でよい。分けられたトークンの数を返す
+    @inlinable
+    public static func tokenized(count: Int32, textIsEmpty: Bool) throws -> Int {
+        if textIsEmpty { return 0 }
+        guard count >= 0 else { throw LLMError.decodeFailed(tokenizeFailedCode) }
+        return Int(count)
     }
 
     /// `llama_process` の戻り値を見る。0 以外は失敗で、その番号のまま投げる

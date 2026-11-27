@@ -43,6 +43,7 @@ extension L10nTables {
         "Read “%1$@” (%2$@)": "« %1$@ » (%2$@) lu",
         "Stopped.": "Arrêté.",
         "The LLM returned an empty answer.": "Le LLM a renvoyé une réponse vide.",
+        "The answer was cut off before it finished.": "La réponse a été coupée avant la fin.",
         "Web pages were read for this answer, so its setting changes are not offered.": "Des pages web ont été lues pour cette réponse ; ses modifications de réglages ne sont donc pas proposées.",
         "%d action in the answer was not used.": "%d action de la réponse n’a pas été utilisée.",
         "%d actions in the answer were not used.": "%d actions de la réponse n’ont pas été utilisées.",
