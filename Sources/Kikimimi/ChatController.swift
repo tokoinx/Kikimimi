@@ -292,6 +292,10 @@ final class ChatController {
         guard !visible.isEmpty || !extra.cards.isEmpty || !extra.opens.isEmpty else {
             // 答えが空: 発言に知らせだけを付ける (その回の user の発言は、対にならないので、次の依頼の履歴に入らない)
             if let last = messages.last, last.role == .user {
+                // 止めてもいない・知らせも無いのに答えが空: 何も返らなかった訳を、発言に知らせる
+                if !stopped && extra.notices.isEmpty {
+                    extra.notices.append(ChatNotice(kind: .warning, text: L("The LLM returned an empty answer.")))
+                }
                 var userExtra = extras[last.id] ?? ChatTurnExtras()
                 userExtra.notices += extra.notices
                 userExtra.stopped = stopped

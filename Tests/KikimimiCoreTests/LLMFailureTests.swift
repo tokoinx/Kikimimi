@@ -198,6 +198,100 @@ final class LLMFailureTests: XCTestCase {
         }
     }
 
+    // MARK: 読めなかった答え
+
+    /// 監査を通し、結果と、onUnread に渡った数 (呼ばれた回数も) を返す
+    private func auditCountingUnread(_ segments: [TranscriptSegment], options: AuditOptions = AuditOptions(),
+                                     _ respond: @escaping (LLMPrompt) -> String) throws -> (report: AuditReport, unread: [Int]) {
+        var unread: [Int] = []
+        let report = try Auditor.audit(segments, language: "en", options: options, generator: FakeGenerator(respond),
+                                       modelName: "fake", shouldCancel: { false }, onUnread: { unread.append($0) })
+        return (report, unread)
+    }
+
+    /// 「END」で終わる答えは、改行の有無によらず書き切った答え (読めなかった所は 0)
+    func testReplyEndingWithEndIsNotCounted() throws {
+        for reply in ["END\n", "END", "END\r\n", "  END  \n\n"] {
+            let result = try auditCountingUnread(distinctSegments(4)) { _ in reply }
+            XCTAssertEqual(result.unread, [0], "答え \(reply.debugDescription)")
+            XCTAssertTrue(result.report.changes.isEmpty)
+        }
+    }
+
+    /// 空の答え・空白だけの答えは、1 か所読めなかったと数える (「指摘なし」と同じに見なさない)
+    func testEmptyOrBlankReplyIsCounted() throws {
+        for reply in ["", "  \n \n"] {
+            let result = try auditCountingUnread(distinctSegments(4)) { _ in reply }
+            XCTAssertEqual(result.unread, [1], "答え \(reply.debugDescription)")
+            XCTAssertNil(result.report.isPartial, "監査はふつうに終わる")
+        }
+    }
+
+    /// 行の途中で切れた答え: 書き切った行の直しは使い、読めなかった所を 1 と数える
+    func testCutOffReplyKeepsFinishedFixAndIsCounted() throws {
+        var segments = distinctSegments(4)
+        segments[1].text = "We will bild a small game today."
+        let result = try auditCountingUnread(segments) { prompt in
+            if prompt.grammar == GBNF.choice {
+                for line in prompt.user.split(separator: "\n") where line.hasPrefix("1: ") || line.hasPrefix("2: ") {
+                    if line.contains("build") { return String(line.prefix(1)) }
+                }
+                return "1"
+            }
+            return "[2] FIX bild => build\n[3] FIX wor"
+        }
+        XCTAssertEqual(result.unread, [1])
+        let fix = result.report.change(forSegment: segments[1].id)
+        XCTAssertEqual(fix?.replacement, "We will build a small game today.")
+        XCTAssertEqual(fix?.origin, .llm)
+    }
+
+    /// 2 つのまとまりのうち 1 つだけが切れた: 読めなかった所は 1
+    func testOneOfTwoChunksCutOffCountsOne() throws {
+        let segments = distinctSegments(6)
+        let result = try auditCountingUnread(segments, options: AuditOptions(maxLinesPerChunk: 3)) { prompt in
+            prompt.user.contains(segments[3].text) ? "[1] DE" : "END\n"
+        }
+        XCTAssertEqual(result.unread, [1])
+    }
+
+    /// 評価役の答えが 2 回とも読めない: 直しは捨て (今までどおり)、読めなかった所として数える
+    func testBothJudgeVotesUnreadableDropTheFixAndAreCounted() throws {
+        var segments = distinctSegments(4)
+        segments[1].text = "We will bild a small game today."
+        let result = try auditCountingUnread(segments) { prompt in
+            prompt.grammar == GBNF.choice ? "" : "[2] FIX bild => build\nEND\n"
+        }
+        XCTAssertEqual(result.unread, [1])
+        XCTAssertNil(result.report.change(forSegment: segments[1].id))
+    }
+
+    /// 評価役の答えが 1 回だけ読めた: 今までどおり (直した後を選べば提案に残る) で、数えない
+    func testOneReadableJudgeVoteIsNotCounted() throws {
+        var segments = distinctSegments(4)
+        segments[1].text = "We will bild a small game today."
+        var judged = 0
+        let result = try auditCountingUnread(segments) { prompt in
+            guard prompt.grammar == GBNF.choice else { return "[2] FIX bild => build\nEND\n" }
+            judged += 1
+            // 1 回目 (1: 直す前 / 2: 直した後) は直した後を選び、2 回目は読めない答え
+            return judged == 1 ? "2" : ""
+        }
+        XCTAssertEqual(judged, 2)
+        XCTAssertEqual(result.unread, [0])
+        let fix = result.report.change(forSegment: segments[1].id)
+        XCTAssertEqual(fix?.replacement, "We will build a small game today.")
+        XCTAssertEqual(fix?.isConfident, false, "1 票だけなので確かめてもらう提案")
+    }
+
+    /// 規則だけの監査では、onUnread を呼ばない
+    func testRulesOnlyAuditDoesNotReportUnread() throws {
+        var calls = 0
+        _ = try Auditor.audit(distinctSegments(4), language: "en", generator: nil, modelName: nil,
+                              shouldCancel: { false }, onUnread: { _ in calls += 1 })
+        XCTAssertEqual(calls, 0)
+    }
+
     // MARK: 翻訳
 
     /// はじめの依頼で失敗: 失敗はそのまま投げ直される (行を「訳せなかった」に数えて黙って終えない)。

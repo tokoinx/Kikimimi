@@ -69,6 +69,8 @@ extension L10nTables {
         "The audit was canceled. Results up to the point it reached are applied.": "审核已取消。已应用到中断处为止的结果。",
         "The LLM audit stopped partway. Results up to the point it reached are applied: %@": "LLM 审核中途停止。已应用到中断处为止的结果：%@",
         "The LLM could not audit, so only the repetition check was applied: %@": "LLM 无法审核，因此只应用了重复检查：%@",
+        "The LLM’s answer could not be read in %d place, so problems there may have been missed.": "有 %d 处无法读取 LLM 的回答，因此可能遗漏了那里的问题。",
+        "The LLM’s answer could not be read in %d places, so problems there may have been missed.": "有 %d 处无法读取 LLM 的回答，因此可能遗漏了那里的问题。",
         "Translating…": "正在翻译…",
         "Translating… (loading the LLM)": "正在翻译…（正在载入 LLM）",
         "Translating %1$d/%2$d": "正在翻译 %1$d/%2$d",

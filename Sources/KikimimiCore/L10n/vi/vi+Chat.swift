@@ -42,6 +42,7 @@ extension L10nTables {
         "Read %@": "Đã đọc %@",
         "Read “%1$@” (%2$@)": "Đã đọc “%1$@” (%2$@)",
         "Stopped.": "Đã dừng.",
+        "The LLM returned an empty answer.": "LLM đã trả về câu trả lời trống.",
         "Web pages were read for this answer, so its setting changes are not offered.": "Câu trả lời này đã đọc trang web nên không đề xuất thay đổi cài đặt.",
         "%d action in the answer was not used.": "%d hành động trong câu trả lời chưa được dùng.",
         "%d actions in the answer were not used.": "%d hành động trong câu trả lời chưa được dùng.",

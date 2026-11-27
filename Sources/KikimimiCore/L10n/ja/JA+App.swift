@@ -78,6 +78,8 @@ extension JA {
         "The audit was canceled. Results up to the point it reached are applied.": "監査を中止しました。見終えた所までの結果を反映しています。",
         "The LLM audit stopped partway. Results up to the point it reached are applied: %@": "LLM の見直しが途中で止まりました。見終えた所までの結果を反映しています: %@",
         "The LLM could not audit, so only the repetition check was applied: %@": "LLM で見直せなかったため、繰り返しの見直しだけを反映しました: %@",
+        "The LLM’s answer could not be read in %d place, so problems there may have been missed.": "LLM の答えを %d か所で読めなかったため、そこの問題を見落としたかもしれません。",
+        "The LLM’s answer could not be read in %d places, so problems there may have been missed.": "LLM の答えを %d か所で読めなかったため、そこの問題を見落としたかもしれません。",
         "Translating…": "翻訳中…",
         "Translating… (loading the LLM)": "翻訳中… (LLM を読み込み中)",
         "Translating %1$d/%2$d": "翻訳中 %1$d/%2$d",

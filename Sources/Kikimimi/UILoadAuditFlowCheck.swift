@@ -239,6 +239,25 @@ extension LoadRun {
              "finished \(finishedKept), idle \(idle(previous)), failures \(standIn.failures - failuresBeforeKept), "
                 + "previous model \(previousBefore?.audit?.model ?? "none"), "
                 + "result unchanged \(previous.transcript == previousBefore), note \"\(noteKept)\"")
+
+        // (d) 見直しの答えが「END」の手前で切れる (答えの長さの上限など): 監査はふつうに終わり、
+        // 書き切った行の直しは使い、読めなかった所の数を知らせる。24 行 = 2 つのまとまりの、どちらの答えも切れる
+        let cut = makeJob("Audit flow check E (self-test)", lines: texts)
+        made.append(cut)
+        standIn.configure(fixes: [(line: "small game", wrong: "bild", right: "build")], cutOff: true)
+        let finishedCut = await audit(cut)
+        let noteCut = cut.postNote ?? ""
+        let expectedCut = LPlural(2, one: "The LLM’s answer could not be read in %d place, so problems there may have been missed.",
+                                  other: "The LLM’s answer could not be read in %d places, so problems there may have been missed.")
+        let cutReport = cut.transcript?.audit
+        let cutRows = cut.transcript?.segments.map(\.text) ?? []
+        step("the LLM answer is cut off: the audit finishes and tells how many places could not be read",
+             finishedCut && idle(cut) && cutReport?.model != nil && cutReport?.isPartial == nil
+                && noteCut == expectedCut
+                && cutRows.count > 1 && cutRows[1] == "We will build a small game today.",
+             "finished \(finishedCut), idle \(idle(cut)), model \(cutReport?.model ?? "none"), "
+                + "partial \(cutReport?.isPartial ?? false), line \(cutRows.count > 1 ? cutRows[1] : "none"), "
+                + "note \"\(noteCut)\"")
         standIn.configure(fixes: [])
     }
 
@@ -281,7 +300,8 @@ extension LoadRun {
 /// 評価役 (1: … / 2: …) には、直した後の字を含む方を選ぶ (KikimimiCore の試験 AuditLedgerAfterLLMTests の偽物と同じ答え方)。
 /// hold の時は、始めの答えの手前で、release() まで待つ (規則だけの段の後の行を見るため。10 秒で待つのをやめる)。
 /// failAfter を渡すと、configure の後にその回数だけ答え、その次から llama.cpp の失敗 (`LLMError.decodeFailed(-1)`) を投げる
-/// (0 なら始めの依頼から。LLM が途中で失敗した時のアプリの受け止め方を見るため)
+/// (0 なら始めの依頼から。LLM が途中で失敗した時のアプリの受け止め方を見るため)。
+/// cutOff の時は、見直しの答えを「END」の手前で切る (書き切っていない答えの、アプリの知らせを見るため)
 final class AuditFlowStandIn: TextGenerating, @unchecked Sendable {
     typealias Fix = (line: String, wrong: String, right: String)
     private let lock = NSLock()
@@ -291,6 +311,7 @@ final class AuditFlowStandIn: TextGenerating, @unchecked Sendable {
     private var failAfter: Int?
     private var sinceConfigure = 0
     private var failedCount = 0
+    private var cutOff = false
 
     /// これまでに答えた回数 (失敗を投げた回は数えない)
     var calls: Int {
@@ -306,9 +327,10 @@ final class AuditFlowStandIn: TextGenerating, @unchecked Sendable {
         return failedCount
     }
 
-    func configure(fixes: [Fix], hold: Bool = false, failAfter: Int? = nil) {
+    func configure(fixes: [Fix], hold: Bool = false, failAfter: Int? = nil, cutOff: Bool = false) {
         lock.lock()
         self.fixes = fixes
+        self.cutOff = cutOff
         gate = hold ? DispatchSemaphore(value: 0) : nil
         self.failAfter = failAfter
         sinceConfigure = 0
@@ -341,6 +363,7 @@ final class AuditFlowStandIn: TextGenerating, @unchecked Sendable {
         sinceConfigure += 1
         count += 1
         let fixes = self.fixes
+        let cutOff = self.cutOff
         lock.unlock()
         if let range = prompt.user.range(of: "Lines to check:\n") {
             var answer: [String] = []
@@ -351,6 +374,8 @@ final class AuditFlowStandIn: TextGenerating, @unchecked Sendable {
                     answer.append("[\(number)] FIX \(fix.wrong) => \(fix.right)")
                 }
             }
+            // 切る時は、書き切った行の後ろに、行の途中で切れた指摘を置く (END は書かない)
+            if cutOff { return (answer + ["[1] FIX wor"]).joined(separator: "\n") }
             return (answer + ["END"]).joined(separator: "\n")
         }
         for line in prompt.user.split(separator: "\n") where line.hasPrefix("1: ") || line.hasPrefix("2: ") {

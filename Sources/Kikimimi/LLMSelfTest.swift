@@ -95,9 +95,12 @@ enum LLMSelfTest {
             }
 
             clock = Date()
+            // LLM の答えを読めなかった所の数 (書き切っていない答えなど)。ふだんの監査なら 0
+            var unread = 0
             let report = try Auditor.audit(segments, language: "en", options: AuditOptions(glossary: "Roblox Studio"),
-                                           generator: engine, modelName: engine.modelDescription, shouldCancel: { false })
-            log("audit: \(report.changes.count) findings, \(seconds(since: clock))")
+                                           generator: engine, modelName: engine.modelDescription, shouldCancel: { false },
+                                           onUnread: { unread = $0 })
+            log("audit: \(report.changes.count) findings, \(seconds(since: clock)), unread \(unread)")
             for c in report.changes {
                 let state = c.isConfident ? "auto" : "suggest"
                 log("  [\(state)] \(c.kind.rawValue) \(TimeFormat.short(c.original.start)) \(c.original.text)"

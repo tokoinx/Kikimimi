@@ -69,6 +69,8 @@ extension L10nTables {
         "The audit was canceled. Results up to the point it reached are applied.": "Audit dibatalkan. Hasil sampai titik yang dicapai sudah diterapkan.",
         "The LLM audit stopped partway. Results up to the point it reached are applied: %@": "Audit LLM berhenti di tengah jalan. Hasil sampai titik yang dicapai sudah diterapkan: %@",
         "The LLM could not audit, so only the repetition check was applied: %@": "LLM tidak dapat mengaudit, jadi hanya pemeriksaan pengulangan yang diterapkan: %@",
+        "The LLM’s answer could not be read in %d place, so problems there may have been missed.": "Jawaban LLM tidak dapat dibaca di %d tempat, jadi masalah di sana mungkin terlewat.",
+        "The LLM’s answer could not be read in %d places, so problems there may have been missed.": "Jawaban LLM tidak dapat dibaca di %d tempat, jadi masalah di sana mungkin terlewat.",
         "Translating…": "Menerjemahkan…",
         "Translating… (loading the LLM)": "Menerjemahkan… (memuat LLM)",
         "Translating %1$d/%2$d": "Menerjemahkan %1$d/%2$d",

@@ -69,6 +69,8 @@ extension L10nTables {
         "The audit was canceled. Results up to the point it reached are applied.": "Lần rà soát đã bị hủy. Kết quả đến điểm đã đạt được đã được áp dụng.",
         "The LLM audit stopped partway. Results up to the point it reached are applied: %@": "Lần rà soát bằng LLM dừng giữa chừng. Kết quả đến điểm đã đạt được đã được áp dụng: %@",
         "The LLM could not audit, so only the repetition check was applied: %@": "LLM không rà soát được nên chỉ áp dụng kiểm tra lặp câu: %@",
+        "The LLM’s answer could not be read in %d place, so problems there may have been missed.": "Không đọc được câu trả lời của LLM ở %d chỗ, nên có thể đã bỏ sót vấn đề ở đó.",
+        "The LLM’s answer could not be read in %d places, so problems there may have been missed.": "Không đọc được câu trả lời của LLM ở %d chỗ, nên có thể đã bỏ sót vấn đề ở đó.",
         "Translating…": "Đang dịch…",
         "Translating… (loading the LLM)": "Đang dịch… (đang nạp LLM)",
         "Translating %1$d/%2$d": "Đang dịch %1$d/%2$d",

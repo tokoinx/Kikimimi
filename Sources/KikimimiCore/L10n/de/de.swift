@@ -69,6 +69,8 @@ extension L10nTables {
         "The audit was canceled. Results up to the point it reached are applied.": "Die Prüfung wurde abgebrochen. Die Ergebnisse bis zum erreichten Punkt wurden übernommen.",
         "The LLM audit stopped partway. Results up to the point it reached are applied: %@": "Die LLM-Prüfung wurde zwischendurch beendet. Die Ergebnisse bis zum erreichten Punkt wurden übernommen: %@",
         "The LLM could not audit, so only the repetition check was applied: %@": "Das LLM konnte nicht prüfen, daher wurde nur die Wiederholungsprüfung übernommen: %@",
+        "The LLM’s answer could not be read in %d place, so problems there may have been missed.": "Die Antwort des LLM konnte an %d Stelle nicht gelesen werden, daher wurden dort eventuell Probleme übersehen.",
+        "The LLM’s answer could not be read in %d places, so problems there may have been missed.": "Die Antwort des LLM konnte an %d Stellen nicht gelesen werden, daher wurden dort eventuell Probleme übersehen.",
         "Translating…": "Übersetzung läuft…",
         "Translating… (loading the LLM)": "Übersetzung läuft… (LLM wird geladen)",
         "Translating %1$d/%2$d": "Übersetzung läuft %1$d/%2$d",

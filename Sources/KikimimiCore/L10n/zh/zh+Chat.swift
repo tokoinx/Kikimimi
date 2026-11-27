@@ -42,6 +42,7 @@ extension L10nTables {
         "Read %@": "已读取 %@",
         "Read “%1$@” (%2$@)": "已读取“%1$@”（%2$@）",
         "Stopped.": "已停止。",
+        "The LLM returned an empty answer.": "LLM 返回了空回答。",
         "Web pages were read for this answer, so its setting changes are not offered.": "此回答读取过网页，因此不提供设置更改建议。",
         "%d action in the answer was not used.": "回答中有 %d 个操作未被使用。",
         "%d actions in the answer were not used.": "回答中有 %d 个操作未被使用。",

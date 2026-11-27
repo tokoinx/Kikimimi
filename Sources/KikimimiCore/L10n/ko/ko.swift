@@ -69,6 +69,8 @@ extension L10nTables {
         "The audit was canceled. Results up to the point it reached are applied.": "점검이 취소되었습니다. 진행된 부분까지의 결과를 적용했습니다.",
         "The LLM audit stopped partway. Results up to the point it reached are applied: %@": "LLM 점검이 도중에 멈췄습니다. 진행된 부분까지의 결과를 적용했습니다: %@",
         "The LLM could not audit, so only the repetition check was applied: %@": "LLM이 점검하지 못해 반복 확인 결과만 적용했습니다: %@",
+        "The LLM’s answer could not be read in %d place, so problems there may have been missed.": "LLM의 답변을 %d곳에서 읽을 수 없어, 그 부분의 문제를 놓쳤을 수 있습니다.",
+        "The LLM’s answer could not be read in %d places, so problems there may have been missed.": "LLM의 답변을 %d곳에서 읽을 수 없어, 그 부분의 문제를 놓쳤을 수 있습니다.",
         "Translating…": "번역 중…",
         "Translating… (loading the LLM)": "번역 중… (LLM 불러오는 중)",
         "Translating %1$d/%2$d": "번역 중 %1$d/%2$d",

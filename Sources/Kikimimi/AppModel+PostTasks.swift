@@ -221,6 +221,8 @@ extension AppModel {
                 if pauseIfRecording(.audit, job: job) { return }
                 job.postState = .running(.audit, message: preparing ? L("Auditing… (loading the LLM)") : L("Auditing…"), progress: nil)
                 let partial = LockedBox<AuditReport>()
+                // LLM の答えを読めなかった所の数 (書き切っていない答えなど。保存しない)
+                let unread = LockedBox<Int>()
                 do {
                     let report = try await llm.run(modelPath: selection.url.path, adapterPath: adapter,
                                                    shouldCancel: { flag.isSet }) { engine in
@@ -234,10 +236,18 @@ extension AppModel {
                                                                            progress: total > 0 ? Double(done) / Double(total) : nil)
                                               }
                                           },
-                                          onPartial: { partial.value = $0 })
+                                          onPartial: { partial.value = $0 },
+                                          onUnread: { unread.value = $0 })
                     }
                     adopt(report, in: job)
-                    job.postNote = adapterNote(job.postNote)
+                    var note = adapterNote(job.postNote)
+                    // 答えを読めなかった所があれば、そこの問題を見落としたかもしれないと知らせる
+                    if let count = unread.value, count > 0 {
+                        let warning = LPlural(count, one: "The LLM’s answer could not be read in %d place, so problems there may have been missed.",
+                                              other: "The LLM’s answer could not be read in %d places, so problems there may have been missed.")
+                        note = note.map { $0 + " " + warning } ?? warning
+                    }
+                    job.postNote = note
                 } catch {
                     let cancelled = flag.isSet || (error as? LLMError) == .cancelled
                     if hadLLMAudit {

@@ -265,6 +265,19 @@ enum ChatCheck {
              "fetches \(chat.fetchCount)")
         chat.turnResearchOff()
 
+        // 7b. 答えが空 (止めても失敗してもいない・ほかの知らせも無い): 何も返らなかった訳を、発言に知らせる
+        chat.selfTestReply = ""
+        chat.draft = "Hello"
+        chat.send()
+        let emptyFinished = await waitUntil(5) { !chat.isAnswering }
+        let lastMessage = chat.messages.last
+        let emptyNotices = lastMessage.flatMap { chat.extras[$0.id]?.notices } ?? []
+        step("an empty reply shows a notice",
+             emptyFinished && lastMessage?.role == .user && lastMessage?.text == "Hello"
+                && emptyNotices.count == 1 && emptyNotices.first?.kind == .warning
+                && emptyNotices.first?.text == L("The LLM returned an empty answer."),
+             "last role \(lastMessage.map { "\($0.role)" } ?? "none"), notices \(emptyNotices.map(\.text))")
+
         // 8. 片付け: 窓を閉じ、設定を元の値に戻す
         chat.selfTestReset()
         chat.fetcher = originalFetcher
