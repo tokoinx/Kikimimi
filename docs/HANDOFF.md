@@ -7,7 +7,7 @@
 - 確かめの手順 → Skill `kikimimi-verify` (`.claude/skills/kikimimi-verify/SKILL.md`)
 - 実機でまだ確かめていない事と、分かっている制限 → `README.md` の「検証状況」「既知の制限」
 
-最後に書き換えた日: 2026-11-27
+最後に書き換えた日: 2026-11-28
 
 ## 進み具合と決めた事
 
@@ -209,6 +209,7 @@
   - 確かめ (2 つを入れた後、手元): `swift test` は「Executed 632 tests, with 0 failures」。
   - CI (447deda。上の 2 つと、マージの記録 70be2ad を含む): build (run 46011977250) は Xcode 16.2・26.3 の 2 列とも success (2 列とも「Executed 632 tests, with 0 failures」、3000 行のアプリの確認の OK の 7 行、`narrow window: asked 880, got 880` が 2 行、「UI LOAD OK」は 3000 行と 8000 行の 2 つ)。「重い」は出ていない。CI の Mac (macOS 15) でも、4 つの操作の一覧の body は、2 列・3000 行と 8000 行のどれも 0 (`list bodies by action: … time tick 0, current row changes 0 … notes edit 0, practice dictation typing 0`)。`notes edit` は、中央 0.4〜0.6 ms・最大 64〜97 ms (20 回のうちの 1 回)。links は、走らなかった (README を変えていないコミット)。
   - 残っている事: LLM の失敗の道 (-1・-2・-3・-100・-101) の試験 (`LlamaEngine` の作り替えが要る)。追いかける・やめるの手での確かめ。11 言語での文の切れ。貼り付けた改行の画面での見え方。文に分けて訳し直す 100 行の測り。モデルの読み直しの待ち。LLM の監査と自動の直しの画面での確かめ (確認用の起動は 60 秒まで)。`LibraryWriter.trash` の文と動きの食い違い (利用者が決める事)。ドイツ語の見出しの折れ (上)。macOS 15 で 300 行がいっぺんに届いた時の重さの直し (試していない案: 小分けにして足す)。
+- 2026-11-28: 利用者の OK (「main へマージ」) で、「問題解決を進めた (6 回目)」の 2 つ (4f44152: 一覧の決まり 4 を、アプリの確認が回数で見る。447deda: 訳の列が狭い時は、行の印とボタンを訳の文の下に並べる) と、記録の 2 コミット (70be2ad・e2c01a9) を main にマージした (PR tokoinx/Kikimimi#23、マージ コミット 8029cc6。マージの直後、main と枝 e2c01a9 の中身は同じ)。マージの前の確かめ: 枝の先頭 e2c01a9 の build (run 46015988945) と links (run 46015988942)、PR の build (run 46022343940) は、どれも success (build は Xcode 16.2・26.3 の 2 列とも「Executed 632 tests, with 0 failures」、「UI LOAD OK」が 3000 行と 8000 行の 2 つ)。マージの後の main の CI (8029cc6): build (run 46026323806) は 1 回目で 2 列とも success (2 列とも「Executed 632 tests, with 0 failures」「UI LOAD OK」が 2 つ)、links (run 46026323425) も success。この 3 つの build のどれにも「重い」は出ていない。ランナーが付かない取り消しは、起きていない。
 - 2026-11-20: **LLM とのチャット**を足した (コミット 1ef6407)。使い方と注意は `README.md` の「LLM とのチャット」、確かめた事は「検証状況」、制限は「既知の制限」。決めた形:
   - 入口は、メニューの「ファイル」›「LLM とチャット」(⇧⌘L) と、メインの窓のツールバーの絵のボタン。別の窓 (`Window(id: "chat")`)。
   - 答えるのは、設定で選んでいる Qwen3.5 (差分 (LoRA) は使わない)。答えを少しずつ出すため、`TextGenerating.generate(_:shouldCancel:onText:)` を足した。監査・翻訳が通る道は変えていない。会話は保存しない。
