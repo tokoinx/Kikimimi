@@ -87,6 +87,9 @@ final class LoadRun {
     /// メインが空くまでの秒と、そのあいだの見張りのいちばん長い待ち (秒。合図が無ければ nil)
     var burstsTimed = 0
     var burstCatchUps: [(total: Double, longestWait: Double?)] = []
+    /// 段階 4 の burst のうち、小刻みに追いつかなかった回の、内わけの行の番号 (appendDetails) と、measured の番号。
+    /// 段階 4 が終わってから、countBurstWaits が、目安と比べる値を直す
+    var burstFixUps: [(detail: Int, sample: Int)] = []
     /// 小刻みに追いつくのが、待つ上限 (10 秒) までに終わらなかった時の注記の行
     var catchUpNotes: [String] = []
 
