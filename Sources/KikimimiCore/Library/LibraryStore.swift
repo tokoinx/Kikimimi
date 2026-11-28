@@ -67,9 +67,11 @@ public struct LibraryStore: Sendable {
             let url = documentURL(for: folderID)
             guard fm.fileExists(atPath: url.path) else { continue }
             if let data = try? Data(contentsOf: url),
-               var document = try? Self.decoder().decode(SavedDocument.self, from: data) {
+               var document = try? JSONInput.decode(SavedDocument.self, from: data, with: Self.decoder()) {
                 // フォルダの名前のほうを正とする (フォルダごと写したときも、同じ所に保存し直せるように)
                 document.id = folderID
+                // 保存ファイルの時刻は、ここで 1 度だけ使える範囲に直す (ファイルは書き換えない)
+                document.transcript = document.transcript.timesClamped()
                 document.notes = readNotes(id: folderID)
                 document.versions = document.versions.filter {
                     fm.fileExists(atPath: versionURL(documentID: folderID, versionID: $0.id).path)
@@ -87,8 +89,9 @@ public struct LibraryStore: Sendable {
     public func load(id: UUID) -> SavedDocument? {
         let fm = FileManager.default
         guard let data = try? Data(contentsOf: documentURL(for: id)),
-              var document = try? Self.decoder().decode(SavedDocument.self, from: data) else { return nil }
+              var document = try? JSONInput.decode(SavedDocument.self, from: data, with: Self.decoder()) else { return nil }
         document.id = id
+        document.transcript = document.transcript.timesClamped()
         document.notes = readNotes(id: id)
         document.versions = document.versions.filter {
             fm.fileExists(atPath: versionURL(documentID: id, versionID: $0.id).path)
@@ -177,7 +180,9 @@ public struct LibraryStore: Sendable {
     /// 版 1 つの中身を読む
     public func loadVersion(documentID: UUID, versionID: UUID) throws -> DocumentVersion {
         let data = try Data(contentsOf: versionURL(documentID: documentID, versionID: versionID))
-        return try Self.decoder().decode(DocumentVersion.self, from: data)
+        var version = try JSONInput.decode(DocumentVersion.self, from: data, with: Self.decoder())
+        version.transcript = version.transcript.timesClamped()
+        return version
     }
 
     /// 版を 1 つ消す (ファイルと一覧から)。ファイルがもう無くても、一覧からは外す

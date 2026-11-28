@@ -14,6 +14,12 @@ import SwiftUI
 enum KikimimiMain {
     static func main() {
         let args = CommandLine.arguments
+        // 知らない確認の名前 (書き間違い) は、窓を出す前に断る (どの確認も始まらず、アプリが残り続けるので)
+        if let unknown = LaunchMode.unknownSelfTests(in: args).first {
+            let known = LaunchMode.selfTestArguments.joined(separator: ", ")
+            FileHandle.standardError.write(Data("unknown self-test \"\(unknown)\"; known self-tests: \(known)\n".utf8))
+            exit(2)
+        }
         if let i = args.firstIndex(of: "--selftest-llm") {
             let path = i + 1 < args.count ? args[i + 1] : ""
             // --translate-to <コード>: 翻訳の例を、その言語へ訳す (無ければ、これまでどおり日本語へ)

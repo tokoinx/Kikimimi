@@ -108,6 +108,41 @@ final class LaunchModeTests: XCTestCase {
         XCTAssertEqual(found, [], "decide whether this is a self-test launch only in KikimimiCore/LaunchMode.swift: use LaunchMode.current.isSelfTest (or LaunchMode(arguments:).isSelfTest)")
     }
 
+    /// 知っている確認の名前の一覧 (LaunchMode.selfTestArguments) と、アプリが実際に見ている名前
+    /// (Sources/Kikimimi の "--selftest-…" の文字列) が、ずれていない。足した確認を一覧に書き忘れると、
+    /// 入り口が「知らない確認」として断ってしまう
+    func testKnownSelfTestNamesMatchTheApp() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let app = root.appendingPathComponent("Sources/Kikimimi")
+        let walker = try XCTUnwrap(FileManager.default.enumerator(at: app, includingPropertiesForKeys: nil))
+        let literal = try NSRegularExpression(pattern: #""(--selftest-[A-Za-z0-9-]+)""#)
+        var used = Set<String>()
+        for case let url as URL in walker where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            let ns = text as NSString
+            for match in literal.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+                used.insert(ns.substring(with: match.range(at: 1)))
+            }
+        }
+        XCTAssertFalse(used.isEmpty, "found no self-test names in Sources/Kikimimi")
+        XCTAssertEqual(used, Set(LaunchMode.selfTestArguments),
+                       "LaunchMode.selfTestArguments must list exactly the self-test names the app looks at")
+        XCTAssertEqual(LaunchMode.selfTestArguments.count, Set(LaunchMode.selfTestArguments).count)
+    }
+
+    /// 知らない確認の名前だけを拾う (知っている名前・`--selftest-` で始まらない引数は拾わない)
+    func testUnknownSelfTests() {
+        let bin = "/Applications/Kikimimi.app/Contents/MacOS/Kikimimi"
+        XCTAssertEqual(LaunchMode.unknownSelfTests(in: [bin, "--selftest-typo"]), ["--selftest-typo"])
+        XCTAssertEqual(LaunchMode.unknownSelfTests(in: [bin, "--selftest-ui-load", "10", "--selftest-"]), ["--selftest-"])
+        XCTAssertEqual(LaunchMode.unknownSelfTests(in: [bin, "--selftest-UI-LOAD"]), ["--selftest-UI-LOAD"])
+        for name in LaunchMode.selfTestArguments {
+            XCTAssertEqual(LaunchMode.unknownSelfTests(in: [bin, name, "x"]), [], name)
+        }
+        XCTAssertEqual(LaunchMode.unknownSelfTests(in: [bin, "--version", "x--selftest-typo", "-selftest-typo"]), [])
+    }
+
     func testNoSettingsWritesOutsideSettingsWriter() throws {
         let found = try LaunchSourceScan.run().settingsWrites
         XCTAssertEqual(found, [], "write UserDefaults only through SettingsWriter (KikimimiCore/SettingsWriter.swift): use SettingsWriter.set / remove / setForThisLaunch")

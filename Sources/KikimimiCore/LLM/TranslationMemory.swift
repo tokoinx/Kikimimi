@@ -326,7 +326,7 @@ public struct TranslationMemory: Codable, Hashable, Sendable {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let data = try? Data(contentsOf: url),
-              let memory = try? decoder.decode(TranslationMemory.self, from: data) else { return TranslationMemory() }
+              let memory = try? JSONInput.decode(TranslationMemory.self, from: data, with: decoder) else { return TranslationMemory() }
         return memory
     }
 
@@ -336,7 +336,7 @@ public struct TranslationMemory: Codable, Hashable, Sendable {
         guard let data = try? Data(contentsOf: url), !data.isEmpty else { return (TranslationMemory(), nil) }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let memory = try? decoder.decode(TranslationMemory.self, from: data) { return (memory, nil) }
+        if let memory = try? JSONInput.decode(TranslationMemory.self, from: data, with: decoder) { return (memory, nil) }
         let stamp = DateFormatter()
         stamp.locale = Locale(identifier: "en_US_POSIX")
         stamp.dateFormat = "yyyyMMdd-HHmmss"

@@ -336,9 +336,51 @@ struct LanguageTally: Equatable {
     }
 }
 
+/// 秒数として使える範囲。保存ファイルには、どんな数でも書けてしまう (1e300・負の値など) ので、
+/// 読み込む所と、時刻を文字にする所で、この範囲に直してから使う
+public enum TimeRange {
+    /// いちばん大きい秒数 (99999 時間 59 分 59 秒)。ミリ秒にしても Int に十分に入る
+    public static let maxSeconds: TimeInterval = 99_999 * 3600 + 59 * 60 + 59
+
+    /// 数でない値・負の値は 0、上限より大きい値 (無限大も) は上限にする
+    public static func clamped(_ seconds: TimeInterval) -> TimeInterval {
+        guard !seconds.isNaN else { return 0 }
+        return min(max(seconds, 0), maxSeconds)
+    }
+}
+
+extension TranscriptSegment {
+    /// 始まり・終わりを使える範囲に直した区間 (終わりは始まりより前にしない)
+    public func timesClamped() -> TranscriptSegment {
+        var copy = self
+        copy.start = TimeRange.clamped(start)
+        copy.end = max(copy.start, TimeRange.clamped(end))
+        return copy
+    }
+}
+
+extension Transcript {
+    /// 区間の始まり・終わり、長さ (duration)、かかった時間 (elapsed) を、使える範囲に直した結果。
+    /// 監査の記録が覚えている直す前の区間も直す。保存ファイルから読んだ直後に 1 度だけ使う
+    public func timesClamped() -> Transcript {
+        var copy = self
+        copy.segments = segments.map { $0.timesClamped() }
+        copy.duration = TimeRange.clamped(duration)
+        copy.elapsed = TimeRange.clamped(elapsed)
+        if var audit = copy.audit {
+            for i in audit.changes.indices {
+                audit.changes[i].original = audit.changes[i].original.timesClamped()
+            }
+            copy.audit = audit
+        }
+        return copy
+    }
+}
+
 public enum TimeFormat {
     private static func split(_ seconds: TimeInterval) -> (h: Int, m: Int, s: Int, ms: Int) {
-        let total = Int((max(0, seconds) * 1000).rounded())
+        // 範囲の外の値 (無限大・NaN・とても大きい値・負の値) は、端の値にしてから整数にする
+        let total = Int((TimeRange.clamped(seconds) * 1000).rounded())
         return (total / 3_600_000, total % 3_600_000 / 60_000, total % 60_000 / 1000, total % 1000)
     }
 
@@ -356,7 +398,7 @@ public enum TimeFormat {
 
     /// `mm:ss` または `h:mm:ss`
     public static func short(_ seconds: TimeInterval) -> String {
-        let total = Int(max(0, seconds))
+        let total = Int(TimeRange.clamped(seconds))
         let h = total / 3600, m = total % 3600 / 60, s = total % 60
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%02d:%02d", m, s)
     }

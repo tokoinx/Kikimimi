@@ -19,6 +19,22 @@ public enum LaunchMode: Equatable, Sendable {
         "--version"
     ]
 
+    /// 知っている確認の名前 (起動の入り口と、各確認が見ている物と同じ。LaunchModeTests がソースを読んで、ずれていないかを見る)
+    public static let selfTestArguments: [String] = [
+        "--selftest-chat",
+        "--selftest-launch",
+        "--selftest-llm",
+        "--selftest-llm-queue",
+        "--selftest-ui-load",
+        "--selftest-whisper"
+    ]
+
+    /// `--selftest-` で始まるのに、知っている確認の名前に無い引数 (書き間違い)。
+    /// 確認用の起動と見るのに、どの確認も始まらず、窓の在るアプリが残り続けるので、入り口で断る
+    public static func unknownSelfTests(in arguments: [String]) -> [String] {
+        arguments.filter { $0.hasPrefix("--selftest-") && !selfTestArguments.contains($0) }
+    }
+
     /// 引数から決める (確認用を先に見る。KikimimiMain も、確認用の引数を道具の引数より先に見る)
     public init(arguments: [String]) {
         if arguments.contains(where: { $0.hasPrefix("--selftest-") }) {

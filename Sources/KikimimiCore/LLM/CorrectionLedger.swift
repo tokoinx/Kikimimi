@@ -267,7 +267,7 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let data = try? Data(contentsOf: url),
-              let ledger = try? decoder.decode(CorrectionLedger.self, from: data) else { return CorrectionLedger() }
+              let ledger = try? JSONInput.decode(CorrectionLedger.self, from: data, with: decoder) else { return CorrectionLedger() }
         return ledger
     }
 
@@ -277,7 +277,7 @@ public struct CorrectionLedger: Codable, Hashable, Sendable {
         guard let data = try? Data(contentsOf: url), !data.isEmpty else { return (CorrectionLedger(), nil) }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let ledger = try? decoder.decode(CorrectionLedger.self, from: data) { return (ledger, nil) }
+        if let ledger = try? JSONInput.decode(CorrectionLedger.self, from: data, with: decoder) { return (ledger, nil) }
         let stamp = DateFormatter()
         stamp.locale = Locale(identifier: "en_US_POSIX")
         stamp.dateFormat = "yyyyMMdd-HHmmss"

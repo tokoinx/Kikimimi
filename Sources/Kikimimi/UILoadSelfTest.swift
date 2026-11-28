@@ -58,12 +58,21 @@ import KikimimiCore
 /// 再生の係で、遅くした 1 行・繰り返し・間・自動で次へ・次と前とまた・スペースキー を確かめる (30 秒ほど。音を出せない Mac では飛ばす)。
 /// `--screenshots` なら、そのあと練習の絵 (09 隠した行と目のボタン、10 書き取りの欄と答え合わせ) も残す
 enum UILoadSelfTest {
+    /// 受け付ける、いちばん少ない行の数。これより少ない数は、この数にする。
+    /// 確認用の結果 (makeSegments・markEditedTranslations) で、訳の在る行は 0・6・12・18・24・30・36… 番目 (6 行に 1 行)。
+    /// その 4 つに 1 つ (0・24…) が直した訳、別の 4 つに 1 つ (12・36…) が「要確認」の印の行になる。
+    /// いちばん多くの行を要るのは、保存の確認 (LIBRARY CHECK) の「印の付いた訳に『この訳でよい』」: 印の行を 2 つ要る
+    /// (2 つめを確かめ、1 つめは絵 13 のために残す) ので、36 番目の行まで = 37 行。
+    /// ほかの確認が要る行は、これより少ない: 行の直し (印の無い訳の行 6 番目と、その次の 7 番目) は 8 行、
+    /// 練習の確認 (5 秒の行 = 2 番目と、その次) は 4 行、行の再生の確認 (5 秒の行) は 3 行、絵 02 (3 番目) は 4 行
+    static let fewestRows = 37
+
     /// 起動の前に呼ぶ。確認を予約するだけで、すぐに戻る
     static func arm(arguments: [String]) {
         let rows: Int = {
             guard let i = arguments.firstIndex(of: "--selftest-ui-load"), i + 1 < arguments.count,
                   let value = Int(arguments[i + 1]), value > 0 else { return 3000 }
-            return min(max(value, 10), 50_000)
+            return min(max(value, fewestRows), 50_000)
         }()
         let reportPath = value(after: "--report", in: arguments)
         let audio = value(after: "--audio", in: arguments).map {

@@ -147,7 +147,7 @@ public struct PracticeSettings: Codable, Hashable, Sendable {
     /// JSON の文字列から読む。nil や読めない文字列なら決まりの設定
     public static func load(jsonString: String?) -> PracticeSettings {
         guard let jsonString, let data = jsonString.data(using: .utf8),
-              let settings = try? JSONDecoder().decode(PracticeSettings.self, from: data) else {
+              let settings = try? JSONInput.decode(PracticeSettings.self, from: data, with: JSONDecoder()) else {
             return PracticeSettings()
         }
         return settings

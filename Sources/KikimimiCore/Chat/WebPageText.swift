@@ -5,29 +5,103 @@ public enum WebPageText {
     /// 読む HTML の長さの上限 (UTF-16 の数)。これより後ろは見ない
     public static let maxHTMLLength = 2_000_000
 
+    // タグの中身は `[^<>]*` で探す (`[^>]*` だと、閉じない `<` ごとに文の終わりまで探しに行き、長さの 2 乗の時間になる。
+    // 2026-11-28 に、`<` だけが 3.2 万字並ぶ文で 6.5 秒かかった)。中に `<` を含む、めずらしいタグは、文として残る
     public static func extract(html: String) -> (title: String, text: String) {
         var s = html.count > maxHTMLLength ? String(html.prefix(maxHTMLLength)) : html
 
         // 中身ごと捨てる物: コメント・script・style・noscript・svg・template
         s = replace(#"<!--[\s\S]*?(?:-->|$)"#, in: s, with: " ")
         for tag in ["script", "style", "noscript", "svg", "template"] {
-            s = replace("<\(tag)\\b[^>]*>[\\s\\S]*?(?:</\(tag)\\s*>|$)", in: s, with: " ")
+            s = replace("<\(tag)\\b[^<>]*>[\\s\\S]*?(?:</\(tag)\\s*>|$)", in: s, with: " ")
         }
         // 題名は、取り出してから本文から外す
+        let titles = takeTitles(from: s)
         var title = ""
-        if let range = firstMatch(#"<title\b[^>]*>([\s\S]*?)</title\s*>"#, in: s) {
-            title = collapse(decodeEntities(replace(#"<[^>]*>"#, in: range, with: "")))
+        if let inner = titles.title {
+            title = collapse(decodeEntities(replace(#"<[^<>]*>"#, in: inner, with: "")))
                 .replacingOccurrences(of: "\n", with: " ")
         }
-        s = replace(#"<title\b[^>]*>[\s\S]*?</title\s*>"#, in: s, with: " ")
+        s = titles.rest
         // 区切りになるタグは改行に、表の升は空白に、ほかのタグは取るだけ
-        s = replace(#"<(?:br|hr)\b[^>]*>"#, in: s, with: "\n")
-        s = replace(#"</?(?:p|div|li|ul|ol|dl|dt|dd|h[1-6]|tr|table|thead|tbody|section|article|header|footer|nav|aside|main|blockquote|pre|figure|figcaption|form|fieldset|details|summary|address)\b[^>]*>"#,
+        s = replace(#"<(?:br|hr)\b[^<>]*>"#, in: s, with: "\n")
+        s = replace(#"</?(?:p|div|li|ul|ol|dl|dt|dd|h[1-6]|tr|table|thead|tbody|section|article|header|footer|nav|aside|main|blockquote|pre|figure|figcaption|form|fieldset|details|summary|address)\b[^<>]*>"#,
                     in: s, with: "\n")
-        s = replace(#"</?(?:td|th)\b[^>]*>"#, in: s, with: " ")
-        s = replace(#"<[^>]*>"#, in: s, with: "")
+        s = replace(#"</?(?:td|th)\b[^<>]*>"#, in: s, with: " ")
+        s = replace(#"<[^<>]*>"#, in: s, with: "")
         // 閉じていない < で始まるかけら (切れた HTML) は残す。文字参照を戻してから、空白をまとめる
         return (title, collapse(decodeEntities(s)))
+    }
+
+    /// 題名 (初めの、閉じている `<title …>…</title>` の中身) を取り出し、閉じている title を全部、本文から空白に変える。
+    /// 正規表現で探すと、閉じない `<title>` ごとに文の終わりまで探し直す (長さの 2 乗の時間) ので、
+    /// 文字の検索で、前から 1 度だけ見ていく。閉じない `<title>` は、タグとして後で取られ、その後ろの文は残る (前と同じ)
+    static func takeTitles(from text: String) -> (title: String?, rest: String) {
+        let ns = text as NSString
+        let length = ns.length
+        let lessThan: unichar = 60, greaterThan: unichar = 62
+        var title: String?
+        var rest = ""
+        var copied = 0
+        var from = 0
+        while from < length {
+            let open = ns.range(of: "<title", options: .caseInsensitive, range: NSRange(location: from, length: length - from))
+            guard open.location != NSNotFound else { break }
+            var cursor = open.location + open.length
+            // `<titlex` のように、名前が続く物は title ではない
+            if cursor < length, isWordUnit(ns.character(at: cursor)) {
+                from = open.location + 1
+                continue
+            }
+            // 開くタグの終わりの `>`。その前に `<` が来たら、タグではない
+            var openEnd: Int?
+            while cursor < length {
+                let unit = ns.character(at: cursor)
+                if unit == greaterThan { openEnd = cursor + 1; break }
+                if unit == lessThan { break }
+                cursor += 1
+            }
+            guard let contentStart = openEnd else {
+                from = max(cursor, open.location + 1)
+                continue
+            }
+            // 閉じるタグ `</title` + 空白 + `>`
+            var close: (start: Int, end: Int)?
+            var search = contentStart
+            while search < length {
+                let found = ns.range(of: "</title", options: .caseInsensitive,
+                                     range: NSRange(location: search, length: length - search))
+                guard found.location != NSNotFound else { break }
+                var k = found.location + found.length
+                while k < length, isSpaceUnit(ns.character(at: k)) { k += 1 }
+                if k < length, ns.character(at: k) == greaterThan {
+                    close = (found.location, k + 1)
+                    break
+                }
+                search = found.location + 1
+            }
+            // 閉じる物が無ければ、この後ろの title も閉じない
+            guard let close else { break }
+            if title == nil {
+                title = ns.substring(with: NSRange(location: contentStart, length: close.start - contentStart))
+            }
+            rest += ns.substring(with: NSRange(location: copied, length: open.location - copied))
+            rest += " "
+            copied = close.end
+            from = close.end
+        }
+        rest += ns.substring(from: copied)
+        return (title, rest)
+    }
+
+    /// 正規表現の `\w` の仲間 (文字・数字・`_`)。対になる半分の文字 (絵文字など) も、文字とみなす
+    private static func isWordUnit(_ unit: unichar) -> Bool {
+        guard let scalar = Unicode.Scalar(unit) else { return true }
+        return scalar == "_" || scalar.properties.isAlphabetic || scalar.properties.numericType != nil
+    }
+
+    private static func isSpaceUnit(_ unit: unichar) -> Bool {
+        Unicode.Scalar(unit)?.properties.isWhitespace ?? false
     }
 
     /// よく在る文字参照と、数値参照を戻す (1 回だけ。`&amp;lt;` は `&lt;` になる)

@@ -161,13 +161,14 @@ public enum ChatActionParser {
     /// 印を取り除き、印だけだった行と、続いた空行と、終わりの空白を片付ける
     static func removing(_ markers: [Marker], from text: String) -> String {
         guard !markers.isEmpty else { return text }
-        var out = ""
-        var cursor = text.startIndex
-        for marker in markers {
-            out += text[cursor..<marker.range.lowerBound]
-            cursor = marker.range.upperBound
+        var out = cut(markers, from: text)
+        // 印を取り除くと、前後がつながって新しい印になる事が在る (`[[se` + `[[set a=b]]` + `t c=d]]` → `[[set c=d]]`)。
+        // その印は当てずに、残らなくなるまで取り除く (1 回ごとに文が短くなるので、必ず終わる)
+        var more = findMarkers(in: out)
+        while !more.isEmpty {
+            out = cut(more, from: out)
+            more = findMarkers(in: out)
         }
-        out += text[cursor...]
         // 行末の空白を落とし、3 つ以上続く改行 (空行 2 つ以上) を 1 つの空行にする
         let lines = out.components(separatedBy: "\n").map { line -> String in
             var l = Substring(line)
@@ -181,5 +182,17 @@ public enum ChatActionParser {
         }
         while cleaned.last?.isEmpty == true { cleaned.removeLast() }
         return cleaned.joined(separator: "\n")
+    }
+
+    /// 印の所を、文から切り取る (印は、文の前から順に並んでいる)
+    private static func cut(_ markers: [Marker], from text: String) -> String {
+        var out = ""
+        var cursor = text.startIndex
+        for marker in markers {
+            out += text[cursor..<marker.range.lowerBound]
+            cursor = marker.range.upperBound
+        }
+        out += text[cursor...]
+        return out
     }
 }

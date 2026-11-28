@@ -182,7 +182,8 @@ struct TranscriptDetailView: View {
                 stat(L("Length"), TimeFormat.short(t.duration))
                 stat(L("Processing"), L("%.1f s", t.elapsed))
                 if let rtf = t.realTimeFactor, rtf > 0 {
-                    let speed = 1 / rtf
+                    // かかった時間がとても短い (保存ファイルの値など) と、速さが Int に入らない (無限大にもなる) ので、上限で止める
+                    let speed = min(1 / rtf, 1_000_000)
                     stat(L("Speed"), speed >= 10 ? L("%d×", Int(speed)) : L("%.1f×", speed))
                 }
                 stat(L("Segments"), "\(t.segments.count)")
