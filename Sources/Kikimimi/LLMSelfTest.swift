@@ -25,6 +25,12 @@ enum LLMSelfTest {
         }
         log("whisper.cpp: " + WhisperContext.systemInfo.trimmingCharacters(in: .whitespacesAndNewlines))
         log("llama.cpp:   " + LlamaEngine.systemInfo.trimmingCharacters(in: .whitespacesAndNewlines))
+        // 本物のエンジンの読み込みの失敗 (壊れたモデル・モデルでないファイル・壊れた差分)。ふだんの読み込みより前に行う:
+        // llama.cpp がここで落ちた時に、どの確かめで落ちたかがすぐわかり、メモリもふだんのモデルと重ならない
+        guard LLMFailureSelfTest.loadFailures(modelPath: modelPath, useGPU: useGPU) else {
+            log("SELFTEST FAILED: a load-failure check of the real engine went wrong")
+            return 1
+        }
         do {
             var clock = Date()
             let engine = try LlamaEngine(modelPath: modelPath, options: LlamaOptions(gpuLayers: useGPU ? -1 : 0))
@@ -62,6 +68,11 @@ enum LLMSelfTest {
             }
             guard wrongBans.isEmpty else {
                 log("SELFTEST FAILED: the Japanese-only token filter is wrong for \(wrongBans.map(\.0))")
+                return 1
+            }
+            // 長すぎる文を断る・途中で止める。この後の翻訳・監査が、失敗の後でもふつうに動く事も見る
+            guard LLMFailureSelfTest.generateFailures(engine: engine) else {
+                log("SELFTEST FAILED: a generate-failure check of the real engine went wrong")
                 return 1
             }
 

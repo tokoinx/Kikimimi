@@ -69,7 +69,7 @@ extension LoadRun {
             notes.append("UI LOAD: note: \(label) at \(detail.rowsBefore) rows built \(detail.bodies) row bodies"
                          + " (idle after \(f(detail.idleSeconds)) ms, longest wait \(wait)): the list built the rows"
                          + " between the old end and the new end. Seen on macOS 15 when 300 rows arrive at once while"
-                         + " following (docs/HANDOFF.md, 2026-11-27).")
+                         + " following (docs/HANDOFF-ARCHIVE.md, 2026-11-27).")
         }
         return lines + notes
     }
