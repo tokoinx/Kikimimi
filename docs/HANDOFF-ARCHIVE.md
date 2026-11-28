@@ -740,3 +740,14 @@ LLM とのチャット (2026-11-20、1ef6407):
   - 見ていない事: 数えた値が目安 (1.5 秒) を越えて「重い」になる所 (値が待ちのほうへ切り替わる所までを見た)。
 - **Xcode 16.2 の列の、小刻みの 1 回目の待ち** (前の項の (3) の続き): 小刻みを入れてからの build を数え直すと、3000 行の確認の 16.2 の列の、いちばん長い待ちは、243.3・232.6・313.9・240.2・58.9・135.6 ms、92.5 ms (main の 9a8cef7 の build)。毎回ではなかった。
 - 確かめ (手元、(2) を入れた後): `swift test` は「Executed 656 tests, with 0 failures」。アプリの確認 (3000 行、音声と絵つき。小刻みは切) は、OK の 7 行が出て終了コード 0 (`time tick` の中央 10.1 ms)。300 行の回は、3 回とも `counted … (idle)` (81.4・85.5・84.0 ms)。任せた側は、小刻みを入にした形でも走らせた (終了コード 0、3 回とも `counted … (longest wait during the catch-up)` で 33.8・45.8・48.6 ms)。
+
+### 2026-11-28 (続き 3): PR 27 のマージと、目安を越えると「重い」で止まる事の確かめ
+
+- **main へのマージ**: 利用者の OK (「main へマージ」「続けてマージ」) で、c2cd2be (300 行の回の測りの見落としの直しと、記録) を main にマージした (PR tokoinx/Kikimimi#27、マージ コミット ff158cd。マージの直後、main と枝 c2cd2be の中身は同じ)。
+  - マージの前の確かめ: 枝の先頭 c2cd2be の build (run 46119997124) と、PR の build (run 46122717968) は、どちらも success (Xcode 16.2・26.3 の 2 列とも「Executed 656 tests, with 0 failures」、「UI LOAD OK」が 3000 行と 8000 行の 2 つ)。CI の Mac (小刻みが入) では、300 行の回は `counted … (longest wait during the catch-up)` で、段階 4 の 1 回目は 20.1〜181.3 ms (181.3 ms は、16.2 の列の 3000 行の確認)。
+  - マージの後の main の CI (ff158cd): build (run 46125962786) は 1 回目で 2 列とも success (2 列とも「Executed 656 tests, with 0 failures」「UI LOAD OK」が 2 つ)。links は、走らなかった (README を変えていないコミット)。
+- **目安を越えると「重い」で止まる事を確かめた** (前の項で「見ていない」と書いた事。確かめだけで、コードは変えていない): わざと、段階 4 の 1 回目の回の「空いた」の 0.15 秒後に、メインを 1.7 秒止めて、アプリの確認 (3000 行、小刻みは切) を走らせた。
+  - その回の行: `idle after 120.5 ms, …, longest wait before the next append 1682.0 ms, counted 1682.0 ms (longest wait)`。操作の行: `n 3, median 120.2 ms, p95 1682.0 ms, max 1682.0 ms`。
+  - 出た「重い」は 2 行: `UI LOAD: SLOW ("burst: 300 segments delivered at once to the selected running job" max 1682 ms >= 1500 ms)` (今回の直しで、数えるようになった行) と、`UI LOAD: SLOW (watchdog max 1682 ms >= 1500 ms in "running job, single segments and bursts of 300")` (前から在る、段の全体の見張り)。終了コード 5。`UI LOAD OK` は出ない。ほかの確認 (LIBRARY・AUDIT FLOW・RETRANSLATE・PRACTICE・CHAT・ADAPTER MESSAGE) は OK。
+  - 止める仕掛けは外した (`git status --short` は空。手元のアプリも、仕掛けの無い形で作り直した)。
+- 途中で起きた事: この確かめの 1 回目は、主の会話の利用の上限で、任せた側を途中で止めた。止めた時、一時の仕掛け (1.7 秒止める 4 行) が作業フォルダに残っていたので、主の会話が外した (コミットには入っていない)。上限が戻った後に、初めからやり直した。

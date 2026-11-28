@@ -15,7 +15,7 @@
 
 ## いまの状態 (2026-11-28)
 
-- 作業の枝は `feature/auditor-translation`。main は 9a8cef7 (PR tokoinx/Kikimimi#26 まで入っている)。枝は、その後に、確認の測りの直し (300 行の回の値を、空くまでの時間と、その後のいちばん長い待ちの、長いほうにした) と、記録を足した状態 (アプリの動きは、main と同じ。main には、まだ入れていない)。
+- 作業の枝は `feature/auditor-translation`。main は ff158cd (PR tokoinx/Kikimimi#27 まで入っている)。枝だけに在るのは、その後の記録のコミットだけ (コードは、main と同じ)。
 - `swift test`: 656 件で失敗 0 (手元と、CI の Xcode 16.2・26.3 の 2 列)。
 - アプリの確認 (3000 行、音声と絵つき) の OK の行は 7 つ: UI LOAD・LIBRARY・AUDIT FLOW・RETRANSLATE・PRACTICE・CHAT・ADAPTER MESSAGE。終了コード 0。
 - 手元の Mac: macOS 14.8.3、M1、16 GB、Xcode 16.2。CI の Mac: macos-15 (仮想、3 コア、7 GB)。macOS 15 以降の実機は、無い。
