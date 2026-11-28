@@ -68,6 +68,7 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
     - `remember an edited pair in the learned corrections` → `saving the same pair again does not count it twice` → `restoring the heard text takes the pair back`: 1 語を「Kikimimi」に直して覚えさせると、台帳に 1 件・反映 1 回 (一時のファイルにも)。同じ組で保存し直しても 1 回のまま。戻すと 0 回。
     - `the job and the ledger are the same as before the learning steps`: 結果と台帳が、始める前と同じ。
   - `the self-test does not use the real learned corrections` (保存の確認の最後): 台帳の保存先が無く、本物の `learned-corrections.json` の有無・大きさ・更新の時刻が、保存の確認の前後で同じ。
+- LLM が失敗した時の段 (2026-11-28 に足した。偽の LLM が、失敗 `decodeFailed(-1)` を投げる・答えを途中で切る・空の答えを返す): `AUDIT FLOW: LLM fails at once: …`・`LLM fails partway: …`・`LLM fails with a previous LLM audit: …`・`the LLM answer is cut off: …`、`RETRANSLATE: LLM fails while translating: …`・`the next translation with a working LLM finishes`、`CHAT CHECK: an empty reply shows a notice`・`an LLM failure shows the error`・`a normal reply works after the failure`。どれも `ok` のはず。`FAILED`・`NG` なら、その確認の `… CHECK FAILED` の行と終了コード (7・9) になる。知らせの文・結果が変わっていない事・仕事が残っていない事を見ている。
 - 複数が失敗しても、返る終了コードは 1 つだけ (5 > 6 > 7 > 8 > 9 の順。`ADAPTER MESSAGE CHECK FAILED`・`AUDIT FLOW CHECK FAILED`・`RETRANSLATE CHECK FAILED` は 7 に入る)。終了コードが 5 でも、7 や 8 の失敗が隠れている事がある。`FAILED` の行を全部探す。
 - 音を出せない Mac (ふつうの再生で位置が進まない・音声を開けない) では、`UI LOAD: no audio playback here (…)` と `PRACTICE: skipped (no audio playback here)` が出て、1 行の再生と練習の確認は飛ばされる。この時 `PRACTICE CHECK OK` は出ないが、終了コードは 0 になりうる。「練習の確認は走らなかった」と報告する。
 - 絵を残せなくても終了コードは変わらない。`UI LOAD: screenshot failed …` の行で分かる。
@@ -133,14 +134,14 @@ description: ききみみの変更を確かめる手順 (ビルド → 試験 �
 ## 6. 手元では見ない事 (CI だけが見る)
 
 - 起動の確認 (`--selftest-launch` の 7 通り: シェルから・open で・reopen で・メニューで・何度か強制終了した後・ウインドウの復元 (参考)・ウインドウの無い写しが動いている時の open。ほかに「確認用の実行中の起動」の段)。
-- `--selftest-llm`、`--selftest-whisper`。`--selftest-whisper` は、`WHISPER: live segments: n … over … s; most within 0.25 s …, 0.5 s …, 1.0 s …, 3.0 s …; longest gap … s` の行も出す (文字起こしの途中の区間が、その幅の時間の中に、多くていくつ届いたか。参考で、OK・FAILED と終了コードには入らない)。
-- `--selftest-chat` (本物の LLM でチャットの答えを測る。手元で走らせるなら `make check-chat LLM=<モデル.gguf>`。`CHAT STREAM OK` (出している途中の文が 2 回以上届き、最後の文が答えと同じ) で終了コード 0。`CHAT EVAL: <id> ok|NG | <期待> | <答えの始め>` の 16 行と `CHAT EVAL: N/16` は参考で、点では落とさない。`--report <ファイル>` で同じ行をファイルにも書く)。
+- `--selftest-llm`、`--selftest-whisper`。`--selftest-llm` の `audit: N findings, … s, unread M` の `unread` は、LLM の答えを読めなかった所の数 (ふつうは 0。0 でなければ、その行を報告する)。`--selftest-whisper` は、`WHISPER: live segments: n … over … s; most within 0.25 s …, 0.5 s …, 1.0 s …, 3.0 s …; longest gap … s` の行も出す (文字起こしの途中の区間が、その幅の時間の中に、多くていくつ届いたか。参考で、OK・FAILED と終了コードには入らない)。
+- `--selftest-chat` (本物の LLM でチャットの答えを測る。手元で走らせるなら `make check-chat LLM=<モデル.gguf>`。`CHAT STREAM OK` (出している途中の文が 2 回以上届き、最後の文が答えと同じ) と、`CHAT FINISH: a tiny limit is reported as cut off: ok`・`CHAT FINISH: a normal answer is reported as complete: ok` (2026-11-28 に足した。答えが長さの上限で切れた事を、エンジンが返すか) の 3 つが揃って、終了コード 0。`CHAT EVAL: <id> ok|NG | <期待> | <答えの始め>` の 16 行と `CHAT EVAL: N/16` は参考で、点では落とさない。`--report <ファイル>` で同じ行をファイルにも書く)。
 - `--selftest-llm-queue` (本物の `LLMService` を通して、監査・翻訳の最中にチャットが割り込めるかを見る。手元で走らせるなら `make check-llm-queue LLM=<モデル.gguf>`。割り込みあり・なしで訳と監査の結果が同じ、最中に通った割り込みが 1 つ以上、中止した割り込みが監査・翻訳を止めない、で `LLM QUEUE OK`・終了コード 0。通らない時は `LLM QUEUE FAILED: 理由`・終了コード 1)。LLM の順番待ち (`LLMService.swift`・`LLMInterrupts.swift`) を変えた時は、手元でも走らせる。
 - 8000 行のアプリの確認 (参考。失敗にしない)。
 - Xcode 16.2 と 26.3 の両方でのビルド (手元の Xcode は 1 つ)。
 - macOS 14 の実機での動作は、利用者の Mac でだけ見られる (CI にも無い)。
 
-push の後の build は、`tools/ci-watch/watch-build.sh <run の ID>` で待てる (裏で走らせる。使い方は `tools/ci-watch/README.md`)。列が「取り消し (cancelled) で、ランナーの名前が空」の時は、GitHub の Mac が付かなかっただけで、コードの失敗ではない。この道具が、その列だけを走らせ直す (3 回まで)。失敗 (failure) の列は走らせ直さないので、ログを読む。
+push の後の build は、`tools/ci-watch/watch-build.sh <run の ID>` で待てる (裏で走らせる。使い方は `tools/ci-watch/README.md`)。列が「取り消し (cancelled) で、ランナーの名前が空」の時は、GitHub の Mac が付かなかっただけで、コードの失敗ではない。この道具は、走らせ直す命令 (`gh run rerun <run の ID> --repo tokoinx/Kikimimi --failed`) を出すだけで、自分では走らせ直さない (2026-11-28 に変えた。確認の出る命令を、台本で包まないため)。出た命令を、そのまま打つ (門の確認が出る)。失敗 (failure) の列の時は、命令を出さないので、ログを読む。
 
 ## 7. 報告に入れる物
 

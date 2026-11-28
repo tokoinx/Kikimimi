@@ -42,6 +42,8 @@ extension L10nTables {
         "Read %@": "Прочитано: %@",
         "Read “%1$@” (%2$@)": "Прочитано: «%1$@» (%2$@)",
         "Stopped.": "Остановлено.",
+        "The LLM returned an empty answer.": "LLM вернула пустой ответ.",
+        "The answer was cut off before it finished.": "Ответ оборвался, не закончившись.",
         "Web pages were read for this answer, so its setting changes are not offered.": "Для этого ответа читались веб-страницы, поэтому изменения настроек не предлагаются.",
         "%d action in the answer was not used.": "Неиспользованное действие в ответе: %d.",
         "%d actions in the answer were not used.": "Неиспользованных действий в ответе: %d.",

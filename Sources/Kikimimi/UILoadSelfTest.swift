@@ -88,8 +88,13 @@ enum UILoadSelfTest {
         // 絵のときは、狭いウインドウの絵 (21・22) のぶんも足す
         // 終わりの参考の段 (UILoadAppendDetail.swift。追いかけたまま・追いかけずに、300 行を 3 回ずつ足す) のぶんも足す
         // メモと書き取りの欄を 20 回ずつ書き換える段 (typingRound。数秒) のぶんも足す (typing。式が長いと型を決められないので分ける)
+        // LLM が途中で失敗した時の段 (監査を 3 回・翻訳を 2 回、LLM の代わりで。数秒) のぶんも足す (llmFailure)
         let typing = 10.0
-        let hangLimit = (screenshots == nil ? 200.0 : 310.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0 + 15.0 + 45.0 + typing
+        let llmFailure = 10.0
+        let base = (screenshots == nil ? 200.0 : 310.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0 + 15.0 + 45.0 + typing
+        // 終わりの実験の段 (UILoadExperiment.swift。結果を作って選び、300 行を足すのを 12〜18 回。手元で 30 秒ほど) のぶんも足す (experiment)
+        let experiment = LoadRun.experimentEnabled ? 100.0 : 0.0
+        let hangLimit = base + llmFailure + experiment
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
             finish(header + ["UI LOAD FAILED: the self-test did not finish in \(Int(hangLimit)) s"
                              + " (the main thread may be stuck)"], code: .hang, reportPath: reportPath)
@@ -195,6 +200,8 @@ enum UILoadSelfTest {
         // 参考の段: 一覧の終わりを追いかけていない時に 300 行を足す (目安と比べず、終了コードにも入れない)。
         // 文字起こし中の結果の行が増えるので、ほかの測り・絵・確認がすべて終わったあとに置く
         lines += await load.notFollowingRound()
+        // 実験の段 (UILoadExperiment.swift): 重くなる行の数で、足し方を変えて比べる (目安と比べず、終了コードにも入れない)
+        lines += await load.experimentRound()
         // 失敗した確認を集め、返す 1 つを UILoadExit の表 (順) で決める
         var failed: Set<UILoadExit> = []
         if slow { failed.insert(.slow) }

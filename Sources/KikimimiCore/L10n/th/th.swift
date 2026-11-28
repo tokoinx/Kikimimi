@@ -69,6 +69,8 @@ extension L10nTables {
         "The audit was canceled. Results up to the point it reached are applied.": "ยกเลิกการตรวจสอบแล้ว ใช้ผลเท่าที่ตรวจสอบได้",
         "The LLM audit stopped partway. Results up to the point it reached are applied: %@": "การตรวจสอบด้วย LLM หยุดกลางคัน ใช้ผลเท่าที่ตรวจสอบได้: %@",
         "The LLM could not audit, so only the repetition check was applied: %@": "LLM ตรวจสอบไม่ได้ จึงใช้เฉพาะการตรวจสอบการพูดซ้ำ: %@",
+        "The LLM’s answer could not be read in %d place, so problems there may have been missed.": "อ่านคำตอบของ LLM ไม่ได้ %d จุด จึงอาจพลาดปัญหาในจุดนั้น",
+        "The LLM’s answer could not be read in %d places, so problems there may have been missed.": "อ่านคำตอบของ LLM ไม่ได้ %d จุด จึงอาจพลาดปัญหาในจุดนั้น",
         "Translating…": "กำลังแปล…",
         "Translating… (loading the LLM)": "กำลังแปล… (กำลังโหลด LLM)",
         "Translating %1$d/%2$d": "กำลังแปล %1$d/%2$d",

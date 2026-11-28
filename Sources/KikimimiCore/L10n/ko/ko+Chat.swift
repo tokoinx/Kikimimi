@@ -42,6 +42,8 @@ extension L10nTables {
         "Read %@": "%@을(를) 읽었습니다",
         "Read “%1$@” (%2$@)": "“%1$@”(%2$@)을(를) 읽었습니다",
         "Stopped.": "중지했습니다.",
+        "The LLM returned an empty answer.": "LLM이 빈 답변을 반환했습니다.",
+        "The answer was cut off before it finished.": "답변이 끝나기 전에 잘렸습니다.",
         "Web pages were read for this answer, so its setting changes are not offered.": "이 답변에서는 웹 페이지를 읽었으므로 설정 변경 제안을 표시하지 않습니다.",
         "%d action in the answer was not used.": "답변 속 동작 %d개를 사용하지 않았습니다.",
         "%d actions in the answer were not used.": "답변 속 동작 %d개를 사용하지 않았습니다.",

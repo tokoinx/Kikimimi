@@ -27,6 +27,7 @@ extension LoadRun {
         let selectedBefore = model.selectedJob
         let standIn = RetranslateStandIn()
         var made: Job?
+        var failing: Job?
         defer {
             // 変えた物を、始める前と同じに戻す (途中で失敗して戻った時も)
             model.llm.selfTestGenerator = nil
@@ -35,6 +36,7 @@ extension LoadRun {
             model.errorMessage = errorBefore
             model.select(selectedBefore)
             if let made { model.delete(made) }
+            if let failing { model.delete(failing) }
             model.flushLibrary()
         }
 
@@ -173,6 +175,58 @@ extension LoadRun {
         step("the history sheet marks the version as automatic",
              badge == L("Automatic (before translating again)") && manualBadge == nil,
              "badge \(badge ?? "none"), manual \(manualBadge ?? "none")")
+
+        // 6. 翻訳の途中で LLM が失敗した時 (llama.cpp の失敗 -1 を、LLM の代わりが投げる)。
+        // 半分だけ訳の在る別の結果を「翻訳」する: 失敗の知らせが出て、訳は変わらず、仕事が終わった状態に戻る。
+        // そのあと、ふつうに答える LLM の代わりで「翻訳」すると、残りの行が訳される (止まったままにならない)
+        let failSources = [
+            "Please water the plants on Friday.",
+            "Seven people joined the call from Osaka.",
+            "The bridge downtown closes at midnight.",
+            "Lunch will be served in the north hall.",
+        ]
+        let failBefore: [String?] = ["Arrosez les plantes vendredi.", nil, "Le pont ferme a minuit.", nil]
+        let half = makeTranslatedJob("Translate failure check (self-test)", sources: failSources, translations: failBefore,
+                                     language: "en", translationLanguage: "fr")
+        failing = half
+        let failAnswers = [
+            failSources[1]: "Sept personnes ont rejoint l'appel depuis Osaka.",
+            failSources[3]: "Le dejeuner sera servi dans la salle nord.",
+        ]
+        func idle(_ job: Job) -> Bool { job.postQueue.isEmpty && job.postState == .idle && !job.isPostActive }
+        func waitIdle(_ job: Job) async -> Bool {
+            for _ in 0..<400 {
+                if idle(job) { return true }
+                await UILoadSelfTest.sleep(0.05)
+            }
+            return false
+        }
+        let halfBefore = half.transcript
+        let failuresBefore = standIn.failures
+        standIn.configure(answers: failAnswers, failAfter: 0)
+        model.translate(half)
+        let finishedFailing = await waitIdle(half)
+        let note = half.postNote ?? ""
+        let error = LLMError.decodeFailed(-1).localizedDescription
+        step("LLM fails while translating: the error is shown and nothing changes",
+             finishedFailing && standIn.failures > failuresBefore
+                && note == L("Could not translate: %@", error) && note.contains("-1")
+                && half.transcript == halfBefore,
+             "finished \(finishedFailing), idle \(idle(half)), failures \(standIn.failures - failuresBefore), "
+                + "transcript unchanged \(half.transcript == halfBefore), note \"\(note)\"")
+
+        let callsBefore = standIn.calls
+        standIn.configure(answers: failAnswers)
+        model.translate(half)
+        let finishedAgain = await waitIdle(half)
+        let translated = half.transcript?.segments.map(\.translation) ?? []
+        let expectedAfter: [String?] = [failBefore[0], failAnswers[failSources[1]], failBefore[2], failAnswers[failSources[3]]]
+        let noteAgain = half.postNote ?? ""
+        step("the next translation with a working LLM finishes",
+             finishedAgain && standIn.calls > callsBefore && translated == expectedAfter
+                && !noteAgain.contains(error) && half.transcript?.translationLanguage == "fr",
+             "finished \(finishedAgain), stand-in calls \(standIn.calls - callsBefore), "
+                + "translations \(translated == expectedAfter ? "as expected" : "\(translated)"), note \"\(noteAgain)\"")
         return finishRetranslate(lines, failure: failure)
     }
 
@@ -181,7 +235,7 @@ extension LoadRun {
     }
 
     /// 確認用の、訳の付いた終わった結果を作って、モデルに入れる (確認用のライブラリに保存される)
-    private func makeTranslatedJob(_ name: String, sources: [String], translations: [String], language: String,
+    private func makeTranslatedJob(_ name: String, sources: [String], translations: [String?], language: String,
                                    translationLanguage: String) -> Job {
         let job = Job(name: name, url: nil)
         let segments = sources.enumerated().map {
@@ -200,22 +254,36 @@ extension LoadRun {
 }
 
 /// 訳し直しの確認の、LLM の代わり。「Lines to translate」の行 ([番号] 原文) に、決めた訳 (原文ごと) で答える。
-/// 決めていない原文には、決まった印の文で答える (照らし合わせで落ちるように)
+/// 決めていない原文には、決まった印の文で答える (照らし合わせで落ちるように)。
+/// failAfter を渡すと、configure の後にその回数だけ答え、その次から llama.cpp の失敗 (`LLMError.decodeFailed(-1)`) を投げる
+/// (0 なら始めの依頼から)
 final class RetranslateStandIn: TextGenerating, @unchecked Sendable {
     private let lock = NSLock()
     private var answers: [String: String] = [:]
     private var count = 0
+    private var failAfter: Int?
+    private var sinceConfigure = 0
+    private var failedCount = 0
 
-    /// これまでに答えた回数
+    /// これまでに答えた回数 (失敗を投げた回は数えない)
     var calls: Int {
         lock.lock()
         defer { lock.unlock() }
         return count
     }
 
-    func configure(answers: [String: String]) {
+    /// これまでに失敗を投げた回数
+    var failures: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return failedCount
+    }
+
+    func configure(answers: [String: String], failAfter: Int? = nil) {
         lock.lock()
         self.answers = answers
+        self.failAfter = failAfter
+        sinceConfigure = 0
         lock.unlock()
     }
 
@@ -225,6 +293,12 @@ final class RetranslateStandIn: TextGenerating, @unchecked Sendable {
 
     func generate(_ prompt: LLMPrompt, shouldCancel: () -> Bool) throws -> String {
         lock.lock()
+        if let failAfter, sinceConfigure >= failAfter {
+            failedCount += 1
+            lock.unlock()
+            throw LLMError.decodeFailed(-1)
+        }
+        sinceConfigure += 1
         count += 1
         let answers = self.answers
         lock.unlock()

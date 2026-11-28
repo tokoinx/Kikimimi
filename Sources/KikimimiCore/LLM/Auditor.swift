@@ -249,6 +249,16 @@ public enum Auditor {
         return actions
     }
 
+    /// 見直しの答えを、終わりまで書き切ったか。最後の空でない行 (前後の空白を除く) が「END」なら書き切った。
+    /// 空の答え・空白だけの答え・「END」の手前で切れた答え (答えの長さの上限など) は、書き切っていない
+    /// (`parse` は END を読まないので、書き切っていない答えも「指摘なし」に見えてしまう。それを見分けるため)
+    static func isComplete(_ output: String) -> Bool {
+        let last = output.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .last { !$0.isEmpty }
+        return last == "END"
+    }
+
     /// 語の一部になる文字 (漢字・かなを除く): 英字・キリル文字・ハングルなど、空白で語を区切る文字と数字。
     /// 漢字・かなは除くので、「Roblocksを」の「を」の前は語の切れ目になる
     static let wordCharacter = "[[\\p{L}\\p{N}'’]--[\\p{Han}\\p{Hiragana}\\p{Katakana}]]"
@@ -404,11 +414,14 @@ public enum Auditor {
         return parts.joined(separator: "\n\n")
     }
 
-    /// LLM で見直す。onChunk には、まとまりごとの結果を渡す (途中で止めても、見終えた所までを使えるように)
+    /// LLM で見直す。onChunk には、まとまりごとの結果を渡す (途中で止めても、見終えた所までを使えるように)。
+    /// onUnread には、LLM の答えを読めなかった所の数 (書き切っていない見直しの答え・評価役の答えが 2 回とも読めない直し) を、
+    /// 終わる前に 1 度だけ渡す
     public static func review(_ segments: [TranscriptSegment], language: String?, options: AuditOptions,
                               generator: any TextGenerating, shouldCancel: () -> Bool,
                               onProgress: (_ done: Int, _ total: Int) -> Void,
-                              onChunk: (_ changes: [AuditChange]) -> Void = { _ in }) throws -> [AuditChange] {
+                              onChunk: (_ changes: [AuditChange]) -> Void = { _ in },
+                              onUnread: (Int) -> Void = { _ in }) throws -> [AuditChange] {
         let lines = segments.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
         let candidates = lines.indices.filter { !TextSimilarity.key(lines[$0]).isEmpty }
         let chunks = LLMChunker.chunks(candidates,
@@ -418,6 +431,7 @@ public enum Auditor {
         let spoken = Transcript(sourceName: "", segments: segments).spokenLanguages
         let system = systemPrompt(language: language, mixed: spoken.count >= 2 ? spoken : nil)
         var changes: [AuditChange] = []
+        var unread = 0
         onProgress(0, chunks.count)
         for (done, chunk) in chunks.enumerated() {
             if shouldCancel() { throw LLMError.cancelled }
@@ -437,6 +451,8 @@ public enum Auditor {
                           maxLineBytes: longest * 2 + 80),
                 shouldCancel: shouldCancel
             )
+            // 書き切っていない答え: 書き切った行の指摘は使うが、残りの行は見ていないかもしれない
+            if !isComplete(output) { unread += 1 }
             let actions = parse(output, count: chunk.count).sorted(by: { $0.key < $1.key })
             // 同じ答えが消そうとしている区間は、ほかの削除の裏付けにしない (2 つの写しが互いを裏付けて両方消えるのを防ぐ)
             let deleting = Set(actions.compactMap { item -> Int? in
@@ -478,9 +494,12 @@ public enum Auditor {
                     let assessment = fixAssessment(original: segment.text, replacement: fixed, language: lineLanguage)
                     guard assessment.keep else { continue }
                     // 評価役: 直す前と後のどちらが正しいかを、もう一度たずねる。どちらの並びでも直す前を選んだら捨てる
-                    let votes = try judgeVotes(original: segment.text, proposed: fixed,
-                                               context: Array(lines[max(0, index - 2)..<index]), language: lineLanguage,
-                                               generator: generator, shouldCancel: shouldCancel)
+                    let judged = try judgeVotes(original: segment.text, proposed: fixed,
+                                                context: Array(lines[max(0, index - 2)..<index]), language: lineLanguage,
+                                                generator: generator, shouldCancel: shouldCancel)
+                    // 2 回とも「1」でも「2」でもない答え: 直しを捨てる (今までどおり) が、読めなかった所として数える
+                    if judged.unreadable { unread += 1 }
+                    let votes = judged.votes
                     guard votes > 0 else { continue }
                     // 行の大部分を差し替える直しは、聞き取りミスではなく書き換えの疑い
                     let wholesale = TextSimilarity.key(wrong).count > TextSimilarity.key(segment.text).count * 6 / 10
@@ -509,6 +528,7 @@ public enum Auditor {
             onChunk(found)
             onProgress(done + 1, chunks.count)
         }
+        onUnread(unread)
         return changes
     }
 
@@ -523,10 +543,11 @@ public enum Auditor {
         """
     }
 
-    /// 評価役: 直す前と直した後のどちらが正しいかを、並びを入れ替えて 2 回たずねる。直した後を選んだ回数 (0〜2) を返す
+    /// 評価役: 直す前と直した後のどちらが正しいかを、並びを入れ替えて 2 回たずねる。直した後を選んだ回数 (0〜2) と、
+    /// 2 回とも答えが「1」でも「2」でもなかったか (読めなかった) を返す
     /// (小さなモデルは「1 番目を選びがち」などの癖があるので、2 回とも選ばれたときだけ信じる)
     static func judgeVotes(original: String, proposed: String, context: [String], language: String?,
-                           generator: any TextGenerating, shouldCancel: () -> Bool) throws -> Int {
+                           generator: any TextGenerating, shouldCancel: () -> Bool) throws -> (votes: Int, unreadable: Bool) {
         let system = judgeSystemPrompt(language: language)
         let contextText = context.isEmpty ? "" : "Context (the lines just before):\n" + context.map { "- \($0)" }.joined(separator: "\n") + "\n\n"
         func ask(_ first: String, _ second: String) throws -> String {
@@ -534,10 +555,13 @@ public enum Auditor {
             return try generator.generate(LLMPrompt(system: system, user: user, grammar: GBNF.choice, maxTokens: 2),
                                           shouldCancel: shouldCancel).trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        let first = try ask(original, proposed)
+        let second = try ask(proposed, original)
         var votes = 0
-        if try ask(original, proposed) == "2" { votes += 1 }
-        if try ask(proposed, original) == "1" { votes += 1 }
-        return votes
+        if first == "2" { votes += 1 }
+        if second == "1" { votes += 1 }
+        let readable = ["1", "2"]
+        return (votes, !readable.contains(first) && !readable.contains(second))
     }
 
     /// 削除の理由に、対象とは別の行の文がそのまま書かれているか
@@ -565,12 +589,15 @@ public enum Auditor {
     }
 
     /// 規則 → LLM の順に見直し、1 区間 1 件にまとめた結果を返す。generator が nil なら規則だけ。
-    /// onPartial には、規則の結果と、LLM が見終えたまとまりまでの結果を渡す (途中で止めたり失敗したりしても、そこまでを使える)
+    /// onPartial には、規則の結果と、LLM が見終えたまとまりまでの結果を渡す (途中で止めたり失敗したりしても、そこまでを使える)。
+    /// onUnread には、LLM の答えを読めなかった所の数を、LLM の見直しを終えた時に 1 度だけ渡す
+    /// (規則だけの時と、途中で止めた・失敗した時は呼ばない。数は保存しない: AuditReport には入れない)
     public static func audit(_ segments: [TranscriptSegment], language: String?, options: AuditOptions = AuditOptions(),
                              generator: (any TextGenerating)?, modelName: String?,
                              shouldCancel: () -> Bool,
                              onProgress: (_ done: Int, _ total: Int) -> Void = { _, _ in },
-                             onPartial: (AuditReport) -> Void = { _ in }) throws -> AuditReport {
+                             onPartial: (AuditReport) -> Void = { _ in },
+                             onUnread: (Int) -> Void = { _ in }) throws -> AuditReport {
         let ruleChanges = findRepeats(segments)
         let ruled = Set(ruleChanges.map(\.original.id))
         let removed = Set(ruleChanges.filter(\.isConfident).map(\.original.id))
@@ -674,10 +701,12 @@ public enum Auditor {
         }
         var soFar: [AuditChange] = []
         let llmChanges = try review(reviewed, language: language, options: options, generator: generator,
-                                    shouldCancel: shouldCancel, onProgress: onProgress) { chunk in
-            soFar += chunk
-            onPartial(report(soFar, model: modelName, partial: true))
-        }
+                                    shouldCancel: shouldCancel, onProgress: onProgress,
+                                    onChunk: { chunk in
+                                        soFar += chunk
+                                        onPartial(report(soFar, model: modelName, partial: true))
+                                    },
+                                    onUnread: onUnread)
         return report(llmChanges, model: modelName, partial: false)
     }
 }

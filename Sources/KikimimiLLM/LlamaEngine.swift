@@ -63,6 +63,25 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     /// 日本語に出てこない文字を含むトークン (初めて日本語だけの出力を頼まれたときに作る)
     private var nonJapaneseTokens: [Bool]?
     private let lock = NSLock()
+    /// 最後の generate が、どうして出すのをやめたか (lock の中で読み書きする)
+    private var finishReason: Finish = .complete
+
+    /// generate が出すのをやめた訳
+    public enum Finish: Sendable, Equatable {
+        /// モデルが答えを書き終えた (終わりのトークン)
+        case complete
+        /// 出してよい長さ (maxTokens・1 行の長さの上限・文脈の残り) に届いた
+        case limit
+        /// 次のトークンを選べなかった (文法に合う物が無い・確率が読めない)
+        case noCandidate
+    }
+
+    /// 最後に終えた generate が、出すのをやめた訳。generate が失敗を投げた時の値は決めない
+    public var lastFinish: Finish {
+        lock.lock()
+        defer { lock.unlock() }
+        return finishReason
+    }
 
     /// 候補として見る上位のトークン数
     private static let topK = 40
@@ -185,7 +204,7 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     public func isExcludedFromJapanese(_ text: String) -> Bool? {
         lock.lock()
         defer { lock.unlock() }
-        let tokens = tokenize(text, addSpecial: false, parseSpecial: false)
+        let tokens = (try? tokenize(text, addSpecial: false, parseSpecial: false)) ?? []
         guard tokens.count == 1 else { return nil }
         return japaneseBanList()[Int(tokens[0])]
     }
@@ -216,7 +235,8 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     public func tokenCount(_ text: String) -> Int {
         lock.lock()
         defer { lock.unlock() }
-        return tokenize(text, addSpecial: false, parseSpecial: false).count
+        // 長さの見積もり (投げない)。分けられない時は、今までどおり 0 と数える
+        return (try? tokenize(text, addSpecial: false, parseSpecial: false))?.count ?? 0
     }
 
     public func generate(_ prompt: LLMPrompt, shouldCancel: () -> Bool) throws -> String {
@@ -228,9 +248,11 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     public func generate(_ prompt: LLMPrompt, shouldCancel: () -> Bool, onText: ((String) -> Void)?) throws -> String {
         lock.lock()
         defer { lock.unlock() }
+        finishReason = .limit
         if shouldCancel() { throw LLMError.cancelled }
 
-        let tokens = promptTokens(prompt)
+        // 文をトークンに分けられない時は、黙って空の答えを返さずに -102 で止める
+        let tokens = try promptTokens(prompt)
         guard !tokens.isEmpty else { return "" }
         let limit = contextLength - 8
         guard tokens.count < limit else { throw LLMError.promptTooLong(tokens: tokens.count, limit: limit) }
@@ -252,8 +274,7 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             let n = min(batchSize, tokens.count - position)
             let isLast = position + n == tokens.count
             try fillBatch(tokens[position..<(position + n)], startingAt: position, wantLastLogits: isLast)
-            let rc = llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch)
-            guard rc == 0 else { throw LLMError.decodeFailed(rc) }
+            try LLMBatchCheck.processed(llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch))
             position += n
         }
 
@@ -263,10 +284,18 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         var recent: [llama_token] = []
         // onText に渡し終えたバイト数 (同じ文を二度渡さない)
         var sent = 0
+        // やめた訳。ループを最後まで回った・上限で抜けた時は「上限」のまま
+        var finish: Finish = .limit
         for step in 0..<maxNew {
             if shouldCancel() { throw LLMError.cancelled }
-            guard let token = pick(grammar: grammar, recent: recent, banned: banned) else { break }
-            if llama_vocab_is_eog(vocab, token) { break }
+            guard let token = pick(grammar: grammar, recent: recent, banned: banned) else {
+                finish = .noCandidate
+                break
+            }
+            if llama_vocab_is_eog(vocab, token) {
+                finish = .complete
+                break
+            }
             if let grammar { llama_sampler_accept(grammar, token) }
             output += piece(token)
             if let onText {
@@ -283,13 +312,13 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             if recent.count > Self.repeatWindow { recent.removeFirst() }
             guard step + 1 < maxNew else { break }
             try fillBatch([token][...], startingAt: position, wantLastLogits: true)
-            let rc = llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch)
-            guard rc == 0 else { throw LLMError.decodeFailed(rc) }
+            try LLMBatchCheck.processed(llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch))
             position += 1
         }
         let text = String(decoding: output, as: UTF8.self)
         // 終わりに読み切れないかけらが残った時も、最後に渡す文を返す文と同じにする
         if let onText, sent < output.count { onText(text) }
+        finishReason = finish
         return text
     }
 
@@ -300,16 +329,17 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
     ///
     /// 入れられない時は、黙って進めずに `LLMError.decodeFailed` で止める。番号は llama.cpp の戻り値のまま:
     /// -1 = 入れ物が一杯、-2 = トークンが無効、-3 = 列の番号が無効 (`llama_batch_ext_add_token` の戻り値)。
-    /// 位置か出力の印を入れられなかった時は、llama.cpp に無い番号 -100 (位置)・-101 (出力の印) を使う
+    /// 位置か出力の印を入れられなかった時は、llama.cpp に無い番号 -100 (位置)・-101 (出力の印) を使う。
+    /// 文をトークンに分けられなかった時 (`tokenize`) は -102 を使う。
+    /// 番号の決まりは `LLMBatchCheck` (KikimimiCore) に在り、試験はそちらで確かめる
     private func fillBatch(_ tokens: ArraySlice<llama_token>, startingAt start: Int, wantLastLogits: Bool) throws {
         llama_batch_ext_clear(batch)
         for (k, token) in tokens.enumerated() {
-            let idx = llama_batch_ext_add_token(batch, 0, token)
-            guard idx >= 0 else { throw LLMError.decodeFailed(idx) }
+            let idx = try LLMBatchCheck.added(llama_batch_ext_add_token(batch, 0, token))
             var pos = llama_pos(start + k)
-            guard llama_batch_ext_set_pos(batch, idx, &pos) else { throw LLMError.decodeFailed(-100) }
+            try LLMBatchCheck.positionSet(llama_batch_ext_set_pos(batch, idx, &pos))
             let output = wantLastLogits && k == tokens.count - 1
-            guard llama_batch_ext_set_output_logits(batch, idx, output) else { throw LLMError.decodeFailed(-101) }
+            try LLMBatchCheck.outputMarked(llama_batch_ext_set_output_logits(batch, idx, output))
         }
     }
 
@@ -402,17 +432,20 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
         return buffer.prefix(Int(n)).map { UInt8(bitPattern: $0) }
     }
 
-    private func tokenize(_ text: String, addSpecial: Bool, parseSpecial: Bool) -> [llama_token] {
+    /// 文をトークンに分ける。空の文は空の列。分けるのに失敗した (戻り値が負の数) 時は
+    /// `LLMError.decodeFailed(-102)` を投げる (番号の決まりは `LLMBatchCheck.tokenized`)
+    private func tokenize(_ text: String, addSpecial: Bool, parseSpecial: Bool) throws -> [llama_token] {
         let byteCount = text.utf8.count
         guard byteCount > 0 else { return [] }
         var tokens = [llama_token](repeating: 0, count: byteCount + 8)
         var n = llama_tokenize(vocab, text, Int32(byteCount), &tokens, Int32(tokens.count), addSpecial, parseSpecial)
-        if n < 0 {
-            guard n != Int32.min else { return [] }
+        // 入れ物が足りない (要る数の負の数): 大きくして、もう一度。Int32.min は失敗
+        if n < 0, n != Int32.min {
             tokens = [llama_token](repeating: 0, count: Int(-n))
             n = llama_tokenize(vocab, text, Int32(byteCount), &tokens, Int32(tokens.count), addSpecial, parseSpecial)
         }
-        return n > 0 ? Array(tokens.prefix(Int(n))) : []
+        let count = try LLMBatchCheck.tokenized(count: n, textIsEmpty: false)
+        return Array(tokens.prefix(count))
     }
 
     /// テンプレートが先頭の BOS を自分で書いていれば、二重に付けない
@@ -453,29 +486,29 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
 
     /// プロンプトのトークン。ChatML は「会話の枠」だけを特別なトークンとして読み、中身はふつうの文字として読む
     /// (中身に <|im_end|> などが紛れても、会話の区切りにならない)
-    private func promptTokens(_ prompt: LLMPrompt) -> [llama_token] {
+    private func promptTokens(_ prompt: LLMPrompt) throws -> [llama_token] {
         switch format {
         case .chatML(let skipThinking):
             var tokens: [llama_token] = []
             if llama_vocab_get_add_bos(vocab), llama_vocab_bos(vocab) >= 0 {
                 tokens.append(llama_vocab_bos(vocab))
             }
-            func frame(_ s: String) { tokens += tokenize(s, addSpecial: false, parseSpecial: true) }
-            func content(_ s: String) { tokens += tokenize(sanitize(s), addSpecial: false, parseSpecial: false) }
-            frame("<|im_start|>system\n")
-            content(prompt.system)
-            frame("<|im_end|>\n")
+            func frame(_ s: String) throws { tokens += try tokenize(s, addSpecial: false, parseSpecial: true) }
+            func content(_ s: String) throws { tokens += try tokenize(sanitize(s), addSpecial: false, parseSpecial: false) }
+            try frame("<|im_start|>system\n")
+            try content(prompt.system)
+            try frame("<|im_end|>\n")
             for example in prompt.examples {
-                frame("<|im_start|>user\n")
-                content(example.user)
-                frame("<|im_end|>\n<|im_start|>assistant\n")
-                content(example.assistant)
-                frame("<|im_end|>\n")
+                try frame("<|im_start|>user\n")
+                try content(example.user)
+                try frame("<|im_end|>\n<|im_start|>assistant\n")
+                try content(example.assistant)
+                try frame("<|im_end|>\n")
             }
-            frame("<|im_start|>user\n")
-            content(prompt.user)
-            frame("<|im_end|>\n<|im_start|>assistant\n")
-            if skipThinking { frame("<think>\n\n</think>\n\n") }
+            try frame("<|im_start|>user\n")
+            try content(prompt.user)
+            try frame("<|im_end|>\n<|im_start|>assistant\n")
+            if skipThinking { try frame("<think>\n\n</think>\n\n") }
             return tokens
         case .builtin(let template):
             var messages: [(role: String, content: String)] = [("system", sanitize(prompt.system))]
@@ -485,7 +518,7 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
             }
             messages.append(("user", sanitize(prompt.user)))
             let text = LlamaEngine.applyTemplate(template, messages) ?? messages.map(\.content).joined(separator: "\n\n") + "\n\n"
-            return tokenize(text, addSpecial: shouldAddSpecial(text), parseSpecial: true)
+            return try tokenize(text, addSpecial: shouldAddSpecial(text), parseSpecial: true)
         }
     }
 
