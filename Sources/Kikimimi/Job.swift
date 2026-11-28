@@ -84,6 +84,10 @@ final class Job: Identifiable {
     var lineQueue: [UUID] = []
     /// 行の「訳」で頼まれた区間のうち、訳のある文を訳し直すもの (右クリックの「この文を訳し直す」)
     var lineRedo: Set<UUID> = []
+    /// 行の「訳」で待っている文を訳す言語 (最初の文を頼んだ時に決める。待ちに文が在る間は 1 つ。待ちが空になると nil)
+    @ObservationIgnored var lineTarget: String?
+    /// 「この文を訳し直す」を押した時に写した、その文の直した訳の覚え (訳し直した訳が届いた時だけ捨てる)
+    @ObservationIgnored var lineRedoEdited: [TranslationNote] = []
     /// 行の「訳」を押したので、対訳の設定がオフでもこのジョブは対訳で表示する (設定には残さない。「対訳」を外すと消える)
     var showsLineTranslations = false
     @ObservationIgnored var postCancel = CancelFlag()

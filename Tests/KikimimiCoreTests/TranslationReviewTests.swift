@@ -174,6 +174,67 @@ final class TranslationReviewTests: XCTestCase {
         XCTAssertNil(t.translationReview)
     }
 
+    /// 「この文を訳し直す」(AppModel.translateLine の redo と translateLines と同じ手順) の、押した時と訳が届いた時。
+    /// 押した時は覚えを写すだけ。返す値は (結果, 直した区間 a, b, 写した覚え, 訳し直しの写しの原文)
+    private func redoClicked(own: String) -> (Transcript, a: UUID, b: UUID, c: UUID, edited: [TranslationNote],
+                                              sources: [UUID: String]) {
+        var (t, a, b, c) = sample()
+        t.setUserTranslation(own, for: a)
+        let unit = Translator.redoUnitIDs(containing: b, in: t.segments, language: "en")
+        let edited = t.userTranslationNotes(touching: Set(unit))
+        let copy = Translator.clearingTranslations(of: [b], in: t.segments)
+        let sources = Dictionary(copy.map { ($0.id, $0.text) }, uniquingKeysWith: { x, _ in x })
+        return (t, a, b, c, edited, sources)
+    }
+
+    /// 直した文で「この文を訳し直す」が訳せなかった (関門の「訳が返らなかった」の結果) 時は、何も変えない:
+    /// 直した訳も、印「直した」も残る。LLM が失敗を投げた時 (結果が 1 つも届かない) も、押しただけでは何も変えない
+    func testFailedRedoKeepsTheEditedTranslationAndItsMark() {
+        let own = "最初に話したいのは、仕組みの振る舞いです。"
+        var (t, a, b, _, edited, sources) = redoClicked(own: own)
+        XCTAssertEqual(edited.map(\.head), [a])
+        let clicked = t
+        // 押しただけ (LLM が失敗を投げて、結果が届かない時と同じ): 印は残る
+        XCTAssertEqual(t.translationNote(for: a)?.isEdited, true)
+        XCTAssertEqual(t.userTranslatedIDs, [a, b])
+        // 訳せなかった結果
+        let failed = TranslationResult(head: a, covers: [b], text: "", flags: [TranslationGate.failed])
+        XCTAssertFalse(t.applyRedone(failed, sources: sources, replacing: edited))
+        XCTAssertEqual(t, clicked)
+        XCTAssertEqual(t.segments[0].translation, own)
+        XCTAssertEqual(t.translationNote(for: a)?.isEdited, true, "the Edited mark stays")
+        XCTAssertEqual(t.translationNote(for: a)?.machine, "まず、仕組みがどう振る舞うかです。")
+    }
+
+    /// 直した文で「この文を訳し直す」が訳せた時は、今までと同じ: 機械の訳に置きかわり、その文の覚え (印「直した」) は消える。
+    /// ほかの直した文の覚えは残る
+    func testSuccessfulRedoReplacesTheEditedTranslation() {
+        var (t, a, b, c, edited, sources) = redoClicked(own: "直した訳")
+        t.setUserTranslation("自分の訳", for: c)
+        XCTAssertTrue(t.applyRedone(TranslationResult(head: a, covers: [b], text: "新しい機械の訳"), sources: sources,
+                                    replacing: edited))
+        XCTAssertEqual(t.segments[0].translation, "新しい機械の訳")
+        XCTAssertNil(t.translationNote(for: a))
+        XCTAssertFalse(t.userTranslatedIDs.contains(a))
+        XCTAssertEqual(t.translationNote(for: c)?.isEdited, true, "only the requested sentence")
+        // 翻訳の終わりに、同じ訳をもう 1 度置く (AppModel の apply(all)) 時も、そのまま置ける
+        XCTAssertTrue(t.applyRedone(TranslationResult(head: a, covers: [b], text: "新しい機械の訳"), sources: sources,
+                                    replacing: edited))
+        XCTAssertEqual(t.segments[0].translation, "新しい機械の訳")
+    }
+
+    /// 押した後 (訳し直しを待っている間) に、利用者がもう 1 度直した訳は、訳し直した訳で上書きしない
+    func testRedoDoesNotOverwriteAnEditMadeAfterTheClick() {
+        var (t, a, b, _, edited, sources) = redoClicked(own: "直した訳")
+        t.setUserTranslation("もう一度直した訳", for: a)
+        let before = t
+        XCTAssertFalse(t.applyRedone(TranslationResult(head: a, covers: [b], text: "新しい機械の訳"), sources: sources,
+                                     replacing: edited))
+        XCTAssertEqual(t, before)
+        XCTAssertEqual(t.segments[0].translation, "もう一度直した訳")
+        XCTAssertEqual(t.translationNote(for: a)?.isEdited, true)
+    }
+
     /// 監査で原文が変わった行は、覚えが無い物になり、新しい原文の機械の訳が入る
     func testAuditChangeReleasesTheUserTranslation() {
         var (t, _, _, c) = sample()

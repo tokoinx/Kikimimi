@@ -28,15 +28,21 @@ extension LoadRun {
         let standIn = RetranslateStandIn()
         var made: Job?
         var failing: Job?
+        var lineJob: Job?
+        var editedJob: Job?
+        let settingBefore = model.translationLanguage
         defer {
             // 変えた物を、始める前と同じに戻す (途中で失敗して戻った時も)
             model.llm.selfTestGenerator = nil
             model.installedLLMIDs = installedBefore
             model.customLLMFiles = customBefore
             model.errorMessage = errorBefore
+            model.translationLanguage = settingBefore
             model.select(selectedBefore)
             if let made { model.delete(made) }
             if let failing { model.delete(failing) }
+            if let lineJob { model.delete(lineJob) }
+            if let editedJob { model.delete(editedJob) }
             model.flushLibrary()
         }
 
@@ -227,6 +233,65 @@ extension LoadRun {
                 && !noteAgain.contains(error) && half.transcript?.translationLanguage == "fr",
              "finished \(finishedAgain), stand-in calls \(standIn.calls - callsBefore), "
                 + "translations \(translated == expectedAfter ? "as expected" : "\(translated)"), note \"\(noteAgain)\"")
+
+        // 7. 訳の無い結果で行の「訳」を押し、訳し始める前に設定の言語を変える: 待っている文は、押した時の言語で訳す。
+        // 設定の言語は確認の間だけ変える (確認用の起動では、SettingsWriter が本物の設定に書かない。終わりに元に戻す)
+        let lineSources = ["The library opens at nine.", "Bring your own cup, please."]
+        let plain = makeTranslatedJob("Line language check (self-test)", sources: lineSources, translations: [nil, nil],
+                                      language: "en", translationLanguage: nil)
+        lineJob = plain
+        let lineAnswer = "La bibliotheque ouvre a neuf heures."
+        standIn.configure(answers: [lineSources[0]: lineAnswer])
+        let clickLanguage = "fr", laterLanguage = "de"
+        model.translationLanguage = clickLanguage
+        if let first = plain.transcript?.segments.first?.id {
+            model.translateLine(first, in: plain)
+        }
+        // 仕事は、この後に Task の中で始まる。その前に設定の言語を変える
+        model.translationLanguage = laterLanguage
+        let finishedLine = await waitIdle(plain)
+        let lineTranslations = plain.transcript?.segments.map(\.translation) ?? []
+        step("a language change after the click does not change the queued line's language",
+             finishedLine && plain.transcript?.translationLanguage == clickLanguage
+                && lineTranslations == [lineAnswer, nil] && plain.lineQueue.isEmpty,
+             "finished \(finishedLine), language \(plain.transcript?.translationLanguage ?? "none") (expected \(clickLanguage), "
+                + "setting \(model.translationLanguage)), translations \(lineTranslations == [lineAnswer, nil] ? "as expected" : "\(lineTranslations)")")
+        model.translationLanguage = settingBefore
+
+        // 8. 直した訳の文で「この文を訳し直す」を押し、LLM が失敗した: 直した訳も、印「直した」も残る。
+        // そのあと、ふつうに答える LLM の代わりで訳し直すと、今までと同じく機械の訳になり、印は消える
+        let editSources = ["The museum is closed on Mondays.", "Tickets are sold at the gate."]
+        let edited = makeTranslatedJob("Edited redo check (self-test)", sources: editSources,
+                                       translations: ["Le musee est ferme le lundi.", "Les billets sont vendus a l'entree."],
+                                       language: "en", translationLanguage: "fr")
+        editedJob = edited
+        let own = "Le musee ferme ses portes chaque lundi."
+        var mark = false
+        if var t = edited.transcript, let first = t.segments.first?.id {
+            mark = t.setUserTranslation(own, for: first)?.isEdited == true
+            edited.transcript = t
+            standIn.configure(answers: [:], failAfter: 0)
+            model.translateLine(first, in: edited, redo: true)
+        }
+        let finishedRedo = await waitIdle(edited)
+        let redoNote = edited.postNote ?? ""
+        let head = edited.transcript?.segments.first
+        let keptMark = head.flatMap { edited.transcript?.translationNote(for: $0.id) }?.isEdited == true
+        step("a failed translate-again keeps the edited translation and its Edited mark",
+             mark && finishedRedo && head?.translation == own && keptMark && redoNote == L("Could not translate: %@", error),
+             "marked \(mark), finished \(finishedRedo), translation \(head?.translation == own ? "the edited one" : head?.translation ?? "none"), "
+                + "Edited mark \(keptMark), note \"\(redoNote)\"")
+        let redoAnswer = "Le musee est ferme tous les lundis."
+        standIn.configure(answers: [editSources[0]: redoAnswer])
+        if let first = edited.transcript?.segments.first?.id {
+            model.translateLine(first, in: edited, redo: true)
+        }
+        let finishedRedoAgain = await waitIdle(edited)
+        let headAgain = edited.transcript?.segments.first
+        let markAgain = headAgain.flatMap { edited.transcript?.translationNote(for: $0.id) }?.isEdited == true
+        step("a working translate-again replaces the edited translation as before",
+             finishedRedoAgain && headAgain?.translation == redoAnswer && !markAgain,
+             "finished \(finishedRedoAgain), translation \(headAgain?.translation ?? "none") (expected \(redoAnswer)), Edited mark \(markAgain)")
         return finishRetranslate(lines, failure: failure)
     }
 
@@ -236,7 +301,7 @@ extension LoadRun {
 
     /// 確認用の、訳の付いた終わった結果を作って、モデルに入れる (確認用のライブラリに保存される)
     private func makeTranslatedJob(_ name: String, sources: [String], translations: [String?], language: String,
-                                   translationLanguage: String) -> Job {
+                                   translationLanguage: String?) -> Job {
         let job = Job(name: name, url: nil)
         let segments = sources.enumerated().map {
             TranscriptSegment(start: Double($0.offset) * 3, end: Double($0.offset) * 3 + 3, text: $0.element,

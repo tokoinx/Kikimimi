@@ -128,6 +128,8 @@ extension AppModel {
         job.postQueue.removeAll()
         job.lineQueue.removeAll()
         job.lineRedo.removeAll()
+        job.lineTarget = nil
+        job.lineRedoEdited.removeAll()
         // 録音のための一時停止を取りやめる (止まったあとに「録音を止めると再開します」と出さない)
         job.pausedForRecording = false
         if job.postState != .idle {

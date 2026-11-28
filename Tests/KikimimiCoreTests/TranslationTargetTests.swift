@@ -274,6 +274,28 @@ final class TranslationTargetTests: XCTestCase {
         XCTAssertEqual(t.translationLanguage, "fr")
     }
 
+    /// 行の「訳」: 訳の無い結果は、文を頼んだ時の言語で訳す (頼んでから訳し始めるまでに設定の言語が変わっても変えない。
+    /// 文の選び方も、その言語で決めてある)。待ちに文が在る間に頼んだ文も、待っている言語にそろえる。
+    /// 訳の在る結果は、今までと同じく、その結果の言語
+    func testLineTranslationUsesTheLanguageChosenAtTheClick() {
+        var t = Transcript(sourceName: "a", segments: [seg(0, "Hello."), seg(2, "World.")], language: "en")
+        // 押した時: 待ちは空、設定は fr
+        let atClick = t.lineTranslationTarget(queued: nil, default: "fr")
+        XCTAssertEqual(atClick, "fr")
+        // 訳し始める時: 設定は de に変わった。頼んだ時の fr で訳す
+        XCTAssertEqual(t.lineTranslationTarget(queued: atClick, default: "de"), "fr")
+        // 待ちに文が在る間に、設定を de にしてから別の文を押した: 待っている fr にそろえる
+        XCTAssertEqual(t.lineTranslationTarget(queued: "fr", default: "de"), "fr")
+        // 訳の在る結果は、その結果の言語 (頼んだ時の言語・設定の言語より先)
+        t.segments[0].translation = "Hallo."
+        t.translationLanguage = "de"
+        XCTAssertEqual(t.lineTranslationTarget(queued: "fr", default: "es"), "de")
+        XCTAssertEqual(t.lineTranslationTarget(queued: nil, default: "es"), "de")
+        // 言語の記録の無い古い結果の訳は日本語
+        t.translationLanguage = nil
+        XCTAssertEqual(t.lineTranslationTarget(queued: "fr", default: "es"), "ja")
+    }
+
     /// 中国語の訳の「・」「ー」と、句読点だけ違う写しは、捨てない
     func testPlausibilityIgnoresKanaMarksAndPunctuationOnlyCopies() {
         XCTAssertTrue(Translator.isPlausible("史蒂夫・乔布斯", source: "スティーブ・ジョブズ", target: "zh"))
