@@ -765,7 +765,7 @@ LLM とのチャット (2026-11-20、1ef6407):
   - 直し: 押した時は、直した訳の覚えを写すだけにする (`Job.lineRedoEdited`)。覚えを捨てるのは、訳し直した機械の訳が、実際に置かれた時だけ (`Transcript.applyRedone(_:sources:replacing:)`)。訳せなかった結果・置けなかった結果では、何も変えない。押した後に、利用者がもう 1 度直した時は、その新しい訳を守る (機械の訳で上書きしない)。うまく訳せた時の動き (機械の訳に替わり、その文の印が消える) は、今までどおり。
   - 試験 3 件 (`TranslationReviewTests`): 失敗した訳し直しは、直した訳も印も残す。うまく行った訳し直しは、今までどおり替える。押した後に直した訳は、上書きしない。(前の作り = 先に捨てる形に戻すと、1 つ目が落ちる事を見た。)
   - アプリの確認の段: `RETRANSLATE: a failed translate-again keeps the edited translation and its Edited mark: ok (… Edited mark true, note "翻訳できませんでした: LLM の計算に失敗しました (llama.cpp エラー -1)。")` (偽の LLM が、失敗を投げる)、`RETRANSLATE: a working translate-again replaces the edited translation as before: ok (…, Edited mark false)`。
-  - 見ていない事: 足した 3 つの段が、直す前のアプリのコードで FAILED になる事 (直す前で落ちる事は、試験の側で見た)。
+  - 見ていない事: 足した 3 つの段が、直す前のアプリのコードで FAILED になる事 (直す前で落ちる事は、試験の側で見た)。→ 後で見た (下の「続き 5」)。
 - **(3) 窓を隠していて戻った時の重さを、CI の Mac (macOS 15) で測った** (08949a6。確認用の起動だけ。見立ては外れだった)。
   - 測り方: 行の数ごと (3988・8087・8987) に、新しい文字起こし中の結果を作り、10 行ずつ 30 回足す (ふつうの届き方)。窓を出したまま・窓を消して (`orderOut`)・Dock にしまって (`miniaturize`)・アプリを隠して (`NSApp.hide`) の 4 通り。隠している間と、戻した後を、分けて数える。build 46130358173 の 2 列。
   - 結果: 隠している間も、一覧は行を並べ続けた (作った行の body は 290〜300。出したままの時と同じ)。戻した後に作った行は 0〜15。戻した後の、メインスレッドのいちばん長い待ちは、窓を消した時 4.8〜110.6 ms、アプリを隠した時 0.9〜84.9 ms。
@@ -776,3 +776,21 @@ LLM とのチャット (2026-11-20、1ef6407):
   - 実験の段は、また切った (`LoadRun.experimentEnabled = false`)。今の台の足し方は、この 4 通り。
 - 確かめ (手元): `swift test` は「Executed 660 tests, with 0 failures」。アプリの確認 (3000 行、音声と絵つき) は、OK の 7 行が出て終了コード 0。1 回目は `time tick` の中央が 15.5 ms と長かったが、もう 1 度走らせると 9.2 ms だった (Mac が込んでいた。直した所は、一覧の描き方に関わらない)。
 - CI (08949a6。build 46130358173): Xcode 16.2・26.3 の 2 列とも success、2 列とも「Executed 660 tests, with 0 failures」、「UI LOAD OK」が 2 つ。足した 3 つの段は、2 列とも ok。記録だけのコミット 7e1596b の build (run 46127883300) も、2 列とも success (656 件・失敗 0)。
+
+### 2026-11-28 (続き 5): PR 28 のマージと、足した 3 つの段が悪い形で落ちる事の確かめ
+
+- **main へのマージ**: 利用者の OK (「main へマージ」) で、7e1596b・11d7e7f・08949a6・6ffaf99 の 4 コミット (2 つの不具合の直し、窓を隠して測る実験の段、記録) を main にマージした (PR tokoinx/Kikimimi#28、マージ コミット c8a4b6e。マージの直後、main と枝 6ffaf99 の中身は同じ = `git diff` が 0 行)。
+  - マージの前の確かめ: 枝の先頭 6ffaf99 の build (run 46132790127)・links (run 46132790080) と、PR の build (run 46136965962) は、どれも success。build は、Xcode 16.2・26.3 の 2 列とも「Executed 660 tests, with 0 failures」、OK の 7 行 (「UI LOAD OK」は 3000 行と 8000 行の 2 つ)。PR は CLEAN / MERGEABLE だった。
+  - マージの後の main の CI (c8a4b6e): build (run 46139047167) は、Xcode 16.2・26.3 の 2 列とも success、2 列とも「Executed 660 tests, with 0 failures」、OK の 7 行 (「UI LOAD OK」は 2 つ)。links (run 46139047173) も success。
+  - 途中で起きた事: PR を作る命令 (`gh pr create`) が、利用者の操作で途中で止まった。止まった後に見ると、PR 28 は出来ていた (`git ls-remote` の `refs/pull/28/head` が 6ffaf99 で、PR の build が走っていた)。作り直さずに、その PR で続けた。
+- **足した 3 つの段が、悪い形で FAILED になる事を確かめた** (前の項で「見ていない」と書いた事。PR の build を待つ間に行った。確かめだけで、コードは変えていない)。わざとアプリの側の動きを変えて、アプリを作り、アプリの確認 (3000 行、音声と絵つき) を走らせた。確認の段と試験は、変えていない。
+  - 破り方 1 (直す前の動きに戻す。`AppModel+PostTasks.swift` の 2 か所): 訳す言語を、仕事が走る時の設定で決める。押した時に、直した訳の覚えを先に捨てる。
+    - `RETRANSLATE: a language change after the click does not change the queued line's language: FAILED (finished true, language de (expected fr, setting de), …)`
+    - `RETRANSLATE: a failed translate-again keeps the edited translation and its Edited mark: FAILED (…, translation the edited one, Edited mark false, …)`
+    - `RETRANSLATE: a working translate-again replaces the edited translation as before: ok` (この段は「うまく訳せた時は、今までどおり」を見る段なので、直す前の動きでも通る)
+    - `RETRANSLATE CHECK FAILED: a language change after the click does not change the queued line's language` (落ちた段が 2 つでも、この行に出る名前は初めの 1 つ。どの段が落ちたかは、段ごとの行で分かる)。`UI LOAD OK` は出ない。終了コード 7 (任せた側が見た値)。ほかの確認 (LIBRARY・AUDIT FLOW・PRACTICE・CHAT・ADAPTER MESSAGE) は OK。
+  - 破り方 2 (うまく訳し直せた時にも、直した訳の覚えを捨てない。`TranslationReview.swift` の `applyRedone` の 1 行):
+    - 初めの 2 つの段は ok。`RETRANSLATE: a working translate-again replaces the edited translation as before: FAILED (finished true, translation Le musee ferme ses portes chaque lundi. (expected Le musee est ferme tous les lundis.), Edited mark true)`
+    - `RETRANSLATE CHECK FAILED: a working translate-again replaces the edited translation as before`。`UI LOAD OK` は出ない。終了コード 7 (任せた側が見た値)。
+  - 元へ戻した後: `git status --short` と `git diff --stat` は何も出さない。作り直したアプリの確認は、OK の 7 行が出て、3 つの段は ok (終了コード 0 は、任せた側が見た値)。
+  - 主の会話が自分で見た事: 3 つの回のログの、上の行。作業フォルダが元どおりである事。見ていない事: 終了コードそのもの (ログには残らない)。
