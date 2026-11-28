@@ -125,6 +125,14 @@ public struct Transcript: Codable, Hashable, Sendable {
         hasTranslation ? (translationLanguage ?? "ja") : fallback
     }
 
+    /// 行の「訳」で待っている文を訳す言語。queued は、文を頼んだ時に決めた言語 (待ちに文が在る間だけ。無ければ nil)。
+    /// 訳が在る結果は、その訳の言語 (1 つの結果の訳は 1 つの言語にそろえる。今までと同じ)。
+    /// 訳が無い結果は、頼んだ時の言語 (頼んでから訳し始めるまでに設定の言語が変わっても、文を選んだ時と同じ言語で訳す)。
+    /// どちらも無ければ fallback (呼ぶ側が決めた、今の訳す先の言語)
+    public func lineTranslationTarget(queued: String?, default fallback: String) -> String {
+        translationTarget(default: queued ?? fallback)
+    }
+
     /// 訳を全部外す (訳す先を変えて訳し直す時に使う)。訳したモデルと言語の記録も消す。
     /// 監査の直しが覚えている直す前の区間の訳も外す (直しを元に戻した時に、前の言語の訳が戻らないように)。
     /// 訳の覚え (利用者が直した訳) も捨てる (利用者が自分で「〇〇語で訳し直す」を選んだので)

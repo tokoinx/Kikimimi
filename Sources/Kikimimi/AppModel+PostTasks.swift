@@ -98,7 +98,10 @@ extension AppModel {
             return
         }
         guard job.status == .done, let transcript = job.transcript, !job.lineQueue.contains(id) else { return }
-        let target = translationTarget(for: transcript)
+        // 訳す言語は、押した時に決めて、待ちといっしょに覚える (訳し始めるまでに設定の言語が変わっても、文の選び方と同じ言語で訳す)。
+        // もう待っている文が在れば、その言語にそろえる (1 回にまとめて訳すのは 1 つの言語。訳の在る結果は、その結果の言語)
+        let target = transcript.lineTranslationTarget(queued: job.lineQueue.isEmpty ? nil : job.lineTarget,
+                                                      default: translationTarget(for: transcript))
         // 訳し直しは、前の訳でまとめていた区間をすべて訳し直す (監査で文の区切りが変わっていても、訳の無い区間を残さない)
         let unit = redo
             ? Translator.redoUnitIDs(containing: id, in: transcript.segments, language: transcript.language, target: target)
@@ -106,11 +109,13 @@ extension AppModel {
         // 同じ文の別の行がもう頼まれていれば、もう一度は訳さない
         let added = unit.filter { !job.lineQueue.contains($0) }
         guard !added.isEmpty else { return }
-        // 利用者が自分で「この文を訳し直す」を押した: その文の、利用者が直した訳の覚えを捨てる
-        // (捨てないと、訳し直した機械の訳を置けない。訳し終えるまで、画面には今の訳を残す。訳の記憶には残す)
-        if redo, var t = job.transcript, t.dropUserTranslations(touching: Set(unit)) {
-            job.transcript = t
+        // 利用者が自分で「この文を訳し直す」を押した: その文の、利用者が直した訳の覚えを写しておく。
+        // 覚えは、訳し直した機械の訳が届いた時だけ捨てる (訳せなかった・失敗した時は、直した訳も印「直した」も残す)
+        if redo {
+            let notes = transcript.userTranslationNotes(touching: Set(unit))
+            job.lineRedoEdited += notes.filter { !job.lineRedoEdited.contains($0) }
         }
+        job.lineTarget = target
         job.lineQueue += added
         if redo { job.lineRedo.insert(id) }
         // 訳した行が見えるように、このジョブだけ対訳で表示する (対訳の設定は変えない)
@@ -340,6 +345,8 @@ extension AppModel {
                 guard useLLM else {
                     job.lineQueue.removeAll()
                     job.lineRedo.removeAll()
+                    job.lineTarget = nil
+                    job.lineRedoEdited.removeAll()
                     return
                 }
                 if pauseIfRecording(.translateLines, job: job) { return }
@@ -347,11 +354,21 @@ extension AppModel {
                 let lines = job.lineQueue
                 guard !lines.isEmpty else { return }
                 let only = Set(lines)
+                // 訳す言語は、文を頼んだ時に決めた言語 (訳の在る結果は、その結果の言語。`lineTranslationTarget`)
+                let lineTarget = transcript.lineTranslationTarget(queued: job.lineTarget, default: target)
+                // 「この文を訳し直す」を押した時に写した、直した訳の覚え (訳し直した訳が届いた時だけ捨てる)
+                let redoEdited = job.lineRedoEdited
                 defer {
                     // 訳し終えた (訳せなかった) 文を待ちから外す。録音のための一時停止なら残し、録音のあとで続ける
                     if !job.pausedForRecording {
                         job.lineQueue.removeAll { only.contains($0) }
                         job.lineRedo.subtract(only)
+                        if job.lineQueue.isEmpty {
+                            job.lineTarget = nil
+                            job.lineRedoEdited.removeAll()
+                        } else {
+                            job.lineRedoEdited.removeAll { only.contains($0.head) }
+                        }
                         if !job.lineQueue.isEmpty && !job.postQueue.contains(.translateLines) {
                             job.postQueue.append(.translateLines)
                         }
@@ -365,21 +382,22 @@ extension AppModel {
                 let options = TranslationOptions(glossary: glossary)
                 // 覚えた訳: 訳の無い 1 行だけを訳す時は引く。利用者が自分で押した「この文を訳し直す」の文は引かない
                 // (機械の訳を見たい時の逃げ道)。前の訳でまとめていた区間を全部含めて、引かない区間にする
-                let memory = translationMemoryLookup(target: target)
+                let memory = translationMemoryLookup(target: lineTarget)
                 let noMemory = Set(redo.flatMap { Translator.translationGroupIDs(of: $0, in: transcript.segments) })
                 let apply: @MainActor ([TranslationResult]) -> Void = { batch in
                     guard !batch.isEmpty, var t = job.transcript else { return }
-                    // 訳しているあいだに監査で文が変わった区間には付けない
-                    for result in batch { t.apply(result, sources: sources) }
+                    // 訳しているあいだに監査で文が変わった区間には付けない。
+                    // 訳し直す文の直した訳は、機械の訳が届いた時だけ置きかえる (訳せなかった結果では、直した訳と印を残す)
+                    for result in batch { t.applyRedone(result, sources: sources, replacing: redoEdited) }
                     // 記憶から置いただけなら、訳した LLM の名前は変えない
                     if batch.contains(where: { !$0.fromMemory }) { t.translationModel = selection.name }
-                    t.translationLanguage = target
+                    t.translationLanguage = lineTarget
                     job.transcript = t
                 }
                 /// 訳す (generator が nil なら、記憶だけで埋める)
                 func run(_ generator: (any TextGenerating)?) throws -> (TranslationRunSummary, [TranslationResult]) {
                     var all: [TranslationResult] = []
-                    let summary = try Translator.translateSummarizing(segments, language: language, target: target,
+                    let summary = try Translator.translateSummarizing(segments, language: language, target: lineTarget,
                                                                       options: options, only: only, memory: memory,
                                                                       memoryExcluding: noMemory,
                                                                       generator: generator,
@@ -395,7 +413,7 @@ extension AppModel {
                     return (summary, all)
                 }
                 // 記憶だけで全部埋まる時は、LLM を読み込まない
-                let usesLLM = !Translator.memoryCoversAll(segments, language: language, target: target, only: only,
+                let usesLLM = !Translator.memoryCoversAll(segments, language: language, target: lineTarget, only: only,
                                                           memory: memory, memoryExcluding: noMemory)
                 let (summary, all) = usesLLM
                     ? try await llm.run(modelPath: selection.url.path, adapterPath: adapter,

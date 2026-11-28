@@ -787,7 +787,8 @@ extension Transcript {
     /// 訳した言語 (`translationLanguage`) は、ここでは変えない (訳した後に、呼ぶ側が `translationModel` と並べて入れる)。
     /// 利用者が直した訳 (今も合う "edited" の覚え) のまとまりに当たる区間を含む訳も置かない: 翻訳の途中に利用者が直した訳が、
     /// 後から届いた機械の訳や、翻訳の終わりにもう 1 度置く訳 (AppModel) で、機械の訳に戻らないように。
-    /// 利用者が自分で訳し直しを選んだ時は、呼ぶ側が先に覚えを捨てる (`dropUserTranslations(touching:)`・`removeAllTranslations()`)
+    /// 利用者が自分で訳し直しを選んだ時は、覚えを捨ててから置く (「この文を訳し直す」は `applyRedone(_:sources:replacing:)`、
+    /// 「〇〇語で訳し直す」は先に `removeAllTranslations()`)
     ///
     /// text が空の結果 (`TranslationResult.isRejection`) は、訳を置かずに「訳せなかった理由」の覚えだけを残す
     /// (区間に訳がまだ無く、文が訳した時と同じ時だけ)

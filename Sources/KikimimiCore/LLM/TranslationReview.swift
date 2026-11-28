@@ -234,17 +234,49 @@ extension Transcript {
     /// 訳そのものは残す (訳し終えるまで、画面には前の訳を出す)。捨てたら true
     @discardableResult
     public mutating func dropUserTranslations(touching ids: Set<UUID>) -> Bool {
-        guard let notes = translationReview, !notes.isEmpty, !ids.isEmpty else { return false }
-        var dropped = Set<UUID>()
-        for note in notes where note.isEdited {
-            guard let index = segments.firstIndex(where: { $0.id == note.head }) else { continue }
-            let group = [note.head] + (segments[index].translationCovers ?? [])
-            if group.contains(where: ids.contains) { dropped.insert(note.head) }
-        }
+        guard let notes = translationReview else { return false }
+        let dropped = Set(userTranslationNotes(touching: ids).map(\.head))
         guard !dropped.isEmpty else { return false }
         let kept = notes.filter { !($0.isEdited && dropped.contains($0.head)) }
         translationReview = kept.isEmpty ? nil : kept
         return true
+    }
+
+    /// 区間 ids を含む訳のまとまりの、利用者が直した訳の覚え ("edited")。
+    /// 「この文を訳し直す」を押した時に写しておき、訳し直した結果を置く時に `applyRedone(_:sources:replacing:)` へ渡す
+    public func userTranslationNotes(touching ids: Set<UUID>) -> [TranslationNote] {
+        guard let notes = translationReview, !notes.isEmpty, !ids.isEmpty else { return [] }
+        return notes.filter { note in
+            guard note.isEdited, let index = segments.firstIndex(where: { $0.id == note.head }) else { return false }
+            return ([note.head] + (segments[index].translationCovers ?? [])).contains(where: ids.contains)
+        }
+    }
+
+    /// 利用者が自分で「この文を訳し直す」を押した文に、訳し直した結果を 1 つ置く。
+    /// edited は、押した時に写した、その文の直した訳の覚え (`userTranslationNotes(touching:)`)。
+    /// 機械の訳を置ける時だけ、その結果のまとまりに当たる覚えを捨ててから置く (直した訳が機械の訳になり、印「直した」も消える)。
+    /// 訳せなかった結果 (理由だけの結果) の時と、置けなかった時は、訳も覚えも変えない (直した訳と印「直した」が残る)。
+    /// 押した後に利用者がもう 1 度直した訳は、覚えが写しと違うので捨てない (その訳を守る)。
+    /// edited が空なら `apply(_:sources:)` と同じ。置いたら true
+    @discardableResult
+    public mutating func applyRedone(_ result: TranslationResult, sources: [UUID: String],
+                                     replacing edited: [TranslationNote]) -> Bool {
+        guard !result.isRejection, !edited.isEmpty, let notes = translationReview else {
+            return apply(result, sources: sources)
+        }
+        let ids = Set([result.head] + result.covers)
+        // 写した覚えのうち、この結果のまとまりに当たる物 (今の区間で見る)
+        let touching = edited.filter { note in
+            guard let index = segments.firstIndex(where: { $0.id == note.head }) else { return false }
+            return ([note.head] + (segments[index].translationCovers ?? [])).contains(where: ids.contains)
+        }
+        let kept = notes.filter { !touching.contains($0) }
+        guard kept.count < notes.count else { return apply(result, sources: sources) }
+        translationReview = kept.isEmpty ? nil : kept
+        if apply(result, sources: sources) { return true }
+        // 置けなかった: 捨てた覚えを戻す
+        translationReview = notes
+        return false
     }
 
     /// 今の原文・訳と合わなくなった覚えを捨てる (覚えが空になったら nil にする)
