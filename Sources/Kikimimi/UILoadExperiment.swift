@@ -12,7 +12,7 @@ extension LoadRun {
 
     /// 実験の段を走らせるか。ふだんは走らせない (CI の時間を 1 分ほど使うので)。原因を調べ直す時だけ true にする
     /// (2026-11-28 に 1 度走らせた。結果は docs/HANDOFF.md)
-    nonisolated static let experimentEnabled = true
+    nonisolated static let experimentEnabled = false
 
     /// この確認で行う、始めの行の数。CI の 8000 行の段は 4 分で打ち切られるので、5 つを 2 つの確認に分ける
     /// (3000 行の確認 (打ち切りは 10 分) で始めの 3 つ、8000 行の確認で残りの 2 つ。手元で 1 つあたり 10 秒ほど)
