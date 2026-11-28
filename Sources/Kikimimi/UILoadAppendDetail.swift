@@ -37,6 +37,8 @@ extension LoadRun {
         var rowsBefore = 0
         var bodies = 0
         var idleSeconds = 0.0
+        /// 一覧が終わりへ小刻みに追いついた burst (通った行をすべて並べるので、body の数の注記は出さない)
+        var caughtUp = false
     }
 
     /// 注記を出す、1 回の burst の body の数 (これ以上なら、一覧が前の終わりから新しい終わりまでの行を作った)
@@ -63,7 +65,7 @@ extension LoadRun {
         for (detail, longest) in zip(details, waits) {
             let wait = longest.map { "\(f($0)) ms" } ?? "unknown (no watchdog samples)"
             lines.append(detail.text + ", longest wait before the next append \(wait)")
-            guard let label = detail.burstLabel, detail.bodies >= Self.heavyBurstBodies else { continue }
+            guard let label = detail.burstLabel, !detail.caughtUp, detail.bodies >= Self.heavyBurstBodies else { continue }
             notes.append("UI LOAD: note: \(label) at \(detail.rowsBefore) rows built \(detail.bodies) row bodies"
                          + " (idle after \(f(detail.idleSeconds)) ms, longest wait \(wait)): the list built the rows"
                          + " between the old end and the new end. Seen on macOS 15 when 300 rows arrive at once while"
@@ -216,7 +218,10 @@ extension LoadRun {
             return "median \(f(UILoadSelfTest.percentile(sorted, 0.5))) ms (max \(f(worst)))"
         }
         lines.append("UI LOAD: burst idle after: following \(summary(measured[Action.burst] ?? [])),"
-                     + " following extra \(summary(followingExtra)), not following \(summary(notFollowing))")
+                     + " following extra \(summary(followingExtra)), not following \(summary(notFollowing))"
+                     + (burstCatchUps.isEmpty ? "" : " (bursts caught up in steps: the longest watchdog wait)"))
+        lines += catchUpNotes
+        lines.append(tailCatchUpSummary)
         Self.live("reference: done")
         return lines
     }

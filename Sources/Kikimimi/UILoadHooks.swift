@@ -22,6 +22,22 @@ enum UILoadHooks {
     static var setFollowing: (@MainActor (Bool) -> Void)?
     /// 一覧の終わりを追いかけているか
     static var isFollowing: (@MainActor () -> Bool)?
+    /// 一覧が、終わりへ小刻みに追いついている最中か (ListFollow.isCatchingUp)
+    static var isCatchingUp: (@MainActor () -> Bool)?
+    /// 小刻みに追いつくのを始めた回数と、そのために動かした (proxy.scrollTo) 回数 (確認の最中だけ数える。
+    /// 小刻みの 1 回ずつも scrollToCalls に入る)
+    static var catchUpsStarted = 0
+    static var catchUpSteps = 0
+
+    /// ListFollow が呼ぶ: 小刻みに追いつくのを始めた
+    static func catchUpStarted() {
+        if isActive { catchUpsStarted += 1 }
+    }
+
+    /// ListFollow が呼ぶ: 小刻みに 1 回動かした
+    static func catchUpStepped() {
+        if isActive { catchUpSteps += 1 }
+    }
     /// 一覧が作った行の数 (PlayableRow を作った回数。確認の最中だけ数える)。一覧が終わりへ飛ぶと、
     /// LazyVStack はすべての行を作る (1 つ 0.1 ms ほど) ので、数千にもなる。重さは次の rowBodies で見る
     static var rowsBuilt = 0
@@ -55,11 +71,13 @@ enum UILoadHooks {
     static func register(owner: ObjectIdentifier,
                          scrollList: @escaping @MainActor (UUID, Edge) -> Void,
                          setFollowing: @escaping @MainActor (Bool) -> Void,
-                         isFollowing: @escaping @MainActor () -> Bool) {
+                         isFollowing: @escaping @MainActor () -> Bool,
+                         isCatchingUp: @escaping @MainActor () -> Bool) {
         self.owner = owner
         self.scrollList = scrollList
         self.setFollowing = setFollowing
         self.isFollowing = isFollowing
+        self.isCatchingUp = isCatchingUp
     }
 
     /// 測る口の始め: 確認の最中なら、いまの時刻 (uptime のナノ秒)。ふだんの起動では 0 (時刻を取らない)
@@ -92,5 +110,6 @@ enum UILoadHooks {
         scrollList = nil
         setFollowing = nil
         isFollowing = nil
+        isCatchingUp = nil
     }
 }

@@ -83,6 +83,12 @@ final class LoadRun {
     var appendDetails: [AppendDetail] = []
     /// 内わけの行に付けた、1 行足す操作の番号
     var singleAppendDetails = 0
+    /// timedBurst で足した回数と、そのうち一覧が終わりへ小刻みに追いついた回ごとの、足し始めてから追いつき終わって
+    /// メインが空くまでの秒と、そのあいだの見張りのいちばん長い待ち (秒。合図が無ければ nil)
+    var burstsTimed = 0
+    var burstCatchUps: [(total: Double, longestWait: Double?)] = []
+    /// 小刻みに追いつくのが、待つ上限 (10 秒) までに終わらなかった時の注記の行
+    var catchUpNotes: [String] = []
 
     init(model: AppModel, rows: Int, url: URL) {
         self.model = model

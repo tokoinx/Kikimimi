@@ -44,6 +44,14 @@ final class ListFollow {
     /// 一覧の位置 (SwiftUI の global: ウインドウの中、左上から下へ)。まだわからなければ空
     @ObservationIgnored var frame: CGRect = .zero
     @ObservationIgnored private var monitor: Any?
+    /// 終わりへ小刻みに追いついている最中か (TailCatchUp)。見ている部品は無い (行が増えた時に CurrentLineTracker が読む)
+    @ObservationIgnored private(set) var isCatchingUp = false
+    /// 小刻みに追いつく仕事と、その時の一覧の行の id (行が増えると延ばす)、いま下の端に出している行の番号
+    @ObservationIgnored private var catchUpTask: Task<Void, Never>?
+    @ObservationIgnored private var catchUpIDs: [UUID] = []
+    @ObservationIgnored private var catchUpIndex = 0
+    /// 始めるたびに増やす番号 (止めたあとに、前の仕事が新しい仕事の状態を消さないため)
+    @ObservationIgnored private var catchUpGeneration = 0
 
     func install() {
         guard monitor == nil else { return }
@@ -54,6 +62,68 @@ final class ListFollow {
     func remove() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        cancelCatchUp()
+    }
+
+    /// 行がまとめて増えた: 下の端に index の行が出ている所から、終わりまで TailCatchUp.step 行ずつ動かす。
+    /// 1 回ごとに、その回の描き直しが済む (メインの run loop が眠る直前になる) のを待ってから次を動かす (タイマーは使わない)。
+    /// 追いかけるのをやめた (isOn) か、canContinue が false になったら、そこでやめる。終わりまでが遠くなりすぎたら
+    /// (TailCatchUp.maximumDistance)、小刻みをやめて 1 回で終わりへ飛ぶ
+    func startCatchUp(ids: [UUID], from index: Int, proxy: ScrollViewProxy,
+                      canContinue: @escaping @MainActor () -> Bool) {
+        cancelCatchUp()
+        catchUpIDs = ids
+        catchUpIndex = max(0, index)
+        isCatchingUp = true
+        let generation = catchUpGeneration
+        UILoadHooks.catchUpStarted()
+        catchUpTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled, self.catchUpGeneration == generation, self.isOn, canContinue() {
+                let lastIndex = self.catchUpIDs.count - 1
+                guard lastIndex >= 0 else { break }
+                if TailCatchUp.isTooFar(reached: self.catchUpIndex, lastIndex: lastIndex) {
+                    self.catchUpIndex = lastIndex
+                    Self.scroll(proxy, to: self.catchUpIDs[lastIndex])
+                    break
+                }
+                guard let next = TailCatchUp.nextIndex(after: self.catchUpIndex, lastIndex: lastIndex) else { break }
+                self.catchUpIndex = next
+                Self.scroll(proxy, to: self.catchUpIDs[next])
+                UILoadHooks.catchUpStepped()
+                await MainRunLoopTurn.afterRedraw()
+            }
+            self?.finishCatchUp(generation)
+        }
+    }
+
+    /// 小刻みに追いついている最中に、また行が増えた: 終わりを延ばす (動かすのは、いまの仕事が続ける)
+    func extendCatchUp(ids: [UUID]) {
+        guard isCatchingUp else { return }
+        catchUpIDs = ids
+        catchUpIndex = min(catchUpIndex, max(0, ids.count - 1))
+    }
+
+    /// 小刻みに追いつくのをやめる (一覧が消えた・行が減った、入れ替わった)
+    func cancelCatchUp() {
+        catchUpTask?.cancel()
+        catchUpGeneration += 1
+        catchUpTask = nil
+        catchUpIDs = []
+        isCatchingUp = false
+    }
+
+    private func finishCatchUp(_ generation: Int) {
+        guard catchUpGeneration == generation else { return }
+        catchUpTask = nil
+        catchUpIDs = []
+        isCatchingUp = false
+    }
+
+    /// 一覧を、その行が下の端に来るように動かす (確認の最中だけ、呼び出しが戻るまでの時間を測る)
+    private static func scroll(_ proxy: ScrollViewProxy, to id: UUID) {
+        let started = UILoadHooks.timingStart()
+        proxy.scrollTo(id, anchor: .bottom)
+        UILoadHooks.scrollToEnded(started)
     }
 
     /// 一覧が現れたときに呼ぶ (TranscriptListView の onAppear)。確認の最中だけ、確認から一覧を動かす口を入れる。
@@ -67,7 +137,7 @@ final class ListFollow {
                 proxy.scrollTo(id, anchor: edge == .top ? .top : .bottom)
             }, setFollowing: { on in
                 if self.isOn != on { self.isOn = on }
-            }, isFollowing: { self.isOn })
+            }, isFollowing: { self.isOn }, isCatchingUp: { self.isCatchingUp })
         }
     }
 
@@ -282,8 +352,25 @@ struct CurrentLineTracker: View {
                     proxy.scrollTo(request.id)
                 }
             }
-            .onChange(of: items.count) { _, _ in
+            .onChange(of: items.count) { old, new in
+                // 行が減った・入れ替わった (やり直しなど): 小刻みに追いついていれば、やめる (そのあとは、これまでどおり)
+                if new < old { follow.cancelCatchUp() }
                 guard job.status == .running, follow.isOn, !player.isPlaying, let last = items.last else { return }
+                // 小刻みに追いついている最中: 終わりを延ばすだけ (ここから終わりへ 1 回で飛ばない)
+                if follow.isCatchingUp {
+                    follow.extendCatchUp(ids: items.map(\.id))
+                    return
+                }
+                // いっぺんに多くの行が増えた (macOS 15 以降): 前の終わりから、TailCatchUp.step 行ずつ動かして追いつく
+                // (1 回で終わりへ飛ぶと、位置によって数百行の body が動き、メインが 0.1〜2 秒止まった)
+                if new > old, TailCatchUp.usesSteps(added: new - old, distance: new - old,
+                                                    enabledOnThisOS: TailFollowSwitch.enabled) {
+                    let job = job
+                    let player = player
+                    follow.startCatchUp(ids: items.map(\.id), from: old - 1, proxy: proxy,
+                                        canContinue: { job.status == .running && !player.isPlaying })
+                    return
+                }
                 let id = last.id
                 Task { @MainActor in
                     guard follow.isOn, !player.isPlaying else { return }
