@@ -68,29 +68,10 @@ extension UILoadSelfTest {
     private static let idleGap = 0.003
 
     /// 次に、メインの run loop が眠る直前 (beforeWaiting) になった時刻 (uptime のナノ秒)。timeout 秒たっても来なければ nil。
-    /// 観測者 (CF の型で Sendable ではない) は ResumeOnce の中だけに置き、ほかのクロージャには ResumeOnce だけを渡す
+    /// アプリの一覧が小刻みに追いつく所と同じもの (MainRunLoopTurn.swift) を使う
     @MainActor
     private static func nextBeforeWaiting(timeout: Double) async -> UInt64? {
-        await withCheckedContinuation { (continuation: CheckedContinuation<UInt64?, Never>) in
-            let once = ResumeOnce(continuation)
-            let observer = CFRunLoopObserverCreateWithHandler(kCFAllocatorDefault, CFRunLoopActivity.beforeWaiting.rawValue,
-                                                              false, CFIndex.max) { _, _ in
-                once.resume(DispatchTime.now().uptimeNanoseconds)
-            }
-            once.hold(observer)
-            CFRunLoopAddObserver(CFRunLoopGetMain(), observer, commonModes)
-            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
-                once.resume(nil)
-            }
-        }
-    }
-
-    private static var commonModes: CFRunLoopMode {
-        #if os(macOS)
-        return CFRunLoopMode.commonModes
-        #else
-        return kCFRunLoopCommonModes
-        #endif
+        await MainRunLoopTurn.nextBeforeWaiting(timeout: timeout)
     }
 
     static func now() -> UInt64 { DispatchTime.now().uptimeNanoseconds }
@@ -130,39 +111,6 @@ final class ActionLog: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return entries.filter { $0.time <= time }.max { $0.time < $1.time }?.name
-    }
-}
-
-/// 続きを 1 回だけ再開する (眠る直前の知らせと、打ち切りの、先に来たほう)。
-/// 眠る直前の観測者も持ち、再開するときに無効にする (CF の型は Sendable ではないので、ほかのクロージャには持たせない。
-/// 観測者はメインの run loop の上でだけ動き、打ち切りもメインのキューから呼ぶ)
-private final class ResumeOnce: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<UInt64?, Never>?
-    private var observer: CFRunLoopObserver?
-
-    init(_ continuation: CheckedContinuation<UInt64?, Never>) {
-        self.continuation = continuation
-    }
-
-    /// 観測者を預かる。もう再開していれば、すぐに無効にする
-    func hold(_ observer: CFRunLoopObserver?) {
-        lock.lock()
-        let done = continuation == nil
-        if !done { self.observer = observer }
-        lock.unlock()
-        if done, let observer, CFRunLoopObserverIsValid(observer) { CFRunLoopObserverInvalidate(observer) }
-    }
-
-    func resume(_ value: UInt64?) {
-        lock.lock()
-        let c = continuation
-        continuation = nil
-        let o = observer
-        observer = nil
-        lock.unlock()
-        if let o, CFRunLoopObserverIsValid(o) { CFRunLoopObserverInvalidate(o) }
-        c?.resume(returning: value)
     }
 }
 

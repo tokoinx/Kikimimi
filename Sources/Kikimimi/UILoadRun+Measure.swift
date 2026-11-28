@@ -314,11 +314,18 @@ extension LoadRun {
 
     /// burst の中身: 届けて、まとめて足し始めるのを待ち、メインスレッドが空くまでを測る。内わけの行も appendDetails に足す。
     /// 返すのは、足し始めてから空くまでの秒 (seconds) と、届けてから足し始めるまでの秒 (wait)。
-    /// 追いかけていない時の参考の段 (UILoadAppendDetail.swift) も使う (そちらは measured に入れない)
+    /// 追いかけていない時の参考の段 (UILoadAppendDetail.swift) も使う (そちらは measured に入れない)。
+    ///
+    /// 一覧が終わりへ小刻みに追いついた (TailCatchUp。macOS 15 以降) 時は、追いつき終わってメインが空くまで待つ
+    /// (上限 10 秒。終わらなければ注記を出して続ける。失敗にはしない)。その時の seconds は、合わせた時間ではなく、
+    /// このあいだの見張りのいちばん長い待ち (小刻みに追いつくあいだ、メインは 1 回ずつ空くので、合わせた時間のあいだ
+    /// 止まっているわけではない。止まった長さは、見張りの待ちで見る)。追いつかなかった時は、これまでと同じ
     func timedBurst(_ count: Int, detail name: String, index: Int, of total: Int) async -> (seconds: Double, wait: Double) {
         let before = running.transcript?.segments.count ?? 0
         let target = before + count
         let mark = detailMark()
+        let catchUpsBefore = UILoadHooks.catchUpsStarted
+        let stepsBefore = UILoadHooks.catchUpSteps
         let started = UILoadSelfTest.now()
         awaitingBurst = true
         burstApplied = nil
@@ -330,9 +337,33 @@ extension LoadRun {
         awaitingBurst = false
         let applied = burstApplied ?? started
         let idle = await UILoadSelfTest.untilIdleDetail(since: applied)
-        appendDetails.append(detailLine(name, index: index, of: total, rowsBefore: before, since: mark, idle: idle,
-                                        start: started))
-        return (idle.seconds, UILoadSelfTest.seconds(from: started, to: applied))
+        burstsTimed += 1
+        guard UILoadHooks.catchUpsStarted > catchUpsBefore else {
+            appendDetails.append(detailLine(name, index: index, of: total, rowsBefore: before, since: mark, idle: idle,
+                                            start: started))
+            return (idle.seconds, UILoadSelfTest.seconds(from: started, to: applied))
+        }
+        // 小刻みに追いついている: 終わるまで、描き直しの 1 回りずつ待つ (タイマーで間をあけない)
+        let giveUp = UILoadSelfTest.now() + 10_000_000_000
+        while UILoadHooks.isCatchingUp?() == true, UILoadSelfTest.now() < giveUp {
+            await MainRunLoopTurn.afterRedraw(timeout: 0.1)
+        }
+        if UILoadHooks.isCatchingUp?() == true {
+            catchUpNotes.append("UI LOAD: note: the tail catch-up did not finish in 10 s (\"\(name)\" \(index) of \(total))")
+        }
+        _ = await UILoadSelfTest.untilIdleDetail(since: UILoadSelfTest.now())
+        let catchUpTotal = UILoadSelfTest.seconds(from: applied, to: UILoadSelfTest.now())
+        var detail = detailLine(name, index: index, of: total, rowsBefore: before, since: mark, idle: idle, start: started)
+        detail.text += ", catch-up steps \(UILoadHooks.catchUpSteps - stepsBefore),"
+            + " catch-up total \(String(format: "%.1f", UILoadSelfTest.ms(catchUpTotal))) ms"
+        detail.caughtUp = true
+        appendDetails.append(detail)
+        // 見張りの合図が届くのを待ってから、このあいだのいちばん長い待ちを取る (50 ms ごとの合図の 1 回分より少し長く)
+        await UILoadSelfTest.sleep(0.08)
+        let end = UILoadSelfTest.now()
+        let longest = probe.samples().filter { $0.posted >= started && $0.posted < end }.map(\.wait).max()
+        burstCatchUps.append((catchUpTotal, longest))
+        return (longest ?? catchUpTotal, UILoadSelfTest.seconds(from: started, to: applied))
     }
 
     /// 入れ物が、まとめた区間を足した (AppModel.liveFeed から)。足し始めてから、メインスレッドが空くまでを測る
