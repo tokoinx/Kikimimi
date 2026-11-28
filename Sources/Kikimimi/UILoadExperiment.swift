@@ -10,6 +10,10 @@ extension LoadRun {
     /// 実験の、始めの行の数 (CI で、追いかけたまま 300 行を足すと重かった数)
     static let experimentBases = [3988, 8087, 8088, 8987, 9288]
 
+    /// 実験の段を走らせるか。ふだんは走らせない (CI の時間を 1 分ほど使うので)。原因を調べ直す時だけ true にする
+    /// (2026-11-28 に 1 度走らせた。結果は docs/HANDOFF.md)
+    static let experimentEnabled = false
+
     /// この確認で行う、始めの行の数。CI の 8000 行の段は 4 分で打ち切られるので、5 つを 2 つの確認に分ける
     /// (3000 行の確認 (打ち切りは 10 分) で始めの 3 つ、8000 行の確認で残りの 2 つ。手元で 1 つあたり 10 秒ほど)
     var experimentBasesForThisRun: [Int] {
@@ -59,6 +63,7 @@ extension LoadRun {
     /// 終わりを追いかけている事を確かめてから足して、body を動かした行の数などを 1 行に出す。
     /// 参考の段 (notFollowingRound) のあとに呼ぶ (このあとに確認は無い)。作った結果は、次の結果を選んでから消す
     func experimentRound() async -> [String] {
+        guard Self.experimentEnabled else { return [] }
         var lines = ["experiment (not compared with any limit): for each row count, a new running job with exactly that"
                      + " many rows (as the running job of phase 4), selected and following the end, then 300 rows added"
                      + " in different ways (applied directly with AppModel.applyLive, each step after the previous one"

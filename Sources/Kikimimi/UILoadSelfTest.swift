@@ -93,7 +93,7 @@ enum UILoadSelfTest {
         let llmFailure = 10.0
         let base = (screenshots == nil ? 200.0 : 310.0) + (audio == nil ? 0 : 45.0) + 40.0 + 20.0 + 15.0 + 45.0 + typing
         // 終わりの実験の段 (UILoadExperiment.swift。結果を作って選び、300 行を足すのを 12〜18 回。手元で 30 秒ほど) のぶんも足す (experiment)
-        let experiment = 100.0
+        let experiment = LoadRun.experimentEnabled ? 100.0 : 0.0
         let hangLimit = base + llmFailure + experiment
         DispatchQueue.global().asyncAfter(deadline: .now() + hangLimit) {
             finish(header + ["UI LOAD FAILED: the self-test did not finish in \(Int(hangLimit)) s"

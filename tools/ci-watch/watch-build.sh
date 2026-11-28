@@ -24,8 +24,16 @@ if [ -z "$RUN" ]; then
   exit 2
 fi
 
-gh run watch "$RUN" --repo "$REPO" --interval 30 --exit-status > /dev/null 2>&1
-echo "watch exit $?"
+# gh run watch は、通信が切れると、run が終わる前に戻る事が在る (2026-11-28 に 2 回見た)。
+# run が終わった (status が completed) のを確かめるまで、掛け直す
+while :; do
+  gh run watch "$RUN" --repo "$REPO" --interval 30 --exit-status > /dev/null 2>&1
+  WATCH=$?
+  STATUS=$(gh run view "$RUN" --repo "$REPO" --json status --jq .status 2> /dev/null)
+  [ "$STATUS" = "completed" ] && break
+  sleep 30
+done
+echo "watch exit $WATCH"
 gh run view "$RUN" --repo "$REPO" --json jobs \
   --jq '.jobs[] | [.name, (.conclusion // "-"), ("steps " + ((.steps | length) | tostring)), (.startedAt // "-"), (.completedAt // "-")] | @tsv'
 gh run view "$RUN" --repo "$REPO" --json conclusion,attempt \
