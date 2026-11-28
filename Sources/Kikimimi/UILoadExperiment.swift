@@ -1,8 +1,10 @@
 // 画面の重さの確認の、終わりの実験の段 (原因を調べるための測り。目安とは比べず、SLOW にも終了コードにも入れない):
-// 一覧の終わりを追いかけたまま 300 行を足すと重くなる行の数 (CI の macOS 15 で、毎回同じ数で重い) で、
-// 足し方を変えて、同じ行の数どうしで比べる。重さは行の数で変わるので、1 回ごとに、ちょうどその行の数の
+// 文字起こし中で一覧の終わりを追いかけている時に、ウインドウを隠している (画面に出ていない) あいだに行が 10 行ずつ
+// 届くと、一覧がどうなるか (隠しているあいだに重いか、また出した時に、届いた行をいっぺんに並べて止まるか) を、
+// 隠し方を変えて、同じ行の数どうしで比べる。重さは行の数で変わるので、1 回ごとに、ちょうどその行の数の
 // 新しい文字起こし中の結果を作って選ぶ。
 
+import AppKit
 import Foundation
 import KikimimiCore
 
@@ -12,12 +14,15 @@ extension LoadRun {
 
     /// 実験の段を走らせるか。ふだんは走らせない (CI の時間を 1 分ほど使うので)。原因を調べ直す時だけ true にする
     /// (2026-11-28 に 1 度走らせた。結果は docs/HANDOFF-ARCHIVE.md)
-    nonisolated static let experimentEnabled = false
+    nonisolated static let experimentEnabled = true
 
-    /// この確認で行う、始めの行の数。CI の 8000 行の段は 4 分で打ち切られるので、5 つを 2 つの確認に分ける
-    /// (3000 行の確認 (打ち切りは 10 分) で始めの 3 つ、8000 行の確認で残りの 2 つ。手元で 1 つあたり 10 秒ほど)
+    /// この確認で行う、始めの行の数。CI の 8000 行の段は 4 分で打ち切られるので、2 つの確認に分ける。
+    /// 隠し方の実験は 1 つの数あたり手元で 20 秒ほどかかるので、それぞれの確認で減らしてある
+    /// (3000 行の確認で 3988 と 8087、8000 行の確認で 8987)
+    static let experimentBasesFewRows = [3988, 8087]
+    static let experimentBasesManyRows = [8987]
     var experimentBasesForThisRun: [Int] {
-        rows < 8000 ? Array(Self.experimentBases.prefix(3)) : Array(Self.experimentBases.dropFirst(3))
+        rows < 8000 ? Self.experimentBasesFewRows : Self.experimentBasesManyRows
     }
 
     /// 実験の結果の、全体の長さ (秒)。その行の数が CI で重かった確認の、文字起こし中の結果と同じ
@@ -26,67 +31,45 @@ extension LoadRun {
         Double(base < 8000 ? 3000 : 8000) * UILoadSelfTest.rowSpacing * 2
     }
 
-    /// 実験の、足し方の 1 つ (足すのは、いつも合わせて 300 行)
-    struct ExperimentVariant {
-        /// 行に出す名前
-        var name: String
-        /// 1 回ごとに足す行の数 (前の回で、メインが空いてから次を足す)
-        var batches: [Int]
-        /// 追いかけるのをやめてから足し、空いたあと、また追いかける (「末尾へ」と同じ道)
-        var unfollowed = false
-        /// 足すのと一覧を動かすのを分ける: 追いかけるのをやめ (位置は前の終わりのまま)、300 行を 1 回で足し、
-        /// そのあと、この行の数ずつ一覧を下へ動かして新しい終わりまで行き、また追いかける
-        var scrollStep: Int?
-        /// scrollStep の動かし方: nil なら 1 回ごとにメインが空くまで待つ。値があれば、その秒ごとに次を動かす
-        /// (空くのは、最後のあとにだけ待つ)
-        var scrollCadence: Double?
-    }
+    /// 実験の、隠し方の 1 つ (どれも、隠したあと 10 行ずつ 30 回、合わせて 300 行を足してから、また出す)
+    enum ExperimentHide: CaseIterable {
+        case visible
+        case orderOut
+        case miniaturize
+        case appHide
 
-    /// 実験の足し方 (この順で行い、この順で行に出す)
-    static let experimentVariants = [
-        ExperimentVariant(name: "control", batches: [300]),
-        ExperimentVariant(name: "steps of 10", batches: Array(repeating: 10, count: 30)),
-        ExperimentVariant(name: "append unfollowed, then follow", batches: [300], unfollowed: true),
-        ExperimentVariant(name: "scroll steps of 10", batches: [300], scrollStep: 10),
-        ExperimentVariant(name: "scroll steps of 20", batches: [300], scrollStep: 20),
-        ExperimentVariant(name: "scroll steps of 30", batches: [300], scrollStep: 30),
-        ExperimentVariant(name: "scroll steps of 10, every 30 ms", batches: [300], scrollStep: 10, scrollCadence: 0.03)
-    ]
-
-    /// 実験の 1 回の結果 (まとめの行に使う)
-    struct ExperimentResult {
-        var line: String
-        var bodies: Int
-        var worst: Double
-        var longestWait: Double?
-        var total: Double
-        var job: Job
+        var name: String {
+            switch self {
+            case .visible: return "visible, 10 at a time"
+            case .orderOut: return "hidden (orderOut), 10 at a time, then shown"
+            case .miniaturize: return "miniaturized, 10 at a time, then restored"
+            case .appHide: return "app hidden, 10 at a time, then unhidden"
+            }
+        }
     }
 
     /// 実験の段のあいだの、見張りの合図の段階の名前 (測る段階の集計には入らない)
     static let experimentPhase = "experiment stage (not measured)"
 
-    /// 実験の段: 始めの行の数ごと・足し方ごとに、新しい文字起こし中の結果 (段階 4 と同じ形) を作って選び、
-    /// 終わりを追いかけている事を確かめてから足して、body を動かした行の数などを 1 行に出す。
+    /// 実験の段: 始めの行の数ごと・隠し方ごとに、新しい文字起こし中の結果 (段階 4 と同じ形) を作って選び、
+    /// 終わりを追いかけている事を確かめてから、ウインドウを隠し、10 行ずつ 30 回足し、また出して、
+    /// 隠しているあいだと、出したあとを分けて 1 行に出す。
     /// 参考の段 (notFollowingRound) のあとに呼ぶ (このあとに確認は無い)。作った結果は、次の結果を選んでから消す
     func experimentRound() async -> [String] {
         guard Self.experimentEnabled else { return [] }
         var lines = ["experiment (not compared with any limit): for each row count, a new running job with exactly that"
-                     + " many rows (as the running job of phase 4), selected and following the end, then 300 rows added"
-                     + " in different ways (applied directly with AppModel.applyLive, each step after the previous one"
-                     + " is idle). \"scroll steps of N\": stop following without moving the list (it stays at the old"
-                     + " end), add the 300 rows at once and wait until idle (append bodies = bodies of that part), then"
-                     + " scrollTo the row base + N*k - 1 at the bottom for k = 1, 2, ... (waiting until idle after each;"
-                     + " \"every 30 ms\": the next one 30 ms after the previous one, idle only after the last, and a step"
-                     + " = from its scrollTo until the 30 ms wait returned), then follow again and wait until idle."
-                     + " bodies / inits = PlayableRow bodies and inits from the first step until the last step is idle;"
-                     + " total = that time; worst / median step idle = over the steps (append and scroll steps);"
-                     + " longest wait = the longest watchdog wait during the whole trial; rows = rows before -> after;"
-                     + " following = the list followed the end before the first step; follow back = the first scroll"
-                     + " step after which the list followed the end again on its own (none = only after the last)"]
+                     + " many rows (as the running job of phase 4), selected and following the end; then the main window"
+                     + " is hidden in different ways, 300 rows are added as 30 batches of 10 (AppModel.applyLive, each"
+                     + " batch after the previous one is idle: the live shape, one jump to the end per batch), and the"
+                     + " window is shown again. while hidden = from the first batch until the last one is idle; after"
+                     + " showing = from the show call until the window is back and the main thread is idle (idle after);"
+                     + " bodies / inits = PlayableRow bodies and inits; scrollTo calls = the tracker's scrollTo calls;"
+                     + " longest wait = the longest watchdog wait in that part; window visible before/after = the main"
+                     + " window's isVisible while the rows were added / after showing; following = the list followed the"
+                     + " end after showing; catch-ups started = stepped tail catch-ups during the trial"]
         lines.append("UI LOAD: experiment row counts in this run: "
                      + experimentBasesForThisRun.map(String.init).joined(separator: ", ")
-                     + " (3988, 8087, 8088 in the run with fewer than 8000 rows; 8987, 9288 in the others)")
+                     + " (3988, 8087 in the run with fewer than 8000 rows; 8987 in the others; 8088 and 9288 dropped for time)")
         Self.live("experiment: start")
         let stageStarted = UILoadSelfTest.now()
         player.stopLine()
@@ -95,27 +78,22 @@ extension LoadRun {
         probe.start()
         var previous: Job?
         var summaries: [String] = []
-        func f(_ seconds: Double) -> String { String(format: "%.1f", UILoadSelfTest.ms(seconds)) }
         for base in experimentBasesForThisRun {
-            var bodies: [String] = []
-            var times: [String] = []
-            for variant in Self.experimentVariants {
-                Self.live("experiment: rows \(base) \"\(variant.name)\"")
-                let trial = await experimentTrial(base: base, variant: variant, previous: previous)
+            var parts: [String] = []
+            for hide in ExperimentHide.allCases {
+                Self.live("experiment: rows \(base) \"\(hide.name)\"")
+                let trial = await experimentTrial(base: base, hide: hide, previous: previous)
                 previous = trial.job
                 lines.append(trial.line)
-                bodies.append("\(variant.name) \(trial.bodies)")
-                let wait = trial.longestWait.map(f) ?? "unknown"
-                times.append("\(variant.name) \(f(trial.worst))/\(wait)/\(f(trial.total)) ms")
+                parts.append("\(hide.name) \(trial.summary)")
             }
-            summaries.append("UI LOAD: experiment summary rows \(base): " + bodies.joined(separator: "; "))
-            summaries.append("UI LOAD: experiment times rows \(base) (worst step idle/longest wait/total): "
-                             + times.joined(separator: "; "))
+            summaries.append("UI LOAD: experiment summary rows \(base): " + parts.joined(separator: "; "))
         }
         probe.stop()
         // 選んでいた文字起こし中の結果に戻してから、最後に作った結果を消す
         model.select(running)
         if let previous { model.delete(previous) }
+        await settle()
         lines += summaries
         let took = UILoadSelfTest.seconds(from: stageStarted, to: UILoadSelfTest.now())
         lines.append("UI LOAD: experiment took \(String(format: "%.1f", took)) s")
@@ -123,8 +101,9 @@ extension LoadRun {
         return lines
     }
 
-    /// 実験の 1 回: 結果を作って選び (前の回の結果は、選び替えてから消す)、追いかけている事を確かめ、足し方のとおりに足す
-    private func experimentTrial(base: Int, variant: ExperimentVariant, previous: Job?) async -> ExperimentResult {
+    /// 実験の 1 回: 結果を作って選び (前の回の結果は、選び替えてから消す)、追いかけている事を確かめ、隠して足して、また出す
+    private func experimentTrial(base: Int, hide: ExperimentHide,
+                                 previous: Job?) async -> (line: String, summary: String, job: Job) {
         func f(_ seconds: Double) -> String { String(format: "%.1f", UILoadSelfTest.ms(seconds)) }
         // 段階 4 の文字起こし中の結果と同じ形 (行の文・長さ・言語・全体の長さ・状態)
         let job = Job(name: "文字起こし中 (確認用, 実験 \(base) 行)", url: running.url)
@@ -137,11 +116,11 @@ extension LoadRun {
         model.select(job)
         if let previous { model.delete(previous) }
         await settle()
-        let prefix = "UI LOAD: experiment rows \(base) \"\(variant.name)\": "
+        let prefix = "UI LOAD: experiment rows \(base) \"\(hide.name)\": "
         guard let setFollowing = UILoadHooks.setFollowing, let scrollList = UILoadHooks.scrollList,
-              let isFollowing = UILoadHooks.isFollowing else {
-            return ExperimentResult(line: prefix + "skipped (the list did not register its hooks)", bodies: -1,
-                                    worst: 0, longestWait: nil, total: 0, job: job)
+              let isFollowing = UILoadHooks.isFollowing,
+              let window = MainWindow.all().first(where: { $0.isVisible }) else {
+            return (prefix + "skipped (no list hooks or no visible main window)", "skipped", job)
         }
         // 段階 4 と同じく、終わりを追いかけている所から始める (選んだだけで追いかけていなければ、「末尾へ」と同じ道で)
         if !isFollowing(), let last = job.transcript?.segments.last?.id {
@@ -149,95 +128,114 @@ extension LoadRun {
             scrollList(last, .bottom)
             await settle()
         }
-        let following = isFollowing()
-        // 追いかけるのをやめる (参考の段と同じ: 終わりから 15 行ほど上へ動かし、追いかけるのをやめる)
-        if variant.unfollowed, let segments = job.transcript?.segments, segments.count > 15 {
-            scrollList(segments[segments.count - 15].id, .bottom)
-            setFollowing(false)
-            await settle()
+        let wasKey = window.isKeyWindow
+        let wasActive = NSApp.isActive
+        let catchUpsBefore = UILoadHooks.catchUpsStarted
+        // 隠す
+        var notes: [String] = []
+        switch hide {
+        case .visible:
+            break
+        case .orderOut:
+            window.orderOut(nil)
+        case .miniaturize:
+            window.miniaturize(nil)
+            if !(await Self.waitUntil(3) { window.isMiniaturized }) { notes.append("did not miniaturize in 3 s") }
+        case .appHide:
+            NSApp.hide(nil)
+            if !(await Self.waitUntil(3) { NSApp.isHidden }) { notes.append("the app did not hide in 3 s") }
         }
-        // 一覧を動かす足し方: 位置は前の終わりのまま、追いかけるのだけをやめる
-        if variant.scrollStep != nil {
-            setFollowing(false)
-            _ = await UILoadSelfTest.untilIdle(since: UILoadSelfTest.now())
-        }
-        let followingBeforeSteps = isFollowing()
-        let rowsBefore = job.transcript?.segments.count ?? 0
-        let inits = UILoadHooks.rowsBuilt
-        let bodies = UILoadHooks.rowBodies
+        _ = await UILoadSelfTest.untilIdle(since: UILoadSelfTest.now())
+        let visibleWhileAdding = window.isVisible
+        let appHiddenWhileAdding = NSApp.isHidden
+        // 1. 隠しているあいだに、10 行ずつ 30 回足す
+        var inits = UILoadHooks.rowsBuilt
+        var bodies = UILoadHooks.rowBodies
+        let calls = UILoadHooks.scrollToCalls
         let started = UILoadSelfTest.now()
-        var next = rowsBefore
-        var stepTimes: [Double] = []
-        for count in variant.batches {
-            let segments = UILoadSelfTest.makeSegments(next..<(next + count))
-            next += count
+        var next = job.transcript?.segments.count ?? 0
+        for _ in 0..<30 {
+            let segments = UILoadSelfTest.makeSegments(next..<(next + 10))
+            next += 10
             let stepStarted = UILoadSelfTest.now()
             AppModel.applyLive(LiveSegmentBuffer.Batch(segments: segments), to: job)
-            let idle = await UILoadSelfTest.untilIdleDetail(since: stepStarted)
-            stepTimes.append(idle.seconds)
-        }
-        let appendBodies = UILoadHooks.rowBodies - bodies
-        var followBack: Int?
-        var scrollTimes: [Double] = []
-        if let step = variant.scrollStep, let segments = job.transcript?.segments {
-            let ids = stride(from: rowsBefore + step - 1, to: segments.count, by: step).map { segments[$0].id }
-            for (index, id) in ids.enumerated() {
-                let stepStarted = UILoadSelfTest.now()
-                scrollList(id, .bottom)
-                if let cadence = variant.scrollCadence {
-                    if index == ids.count - 1 {
-                        let idle = await UILoadSelfTest.untilIdleDetail(since: stepStarted)
-                        scrollTimes.append(idle.seconds)
-                    } else {
-                        await UILoadSelfTest.sleep(cadence)
-                        scrollTimes.append(UILoadSelfTest.seconds(from: stepStarted, to: UILoadSelfTest.now()))
-                    }
-                } else {
-                    let idle = await UILoadSelfTest.untilIdleDetail(since: stepStarted)
-                    scrollTimes.append(idle.seconds)
-                }
-                if followBack == nil, index < ids.count - 1, isFollowing() { followBack = index + 1 }
-            }
-            // また追いかける
-            let stepStarted = UILoadSelfTest.now()
-            setFollowing(true)
-            let idle = await UILoadSelfTest.untilIdleDetail(since: stepStarted)
-            stepTimes.append(idle.seconds)
-        }
-        if variant.unfollowed, let last = job.transcript?.segments.last?.id {
-            // また追いかける (「末尾へ」と同じ: 追いかけるのを戻し、終わりの行へ動かす)
-            let stepStarted = UILoadSelfTest.now()
-            setFollowing(true)
-            scrollList(last, .bottom)
-            let idle = await UILoadSelfTest.untilIdleDetail(since: stepStarted)
-            stepTimes.append(idle.seconds)
+            _ = await UILoadSelfTest.untilIdleDetail(since: stepStarted)
         }
         let ended = UILoadSelfTest.now()
-        let builtBodies = UILoadHooks.rowBodies - bodies
-        let builtInits = UILoadHooks.rowsBuilt - inits
-        let rowsAfter = job.transcript?.segments.count ?? 0
-        // 見張りの合図が届くのを待ってから、この回のあいだのいちばん長い待ちを取る
-        // (見張りは 50 ms ごとに合図を積む。メインは空いているので、1 回分より少し長く待てば足りる)
+        let hiddenBodies = UILoadHooks.rowBodies - bodies
+        let hiddenInits = UILoadHooks.rowsBuilt - inits
+        let hiddenCalls = UILoadHooks.scrollToCalls - calls
         await UILoadSelfTest.sleep(0.08)
-        let windowEnd = UILoadSelfTest.now()
-        let longest = probe.samples().filter { $0.posted >= started && $0.posted < windowEnd }.map(\.wait).max()
-        let wait = longest.map { "\(f($0)) ms" } ?? "unknown (no watchdog samples)"
-        var followingText = "following \(following)"
-        if variant.unfollowed || variant.scrollStep != nil {
-            followingText += " (then stopped: following \(followingBeforeSteps))"
+        let hiddenWait = longestWait(from: started)
+        // 2. また出す
+        inits = UILoadHooks.rowsBuilt
+        bodies = UILoadHooks.rowBodies
+        let showStarted = UILoadSelfTest.now()
+        switch hide {
+        case .visible:
+            break
+        case .orderOut:
+            window.makeKeyAndOrderFront(nil)
+        case .miniaturize:
+            window.deminiaturize(nil)
+            if !(await Self.waitUntil(3) { !window.isMiniaturized && window.isVisible }) {
+                notes.append("did not restore in 3 s")
+            }
+        case .appHide:
+            NSApp.unhide(nil)
+            if !(await Self.waitUntil(3) { !NSApp.isHidden && window.isVisible }) { notes.append("the app did not unhide in 3 s") }
         }
-        let allSteps = stepTimes + scrollTimes
-        let worst = allSteps.max() ?? 0
-        let total = UILoadSelfTest.seconds(from: started, to: ended)
-        let steps = variant.batches.count + scrollTimes.count + (variant.unfollowed || variant.scrollStep != nil ? 1 : 0)
-        var line = prefix + "bodies \(builtBodies), inits \(builtInits), steps \(steps),"
-            + " total \(f(total)) ms, worst step idle \(f(worst)) ms,"
-            + " longest wait \(wait), rows \(rowsBefore) -> \(rowsAfter), \(followingText)"
-        if variant.scrollStep != nil {
-            let median = UILoadSelfTest.percentile(allSteps.sorted(), 0.5)
-            line += ", append bodies \(appendBodies), median step idle \(f(median)) ms,"
-                + " scroll steps \(scrollTimes.count), follow back \(followBack.map { "at scroll step \($0)" } ?? "none")"
+        let idle = await UILoadSelfTest.untilIdleDetail(since: showStarted)
+        let shownBodies = UILoadHooks.rowBodies - bodies
+        let shownInits = UILoadHooks.rowsBuilt - inits
+        await UILoadSelfTest.sleep(0.08)
+        let shownWait = longestWait(from: showStarted)
+        // 次の回と、確認の終わりのために、ウインドウを出したまま、キーかどうかを前と同じにする
+        if !window.isVisible || window.isMiniaturized || NSApp.isHidden {
+            notes.append("the window had to be restored again")
+            if NSApp.isHidden { NSApp.unhide(nil) }
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+            _ = await Self.waitUntil(3) { window.isVisible && !window.isMiniaturized }
         }
-        return ExperimentResult(line: line, bodies: builtBodies, worst: worst, longestWait: longest, total: total, job: job)
+        // 隠したアプリは、出しても前面にならない: 前面だったなら、前面に戻してからキーにする
+        if wasActive, !NSApp.isActive {
+            NSApp.activate()
+            _ = await Self.waitUntil(2) { NSApp.isActive }
+        }
+        if wasKey, !window.isKeyWindow {
+            window.makeKeyAndOrderFront(nil)
+            _ = await Self.waitUntil(1) { window.isKeyWindow }
+        }
+        await settle()
+        let visibleAfter = window.isVisible
+        let followingAfter = UILoadHooks.isFollowing?() ?? false
+        let wait1 = hiddenWait.map(f) ?? "unknown"
+        let wait2 = shownWait.map(f) ?? "unknown"
+        var line = prefix + "while hidden: bodies \(hiddenBodies), inits \(hiddenInits), scrollTo calls \(hiddenCalls),"
+            + " total \(f(UILoadSelfTest.seconds(from: started, to: ended))) ms, longest wait \(wait1) ms;"
+            + " after showing: bodies \(shownBodies), inits \(shownInits), idle after \(f(idle.seconds)) ms,"
+            + " longest wait \(wait2) ms; window visible before/after \(visibleWhileAdding)/\(visibleAfter),"
+            + " following \(followingAfter), catch-ups started \(UILoadHooks.catchUpsStarted - catchUpsBefore)"
+        if hide == .appHide { line += ", app hidden while adding \(appHiddenWhileAdding)" }
+        line += ", key before/after \(wasKey)/\(window.isKeyWindow), app active before/after \(wasActive)/\(NSApp.isActive)"
+        if !notes.isEmpty { line += " (" + notes.joined(separator: "; ") + ")" }
+        return (line, "\(hiddenBodies)+\(shownBodies) (\(wait2) ms)", job)
+    }
+
+    /// from から今までに積まれた、見張りの合図のいちばん長い待ち (秒。合図が無ければ nil)
+    private func longestWait(from start: UInt64) -> Double? {
+        let end = UILoadSelfTest.now()
+        return probe.samples().filter { $0.posted >= start && $0.posted < end }.map(\.wait).max()
+    }
+
+    /// 条件が満たされるまで待つ (50 ms ごとに見る。Dock の動きなどを待つだけなので、タイマーでよい)。満たされたか
+    private static func waitUntil(_ seconds: Double, _ condition: @MainActor () -> Bool) async -> Bool {
+        let giveUp = UILoadSelfTest.now() + UInt64(seconds * 1_000_000_000)
+        while !condition() {
+            if UILoadSelfTest.now() >= giveUp { return false }
+            await UILoadSelfTest.sleep(0.05)
+        }
+        return true
     }
 }
