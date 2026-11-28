@@ -719,4 +719,24 @@ LLM とのチャット (2026-11-20、1ef6407):
 - **(3) Xcode 16.2 の列でだけ出る、0.23〜0.31 秒の待ち**: 3000 行の確認の、小刻みの 1 回目 (3088 行から) に出る (4 本の build で毎回: 243.3・232.6・313.9・240.2 ms。26.3 の列の同じ回は 47〜83 ms)。足した直後の 1 回りが長い (6df2463 の build で 285.6 ms)。`scrollTo` の呼び出しは、どれも短い (いちばん長くて 5.2 ms)。8000 行の確認の 1 回目には出ない (61.8 ms)。訳は分かっていない。目安 (1.5 秒) より短いので、記録だけ。
   - ついでに分かった事: `scrollTo` の 1 回の呼び出しは、行が多いほど長い (3000 行で 4〜7 ms、8000 行で 14 ms ほど)。
 - 確かめ (手元): `swift test` は「Executed 656 tests, with 0 failures」。`--selftest-llm` (Qwen3.5 4B、GPU) は、`LLM FAILURE:` の 6 行とも ok、`audit: 2 findings, 3.64 s, unread 0`、`SELFTEST OK`、終了コード 0 (16.2 秒)。アプリの確認 (3000 行、音声と絵つき) は、OK の 7 行が出て終了コード 0 (`time tick` の中央 9.4 ms、`tail catch-up: off`)。本物のライブラリとモデルのフォルダで、確かめの間に変わったファイルは 0 個。
-- CI: この記録と同じ push で走る (build と links。エンジンは触っていないので、finetune は走らない)。結果は、次の記録に書く。CI の `--selftest-llm` は小さなモデルで走るので、足した 6 行がそこでも ok になるかは、その build で初めて分かる。
+- CI (3f00234): build (run 46112168405) は 2 列とも success、2 列とも「Executed 656 tests, with 0 failures」。links (run 46112168424) も success。くわしくは、次の項。
+
+### 2026-11-28 (続き 2): PR 26 のマージと、問題解決を進めた (9 回目)
+
+- **main へのマージ**: 利用者の OK (「main へマージ」) で、3f00234 (本物のエンジンで失敗の道を確かめる段、`docs/HANDOFF.md` を短くした事) を main にマージした (PR tokoinx/Kikimimi#26、マージ コミット 9a8cef7。マージの直後、main と枝 3f00234 の中身は同じ)。
+  - マージの前の確かめ: 枝の先頭 3f00234 の build (run 46112168405) と links (run 46112168424)、PR の build (run 46114698069) は、どれも success (build は Xcode 16.2・26.3 の 2 列とも「Executed 656 tests, with 0 failures」、「UI LOAD OK」が 3000 行と 8000 行の 2 つ)。
+  - CI の小さなモデル (25.5 MB) でも、`--selftest-llm` の `LLM FAILURE:` の 6 行は、2 列とも ok だった (1 列で 2 回走る: `4194304 of 25527744 bytes` の切れたファイルを 0.02〜0.03 秒で断る、`refused 5143/4088 tokens`、`stopped after 3 updates in 0.01〜0.05 s` など)。`audit: 1 findings, … unread 0`、`SELFTEST OK` が 1 列に 4 つ。
+  - 小刻みの値 (3f00234 の build と PR の build): メインスレッドのいちばん長い待ちは 56.7〜135.6 ms。全部が出るまでのいちばん長い回は 2123.1 ms (16.2 の列の 8000 行。この時も、待ちは 92.1 ms)。「重い」は 0 件。
+  - マージの後の main の CI (9a8cef7): build (run 46118133198) は 1 回目で 2 列とも success (2 列とも「Executed 656 tests, with 0 failures」「UI LOAD OK」が 2 つ)、links (run 46118133199) も success。小刻みのいちばん長い待ちは 54.7〜92.5 ms。
+- **(1) 一覧の決まりの確認が、メモ・練習を読む形も止める事を、わざと破って確かめた** (試した形は戻した。コードは変えていない)。前は、再生位置だけを試していた。
+  - 破り方: `Views/TranscriptListSupport.swift` に、`job.notes` を読む関数 (2 回目は `model.practice.dictation.typed` を読む関数) を足し、一覧の body から呼ぶ (書き方を見る試験が見逃す形)。
+  - メモ: `swift test --filter TranscriptListRulesTests` は通った (「Executed 5 tests, with 0 failures」= 見逃す)。アプリの確認 (3000 行) は、終了コード 5 で `UI LOAD: SLOW ("notes edit" re-ran the list (list bodies 20, row inits 0, row bodies 0; list bodies must be 0): the list body reads the notes (job.notes) (CLAUDE.md, results list rule 4))`。
+  - 練習の書き取り: 同じく、試験は通り、アプリの確認は、終了コード 5 で `UI LOAD: SLOW ("practice dictation typing" re-ran the list (list bodies 20, …): the list body reads the practice state (practice.dictation) …)`。
+  - これで、決まり 4 の 3 つの状態 (再生位置・メモ・練習の書き取り) とも、破ると確認が止める事を見た。戻した後、`git diff --stat -- Sources/Kikimimi/Views` は空。
+- **(2) 確認の測りの見落としを直した** (確認の側だけ。`UILoadRun+Measure.swift`・`UILoadAppendDetail.swift`・`UILoadRun.swift`)。
+  - 見落とし: 300 行の回は、「足してから、メインが空くまでの時間」を測っていた。重い仕事が、「空いた」の判定の後に来ると、数えなかった (CI で、空くまで 79 ms と出た回の直後に、530 ms の待ちが在った)。
+  - 直し: 小刻みに追いつかなかった回の値は、「空くまでの時間」と、「その回の始めから、次に足すまでの、メインスレッドのいちばん長い待ち」の、長いほうにする。内わけの行の終わりに `, counted X ms (idle|longest wait)` が付く (小刻みに追いついた回は `(longest wait during the catch-up)`。その意味は、前と同じ)。目安の値は、変えていない。
+  - 確かめ: わざと、1 回目の回の「空いた」の 0.15 秒後に、メインを 0.4 秒止めると、その回は `idle after 49.6 ms, …, longest wait before the next append 390.4 ms, counted 390.4 ms (longest wait)` になり、操作の行は `max 390.4 ms` になった (止める仕掛けは外した)。仕掛けの無い時は、3 回とも `counted … (idle)` (55.9・98.6・101.4 ms)。
+  - 見ていない事: 数えた値が目安 (1.5 秒) を越えて「重い」になる所 (値が待ちのほうへ切り替わる所までを見た)。
+- **Xcode 16.2 の列の、小刻みの 1 回目の待ち** (前の項の (3) の続き): 小刻みを入れてからの build を数え直すと、3000 行の確認の 16.2 の列の、いちばん長い待ちは、243.3・232.6・313.9・240.2・58.9・135.6 ms、92.5 ms (main の 9a8cef7 の build)。毎回ではなかった。
+- 確かめ (手元、(2) を入れた後): `swift test` は「Executed 656 tests, with 0 failures」。アプリの確認 (3000 行、音声と絵つき。小刻みは切) は、OK の 7 行が出て終了コード 0 (`time tick` の中央 10.1 ms)。300 行の回は、3 回とも `counted … (idle)` (81.4・85.5・84.0 ms)。任せた側は、小刻みを入にした形でも走らせた (終了コード 0、3 回とも `counted … (longest wait during the catch-up)` で 33.8・45.8・48.6 ms)。

@@ -70,6 +70,8 @@ extension LoadRun {
         probe.stop()
         // 届いていない合図を待つ
         await UILoadSelfTest.sleep(0.3)
+        // burst の比べる値に、そのあとの見張りの待ちを入れる (合図がそろったので、目安と比べる前に)
+        countBurstWaits()
         // 操作ごとに分けるのは、ここまで (合計と同じ所で止める)
         flushRowCounts()
         rowCountMark = nil
@@ -310,6 +312,15 @@ extension LoadRun {
         burstWaits.append(timed.wait)
         endRowCount(Action.burst)
         measured[Action.burst, default: []].append(timed.seconds)
+        guard let last = appendDetails.indices.last else { return }
+        if appendDetails[last].caughtUp {
+            // 小刻みに追いついた回: 比べる値は、timedBurst が返した値のまま (いちばん長い待ち。合図が無ければ合わせた時間)
+            let how = burstCatchUps.last?.longestWait == nil ? "catch-up total" : "longest wait during the catch-up"
+            appendDetails[last].counted = ", counted \(String(format: "%.1f", UILoadSelfTest.ms(timed.seconds))) ms (\(how))"
+        } else {
+            // 追いつかなかった回: 次に足す操作までの見張りの待ちは、あとで分かるので、段階 4 のあとで直す (countBurstWaits)
+            burstFixUps.append((last, (measured[Action.burst]?.count ?? 1) - 1))
+        }
     }
 
     /// burst の中身: 届けて、まとめて足し始めるのを待ち、メインスレッドが空くまでを測る。内わけの行も appendDetails に足す。

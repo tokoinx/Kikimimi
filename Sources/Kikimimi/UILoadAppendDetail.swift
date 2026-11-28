@@ -25,7 +25,9 @@ extension LoadRun {
         + " row inits / row bodies = PlayableRow inits and bodies during the action; crosses = the powers of two the"
         + " row count passed (before < 2^k <= after); longest wait before the next append = the longest watchdog wait"
         + " among the samples posted from the start of this action until the start of the next one (the last one: until"
-        + " the end of the phase or of the reference stage)"
+        + " the end of the phase or of the reference stage); counted (phase 4 bursts only) = the value compared with the"
+        + " burst limit: the larger of idle after and the longest wait before the next append (idle or longest wait),"
+        + " or for a burst caught up in steps the longest watchdog wait during the catch-up"
 
     /// 内わけの 1 つ: 行の文 (watchdog の待ちの前まで) と、その操作を始めた時刻 (uptime のナノ秒)
     struct AppendDetail {
@@ -39,6 +41,26 @@ extension LoadRun {
         var idleSeconds = 0.0
         /// 一覧が終わりへ小刻みに追いついた burst (通った行をすべて並べるので、body の数の注記は出さない)
         var caughtUp = false
+        /// 段階 4 の burst の、目安と比べた値と、どちらで決まったか (行の終わりに付ける。ほかの操作は nil)
+        var counted: String?
+    }
+
+    /// 段階 4 の、小刻みに追いつかなかった burst の、目安と比べる値を、メインが空くまでの時間と、その burst を始めてから
+    /// 次に足す操作を始めるまで (最後は段階 4 の終わりまで) の見張りのいちばん長い待ちの、長いほうにする
+    /// (空いたと見たあとに、重い仕事が始まることがある)。待ちは段階 4 のあとで分かるので、段階 4 のあと、目安と比べる前に呼ぶ
+    func countBurstWaits() {
+        func f(_ seconds: Double) -> String { String(format: "%.1f", UILoadSelfTest.ms(seconds)) }
+        let end = phaseTimes[Phase.burst]?.end ?? UILoadSelfTest.now()
+        let waits = longestWaits(appendDetails[...], until: end)
+        for fix in burstFixUps {
+            let idle = appendDetails[fix.detail].idleSeconds
+            let wait = waits[fix.detail] ?? 0
+            let byWait = wait > idle
+            let counted = byWait ? wait : idle
+            measured[Action.burst]?[fix.sample] = counted
+            appendDetails[fix.detail].counted = ", counted \(f(counted)) ms (\(byWait ? "longest wait" : "idle"))"
+        }
+        burstFixUps = []
     }
 
     /// 注記を出す、1 回の burst の body の数 (これ以上なら、一覧が前の終わりから新しい終わりまでの行を作った)
@@ -64,7 +86,7 @@ extension LoadRun {
         var notes: [String] = []
         for (detail, longest) in zip(details, waits) {
             let wait = longest.map { "\(f($0)) ms" } ?? "unknown (no watchdog samples)"
-            lines.append(detail.text + ", longest wait before the next append \(wait)")
+            lines.append(detail.text + ", longest wait before the next append \(wait)" + (detail.counted ?? ""))
             guard let label = detail.burstLabel, !detail.caughtUp, detail.bodies >= Self.heavyBurstBodies else { continue }
             notes.append("UI LOAD: note: \(label) at \(detail.rowsBefore) rows built \(detail.bodies) row bodies"
                          + " (idle after \(f(detail.idleSeconds)) ms, longest wait \(wait)): the list built the rows"
@@ -217,7 +239,8 @@ extension LoadRun {
             guard let worst = sorted.last else { return "no samples" }
             return "median \(f(UILoadSelfTest.percentile(sorted, 0.5))) ms (max \(f(worst)))"
         }
-        lines.append("UI LOAD: burst idle after: following \(summary(measured[Action.burst] ?? [])),"
+        // 段階 4 の値は、目安と比べた値 (countBurstWaits で直したもの)
+        lines.append("UI LOAD: burst idle after: following (counted) \(summary(measured[Action.burst] ?? [])),"
                      + " following extra \(summary(followingExtra)), not following \(summary(notFollowing))"
                      + (burstCatchUps.isEmpty ? "" : " (bursts caught up in steps: the longest watchdog wait)"))
         lines += catchUpNotes
