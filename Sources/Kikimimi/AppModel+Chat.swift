@@ -30,6 +30,17 @@ extension AppModel {
         return chatAccess(setting)?.get()
     }
 
+    /// 札の「前の値」(頼まれた値 `requested` と比べて「もうこの値」かを決める)。
+    /// 対訳だけは、頼まれた値で読み分ける (`ChatProposalBefore.bilingual`): 「入」なら設定そのもの、「切」なら結果の画面の見え方。
+    /// ほかの鍵は `currentValue(for:)` と同じ
+    func proposalBeforeValue(for key: String, requested: String) -> String? {
+        guard SettingKey(rawValue: key) == .showBilingual else { return currentValue(for: key) }
+        let on = ChatProposalBefore.bilingual(setting: showBilingual,
+                                              shownForResult: selectedJob.map { showsBilingual($0) },
+                                              requested: requested == "on")
+        return on ? "on" : "off"
+    }
+
     /// チャットから設定 1 つを読み書きする口 (値はチャットの書き方。toggle は "on" / "off")
     private struct ChatAccess {
         let get: () -> String

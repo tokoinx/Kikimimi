@@ -253,7 +253,11 @@ public final class LlamaEngine: TextGenerating, @unchecked Sendable {
 
         // 文をトークンに分けられない時は、黙って空の答えを返さずに -102 で止める
         let tokens = try promptTokens(prompt)
-        guard !tokens.isEmpty else { return "" }
+        // 空の依頼は、出す物が無いので、書き終えた扱いで戻る (上限に届いた訳ではない)
+        guard !tokens.isEmpty else {
+            finishReason = .complete
+            return ""
+        }
         let limit = contextLength - 8
         guard tokens.count < limit else { throw LLMError.promptTooLong(tokens: tokens.count, limit: limit) }
         let maxNew = max(0, min(prompt.maxTokens, contextLength - tokens.count - 1))

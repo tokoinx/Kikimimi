@@ -1247,7 +1247,10 @@ struct PostProcessBar: View {
                         } else {
                             ProgressView().progressViewStyle(.linear)
                         }
-                        Text(job.postQueue.isEmpty ? message : L("%1$@ (next: %2$@)", message, queued))
+                        // チャットが LLM で答えている間は、進み具合の文を、止めている事を言う文に替える
+                        let shown = ChatPause.replacesProgress(chatPhase: model.chat.phase, postTaskRunning: true)
+                            ? L("Paused while the chat answers") : message
+                        Text(job.postQueue.isEmpty ? shown : L("%1$@ (next: %2$@)", shown, queued))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }

@@ -9,7 +9,7 @@ import KikimimiWhisper
 /// ページを読んだ回の案を出さない事・一覧の 20 項目の読み書き・設定の画面と同じ「変えられない時」・
 /// 対訳の値が結果の画面のチェックと同じ事・札のラベルが設定の画面と同じ文である事・語彙のヒントの上限・
 /// リサーチが切の時に読みに行かない事を確かめる。
-/// 終わりに窓を閉じ、設定を元の値に戻す。`screenshots` があれば、絵 14〜17 を残す
+/// 終わりに窓を閉じ、設定を元の値に戻す。`screenshots` があれば、絵 14〜18 と 25〜27 を残す
 @MainActor
 enum ChatCheck {
     static func run(model: AppModel, screenshots: URL?, lines: inout [String]) async -> Bool {
@@ -204,6 +204,13 @@ enum ChatCheck {
             job.showsLineTranslations = true
             step("bilingual: the chat reads the result screen's check (setting off, line mark on)",
                  model.currentValue(for: SettingKey.showBilingual.rawValue) == "on" && model.showsBilingual(job))
+            // 設定が切・印が在る時の「入」の案は、「もうこの値」にならない (札は「切 → 入」。押さないので、設定は変わらない)
+            let onReply = chat.receive(reply: "Sure.\n[[set showBilingual=on]]", pagesRead: false)
+            let onCards = onReply.flatMap { chat.extras[$0]?.cards } ?? []
+            step("bilingual: an on card with the setting off and a line mark is not already set",
+                 onCards.count == 1 && onCards.first?.state == .pending && onCards.first?.before == "off"
+                 && !model.showBilingual && job.showsLineTranslations,
+                 onCards.map { "\($0.before ?? "nil") \($0.state)" }.joined(separator: ","))
             step("bilingual: off from the chat clears the result's mark",
                  model.applyChatSetting(key: SettingKey.showBilingual.rawValue, value: "off")
                  && !job.showsLineTranslations && !model.showsBilingual(job)
@@ -277,6 +284,15 @@ enum ChatCheck {
                 && emptyNotices.count == 1 && emptyNotices.first?.kind == .warning
                 && emptyNotices.first?.text == L("The LLM returned an empty answer."),
              "last role \(lastMessage.map { "\($0.role)" } ?? "none"), notices \(emptyNotices.map(\.text))")
+        // 絵 25: 空の答えの知らせ (知らせが、窓の終わりの発言に付いている時だけ撮る)
+        if let window, let screenshots {
+            if emptyNotices.contains(where: { $0.text == L("The LLM returned an empty answer.") }) {
+                await settle()
+                lines.append(shot("25-chat-empty-answer", window, screenshots))
+            } else {
+                lines.append("UI LOAD: screenshot 25-chat-empty-answer skipped (the notice is not on the last message)")
+            }
+        }
 
         // 7c. LLM が失敗した (llama.cpp の失敗 -1 を、LLM を呼ぶ所で投げる): 発言に、失敗の知らせを 1 つ付ける。
         // その後、ふつうの答えは今までどおり出る
@@ -303,6 +319,10 @@ enum ChatCheck {
              afterFinished && afterLast?.role == .assistant && afterLast?.text == "Fine, thanks.",
              "last role \(afterLast.map { "\($0.role)" } ?? "none"), text \(afterLast?.text ?? "none")")
         chat.selfTestReply = ""
+        // 絵 26・27 (絵を残す時だけ。確認の合否には入れない)
+        if let screenshots {
+            await failureScreenshots(model: model, chatWindow: window, job: bilingualJob, into: screenshots, lines: &lines)
+        }
 
         // 8. 片付け: 窓を閉じ、設定を元の値に戻す
         chat.selfTestReset()
@@ -397,6 +417,47 @@ enum ChatCheck {
             await pause(0.05)
         }
         return condition()
+    }
+
+    /// 絵 26: 答えが上限で切れた知らせ (決めた答えを、上限でやめた事にして送る)。
+    /// 絵 27: チャットが答えている間の、監査・翻訳の進み具合の文 (メインの窓。選んでいる結果の後の仕事が進んでいる事にする)。
+    /// どちらも、知らせ・文が見えている事を確かめてから撮り、撮った後は元に戻す
+    private static func failureScreenshots(model: AppModel, chatWindow: NSWindow?, job: Job?, into directory: URL,
+                                           lines: inout [String]) async {
+        let chat = model.chat
+        if let chatWindow {
+            chat.selfTestReply = "The first step is"
+            chat.selfTestFinish = .limit
+            chat.draft = "Explain the steps"
+            chat.send()
+            let finished = await waitUntil(5) { !chat.isAnswering }
+            let notices = chat.messages.last.flatMap { chat.extras[$0.id]?.notices } ?? []
+            chat.selfTestFinish = nil
+            chat.selfTestReply = ""
+            if finished, notices.contains(where: { $0.text == L("The answer was cut off before it finished.") }) {
+                await settle()
+                lines.append(shot("26-chat-cut-off", chatWindow, directory))
+            } else {
+                lines.append("UI LOAD: screenshot 26-chat-cut-off skipped (the notice is not on the last message)")
+            }
+        }
+        guard let job, model.selectedJob === job, job.postState == .idle,
+              let main = MainWindow.all().first(where: { $0.isVisible }) else {
+            lines.append("UI LOAD: screenshot 27-paused-while-chat-answers skipped (no selected idle result or no main window)")
+            return
+        }
+        job.postState = .running(.translate, message: L("Translating…"), progress: 0.4)
+        chat.selfTestSetPhase(.answering)
+        await settle()
+        let shown = ChatPause.replacesProgress(chatPhase: chat.phase, postTaskRunning: job.postState != .idle)
+        if shown {
+            lines.append(shot("27-paused-while-chat-answers", main, directory))
+        } else {
+            lines.append("UI LOAD: screenshot 27-paused-while-chat-answers skipped (the progress text is not replaced)")
+        }
+        chat.selfTestSetPhase(.idle)
+        job.postState = .idle
+        await settle()
     }
 
     /// 窓の絵を PNG で残す (タイトルバーとツールバーも入るよう、枠の view から撮る)

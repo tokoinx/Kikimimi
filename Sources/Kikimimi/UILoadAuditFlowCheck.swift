@@ -10,8 +10,9 @@ extension LoadRun {
     /// LLM の代わりが覚えた字を書き換える直しを出しても、行が覚えた字のままかを見る。
     /// 本物の設定・台帳・ライブラリには書かない: 台帳は一時のファイル (終わりに消し、始める前の状態に戻す)、
     /// 結果は確認用のライブラリ (一時のフォルダ) に入れ、終わりに消す。LLM の代わりも、終わりに外す。
+    /// `screenshots` があれば、読めなかった所の知らせの絵 (23) を残す (重さを測り終えた後。合否には入れない)。
     /// 出力の行と、失敗したかを返す
-    func auditFlowCheck(root: URL) async -> (lines: [String], failed: Bool) {
+    func auditFlowCheck(root: URL, screenshots: URL?) async -> (lines: [String], failed: Bool) {
         Self.live("audit flow check")
         var lines: [String] = []
         var failure: String?
@@ -146,7 +147,10 @@ extension LoadRun {
              "line \(second.transcript?.segments[1].text ?? "none"), origin \(other.map { "\($0.origin)" } ?? "none")")
 
         // 5. LLM が途中で失敗した時 (llama.cpp の失敗 -1 を、LLM の代わりが投げる)
-        await llmFailureSteps(standIn: standIn, previous: second, step: step, made: &made)
+        let unread = await llmFailureSteps(standIn: standIn, previous: second, step: step, made: &made)
+        if let screenshots {
+            lines.append(await noteScreenshot("23-audit-unread-note", of: unread.job, note: unread.note, into: screenshots))
+        }
 
         // 6. 終わり: 本物の台帳は変わっていない (戻すのは defer。ここでは本物のファイルだけを見る)
         step("the check does not touch the real learned corrections", Self.fileStamp(realLedger) == realLedgerBefore,
@@ -157,9 +161,10 @@ extension LoadRun {
     /// LLM が途中で失敗した時の監査の受け止め方を見る: (a) はじめの監査で、始めの依頼から失敗 → 規則だけを反映した知らせ、
     /// (b) はじめの監査で、1 つ目のまとまりの後に失敗 → 見終えた所までを反映した知らせ、
     /// (c) 前に LLM で監査した結果 previous で失敗 → 前の監査の結果のまま。
-    /// どれも、仕事が終わった状態 (待ち・動いている仕事が無い) に戻る事も見る。作った結果は made に足す (終わりに消す)
+    /// どれも、仕事が終わった状態 (待ち・動いている仕事が無い) に戻る事も見る。作った結果は made に足す (終わりに消す)。
+    /// 答えが切れた結果 (d) と、その知らせの文を返す (絵 23 を撮るため)
     private func llmFailureSteps(standIn: AuditFlowStandIn, previous: Job,
-                                 step: (String, Bool, String) -> Void, made: inout [Job]) async {
+                                 step: (String, Bool, String) -> Void, made: inout [Job]) async -> (job: Job, note: String) {
         let error = LLMError.decodeFailed(-1).localizedDescription
         func idle(_ job: Job) -> Bool { job.postQueue.isEmpty && job.postState == .idle && !job.isPostActive }
 
@@ -259,6 +264,7 @@ extension LoadRun {
                 + "partial \(cutReport?.isPartial ?? false), line \(cutRows.count > 1 ? cutRows[1] : "none"), "
                 + "note \"\(noteCut)\"")
         standIn.configure(fixes: [])
+        return (cut, expectedCut)
     }
 
     private func finish(_ lines: [String], failure: String?) -> (lines: [String], failed: Bool) {
@@ -278,6 +284,24 @@ extension LoadRun {
         job.message = "完了"
         model.adopt(job, at: model.jobs.count)
         return job
+    }
+
+    /// 結果の知らせ (監査・翻訳の後の postNote) の絵を撮る。その結果を選び、窓の結果がそれで、知らせが `note` の時だけ撮る。
+    /// 撮った後は、前に選んでいた結果に戻す
+    func noteScreenshot(_ name: String, of job: Job, note: String, into directory: URL) async -> String {
+        let selectedBefore = model.selectedJob
+        defer { model.select(selectedBefore) }
+        guard let window = MainWindow.all().first(where: { $0.isVisible }) else {
+            return "UI LOAD: screenshot \(name) skipped (no visible main window)"
+        }
+        Self.live("scene \(name)")
+        model.select(job)
+        await settle()
+        guard model.selectedJob === job, job.postNote == note else {
+            return "UI LOAD: screenshot \(name) skipped (the result with the notice is not shown: selected "
+                + "\(model.selectedJob === job), notice \"\(job.postNote ?? "none")\")"
+        }
+        return shot(name, in: window, to: directory)
     }
 
     /// 監査を頼み、終わるまで待つ。終わったら true

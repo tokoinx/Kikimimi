@@ -12,7 +12,8 @@ extension LoadRun {
     /// 本物の設定・ライブラリには書かない: 結果は確認用のライブラリ (一時のフォルダ) に入れ、終わりに消す。
     /// LLM が在る事にするのも、LLM の代わりを入れるのも、この確認の間だけ (終わりに元に戻す)。
     /// 出力の行と、失敗したかを返す
-    func retranslateCheck(root: URL) async -> (lines: [String], failed: Bool) {
+    /// `screenshots` があれば、訳せなかった知らせの絵 (24) を残す (重さを測り終えた後。合否には入れない)
+    func retranslateCheck(root: URL, screenshots: URL?) async -> (lines: [String], failed: Bool) {
         Self.live("retranslate check")
         var lines: [String] = []
         var failure: String?
@@ -220,6 +221,10 @@ extension LoadRun {
                 && half.transcript == halfBefore,
              "finished \(finishedFailing), idle \(idle(half)), failures \(standIn.failures - failuresBefore), "
                 + "transcript unchanged \(half.transcript == halfBefore), note \"\(note)\"")
+        if let screenshots {
+            lines.append(await noteScreenshot("24-translate-failed-note", of: half, note: L("Could not translate: %@", error),
+                                              into: screenshots))
+        }
 
         let callsBefore = standIn.calls
         standIn.configure(answers: failAnswers)

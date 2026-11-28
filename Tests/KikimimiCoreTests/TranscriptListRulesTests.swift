@@ -4,7 +4,10 @@ import XCTest
 /// 結果の一覧 (数千行) の 4 つの決まり (CLAUDE.md の「結果の一覧」) を、ソースの書き方で見る。
 /// 注釈と文字列の中身は除いてから見る (文字列に埋め込んだ式 \( … ) は、式として残す)。
 /// 走査は書き方しか見ないので、次の形は見逃す: 一覧の body が、別のファイルの関数や部品を通して状態を読む・
-/// 禁じた語と違う名前 (別名の変数など) で読む・呼ぶ側が TranscriptListView を変数に入れてから .id を付けずに置く。
+/// 禁じた語と違う名前で読む (AppModel を別名の変数に入れる形は testRule4ListBodyReadsAppModelOnlyByName が止める。
+/// job など、AppModel でない物を通して読む形は見逃す)・行の部品の中で、よく変わる状態を読む (再生の位置だけは
+/// testRule4RowsDoNotReadThePlaybackPosition が止める。練習・メモは、行が細かく見る・押した時に呼ぶ形で使うので見ない)。
+/// 呼ぶ側が TranscriptListView を変数に入れてから .id を付けずに置く形は、決まり 2 の試験が止める (2026-11-28 に試した)。
 /// 破った時の重さそのものは、アプリの確認 (--selftest-ui-load 3000) が測る
 final class TranscriptListRulesTests: XCTestCase {
     static let reasonsAt = "See CLAUDE.md (section \"結果の一覧\") and the notes in TranscriptListView.swift for the reasons"
@@ -126,7 +129,47 @@ final class TranscriptListRulesTests: XCTestCase {
                            + "the whole file as the list body). Put other components in TranscriptListSupport.swift. \(Self.reasonsAt)")
     }
 
+    /// 一覧の body は、AppModel を `model.<名前>` の形でだけ読む (別名の変数に入れて、禁じた語や modelAllowed を通らずに読む形を止める)。
+    /// AppModel を見る口も、`@Environment(AppModel.self) private var model` の 1 つだけ
+    func testRule4ListBodyReadsAppModelOnlyByName() throws {
+        let code = try SwiftCode.read(SwiftCode.listFile)
+        let declaration = #"@Environment\(\s*AppModel\.self\s*\)\s*(?:private\s+)?var\s+model\b"#
+        XCTAssertEqual(code.captures(of: #"@Environment\(\s*AppModel\.self\s*\)\s*(?:private\s+)?var\s+(\w+)"#), ["model"],
+                       "Rule 4: TranscriptListView.swift must see AppModel only through `@Environment(AppModel.self) private var model`. \(Self.reasonsAt)")
+        XCTAssertEqual(code.lines(matching: #"\bmodel\b(?!\s*\.\s*\w)"#), code.lines(matching: declaration),
+                       "Rule 4: in TranscriptListView.swift, use AppModel only as `model.<name>` (do not put it in another variable "
+                           + "or pass it on: the name checks would not see what is read through it). \(Self.reasonsAt)")
+    }
+
+    /// 行の部品 (TranscriptDetailView.swift の PlayableRow・SegmentRow・BilingualRow) は、再生の位置 (1 秒に何度も変わる) を読まない。
+    /// 行の色は RowHighlight の Cell を通して見る。練習・メモ・再生の操作は、行が細かく見る・押した時に呼ぶ形で使うので、ここでは見ない
+    static let rowTypes = ["PlayableRow", "SegmentRow", "BilingualRow"]
+
+    func testRule4RowsDoNotReadThePlaybackPosition() throws {
+        let detail = try SwiftCode.read(SwiftCode.detailFile)
+        var found: [String] = []
+        for name in Self.rowTypes {
+            let body = try XCTUnwrap(detail.typeText(name), "Rule 4: found no `struct \(name)` in TranscriptDetailView.swift (did the scan break?)")
+            for pattern in [#"\bcurrentTime\b"#, #"\bplayingLineID\b"#] where body.range(of: pattern, options: .regularExpression) != nil {
+                found.append("\(name): \(pattern)")
+            }
+        }
+        XCTAssertEqual(found, [],
+                       "Rule 4: the rows must not read the playback position (it changes many times a second, and every row would be "
+                           + "drawn again). Read the row tint through RowHighlight (TranscriptListSupport.swift). \(Self.reasonsAt)")
+    }
+
     // MARK: 走査の道具そのもの
+
+    func testTypeTextFindsTheWholeType() {
+        let code = SwiftCode(name: "x.swift", text: """
+            struct A { var x: Int { if y { "}" } else { 1 } } }
+            struct AB { let z = 1 }
+            """)
+        XCTAssertEqual(code.typeText("A"), #"struct A { var x: Int { if y { "" } else { 1 } } }"#)
+        XCTAssertEqual(code.typeText("AB"), "struct AB { let z = 1 }")
+        XCTAssertNil(code.typeText("C"))
+    }
 
     func testScannerRemovesCommentsAndStrings() {
         let code = SwiftCode(name: "x.swift", text: """
@@ -237,6 +280,24 @@ struct SwiftCode {
             found.append((lineNumber(match.range.location), ns.substring(from: min(end, ns.length))))
         }
         return found
+    }
+
+    /// `struct 名前` (または class・enum) から、対になる閉じ波かっこまでの文 (注釈と文字列の中身は除いた形)。無ければ nil
+    func typeText(_ name: String) -> String? {
+        guard let start = firstRange(of: #"\b(?:struct|class|enum)\s+"# + NSRegularExpression.escapedPattern(for: name) + #"\b"#) else {
+            return nil
+        }
+        let utf16 = Array(code.utf16)
+        var depth = 0
+        var opened = false
+        for i in start.location..<utf16.count {
+            if utf16[i] == 0x7B { depth += 1; opened = true }
+            if utf16[i] == 0x7D {
+                depth -= 1
+                if opened && depth == 0 { return (code as NSString).substring(with: NSRange(location: start.location, length: i + 1 - start.location)) }
+            }
+        }
+        return nil
     }
 
     private func lineNumber(_ location: Int) -> Int {

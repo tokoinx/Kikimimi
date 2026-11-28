@@ -170,11 +170,11 @@ enum UILoadSelfTest {
         }
         // 監査の流れの確認 (AUDIT FLOW CHECK): アプリの監査の呼び方を、LLM の代わりで最後まで通す。
         // 失敗した時の終了コードは、保存の確認と同じ (UILoadExit.library。終了コードの表は変えていない)
-        let auditFlow = await load.auditFlowCheck(root: libraryRoot)
+        let auditFlow = await load.auditFlowCheck(root: libraryRoot, screenshots: screenshots)
         lines += auditFlow.lines
         // 訳し直しの確認 (RETRANSLATE CHECK): 「〇〇語で訳し直す」の道を、LLM の代わりで最後まで通す。
         // 失敗した時の終了コードは、監査の流れの確認と同じ (UILoadExit.library)
-        let retranslate = await load.retranslateCheck(root: libraryRoot)
+        let retranslate = await load.retranslateCheck(root: libraryRoot, screenshots: screenshots)
         lines += retranslate.lines
 
         // 4. 音声があれば、1 行を本当に再生して、行の終わりで止まるかを見る

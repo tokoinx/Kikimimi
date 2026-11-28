@@ -68,6 +68,7 @@ struct JobListView: View {
 }
 
 struct JobRow: View {
+    @Environment(AppModel.self) private var model
     let job: Job
 
     var body: some View {
@@ -123,7 +124,11 @@ struct JobRow: View {
         case .queued: return L("Waiting")
         case .running: return job.message
         case .done:
-            if case .running(_, let message, _) = job.postState { return message }
+            if case .running(_, let message, _) = job.postState {
+                // チャットが LLM で答えている間は、後の仕事が待っている事を言う (チャットの段階は、後の仕事が進んでいる行だけが読む)
+                return ChatPause.replacesProgress(chatPhase: model.chat.phase, postTaskRunning: true)
+                    ? L("Paused while the chat answers") : message
+            }
             if let t = job.transcript {
                 var parts = ["\(TimeFormat.short(t.duration))", LPlural(t.segments.count, one: "%d segment", other: "%d segments")]
                 if t.hasTranslation { parts.append(L("Bilingual")) }

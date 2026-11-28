@@ -3,17 +3,7 @@ import KikimimiCore
 import KikimimiLLM
 import Observation
 
-/// チャットの窓の段階
-enum ChatPhase: Equatable {
-    /// 待っていない
-    case idle
-    /// リサーチで Web ページを読んでいる
-    case readingPages
-    /// LLM を待っている (モデルの読み込みか、監査・翻訳が先に使っている)
-    case waitingForLLM
-    /// 答えを出している
-    case answering
-}
+// チャットの窓の段階 (ChatPhase) は、KikimimiCore の ChatPause.swift に在る (進み具合の文の決めを試験するため)
 
 /// 答えに付ける「設定を変える案」の札
 struct ChatProposalCard: Identifiable, Equatable {
@@ -99,6 +89,8 @@ final class ChatController {
     @ObservationIgnored var selfTestReply: String?
     /// 確認用: 入れると、LLM を呼ぶ所でこの失敗を投げる (本物の失敗と同じ catch で受け止める。selfTestReply より先に見る)
     @ObservationIgnored var selfTestError: Error?
+    /// 確認用: selfTestReply の答えを、この訳で出すのをやめた事にする (nil は、書き終えた扱い)
+    @ObservationIgnored var selfTestFinish: LlamaEngine.Finish?
     @ObservationIgnored private var cancelFlag: CancelFlag?
     /// 何回目のやり取りか (「新しいチャット」の後に、前の答えが入らないように)
     @ObservationIgnored private var serial = 0
@@ -193,25 +185,28 @@ final class ChatController {
         do {
             // 確認用: 本物の LLM を呼ぶ所の代わり (失敗は下の catch で、本物の失敗と同じに受け止める)
             if let error = selfTestError { throw error }
+            let reply: String
             if let canned = selfTestReply {
-                finish(reply: canned, pagesRead: !pages.isEmpty, notices: notices, stopped: false, userID: userID)
-                return
-            }
-            let reply = try await model.runChatLLM(shouldCancel: { flag.isSet }) { [weak self] engine in
-                // ここから LLM の番 (読み込みと、先の監査・翻訳が終わった)
-                Task { @MainActor in self?.began(turn: turn) }
-                let prompt = try ChatPromptBuilder.build(history: history, newUserText: text, catalog: catalog,
-                                                         access: snapshot, pages: pages, researchOn: research,
-                                                         engine: engine)
-                let answer = try engine.generate(prompt, shouldCancel: { flag.isSet }, onText: { full in
-                    latest.value = full
-                    if throttle.shouldSend() {
-                        Task { @MainActor in self?.stream(full, turn: turn) }
-                    }
-                })
-                // この中は LLM の番を持ったまま (ほかの generate は、この間に同じ engine で走らない)
-                ended.value = engine.lastFinish
-                return answer
+                // やめた訳も、決めた物を使う (下の「切れた」の知らせを、本物と同じ道で付ける)
+                reply = canned
+                ended.value = selfTestFinish
+            } else {
+                reply = try await model.runChatLLM(shouldCancel: { flag.isSet }) { [weak self] engine in
+                    // ここから LLM の番 (読み込みと、先の監査・翻訳が終わった)
+                    Task { @MainActor in self?.began(turn: turn) }
+                    let prompt = try ChatPromptBuilder.build(history: history, newUserText: text, catalog: catalog,
+                                                             access: snapshot, pages: pages, researchOn: research,
+                                                             engine: engine)
+                    let answer = try engine.generate(prompt, shouldCancel: { flag.isSet }, onText: { full in
+                        latest.value = full
+                        if throttle.shouldSend() {
+                            Task { @MainActor in self?.stream(full, turn: turn) }
+                        }
+                    })
+                    // この中は LLM の番を持ったまま (ほかの generate は、この間に同じ engine で走らない)
+                    ended.value = engine.lastFinish
+                    return answer
+                }
             }
             guard turn == serial else { return }
             // 答えが、書き終える前に上限で切れた・次の字を選べずに止まった: 終わったように見せず、そう知らせる
@@ -288,7 +283,7 @@ final class ChatController {
             let parsed = ChatActionParser.parse(reply, catalog: model.chatCatalog, allowSettings: !pagesRead)
             visible = parsed.visibleText.trimmingCharacters(in: .whitespacesAndNewlines)
             extra.cards = parsed.proposals.map { proposal in
-                let current = model.currentValue(for: proposal.key)
+                let current = model.proposalBeforeValue(for: proposal.key, requested: proposal.value)
                 let before = current.map { proposal.item.normalizedValue($0) ?? $0 }
                 return ChatProposalCard(id: UUID(), proposal: proposal, before: before,
                                         state: before == proposal.value ? .alreadySet : .pending)
@@ -374,6 +369,12 @@ final class ChatController {
         showsResearchConfirm = false
         selfTestReply = nil
         selfTestError = nil
+        selfTestFinish = nil
+    }
+
+    /// 確認用: 段階だけを替える (絵を撮るため。LLM は呼ばない。撮った後は `.idle` に戻す)
+    func selfTestSetPhase(_ newPhase: ChatPhase) {
+        phase = newPhase
     }
 }
 

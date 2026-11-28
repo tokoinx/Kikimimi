@@ -228,6 +228,40 @@ final class ChatSettingsLabelGuardTests: XCTestCase {
         XCTAssertTrue(model.contains("var initialPrompt: String { didSet { save(initialPrompt, .initialPrompt) } }"))
     }
 
+    // MARK: 食い違い 4: 画面の部品の置き忘れ
+
+    /// 書き方が `$model.<鍵の名前>` でない設定の、画面の部品の書き方 (そのまま探す)
+    static let otherControls: [SettingKey: [String]] = [
+        // 結果の画面の「対訳」のチェック。読むのも書くのも AppModel の関数を通す (行の「訳」の印も見るため)
+        .showBilingual: ["get: { model.showsBilingual(job) }", "set: { model.setShowsBilingual($0, for: job) }"],
+        // 「練習」のメニューの「書き取りの欄を出す」。練習の係 (model.practice) の値を、その場で束ねて操作する
+        .practiceDictation: ["@Bindable var practice = model.practice",
+                             "Toggle(L(\"Show the dictation box\"), isOn: $practice.showsDictation)"]
+    ]
+
+    /// チャットから変えられる設定の 1 つ 1 つに、画面 (ChatView.swift を除く) の部品が在る。
+    /// 部品を消して、チャットの札だけが残る形を止める。行の注釈 (// の後) は除いてから見る
+    func testEveryChatSettingHasAControlOnScreen() throws {
+        let screen = try Self.screenSources().components(separatedBy: "\n").map { line -> String in
+            guard let range = line.range(of: "//") else { return line }
+            return String(line[..<range.lowerBound])
+        }.joined(separator: "\n")
+        var missing: [String] = []
+        for key in SettingKey.allCases where key.chatPresentation != nil {
+            if let forms = Self.otherControls[key] {
+                for form in forms where !screen.contains(form) { missing.append("\(key.rawValue): \(form)") }
+            } else {
+                let pattern = #"\$model\."# + key.rawValue + #"\b"#
+                if screen.range(of: pattern, options: .regularExpression) == nil {
+                    missing.append("\(key.rawValue): $model.\(key.rawValue)")
+                }
+            }
+        }
+        XCTAssertEqual(missing, [], "a setting the chat can change has no control on the screen (Sources/Kikimimi/Views, ChatView.swift excluded). Put the control back, or, if it is written another way, add that form to otherControls")
+        // 書き方の表は、チャットから変えられる設定だけ
+        for key in Self.otherControls.keys { XCTAssertNotNil(key.chatPresentation, key.rawValue) }
+    }
+
     // MARK: 食い違い 5: 確認用の起動の画面の言語
 
     func testSelfTestUILanguageComesFromTheDefinition() throws {

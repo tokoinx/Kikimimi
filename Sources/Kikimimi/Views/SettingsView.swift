@@ -67,9 +67,12 @@ struct GeneralSettingsForm: View {
                         }
                     }
                 }
-                Text(L("Standard menu bar items (Edit, Window, and so on) change after you reopen the app."))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                if !model.needsReopenForLanguage {
+                    // 上の案内が出ている間は、同じ事を 2 度言わないように隠す
+                    Text(L("Standard menu bar items (Edit, Window, and so on) change after you reopen the app."))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
                 Text(L("The spoken language for transcription is chosen in the “Transcription” tab."))
                     .font(.callout)
                     .foregroundStyle(.secondary)

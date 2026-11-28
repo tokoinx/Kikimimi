@@ -43,6 +43,7 @@ extension L10nTables {
         "Read “%1$@” (%2$@)": "อ่าน “%1$@” (%2$@) แล้ว",
         "Stopped.": "หยุดแล้ว",
         "The LLM returned an empty answer.": "LLM ส่งคำตอบว่างกลับมา",
+        "Paused while the chat answers": "หยุดชั่วคราวขณะที่แชตกำลังตอบ",
         "The answer was cut off before it finished.": "คำตอบถูกตัดก่อนจะจบ",
         "Web pages were read for this answer, so its setting changes are not offered.": "คำตอบนี้ได้อ่านหน้าเว็บ จึงไม่เสนอการเปลี่ยนการตั้งค่า",
         "%d action in the answer was not used.": "มี %d การดำเนินการในคำตอบที่ไม่ได้ใช้",
