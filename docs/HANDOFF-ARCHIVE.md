@@ -751,3 +751,28 @@ LLM とのチャット (2026-11-20、1ef6407):
   - 出た「重い」は 2 行: `UI LOAD: SLOW ("burst: 300 segments delivered at once to the selected running job" max 1682 ms >= 1500 ms)` (今回の直しで、数えるようになった行) と、`UI LOAD: SLOW (watchdog max 1682 ms >= 1500 ms in "running job, single segments and bursts of 300")` (前から在る、段の全体の見張り)。終了コード 5。`UI LOAD OK` は出ない。ほかの確認 (LIBRARY・AUDIT FLOW・RETRANSLATE・PRACTICE・CHAT・ADAPTER MESSAGE) は OK。
   - 止める仕掛けは外した (`git status --short` は空。手元のアプリも、仕掛けの無い形で作り直した)。
 - 途中で起きた事: この確かめの 1 回目は、主の会話の利用の上限で、任せた側を途中で止めた。止めた時、一時の仕掛け (1.7 秒止める 4 行) が作業フォルダに残っていたので、主の会話が外した (コミットには入っていない)。上限が戻った後に、初めからやり直した。
+
+### 2026-11-28 (続き 4): 問題解決を進めた (10 回目)
+
+利用者の言葉「問題解決を進めて」。不具合を 2 つ直し、見立てのままだった事を 1 つ測った (コミット 11d7e7f・08949a6 と、この記録のコミット)。
+
+- **(1) 行の「訳」の言語のずれを直した** (11d7e7f)。
+  - 不具合: 行の「訳」を押すと、その文が待ちに入り、訳す仕事は後で走る (監査・翻訳・LLM の読み込みの後)。文の選び方は、押した時の言語で決めるのに、訳す言語は、仕事が走る時の設定で決めていた (`AppModel+PostTasks.swift`)。その間に設定の言語を変えると、訳の無い結果では、食い違った。
+  - 直し: 訳す言語を、押した時に決めて、待ちと一緒に覚える (`Job.lineTarget`)。決まりは `Transcript.lineTranslationTarget(queued:default:)` (KikimimiCore): 訳の在る結果は、その結果の言語 (今までどおり)。無ければ、待ちが覚えている言語。待ちに文が在る間に、設定を変えてから別の文を押しても、待ちの言語にそろえる (1 回にまとめて訳すのは、1 つの言語)。待ちが空になる・LLM が無い・中止の時に、覚えを消す。
+  - 試験: `TranslationTargetTests.testLineTranslationUsesTheLanguageChosenAtTheClick` (前の決め方に戻すと、落ちる事を見た)。アプリの確認の段: `RETRANSLATE: a language change after the click does not change the queued line's language: ok (finished true, language fr (expected fr, setting de), …)`。確認の中で設定の言語を変えても、本物の設定には書かれない (確認用の起動は、設定を書かない)。
+- **(2) 「この文を訳し直す」が失敗すると、印「直した」が消える事を直した** (11d7e7f)。
+  - 不具合: 記録には「失敗すると消える」と在ったが、読むと、押した時に、利用者が直した訳の覚えを先に捨てていた (`translateLine` の `dropUserTranslations`)。だから、訳せなかった時だけでなく、LLM が失敗した時・中止した時にも、印が消えていた (文は残っていた)。
+  - 直し: 押した時は、直した訳の覚えを写すだけにする (`Job.lineRedoEdited`)。覚えを捨てるのは、訳し直した機械の訳が、実際に置かれた時だけ (`Transcript.applyRedone(_:sources:replacing:)`)。訳せなかった結果・置けなかった結果では、何も変えない。押した後に、利用者がもう 1 度直した時は、その新しい訳を守る (機械の訳で上書きしない)。うまく訳せた時の動き (機械の訳に替わり、その文の印が消える) は、今までどおり。
+  - 試験 3 件 (`TranslationReviewTests`): 失敗した訳し直しは、直した訳も印も残す。うまく行った訳し直しは、今までどおり替える。押した後に直した訳は、上書きしない。(前の作り = 先に捨てる形に戻すと、1 つ目が落ちる事を見た。)
+  - アプリの確認の段: `RETRANSLATE: a failed translate-again keeps the edited translation and its Edited mark: ok (… Edited mark true, note "翻訳できませんでした: LLM の計算に失敗しました (llama.cpp エラー -1)。")` (偽の LLM が、失敗を投げる)、`RETRANSLATE: a working translate-again replaces the edited translation as before: ok (…, Edited mark false)`。
+  - 見ていない事: 足した 3 つの段が、直す前のアプリのコードで FAILED になる事 (直す前で落ちる事は、試験の側で見た)。
+- **(3) 窓を隠していて戻った時の重さを、CI の Mac (macOS 15) で測った** (08949a6。確認用の起動だけ。見立ては外れだった)。
+  - 測り方: 行の数ごと (3988・8087・8987) に、新しい文字起こし中の結果を作り、10 行ずつ 30 回足す (ふつうの届き方)。窓を出したまま・窓を消して (`orderOut`)・Dock にしまって (`miniaturize`)・アプリを隠して (`NSApp.hide`) の 4 通り。隠している間と、戻した後を、分けて数える。build 46130358173 の 2 列。
+  - 結果: 隠している間も、一覧は行を並べ続けた (作った行の body は 290〜300。出したままの時と同じ)。戻した後に作った行は 0〜15。戻した後の、メインスレッドのいちばん長い待ちは、窓を消した時 4.8〜110.6 ms、アプリを隠した時 0.9〜84.9 ms。
+  - Dock にしまって戻す時だけ、467.8〜606.5 ms の待ちが在る。この時に作った行は 0 で、手元 (macOS 14) でも 600〜609 ms なので、一覧の仕事ではなく、macOS が窓を戻す動きの時間 (と見ている。確かめてはいない)。
+  - 手元 (macOS 14) も同じ形: 隠している間に 290〜301、戻した後に 0〜1。
+  - 分かった事: 「隠している間にたまった行を、戻した時にまとめて描いて止まる」は、起きていない。小刻みの追いつきを、この道に足す必要は無い。
+  - 測っていない事: 長い時間 (数分) 隠した後 (測ったのは、30 回足す 3 秒ほど)。画面を消す・ロックする・別のデスクトップへ移る、の時。
+  - 実験の段は、また切った (`LoadRun.experimentEnabled = false`)。今の台の足し方は、この 4 通り。
+- 確かめ (手元): `swift test` は「Executed 660 tests, with 0 failures」。アプリの確認 (3000 行、音声と絵つき) は、OK の 7 行が出て終了コード 0。1 回目は `time tick` の中央が 15.5 ms と長かったが、もう 1 度走らせると 9.2 ms だった (Mac が込んでいた。直した所は、一覧の描き方に関わらない)。
+- CI (08949a6。build 46130358173): Xcode 16.2・26.3 の 2 列とも success、2 列とも「Executed 660 tests, with 0 failures」、「UI LOAD OK」が 2 つ。足した 3 つの段は、2 列とも ok。記録だけのコミット 7e1596b の build (run 46127883300) も、2 列とも success (656 件・失敗 0)。
