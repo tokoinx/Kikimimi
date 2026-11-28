@@ -44,6 +44,7 @@ extension L10nTables {
         "Stopped.": "Detenido.",
         "The LLM returned an empty answer.": "El LLM devolvió una respuesta vacía.",
         "Paused while the chat answers": "En pausa mientras responde el chat",
+        "Paused": "En pausa",
         "The answer was cut off before it finished.": "La respuesta se cortó antes de terminar.",
         "Web pages were read for this answer, so its setting changes are not offered.": "Para esta respuesta se leyeron páginas web, así que no se ofrecen cambios de ajustes.",
         "%d action in the answer was not used.": "No se usó %d acción de la respuesta.",

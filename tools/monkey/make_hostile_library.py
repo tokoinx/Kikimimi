@@ -9,9 +9,16 @@ import os
 import sys
 import uuid
 
+#   `--skip <名前>` を付けると、その場面を入れない (全部を入れる時に、止まると分かっている場面を外す。何度でも付けられる)。
 root = sys.argv[1]
-only = set(sys.argv[2:])
+rest = sys.argv[2:]
+skip = set(rest[i + 1] for i, a in enumerate(rest) if a == "--skip" and i + 1 < len(rest))
+only = set(a for i, a in enumerate(rest) if a != "--skip" and (i == 0 or rest[i - 1] != "--skip"))
 os.makedirs(root, exist_ok=True)
+
+
+def wanted(name):
+    return name not in skip and (not only or name in only)
 
 
 def seg(start, end, text, **more):
@@ -78,6 +85,13 @@ scenes = {
     "source-directory": doc("source directory", base, sourcePath="/System"),
     "source-missing": doc("source missing", base, sourcePath="/nonexistent/‮/a.wav"),
     "source-not-audio": doc("source not audio", base, sourcePath="/etc/hosts"),
+    # 本当に鳴る音声 (リポジトリの試験の音声) と、訳の在る行 (再生・練習・訳を直すシートを、開いた後の画面で試すため)
+    "real-audio": doc("real audio", [seg(0, 2.5, "So the first thing I want to talk about.", translation="まず話したいこと。"),
+                                     seg(2.5, 5, "Right, and that is exactly the point."),
+                                     seg(5, 8, "Let me show you an example.", translation="例を見せます。")],
+                      sourcePath=os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                               "..", "..", "Tests", "Fixtures", "mixed-en-ja.wav")),
+                      t_translationLanguage="ja"),
     # 新しすぎる版の番号
     "future-format": doc("future format", base, formatVersion=999, somethingNew={"a": [1, 2, 3]}),
     # 知らない言語のコード
@@ -95,7 +109,7 @@ scenes = {
 }
 
 for name, d in scenes.items():
-    if only and name not in only:
+    if not wanted(name):
         continue
     folder = os.path.join(root, d["id"])
     os.makedirs(folder, exist_ok=True)
@@ -122,7 +136,7 @@ extra = {
     "key-lone-surrogate": b'{"formatVersion":1,"\\uD800":0}',
 }
 for name, data in extra.items():
-    if only and name not in only:
+    if not wanted(name):
         continue
     fid = str(uuid.uuid4()).upper()
     folder = os.path.join(root, fid)
@@ -131,7 +145,7 @@ for name, data in extra.items():
     print(name, fid)
 
 # メモが、文字として読めない・とても大きい
-if not only or "odd-notes" in only:
+if wanted("odd-notes"):
     d = doc("odd notes", base)
     folder = os.path.join(root, d["id"])
     os.makedirs(folder, exist_ok=True)

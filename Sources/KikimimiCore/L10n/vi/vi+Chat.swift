@@ -44,6 +44,7 @@ extension L10nTables {
         "Stopped.": "Đã dừng.",
         "The LLM returned an empty answer.": "LLM đã trả về câu trả lời trống.",
         "Paused while the chat answers": "Tạm dừng trong khi trò chuyện trả lời",
+        "Paused": "Tạm dừng",
         "The answer was cut off before it finished.": "Câu trả lời bị cắt trước khi kết thúc.",
         "Web pages were read for this answer, so its setting changes are not offered.": "Câu trả lời này đã đọc trang web nên không đề xuất thay đổi cài đặt.",
         "%d action in the answer was not used.": "%d hành động trong câu trả lời chưa được dùng.",

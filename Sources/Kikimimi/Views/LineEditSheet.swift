@@ -139,7 +139,8 @@ struct LineEditSheet: View {
     /// Return キーで保存すると、画面が見せた組が記録に残らない事が在った (2026-11-26 に画面で見た。ボタンを押した時は残った)
     private func save() {
         let lines = current.lines
-        let learnings = Dictionary(uniqueKeysWithValues: lines.map { ($0.id, learning(of: $0)) })
+        // 同じ ID の区間が在っても落ちない (読み込みで別の ID にしてあるが、二重の守り。初めの区間の物を使う)
+        let learnings = Dictionary(lines.map { ($0.id, learning(of: $0)) }, uniquingKeysWith: { first, _ in first })
         // 空の入力欄・覚える組の理由が在る時は、保存しない (ボタンが押せない時と同じ決まり)
         guard !lines.contains(where: { LineEdit.normalized(draft(of: $0)).isEmpty }),
               !learnings.values.contains(where: { $0.shown && $0.on && $0.problem != nil }) else { return }
@@ -157,7 +158,8 @@ struct LineEditSheet: View {
     var body: some View {
         let current = self.current
         let lines = current.lines
-        let learnings = Dictionary(uniqueKeysWithValues: lines.map { ($0.id, learning(of: $0)) })
+        // 同じ ID の区間が在っても落ちない (save と同じ。初めの区間の物を使う)
+        let learnings = Dictionary(lines.map { ($0.id, learning(of: $0)) }, uniquingKeysWith: { first, _ in first })
         // 文が変わった区間 (整えた後で、今の文と違う) と、覚えさせる組が変わった区間 (学習した直しを使う設定の時)
         let changed = lines.filter { isChanged($0, learning: learnings[$0.id]) }
         // 空の入力欄・覚える組の理由が 1 つでも在れば、保存できない

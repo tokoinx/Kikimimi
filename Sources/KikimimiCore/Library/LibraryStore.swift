@@ -70,8 +70,9 @@ public struct LibraryStore: Sendable {
                var document = try? JSONInput.decode(SavedDocument.self, from: data, with: Self.decoder()) {
                 // フォルダの名前のほうを正とする (フォルダごと写したときも、同じ所に保存し直せるように)
                 document.id = folderID
-                // 保存ファイルの時刻は、ここで 1 度だけ使える範囲に直す (ファイルは書き換えない)
-                document.transcript = document.transcript.timesClamped()
+                // 保存ファイルの時刻は、ここで 1 度だけ使える範囲に直す (ファイルは書き換えない)。
+                // 同じ ID の区間も、ここで 1 度だけ別の ID にする (行を直す画面などが、ID が 1 つずつ違う事を前に置いている)
+                document.transcript = document.transcript.timesClamped().idsMadeUnique()
                 document.notes = readNotes(id: folderID)
                 document.versions = document.versions.filter {
                     fm.fileExists(atPath: versionURL(documentID: folderID, versionID: $0.id).path)
@@ -91,7 +92,7 @@ public struct LibraryStore: Sendable {
         guard let data = try? Data(contentsOf: documentURL(for: id)),
               var document = try? JSONInput.decode(SavedDocument.self, from: data, with: Self.decoder()) else { return nil }
         document.id = id
-        document.transcript = document.transcript.timesClamped()
+        document.transcript = document.transcript.timesClamped().idsMadeUnique()
         document.notes = readNotes(id: id)
         document.versions = document.versions.filter {
             fm.fileExists(atPath: versionURL(documentID: id, versionID: $0.id).path)
@@ -181,7 +182,8 @@ public struct LibraryStore: Sendable {
     public func loadVersion(documentID: UUID, versionID: UUID) throws -> DocumentVersion {
         let data = try Data(contentsOf: versionURL(documentID: documentID, versionID: versionID))
         var version = try JSONInput.decode(DocumentVersion.self, from: data, with: Self.decoder())
-        version.transcript = version.transcript.timesClamped()
+        // 同じ ID の区間も、ここで 1 度だけ別の ID にする (区間の ID は 1 つずつ違う事を、画面が前に置いている)
+        version.transcript = version.transcript.timesClamped().idsMadeUnique()
         return version
     }
 

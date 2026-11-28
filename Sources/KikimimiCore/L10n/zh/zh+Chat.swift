@@ -44,6 +44,7 @@ extension L10nTables {
         "Stopped.": "已停止。",
         "The LLM returned an empty answer.": "LLM 返回了空回答。",
         "Paused while the chat answers": "聊天回答期间已暂停",
+        "Paused": "已暂停",
         "The answer was cut off before it finished.": "回答在结束前被截断了。",
         "Web pages were read for this answer, so its setting changes are not offered.": "此回答读取过网页，因此不提供设置更改建议。",
         "%d action in the answer was not used.": "回答中有 %d 个操作未被使用。",

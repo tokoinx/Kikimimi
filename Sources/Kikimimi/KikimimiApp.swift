@@ -70,6 +70,10 @@ enum KikimimiMain {
         if args.contains("--selftest-ui-load") {
             UILoadSelfTest.arm(arguments: args)
         }
+        // 画面をでたらめな順に触る確認 (一時のライブラリが無ければ、窓を出す前に断って終わる)
+        if args.contains("--selftest-monkey") {
+            MonkeyRun.arm(arguments: args)
+        }
         LaunchLog.note("launch: \(LaunchLog.versionLine); \(LaunchLog.environmentLine); other instances: \(LaunchLog.otherInstances())")
         // 前回のウインドウの状態を復元しない。強制終了の後 (make run は前のアプリを終了させてから起動する) の起動では、
         // macOS が復元しようとして、ウインドウが 1 つも無いまま動いていることがあった (CI で、3 回目の起動で再現)。

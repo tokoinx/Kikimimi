@@ -43,6 +43,33 @@ final class ExporterTests: XCTestCase {
         XCTAssertTrue(Exporter.vtt(sample()).hasPrefix("WEBVTT\n\n00:00:00.000 --> 00:00:01.500\nこんにちは"))
     }
 
+    /// 字幕の文に、時刻の行と同じ印 (`-->`) や空の行が在っても、字幕の区切りを壊さない:
+    /// `-->` は `->` に、空の行 (空白だけの行も) は取り除いて、残った行を改行 1 つでつなぐ (SRT と WebVTT だけ)
+    func testSubtitleTextKeepsTheCueShape() {
+        let t = Transcript(sourceName: "m", segments: [
+            TranscriptSegment(start: 0, end: 1, text: "a --> b"),
+            TranscriptSegment(start: 1, end: 2, text: "first\n\nsecond\n \t \nthird"),
+            TranscriptSegment(start: 2, end: 3, text: "x --->> y"),
+            TranscriptSegment(start: 3, end: 4, text: " \n ")
+        ], language: "en")
+        XCTAssertEqual(Exporter.srt(t), "1\n00:00:00,000 --> 00:00:01,000\na -> b\n\n"
+                       + "2\n00:00:01,000 --> 00:00:02,000\nfirst\nsecond\nthird\n\n"
+                       + "3\n00:00:02,000 --> 00:00:03,000\nx ->> y\n\n"
+                       + "4\n00:00:03,000 --> 00:00:04,000\n\n")
+        XCTAssertEqual(Exporter.vtt(t), "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\na -> b\n\n"
+                       + "00:00:01.000 --> 00:00:02.000\nfirst\nsecond\nthird\n\n"
+                       + "00:00:02.000 --> 00:00:03.000\nx ->> y\n\n"
+                       + "00:00:03.000 --> 00:00:04.000\n\n")
+        // ほかの形は、変えない
+        XCTAssertTrue(Exporter.txt(t).contains("a --> b"))
+        XCTAssertTrue(Exporter.csv(t).contains("first\n\nsecond"))
+        // 対訳: 原文が空なら、訳だけの 1 行 (空の行を頭に置かない)
+        var bilingual = Transcript(sourceName: "m", segments: [TranscriptSegment(start: 0, end: 1, text: "a")], language: "en")
+        bilingual.segments[0].translation = "x\n\n--> y"
+        XCTAssertEqual(Exporter.srt(bilingual, content: .bilingual, target: "ja"),
+                       "1\n00:00:00,000 --> 00:00:01,000\na\nx\n-> y\n")
+    }
+
     func testTxtMdCsvJson() {
         let t = sample()
         XCTAssertEqual(Exporter.txt(t), "こんにちは\nさよう\"なら\n")

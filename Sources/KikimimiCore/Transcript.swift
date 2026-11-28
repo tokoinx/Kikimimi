@@ -360,6 +360,34 @@ extension TranscriptSegment {
 }
 
 extension Transcript {
+    /// 区間の ID を、どれも違う ID にした結果。同じ ID の 2 つめから後の区間だけに、新しい ID を付ける
+    /// (初めの区間の ID は変えないので、訳のまとまり・直しの記録は、初めの区間を指したまま)。
+    /// 新しい ID は、元の ID と何番目かから決める (同じファイルなら、何度読んでも同じ ID)。
+    /// 保存ファイルから読んだ直後に 1 度だけ使う (画面は、区間の ID が 1 つずつ違う事を前に置いている)
+    public func idsMadeUnique() -> Transcript {
+        var seen = Set<UUID>()
+        guard segments.contains(where: { !seen.insert($0.id).inserted }) else { return self }
+        var copy = self
+        var used = Set(segments.map(\.id))
+        seen = []
+        for i in copy.segments.indices where !seen.insert(copy.segments[i].id).inserted {
+            var bytes = copy.segments[i].id.uuid
+            var salt = UInt32(truncatingIfNeeded: i)
+            var fresh: UUID
+            repeat {
+                salt &+= 0x9E37_79B9
+                bytes.12 ^= UInt8(truncatingIfNeeded: salt)
+                bytes.13 ^= UInt8(truncatingIfNeeded: salt >> 8)
+                bytes.14 ^= UInt8(truncatingIfNeeded: salt >> 16)
+                bytes.15 ^= UInt8(truncatingIfNeeded: salt >> 24)
+                fresh = UUID(uuid: bytes)
+            } while used.contains(fresh)
+            used.insert(fresh)
+            copy.segments[i].id = fresh
+        }
+        return copy
+    }
+
     /// 区間の始まり・終わり、長さ (duration)、かかった時間 (elapsed) を、使える範囲に直した結果。
     /// 監査の記録が覚えている直す前の区間も直す。保存ファイルから読んだ直後に 1 度だけ使う
     public func timesClamped() -> Transcript {

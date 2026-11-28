@@ -1,6 +1,7 @@
 #if os(macOS)
 import AVFoundation
 import Foundation
+import KikimimiCore
 import Observation
 
 /// 結果の行をクリックして、その行だけを再生するための小さなプレイヤー
@@ -271,9 +272,11 @@ final class PlayerController {
         if let player { timeDidChange(player.currentTime().seconds) }
     }
 
-    private func move(to seconds: TimeInterval) {
+    private func move(to asked: TimeInterval) {
         guard let player else { return }
-        player.seek(to: CMTime(seconds: max(0, seconds), preferredTimescale: 600),
+        // 数でない値・負の値・とても大きい値は、使える範囲に直す (位置を見る画面が NaN を描かないように)
+        let seconds = TimeRange.clamped(asked)
+        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600),
                     toleranceBefore: .zero, toleranceAfter: .zero)
         currentTime = seconds
     }

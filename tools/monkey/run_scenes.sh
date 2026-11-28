@@ -16,15 +16,17 @@ REPO="$(cd "$HERE/../.." && pwd)"
 WORK="${1:?usage: run_scenes.sh <work folder> [scene ...]}"; shift
 BIN="$REPO/build/Kikimimi.app/Contents/MacOS/Kikimimi"
 ALL="baseline huge-duration huge-time backwards same-id empty long-line many odd-title empty-title
-source-dev-zero source-directory source-missing source-not-audio future-format odd-language covers-ring
+source-dev-zero source-directory source-missing source-not-audio real-audio future-format odd-language covers-ring
 odd-dates broken-version truncated empty-file not-utf8 array deep key-control key-not-utf8 key-bad-escape
 key-lone-surrogate odd-notes"
 [ "$#" -gt 0 ] || set -- $ALL
 mkdir -p "$WORK/scenes" "$WORK/models-empty"
 defaults read local.kikimimi.app > "$WORK/defaults-before.txt" 2>&1
+# 回ごとに、新しいライブラリのフォルダを使う (前の回の「とっておいたファイル」を数えないように)
+RUN="$(date +%Y%m%d-%H%M%S)"
 
 for scene in "$@"; do
-  LIB="$WORK/scenes/lib-$scene"
+  LIB="$WORK/scenes/$RUN/lib-$scene"
   mkdir -p "$LIB"
   /usr/bin/python3 -I "$HERE/make_hostile_library.py" "$LIB" baseline "$scene" > "$WORK/scenes/$scene.ids" 2>&1
   if pgrep -x Kikimimi > /dev/null; then echo "$scene: SKIPPED (Kikimimi is running)"; continue; fi

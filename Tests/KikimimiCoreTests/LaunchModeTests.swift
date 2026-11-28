@@ -56,6 +56,12 @@ final class LaunchModeTests: XCTestCase {
         XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "5", "--selftest-chat", "m.gguf"],
                                                      environment: temp))
         XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--version"], environment: temp))
+        // 画面をでたらめに触る確認 (--selftest-monkey) も、同じ決まりで開く (ほかの確認と一緒の時は開かない)
+        XCTAssertEqual(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-monkey", "--seed", "3"], environment: temp),
+                       "/private/tmp/kikimimi-hand-check/library")
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-monkey"], environment: [:]))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-monkey", "--selftest-launch"], environment: temp))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-monkey", "--selftest-monkey"], environment: temp))
         // 本物の置き場 (Application Support の Kikimimi) と、その中は、開かない
         let real = LibraryStore.defaultRoot(environment: [:])
         XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "60"],
@@ -64,6 +70,10 @@ final class LaunchModeTests: XCTestCase {
                                                      environment: ["KIKIMIMI_LIBRARY_DIR": real.deletingLastPathComponent().path]))
         XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-launch", "60"],
                                                      environment: ["KIKIMIMI_LIBRARY_DIR": real.path + "/../Library/x"]))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-monkey"],
+                                                     environment: ["KIKIMIMI_LIBRARY_DIR": real.path]))
+        XCTAssertNil(LaunchMode.handCheckLibraryPath(arguments: [bin, "--selftest-monkey"],
+                                                     environment: ["KIKIMIMI_LIBRARY_DIR": real.deletingLastPathComponent().path]))
     }
 
     // MARK: 書く口

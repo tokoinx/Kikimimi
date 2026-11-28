@@ -25,6 +25,7 @@ public enum LaunchMode: Equatable, Sendable {
         "--selftest-launch",
         "--selftest-llm",
         "--selftest-llm-queue",
+        "--selftest-monkey",
         "--selftest-ui-load",
         "--selftest-whisper"
     ]
@@ -55,14 +56,18 @@ public enum LaunchMode: Equatable, Sendable {
     /// 利用者の設定 (UserDefaults) に書いてよい起動か。ふつうの起動の時だけ
     public var writesSettings: Bool { self == .app }
 
-    /// 確認用の起動で開いてよい、ライブラリの場所 (行の画面を、手で触って確かめる時に使う)。
-    /// 起動の確認 (`--selftest-launch`。ほかの確認用の引数が無い時) で、環境変数 `KIKIMIMI_LIBRARY_DIR` が
-    /// 在る時だけ、その場所を返す (一時フォルダに写した結果を開き、そこへ保存する)。
+    /// ライブラリを開いてよい確認の名前 (どれか 1 つだけを付けた時)
+    public static let libraryOpeningSelfTests: Set<String> = ["--selftest-launch", "--selftest-monkey"]
+
+    /// 確認用の起動で開いてよい、ライブラリの場所 (行の画面を、手で触って・でたらめに触って確かめる時に使う)。
+    /// 起動の確認 (`--selftest-launch`) か、画面をでたらめに触る確認 (`--selftest-monkey`) の 1 つだけを付けた時に、
+    /// 環境変数 `KIKIMIMI_LIBRARY_DIR` が在る時だけ、その場所を返す (一時フォルダに写した結果を開き、そこへ保存する)。
     /// 環境変数が無い時と、利用者の本物の置き場 (Application Support の Kikimimi) の中を指している時は nil:
     /// 確認用の起動は、利用者の本物のライブラリを決して開かない
     public static func handCheckLibraryPath(arguments: [String] = CommandLine.arguments,
                                             environment: [String: String] = ProcessInfo.processInfo.environment) -> String? {
-        guard arguments.filter({ $0.hasPrefix("--selftest-") }) == ["--selftest-launch"],
+        let selfTests = arguments.filter { $0.hasPrefix("--selftest-") }
+        guard selfTests.count == 1, libraryOpeningSelfTests.contains(selfTests[0]),
               let path = environment["KIKIMIMI_LIBRARY_DIR"], !path.isEmpty else { return nil }
         let real = LibraryStore.defaultRoot(environment: [:]).deletingLastPathComponent().standardizedFileURL.path
         let wanted = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.path

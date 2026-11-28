@@ -80,6 +80,7 @@ extension AppModel {
                                other: "%d saved results could not be read, so they are not in the list. The original files are kept in their folders as “document.unreadable-…”.")
             errorMessage = errorMessage.map { $0 + "\n\n" + text } ?? text
         }
+        libraryLoadFinished = true
     }
 
     /// ジョブを一覧に入れる (保存の受け口を付ける)。一覧にジョブを足すときは、いつもこれを使う

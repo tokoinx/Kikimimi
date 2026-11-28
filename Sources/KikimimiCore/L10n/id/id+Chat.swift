@@ -44,6 +44,7 @@ extension L10nTables {
         "Stopped.": "Dihentikan.",
         "The LLM returned an empty answer.": "LLM mengembalikan jawaban kosong.",
         "Paused while the chat answers": "Dijeda selagi obrolan menjawab",
+        "Paused": "Dijeda",
         "The answer was cut off before it finished.": "Jawaban terpotong sebelum selesai.",
         "Web pages were read for this answer, so its setting changes are not offered.": "Halaman web dibaca untuk jawaban ini, jadi usulan perubahan pengaturannya tidak ditampilkan.",
         "%d action in the answer was not used.": "%d aksi dalam jawaban tidak digunakan.",

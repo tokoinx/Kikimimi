@@ -48,6 +48,7 @@ extension JA {
         "Stopped.": "止めました。",
         "The LLM returned an empty answer.": "LLM の答えが空でした。",
         "Paused while the chat answers": "チャットが答えている間、止めています",
+        "Paused": "一時停止",
         "The answer was cut off before it finished.": "答えが、終わる前に切れました。",
         "Web pages were read for this answer, so its setting changes are not offered.": "この答えでは Web ページを読んだので、設定の変更の案は出しません。",
         "%d action in the answer was not used.": "答えの中の %d 個の印は、使っていません。",

@@ -23,59 +23,21 @@ import XCTest
 
 // MARK: - 道具 (ほかの試験からも使う)
 
-/// 種を決めた乱数 (SplitMix64)。同じ種なら、いつも同じ並びになる
-struct Monkey: RandomNumberGenerator {
-    let seed: UInt64
-    private var state: UInt64
+/// 種を決めた乱数 (SplitMix64)。同じ種なら、いつも同じ並びになる。
+/// 中身は KikimimiCore の `SeededRandom` (画面を触る確認 `--selftest-monkey` も、同じ物を使う)
+typealias Monkey = SeededRandom
 
-    init(seed: UInt64) {
-        self.seed = seed
-        self.state = seed
-    }
-
-    mutating func next() -> UInt64 {
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-        return z ^ (z >> 31)
-    }
-
-    /// 並びから 1 つ選ぶ (空の並びは渡さない)
-    mutating func pick<T>(_ items: [T]) -> T {
-        items[Int(next() % UInt64(items.count))]
-    }
-
-    mutating func int(_ range: ClosedRange<Int>) -> Int {
-        Int.random(in: range, using: &self)
-    }
-
-    /// かけらを、決めた数だけつないだ文
-    mutating func text(from fragments: [String], pieces: ClosedRange<Int>) -> String {
-        var out = ""
-        for _ in 0..<int(pieces) { out += pick(fragments) }
-        return out
-    }
-}
-
-/// よく落ちる原因になる値の集まり。試験ごとに、ここから選ぶ (足りない値は、ここへ足す)
+/// よく落ちる原因になる値の集まり。試験ごとに、ここから選ぶ (足りない値は、ここへ足す)。
+/// 数と文のかけらは、KikimimiCore の `HostileValues` に在る (画面を触る確認も使うので、そちらへ足す)
 enum MonkeyPool {
     /// 秒数・長さなどの、端の値
-    static let doubles: [Double] = [
-        0, -0.0, 0.000_4, 0.999_6, 59.999_6, 3599.999_6, 86_399.5, 359_999.999_6,
-        1e9, 9.2e15, 9.3e15, 1e19, 1e300, Double.greatestFiniteMagnitude, Double.leastNonzeroMagnitude,
-        -1, -0.000_1, -1e300, Double.infinity, -Double.infinity, Double.nan
-    ]
+    static var doubles: [Double] { HostileValues.doubles }
 
     /// JSON に書ける数だけ (無限大と NaN は、JSON に書けない)
     static var finiteDoubles: [Double] { doubles.filter(\.isFinite) }
 
     /// 文のかけら。空・空白・改行の仲間・区切りの記号・絵文字・向きを変える印・とても長い文
-    static let textFragments: [String] = [
-        "", " ", "\n", "\r\n", "\u{2028}", "\t", "\"", ",", "|", "-->", "<b>", "&amp;", "\\",
-        "a", "The quick brown fox", "漢字かな", "ｱｲｳ", "e\u{301}", "😀", "👨‍👩‍👧‍👦", "\u{202E}", "\u{200B}", "\u{0}",
-        String(repeating: "x", count: 5000)
-    ]
+    static var textFragments: [String] { HostileValues.textFragments }
 
     /// HTML のかけら。閉じないタグ・題名・注釈・script・文字参照・タグの中の `<`
     static let markupFragments: [String] = [
@@ -225,6 +187,64 @@ final class MonkeyTests: XCTestCase {
                })
     }
 
+    // 形 1「落ちない」: SRT・WebVTT は、どんな文でも、書き出す行の数だけ字幕が在り (時刻の印 `-->` は時刻の行にだけ)、
+    // 字幕の 1 枚の中に空の行が無い (区間の文の `-->` や空の行で、字幕の区切りが壊れない。2026-11-29 に足した)
+    func testSubtitlesKeepOneCuePerRow() {
+        monkey("subtitle cues", rounds: 150,
+               make: { rng -> Transcript in
+                   let fragments = MonkeyPool.textFragments.filter { $0.count < 100 } + ["--", ">", "-->", "\n\n", " \n ", "\r", "->"]
+                   var segments = (0..<rng.int(0...5)).map { i in
+                       TranscriptSegment(start: Double(i), end: Double(i) + 0.5, text: rng.text(from: fragments, pieces: 0...6))
+                   }
+                   for i in segments.indices where rng.int(0...1) == 0 {
+                       segments[i].translation = rng.text(from: fragments, pieces: 0...4)
+                   }
+                   return Transcript(sourceName: "m", segments: segments, language: "en", translationLanguage: "ja")
+               },
+               describe: { t in t.segments.map { "\($0.text.debugDescription)/\(($0.translation ?? "nil").debugDescription)" }
+                   .joined(separator: ", ") },
+               check: { transcript in
+                   for content in ExportContent.allCases {
+                       let rows = Exporter.rows(transcript, content, target: "ja").count
+                       if let broken = Self.cueProblem(Exporter.srt(transcript, content: content, target: "ja"), rows: rows, srt: true) {
+                           return "srt \(content): \(broken)"
+                       }
+                       if let broken = Self.cueProblem(Exporter.vtt(transcript, content: content, target: "ja"), rows: rows, srt: false) {
+                           return "vtt \(content): \(broken)"
+                       }
+                   }
+                   return nil
+               })
+    }
+
+    /// 字幕の形の崩れ (無ければ nil)。字幕の 1 枚は「(SRT は番号の行) 時刻の行 文の行… 空の行」。
+    /// 空の行 (空白だけの行も) は、字幕を読む道具が区切りと見るので、1 枚の中に在ると、そこで切れる
+    static func cueProblem(_ text: String, rows: Int, srt: Bool) -> String? {
+        var lines = text.components(separatedBy: CharacterSet.newlines)
+        if !srt {
+            guard lines.first == "WEBVTT" else { return "no WEBVTT header" }
+            lines.removeFirst()
+        }
+        func blank(_ s: String) -> Bool { s.trimmingCharacters(in: .whitespaces).isEmpty }
+        var cues = 0
+        var i = 0
+        while i < lines.count {
+            if blank(lines[i]) { i += 1; continue }
+            if srt {
+                guard lines[i] == String(cues + 1) else { return "line \(i) is \(lines[i].debugDescription), not the number \(cues + 1)" }
+                i += 1
+            }
+            guard i < lines.count, lines[i].contains("-->") else { return "no time line for cue \(cues + 1)" }
+            cues += 1
+            i += 1
+            while i < lines.count, !blank(lines[i]) {
+                if lines[i].contains("-->") { return "cue \(cues) has --> in its text" }
+                i += 1
+            }
+        }
+        return cues == rows ? nil : "\(cues) cues for \(rows) rows"
+    }
+
     // 形 2「行って戻る」: ライブラリの日時は、書いて読むと、元とまったく同じ値になる
     func testLibraryDateRoundTrips() {
         monkey("library date", rounds: 300,
@@ -336,6 +356,57 @@ final class MonkeyTests: XCTestCase {
                })
     }
 
+    // 形 1「落ちない」: 保存ファイルに同じ ID の区間が在っても、読み込んだ後は、区間の ID がどれも違う
+    // (読み込む所で 1 度だけ直す。LibraryStore.loadAll・load・loadVersion)。同じ ID のままだと、行を直す画面が
+    // `Dictionary(uniqueKeysWithValues:)` で落ちた (2026-11-29、画面を触る確認 --selftest-monkey の種 3 で見つけた)。
+    // 初めの区間の ID は変えない (訳のまとまり・直しの記録は、そちらを指したまま)。同じファイルなら、何度読んでも同じ ID
+    func testLibraryStoreMakesSegmentIDsUnique() throws {
+        let root = try Self.temporaryLibrary()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = LibraryStore(root: root)
+        monkey("library segment ids", rounds: 15,
+               make: { rng -> [UUID] in
+                   let pool = (0..<rng.int(1...3)).map { _ in UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", rng.int(0...5)))! }
+                   return (0..<rng.int(0...6)).map { _ in rng.pick(pool) }
+               },
+               describe: { ids in ids.map { String($0.uuidString.suffix(2)) }.joined(separator: " ") },
+               check: { ids in
+                   let items = ids.enumerated().map { i, id in
+                       "{\"id\":\"\(id.uuidString)\",\"start\":\(i),\"end\":\(i + 1),\"text\":\"t\(i)\"}"
+                   }
+                   let transcriptJSON = "{\"sourceName\":\"m.wav\",\"segments\":[" + items.joined(separator: ",") + "],\"duration\":9,\"elapsed\":1}"
+                   let id = UUID()
+                   let folder = root.appendingPathComponent(id.uuidString, isDirectory: true)
+                   try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                   defer { try? FileManager.default.removeItem(at: folder) }
+                   let version = UUID()
+                   let document = "{\"formatVersion\":1,\"id\":\"\(id.uuidString)\",\"title\":\"m\",\"isRecording\":false,"
+                       + "\"createdAt\":\"2026-11-28T10:00:00Z\",\"updatedAt\":\"2026-11-28T10:00:00Z\","
+                       + "\"transcript\":\(transcriptJSON),\"versions\":[]}"
+                   try Data(document.utf8).write(to: folder.appendingPathComponent("document.json"))
+                   let versions = folder.appendingPathComponent("versions", isDirectory: true)
+                   try FileManager.default.createDirectory(at: versions, withIntermediateDirectories: true)
+                   let versionJSON = "{\"info\":{\"id\":\"\(version.uuidString)\",\"savedAt\":\"2026-11-28T10:00:00Z\","
+                       + "\"label\":\"\",\"origin\":\"manual\"},\"transcript\":\(transcriptJSON),\"notes\":\"\"}"
+                   try Data(versionJSON.utf8).write(to: versions.appendingPathComponent(version.uuidString + ".json"))
+                   guard let one = store.load(id: id), let again = store.load(id: id) else { return "load(id:) could not read the document" }
+                   let all = store.loadAll().documents.filter { $0.id == id }
+                   guard all.count == 1 else { return "loadAll read \(all.count) documents" }
+                   let kept = try store.loadVersion(documentID: id, versionID: version)
+                   for (name, t) in [("load", one.transcript), ("loadAll", all[0].transcript), ("loadVersion", kept.transcript)] {
+                       let read = t.segments.map(\.id)
+                       if Set(read).count != read.count { return "\(name): the same segment ID twice" }
+                       if read.count != ids.count { return "\(name): \(read.count) segments, not \(ids.count)" }
+                       for (i, original) in ids.enumerated() where ids.firstIndex(of: original) == i && read[i] != original {
+                           return "\(name): the first segment with an ID got a new ID"
+                       }
+                       if t.segments.map(\.text) != ids.indices.map({ "t\($0)" }) { return "\(name): the texts changed" }
+                   }
+                   if again.transcript.segments.map(\.id) != one.transcript.segments.map(\.id) { return "two loads give different IDs" }
+                   return nil
+               })
+    }
+
     // 形 1「落ちない」: ライブラリのフォルダに、でたらめなバイト・正しい JSON の一部を壊した物が在っても、
     // 読み込みは落ちず、どのフォルダも「読めた」か「名前を変えてとっておいた」のどちらかになる
     func testLibraryLoadAllTakesBrokenFolders() throws {
@@ -424,6 +495,83 @@ final class MonkeyTests: XCTestCase {
                    _ = try? JSONInput.decode(SavedDocument.self, from: data, with: LibraryStore.decoder())
                    return nil
                })
+    }
+
+    // 形 2「行って戻る」: 正しい JSON は、見張り (JSONInput) が断らない (断ると、利用者の結果が「読めない」扱いになる)。
+    // (1) アプリが書いた保存の形 (変な文・制御文字・絵文字・\u{0} を含む結果) は、必ず通り、元と同じに読める
+    func testJSONInputPassesWhatTheAppWrites() {
+        monkey("json input passes the library encoder", rounds: 150,
+               make: { rng -> SavedDocument in
+                   let fragments = MonkeyPool.textFragments + ["\u{1}", "\u{1f}", "\u{7f}", "\u{8}", "\u{c}", "/", "\u{FEFF}", "\u{10FFFF}"]
+                   let segments = (0..<rng.int(0...4)).map { i in
+                       TranscriptSegment(start: Double(i), end: Double(i) + 1, text: rng.text(from: fragments, pieces: 0...4),
+                                         translation: rng.int(0...1) == 0 ? nil : rng.text(from: fragments, pieces: 0...3))
+                   }
+                   return SavedDocument(title: rng.text(from: fragments, pieces: 0...4),
+                                        sourcePath: rng.int(0...1) == 0 ? nil : rng.text(from: fragments, pieces: 1...3),
+                                        createdAt: Date(timeIntervalSinceReferenceDate: 800_000_000),
+                                        transcript: Transcript(sourceName: rng.text(from: fragments, pieces: 0...2), segments: segments))
+               },
+               describe: { document in document.title.prefix(80).debugDescription },
+               check: { document in
+                   let data = try LibraryStore.encoder().encode(document)
+                   if let offset = JSONInput.problemOffset(in: data) { return "refused at byte \(offset)" }
+                   var back = try JSONInput.decode(SavedDocument.self, from: data, with: LibraryStore.decoder())
+                   back.notes = document.notes
+                   return back == document ? nil : "reads back differently"
+               })
+    }
+
+    // (2) JSONSerialization が書いた物 (でたらめな名前と値。逃がしの書き方が JSONEncoder と違う) も、必ず通り、元と同じに読める
+    func testJSONInputPassesJSONSerialization() {
+        monkey("json input passes JSONSerialization", rounds: 300,
+               make: { rng -> [String: String] in
+                   let fragments = MonkeyPool.textFragments + ["\u{1}", "\u{1f}", "\u{7f}", "\u{8}", "\u{c}", "/", "\u{FEFF}", "</", "\u{D7FF}", "\u{E000}"]
+                   var object: [String: String] = [:]
+                   for _ in 0..<rng.int(0...5) {
+                       object[rng.text(from: fragments, pieces: 0...3)] = rng.text(from: fragments, pieces: 0...4)
+                   }
+                   return object
+               },
+               describe: { object in object.map { "\($0.key.prefix(30).debugDescription):\($0.value.prefix(30).debugDescription)" }
+                   .joined(separator: ", ") },
+               check: { object in
+                   for options in [JSONSerialization.WritingOptions(), [.prettyPrinted, .sortedKeys], [.withoutEscapingSlashes]] {
+                       let data = try JSONSerialization.data(withJSONObject: object, options: options)
+                       if let offset = JSONInput.problemOffset(in: data) {
+                           return "refused at byte \(offset) of \(String(decoding: data, as: UTF8.self).debugDescription.prefix(200))"
+                       }
+                       let back = try JSONInput.decode([String: String].self, from: data, with: JSONDecoder())
+                       if back != object { return "reads back differently (options \(options.rawValue))" }
+                   }
+                   return nil
+               })
+    }
+
+    // (3) 手で書いた正しい例: どの逃がしも、対になったサロゲート、文字列の外の空白 (タブ・改行・復帰)、頭の BOM
+    func testJSONInputPassesHandWrittenValidJSON() throws {
+        let cases: [(json: String, value: [String: String])] = [
+            (#"{"a":"\" \\ \/ \b \f \n \r \t \u00e9 \u00E9"}"#, ["a": "\" \\ / \u{8} \u{c} \n \r \t é é"]),
+            (#"{"\" \\ \/ \b \f \n \r \t \u00e9":"k"}"#, ["\" \\ / \u{8} \u{c} \n \r \t é": "k"]),
+            (#"{"e":"\ud83d\ude00","\uD83D\uDE00":"\uD83D\uDE00x"}"#, ["e": "😀", "😀": "😀x"]),
+            ("{\t\"a\"\n:\r\n\"b\" ,\r\"c\" : \"\\u0000\\u001f\"\t}\n", ["a": "b", "c": "\u{0}\u{1f}"]),
+            ("\u{FEFF}{\"a\":\"b\"}", ["a": "b"]),
+            ("{\"a\":\"é😀\u{7f}\u{10FFFF}\"}", ["a": "é😀\u{7f}\u{10FFFF}"]),
+            ("{}", [:]),
+            ("  {  }  ", [:])
+        ]
+        for item in cases {
+            let data = Data(item.json.utf8)
+            XCTAssertNil(JSONInput.problemOffset(in: data), "refused \(item.json.debugDescription)")
+            XCTAssertEqual(try? JSONInput.decode([String: String].self, from: data, with: JSONDecoder()), item.value,
+                           item.json.debugDescription)
+        }
+        // 数・真偽・null・入れ子 (文字列の外の物) も通る
+        struct Other: Decodable, Equatable { var n: Double; var t: Bool; var f: Bool; var z: Int?; var a: [[Int]]; var o: [String: String] }
+        let other = Data(#"{"n":-1.5e-3,"t":true,"f":false,"z":null,"a":[[1,2],[]],"o":{"b":"\/"}}"#.utf8)
+        XCTAssertNil(JSONInput.problemOffset(in: other))
+        XCTAssertEqual(try JSONInput.decode(Other.self, from: other, with: JSONDecoder()),
+                       Other(n: -0.0015, t: true, f: false, z: nil, a: [[1, 2], []], o: ["b": "/"]))
     }
 
     // 形 2「行って戻る」: でたらめに作った結果を、保存の形で書いて読むと、元と同じ (メモは別のファイルなので除く)

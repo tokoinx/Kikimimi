@@ -91,7 +91,18 @@ extension LoadRun {
                 && !(message ?? "").isEmpty && job.postQueue.isEmpty && job.postState == .idle,
              "LLM installed \(installedWithout), versions \(job.versions.count) (expected 1), "
                 + "transcript unchanged \(job.transcript == transcriptBefore), message \(message.map { "\"\($0)\"" } ?? "none")")
+        // 落ちた時は、知らせの変わり方の履歴 (誰が消したか・アプリが前に出たか) を出す
+        appendNoticeHistoryIfFailed(&lines)
         model.errorMessage = nil
+        await UILoadSelfTest.sleep(0.6)
+
+        // 2b. 履歴のシートが出ている間に、失敗の知らせが入っても、消えない (シートを閉じた後に、知らせの窓が出て、読める)。
+        // 段 2 が 16 回に 1 回「message none」で落ちた (2026-11-28) 時の見立て「シートで知らせの窓を出せないと、
+        // SwiftUI が Binding の set(false) で文を消す」を確かめるために足した (2026-11-29)。直す前から通った (見立ては外れ)。
+        // 見張りとして残す
+        lines.append(await noticeDuringSheetCheck(job: job, target: newLanguage))
+        if lines.last?.contains("FAILED") == true, failure == nil { failure = "a notice during a sheet is kept" }
+        appendNoticeHistoryIfFailed(&lines)
 
         // 3. LLM が在る事にして (今の LLM の ID を、確認の間だけ入れる)、LLM の代わりで、別の言語へ訳し直す
         let current = model.currentLLM
@@ -298,6 +309,60 @@ extension LoadRun {
              finishedRedoAgain && headAgain?.translation == redoAnswer && !markAgain,
              "finished \(finishedRedoAgain), translation \(headAgain?.translation ?? "none") (expected \(redoAnswer)), Edited mark \(markAgain)")
         return finishRetranslate(lines, failure: failure)
+    }
+
+    /// 履歴のシートを出したまま、LLM の無い訳し直しで知らせを入れ (job は保存した、終わった結果。LLM は無い事にしてある)、
+    /// シートが出ている間も知らせの文が残る事と、シートを閉じた後に知らせの窓が出て、文が読める事を見る。
+    /// 終わりに知らせを消し (利用者の「OK」と同じ)、知らせの窓が閉じるのを待つ。結果の 1 行を返す
+    private func noticeDuringSheetCheck(job: Job, target: String) async -> String {
+        let name = "RETRANSLATE: a notice that comes while the history sheet is shown is kept until it is read"
+        guard let window = MainWindow.all().first(where: { $0.isVisible }) else { return name + ": FAILED (no visible main window)" }
+        model.select(job)
+        model.historyJobID = job.id
+        await settle()
+        await UILoadSelfTest.sleep(0.6)
+        await settle()
+        let sheetShown = window.attachedSheet != nil
+        // アプリが前に出ると (シートを出した時など)、LLM の有無を見直す (refreshLLMInstalled) ので、頼む直前に、もう 1 度
+        // 「LLM が無い」事にする (見直しで本物の LLM が在る事になると、訳し直しが本当に始まる。2026-11-29 に 1 度起きた)
+        model.installedLLMIDs = []
+        model.customLLMFiles = []
+        let noLLM = !model.isLLMInstalled
+        model.errorMessage = nil
+        if noLLM { model.retranslate(job, into: target) }
+        let set = model.errorMessage != nil
+        // SwiftUI が知らせの窓を出そうとして出せない (シートが出ている) 間を、しばらく待つ
+        await settle()
+        await UILoadSelfTest.sleep(0.8)
+        await settle()
+        let keptDuringSheet = model.errorMessage != nil
+        model.historyJobID = nil
+        await settle()
+        // シートが閉じきって、知らせの窓が出るまで待つ (3 秒まで)
+        var alertShown = false
+        for _ in 0..<30 {
+            await UILoadSelfTest.sleep(0.1)
+            await settle()
+            if model.historyJobID == nil, model.errorMessage != nil, window.attachedSheet != nil {
+                alertShown = true
+                break
+            }
+        }
+        let keptAfter = model.errorMessage
+        // 読んだ事にして消し (「OK」のボタンと同じ)、知らせの窓が閉じきるのを待つ
+        model.errorMessage = nil
+        await settle()
+        await UILoadSelfTest.sleep(0.6)
+        await settle()
+        let ok = noLLM && sheetShown && set && keptDuringSheet && alertShown && !(keptAfter ?? "").isEmpty
+        return name + ": \(ok ? "ok" : "FAILED") (no LLM \(noLLM), sheet shown \(sheetShown), message set \(set), kept while the sheet is shown "
+            + "\(keptDuringSheet), notice shown after closing the sheet \(alertShown), message after \(keptAfter.map { "\"\($0.prefix(40))…\"" } ?? "none"))"
+    }
+
+    /// 直前の段 (知らせの文を見る段) が落ちていたら、知らせの変わり方の履歴を 1 行足す (ok の時は足さない)
+    private func appendNoticeHistoryIfFailed(_ lines: inout [String]) {
+        guard lines.last?.contains(": FAILED (") == true else { return }
+        lines.append("RETRANSLATE: notice history: \(NoticeHistory.shared.line)")
     }
 
     private func finishRetranslate(_ lines: [String], failure: String?) -> (lines: [String], failed: Bool) {

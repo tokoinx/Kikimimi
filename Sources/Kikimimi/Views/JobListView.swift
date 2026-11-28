@@ -85,6 +85,8 @@ struct JobRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        // 短い語 (一時停止) の時だけ、マウスを乗せると長い文を出す (行の下は、進み具合の棒と並んで狭いため)
+                        .modifier(StatusHelp(text: pausedForChat ? L("Paused while the chat answers") : nil))
                     if job.status == .running {
                         ProgressView(value: job.progress)
                             .controlSize(.mini)
@@ -119,15 +121,21 @@ struct JobRow: View {
         }
     }
 
+    /// 後の仕事が、チャットが LLM で答えている間、止まっている (チャットの段階は、後の仕事が進んでいる行だけが読む)
+    private var pausedForChat: Bool {
+        guard job.status == .done, case .running = job.postState else { return false }
+        return ChatPause.replacesProgress(chatPhase: model.chat.phase, postTaskRunning: true)
+    }
+
     private var statusText: String {
         switch job.status {
         case .queued: return L("Waiting")
         case .running: return job.message
         case .done:
             if case .running(_, let message, _) = job.postState {
-                // チャットが LLM で答えている間は、後の仕事が待っている事を言う (チャットの段階は、後の仕事が進んでいる行だけが読む)
-                return ChatPause.replacesProgress(chatPhase: model.chat.phase, postTaskRunning: true)
-                    ? L("Paused while the chat answers") : message
+                // チャットが答えている間は、後の仕事が待っている事を、短い語で言う (長い文は、マウスを乗せると出る: StatusHelp)。
+                // 行の下は、進み具合の棒と並ぶので、全角で 7 字ほどしか入らない
+                return pausedForChat ? L("Paused") : message
             }
             if let t = job.transcript {
                 var parts = ["\(TimeFormat.short(t.duration))", LPlural(t.segments.count, one: "%d segment", other: "%d segments")]
@@ -139,6 +147,19 @@ struct JobRow: View {
             return L("Done")
         case .failed: return L("Error")
         case .cancelled: return L("Stopped")
+        }
+    }
+}
+
+/// マウスを乗せると出る説明。文が在る時だけ付ける (無い時は、説明を出さない)
+private struct StatusHelp: ViewModifier {
+    let text: String?
+
+    func body(content: Content) -> some View {
+        if let text {
+            content.help(text)
+        } else {
+            content
         }
     }
 }

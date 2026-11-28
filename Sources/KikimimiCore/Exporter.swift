@@ -129,15 +129,29 @@ public enum Exporter {
         }
     }
 
+    /// 字幕 1 枚の文 (SRT と WebVTT だけ)。字幕を読む道具は、空の行を字幕の区切りと、`-->` を時刻の印と見るので、
+    /// 文の中の `-->` は `->` に替え (替えた後に、また `-->` ができる `--->` も)、空の行 (空白だけの行も) は取り除いて、
+    /// 残った行を改行 1 つでつなぐ。全部が空なら、空の文 (今までと同じ)
+    static func subtitleText(_ lines: [String]) -> String {
+        let kept = lines.joined(separator: "\n")
+            .split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        var text = kept.joined(separator: "\n")
+        while text.contains("-->") {
+            text = text.replacingOccurrences(of: "-->", with: "->")
+        }
+        return text
+    }
+
     public static func srt(_ t: Transcript, content: ExportContent = .original, target: String? = nil) -> String {
         rows(t, content, target: resolvedTarget(t, target)).enumerated().map { i, row in
-            "\(i + 1)\n\(TimeFormat.srt(row.start)) --> \(TimeFormat.srt(row.end))\n\(lines(row, content).joined(separator: "\n"))\n"
+            "\(i + 1)\n\(TimeFormat.srt(row.start)) --> \(TimeFormat.srt(row.end))\n\(subtitleText(lines(row, content)))\n"
         }.joined(separator: "\n")
     }
 
     public static func vtt(_ t: Transcript, content: ExportContent = .original, target: String? = nil) -> String {
         let body = rows(t, content, target: resolvedTarget(t, target)).map { row in
-            "\(TimeFormat.vtt(row.start)) --> \(TimeFormat.vtt(row.end))\n\(lines(row, content).joined(separator: "\n"))\n"
+            "\(TimeFormat.vtt(row.start)) --> \(TimeFormat.vtt(row.end))\n\(subtitleText(lines(row, content)))\n"
         }.joined(separator: "\n")
         return "WEBVTT\n\n" + body
     }

@@ -15,7 +15,10 @@ final class AppModel {
     var selectedJobID: Job.ID?
     var installedModelIDs: Set<String> = []
     var downloads: [String: Double] = [:]
-    var errorMessage: String?
+    var errorMessage: String? {
+        // 確認用の起動の時だけ、変わり方を小さい履歴に残す (ふつうの起動では、NoticeHistory が何もしない)
+        didSet { NoticeHistory.shared.noteMessage(errorMessage) }
+    }
     var showTimestamps = true
     var searchText = ""
     /// 設定で開いているタブ (保存しない。LLM の案内の「設定で選ぶ…」で「監査・翻訳」に切り替える)
@@ -169,6 +172,8 @@ final class AppModel {
     @ObservationIgnored var vadRetryAfter: Date?
     /// 結果の保存先 (nil なら保存しない: 確認用の起動 --selftest-…)
     @ObservationIgnored private(set) var library: LibraryWriter?
+    /// 起動の時の、保存した結果の読み込みが終わり、一覧に入れ終えた (画面をでたらめに触る確認が、始める時を知るのに使う)
+    @ObservationIgnored var libraryLoadFinished = false
     /// 少し待ってから document.json を書く予定 (ジョブの id ごと)
     @ObservationIgnored var documentSaveTimers: [UUID: Task<Void, Never>] = [:]
     /// 少し待ってから notes.md を書く予定 (ジョブの id ごと)
@@ -180,6 +185,8 @@ final class AppModel {
         practice = PracticeController(player: player)
         // 既定の値・確認用の起動で決まった値・読む時の直しは、SettingKey の定義から来る
         let settings = SettingsReader()
+        // 確認用の起動の時だけ、知らせの変わり方とアプリの前後の入れ替わりを記録し始める
+        NoticeHistory.shared.startIfSelfTest()
         uiLanguage = UILanguageSetting.startup.language
         L10n.language = UILanguageSetting.startup.language
         // 一覧に無い言語は "ja" に、一覧に無いモデルは既定のモデルに直る
